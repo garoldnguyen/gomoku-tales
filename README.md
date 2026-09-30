@@ -35,6 +35,9 @@ If a window closes or goes quiet mid-game, the other one shows "Opponent left. Y
 in 10" and counts down; at 0 it shows "Opponent left, you win!". If the opponent comes
 back before 0, the countdown stops.
 
+[docs/testing.md](docs/testing.md) is a step-by-step manual test of all this in two
+windows, including every skill and its edge cases.
+
 ### Local dev mode
 
 Open http://localhost:8000/?local=1 to play both sides in one window. Click a cell to

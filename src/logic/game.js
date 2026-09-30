@@ -112,12 +112,14 @@ function checkSkill(state, player, skillId) {
 // a Tornado Zone lasting through this turn disappears, rocks whose
 // lifetime ends with this turn break, the draw check runs, their cooldowns
 // count down (a skill used this turn starts its full cooldown) and the
-// other player is to move. If the acting player wins, nothing else happens
-// (a pending dash never resolves).
+// other player is to move. If the acting player wins, nothing else happens:
+// a pending dash never resolves and is dropped, and so is a Tornado Zone
+// (it only lasts through this turn), so neither is still shown as coming.
 function finishTurn(state, player, events, changed, usedSkillId = null) {
   const winLine = changed ? findWinLineAt(state.board, changed.x, changed.y) : null;
   if (winLine) {
-    return done({ ...state, winner: player, winLine }, [...events, { type: 'win', player, line: winLine }]);
+    const ended = { ...state, winner: player, winLine, pendingDash: null, tornado: null };
+    return done(ended, [...events, { type: 'win', player, line: winLine }]);
   }
 
   const dash = state.pendingDash;

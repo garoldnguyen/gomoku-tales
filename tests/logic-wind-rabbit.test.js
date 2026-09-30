@@ -144,6 +144,7 @@ test('Wind Dash never resolves if the opponent wins on their turn', () => {
   assert.deepEqual(types(result.events), ['stonePlaced', 'win']);
   assert.equal(result.state.board[3][3], X, 'the stone did not move');
   assert.equal(result.state.board[3][6], EMPTY);
+  assert.equal(result.state.pendingDash, null, 'the announced dash is dropped, so it is no longer shown');
   assert.equal(isGameOver(result.state), true);
 });
 
@@ -341,4 +342,11 @@ test('a stone that cannot be thrown still wins if it makes five where it was pla
   const result = placeStone(activeTornado(cells), { player: O, x: 6, y: 7 }, { random: noRandom });
   assert.equal(result.state.winner, O);
   assert.deepEqual(types(result.events), ['stonePlaced', 'throwBlocked', 'win']);
+});
+
+test('the zone is gone once the opponent wins on its turn', () => {
+  const four = [0, 1, 2, 3].map((x) => [x, 12, O]);
+  const result = placeStone(activeTornado(four), { player: O, x: 4, y: 12 }, { random: noRandom });
+  assert.equal(result.state.winner, O);
+  assert.equal(result.state.tornado, null);
 });
