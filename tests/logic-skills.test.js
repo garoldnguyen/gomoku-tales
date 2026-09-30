@@ -199,11 +199,13 @@ test('useSkill rejects a skill on cooldown', () => {
 function cooldownTimeline(player, skillId, ownTurns) {
   const next = filler();
   let state = createInitialState();
+  let xStone = null;
   if (player === O) {
-    const { x, y } = next();
-    state = place(state, X, x, y);
+    xStone = next();
+    state = place(state, X, xStone.x, xStone.y);
   }
-  state = skill(state, player, skillId);
+  // Stone Conversion needs an X stone; the other skills get a free cell.
+  state = skill(state, player, skillId, skillId === STONE_CONVERSION ? xStone : { x: 7, y: 0 });
   const timeline = [];
   for (let i = 0; i < ownTurns; i++) {
     const opponentMove = next();
@@ -251,7 +253,7 @@ test('cooldowns count only the owner\'s turns', () => {
   assert.equal(skillCooldown(state, X, WIND_DASH), 3);
   state = place(state, X, 2, 0);
   assert.equal(skillCooldown(state, X, WIND_DASH), 2);
-  state = skill(state, O, TERRAIN_CREATION);
+  state = skill(state, O, TERRAIN_CREATION, { x: 6, y: 6 });
   assert.equal(skillCooldown(state, X, WIND_DASH), 2);
   assert.equal(skillCooldown(state, O, TERRAIN_CREATION), 3);
   state = place(state, X, 4, 0);

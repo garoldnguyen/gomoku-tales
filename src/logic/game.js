@@ -7,13 +7,22 @@
 import { BOARD_SIZE } from '../config.js';
 import { X, O, cloneBoard, createBoard, inBounds, isBoardFull, isEmptyCell, findWinLineAt } from './board.js';
 import { characterForStone } from './characters.js';
-import { cooldownTurns, getSkill } from './skills.js';
+import { cooldownTurns, getSkill, TERRAIN_CREATION, STONE_CONVERSION } from './skills.js';
+import { breakRocks, stoneConversion, terrainCreation } from './earth-bear-skills.js';
+
+// Skill effects that exist so far, by skill id. Skills without an entry
+// only use the turn and start their cooldown.
+const SKILL_EFFECTS = {
+  [TERRAIN_CREATION]: terrainCreation,
+  [STONE_CONVERSION]: stoneConversion,
+};
 
 export function createInitialState(size = BOARD_SIZE) {
   return {
     board: createBoard(size),
     currentPlayer: X, // Wind Rabbit (X) always moves first
     turn: 1, // number of the turn being played, counting both players
+    rocks: [], // [{ x, y, breaksAfterTurn }], also marked ROCK on the board
     cooldowns: { [X]: initialCooldowns(X), [O]: initialCooldowns(O) },
     winner: null,
     winLine: null,
@@ -58,7 +67,7 @@ export function placeStone(state, action) {
 
 // Uses one of the acting player's skills. Using a skill uses the whole
 // turn. action = { player, skill, target } where target is whatever the
-// skill needs (checked by the skill effect once it exists).
+// skill needs (a cell { x, y } for the Earth Bear skills).
 export function useSkill(state, action) {
   const { player, skill: skillId, target = null } = action;
   if (isGameOver(state)) return fail('The game is over.');
@@ -66,10 +75,14 @@ export function useSkill(state, action) {
   const error = checkSkill(state, player, skillId);
   if (error) return fail(error);
 
-  // Skill effects are not implemented yet: the skill only uses the turn
-  // and starts its cooldown.
   const events = [{ type: 'skillUsed', player, skill: skillId, target }];
-  return finishTurn(state, player, events, null, skillId);
+  const effect = SKILL_EFFECTS[skillId];
+  if (!effect) return finishTurn(state, player, events, null, skillId);
+
+  const result = effect(state, player, target);
+  if (result.error) return fail(result.error);
+  const next = { ...state, board: result.board, rocks: result.rocks };
+  return finishTurn(next, player, [...events, ...result.events], result.changed, skillId);
 }
 
 function checkSkill(state, player, skillId) {
@@ -82,14 +95,20 @@ function checkSkill(state, player, skillId) {
   return null;
 }
 
-// Runs the win and draw checks for the acting player and, if the game goes
-// on, ends their turn: their cooldowns count down (a skill used this turn
-// starts its full cooldown) and the other player is to move.
-function finishTurn(state, player, events, placed, usedSkillId = null) {
-  const winLine = placed ? findWinLineAt(state.board, placed.x, placed.y) : null;
+// Runs the win check for the acting player on the cell whose stone
+// changed and, if the game goes on, ends their turn: rocks whose lifetime
+// ends with this turn break, the draw check runs, their cooldowns count
+// down (a skill used this turn starts its full cooldown) and the other
+// player is to move.
+function finishTurn(state, player, events, changed, usedSkillId = null) {
+  const winLine = changed ? findWinLineAt(state.board, changed.x, changed.y) : null;
   if (winLine) {
     return done({ ...state, winner: player, winLine }, [...events, { type: 'win', player, line: winLine }]);
   }
+
+  const rocks = breakRocks(state.board, state.rocks, state.turn);
+  state = { ...state, board: rocks.board, rocks: rocks.rocks };
+  events = [...events, ...rocks.events];
   if (isBoardFull(state.board)) {
     return done({ ...state, draw: true }, [...events, { type: 'draw' }]);
   }
