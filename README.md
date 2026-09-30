@@ -17,6 +17,24 @@ python3 -m http.server 8000
 Then open http://localhost:8000 in your browser. You need the server because ES modules
 don't load from `file://` URLs.
 
+### Play online (two windows)
+
+In version 1 a room links two windows of the same browser profile (a BroadcastChannel),
+so open http://localhost:8000 in two windows of the same Chrome profile and keep both
+visible (hidden tabs slow their timers, which can start a false leave countdown).
+
+1. In the first window click Create Room and pick Wind Rabbit or Earth Bear. The Waiting
+   screen shows the 5 character room code; Copy puts it on the clipboard.
+2. In the second window click Join Room, type or paste the code and press Join. The
+   joiner gets the other character and the game starts in both windows.
+3. Wind Rabbit (X) moves first. Each window can only place its own stones and use its own
+   skills. The window that created the room is the host and checks every move.
+4. When the game ends the Game over screen shows the result; Back to Lobby leaves the room.
+
+If a window closes or goes quiet mid-game, the other one shows "Opponent left. You win
+in 10" and counts down; at 0 it shows "Opponent left, you win!". If the opponent comes
+back before 0, the countdown stops.
+
 ### Local dev mode
 
 Open http://localhost:8000/?local=1 to play both sides in one window. Click a cell to
@@ -50,7 +68,7 @@ Test files go in `tests/` and are named `*.test.js`.
 - `src/logic/`: pure game rules (no DOM, runs under Node)
 - `src/net/`: transport and room sync
 - `src/render/`: canvas drawing and effects
-- `src/ui/`: screens and input
+- `src/ui/`: screens (lobby, room, game over) and input
 - `assets/`: images and manifest
 - `tests/`: unit tests
 - `docs/`: design spec

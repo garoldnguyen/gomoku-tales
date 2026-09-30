@@ -17,3 +17,6 @@ export const ROOM_CODE_LENGTH = 5;
 // Networking timings not listed in docs/design.md section 10.
 export const PRESENCE_CHECK_INTERVAL_MS = 250; // how often the leave countdown is re-checked
 export const JOIN_TIMEOUT_MS = 3000; // no answer to "join" within this time means no such room
+
+// Screen timings not listed in docs/design.md section 10.
+export const GAME_OVER_DELAY_MS = 1500; // time to see the final board before the Game over screen

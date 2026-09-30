@@ -13,14 +13,16 @@
 // the same channel may hear it too.
 //   join      guest -> host   ask for a seat; repeated every HEARTBEAT_INTERVAL_MS
 //                             until answered, and sent again later to resync
-//   welcome   host -> guest   { character, hostCharacter, state, seq, result }
+//   welcome   host -> guest   { character, hostCharacter, state, seq, handled, result }
 //   full      host -> other   the room already has two players
-//   action    guest -> host   { action, requestId }
-//   state     host -> guest   { state, events, seq } after every applied action
-//   rejected  host -> guest   { error, requestId } for an invalid action
+//   action    guest -> host   { action, requestId }; requestId counts up from 1
+//   state     host -> guest   { state, events, seq, handled } after every applied action
+//   rejected  host -> guest   { error, requestId, seq, handled } for an invalid action
 //   ping      both ways       heartbeat, every HEARTBEAT_INTERVAL_MS; the
 //                             host's carries its seq so the guest notices a
-//                             lost state message and asks for a resync. Once
+//                             lost state message and asks for a resync, and
+//                             handled so the guest notices a lost action
+//                             request (or a lost answer to it). Once
 //                             a side has a result it adds { result }, and
 //                             keeps pinging so a peer that is still there
 //                             learns the outcome
@@ -28,6 +30,12 @@
 //
 // Actions are { kind: 'place', x, y } or { kind: 'skill', skill, target };
 // the host fills in the acting player from who sent it.
+//
+// Lost actions: handled is the requestId of the last guest action the host
+// applied or rejected. Until a host message shows the guest's request as
+// handled and the guest has the state that followed it, the guest waits and
+// sends the same request again with every host ping it hears. The host skips
+// a request it has already handled, so a repeat is never applied twice.
 //
 // Leave results: when the countdown runs out mid-game, that side takes the
 // win and tells the other side through its pings, so both agree even when
@@ -93,6 +101,7 @@ export function createHostRoom(options) {
     hostCharacter: character,
     state: room.state,
     seq: room.seq,
+    handled: room.handled,
     result: room.result,
   });
 
@@ -104,7 +113,7 @@ export function createHostRoom(options) {
     if (!result.ok) return { ok: false, error: result.error };
     room.state = result.state;
     room.seq += 1;
-    room.send({ type: 'state', to: room.peerId, state: room.state, events: result.events, seq: room.seq });
+    room.send({ type: 'state', to: room.peerId, state: room.state, events: result.events, seq: room.seq, handled: room.handled });
     room.emit({ type: 'state', state: room.state, events: result.events });
     return { ok: true };
   };
@@ -131,8 +140,15 @@ export function createHostRoom(options) {
       room.setResult({ winner: guestStone, reason: 'opponentLeft' });
     }
     if (message.type === 'action') {
+      const requestId = Number.isInteger(message.requestId) ? message.requestId : null;
+      if (requestId !== null) {
+        if (requestId <= room.handled) return; // a repeat of a request already answered
+        room.handled = requestId;
+      }
       const result = apply(guestStone, message.action);
-      if (!result.ok) room.send({ type: 'rejected', to: room.peerId, error: result.error, requestId: message.requestId ?? null });
+      if (!result.ok) {
+        room.send({ type: 'rejected', to: room.peerId, error: result.error, requestId, seq: room.seq, handled: room.handled });
+      }
     }
   };
 
@@ -189,14 +205,23 @@ export function createGuestRoom(options) {
     }
     if (message.from !== room.peerId) return;
     room.receiveCommon(message);
+    let stateEvent = null;
     if ((message.type === 'state' || message.type === 'welcome') && message.seq > room.seq) {
       room.state = message.state;
       room.seq = message.seq;
-      room.emit({ type: 'state', state: room.state, events: message.events ?? [] });
+      stateEvent = { type: 'state', state: room.state, events: message.events ?? [] };
+    }
+    // The request is settled once the host has handled it and this side
+    // has caught up with the state that followed.
+    if (room.pending && message.handled >= room.pending.requestId && !(message.seq > room.seq)) room.pending = null;
+    if (stateEvent) {
+      room.emit(stateEvent);
     } else if (message.type === 'rejected') {
       room.emit({ type: 'rejected', error: message.error });
     } else if (message.type === 'ping' && message.seq > room.seq) {
       room.send({ type: 'join' }); // a state message was lost; the host answers with a fresh welcome
+    } else if (message.type === 'ping' && room.pending && !(message.handled >= room.pending.requestId)) {
+      room.send({ type: 'action', to: room.peerId, ...room.pending }); // the request or its answer was lost
     }
     if (message.type !== 'ping' && message.type !== 'welcome') return;
     if (isClaim(message.result, CHARACTERS[room.hostCharacter].stone)) {
@@ -210,12 +235,13 @@ export function createGuestRoom(options) {
   // was sent (the host may still reject it) or { ok: false, error } when it
   // cannot be sent now.
   room.act = (action) => {
-    const error = actionBlocker(room);
+    const error = actionBlocker(room) ?? (room.pending ? 'Waiting for the host...' : null);
     if (error) {
       room.emit({ type: 'rejected', error });
       return { ok: false, error };
     }
     requestId += 1;
+    room.pending = { action, requestId };
     room.send({ type: 'action', to: room.peerId, action, requestId });
     return { ok: true, requestId };
   };
@@ -265,6 +291,8 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
     peerId: null,
     state: null,
     seq: 0,
+    handled: 0, // host: requestId of the last guest action applied or rejected
+    pending: null, // guest: { action, requestId } sent and not yet settled by the host
     result: null, // { winner, reason: 'opponentLeft' } when a player left mid-game
     handle: () => {},
     act: () => ({ ok: false, error: 'You are not in a game.' }),
@@ -324,7 +352,7 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
     room.send({
       type: 'ping',
       to: room.peerId,
-      ...(role === HOST ? { seq: room.seq } : {}),
+      ...(role === HOST ? { seq: room.seq, handled: room.handled } : {}),
       ...(room.result ? { result: room.result } : {}),
     });
   };
@@ -398,6 +426,7 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
 
     // Everything the screens need. peer is null until both players are in;
     // then { status, secondsLeft } as in presence.js, computed for now.
+    // waiting is true while a guest's action request is not yet settled.
     getView() {
       const peer = presence ? checkPresence(presence, clock.now()) : null;
       const canAct = actionBlocker(room) === null && room.state.currentPlayer === room.stone;
@@ -412,6 +441,7 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
         peer: peer && { status: peer.status, secondsLeft: peer.secondsLeft },
         result: room.result,
         yourTurn: canAct,
+        waiting: room.pending !== null,
       };
     },
 

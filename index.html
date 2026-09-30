@@ -16,18 +16,77 @@
       align-items: center;
       justify-content: center;
     }
-    /* Internal resolution is 960x540; scale to fit the window at 16:9. */
-    canvas {
-      display: block;
+    [hidden] {
+      display: none !important;
+    }
+    /* Internal resolution is 960x540; scale to fit the window at 16:9.
+       --u is one internal pixel, so the DOM screens scale with the canvas. */
+    #stage {
+      position: relative;
       width: min(100vw, calc(100vh * 16 / 9));
       height: min(100vh, calc(100vw * 9 / 16));
+      --u: calc(min(100vw, 100vh * 16 / 9) / 960);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
     }
   </style>
+  <link rel="stylesheet" href="src/ui/screens.css">
 </head>
 <body>
-  <canvas id="game" width="960" height="540"></canvas>
+  <div id="stage">
+    <canvas id="game" width="960" height="540"></canvas>
+
+    <!-- Lobby and room screens (docs/design.md section 3), shown over the canvas. -->
+    <div id="screens" hidden>
+      <section class="card" data-screen="lobby">
+        <p class="lead">Five in a row, with wind and earth skills.</p>
+        <button type="button" data-action="openCreate">Create Room</button>
+        <button type="button" data-action="openJoin">Join Room</button>
+      </section>
+
+      <section class="card" data-screen="create">
+        <h2>Create Room</h2>
+        <p>Pick your character. Your opponent gets the other one.</p>
+        <div class="choices" id="character-choices"></div>
+        <button type="button" class="secondary" data-action="backToLobby">Back</button>
+      </section>
+
+      <section class="card" data-screen="join">
+        <h2>Join Room</h2>
+        <form id="join-form" class="join-row" autocomplete="off">
+          <label for="join-code">Room code</label>
+          <input id="join-code" name="code" maxlength="12" spellcheck="false" placeholder="ABCDE">
+          <button type="submit" id="join-submit">Join</button>
+        </form>
+        <p class="error" id="join-error" role="alert"></p>
+        <p class="note" id="join-status"></p>
+        <button type="button" class="secondary" data-action="backToLobby">Back</button>
+      </section>
+
+      <section class="card" data-screen="waiting">
+        <h2>Room code</h2>
+        <div class="code-row">
+          <output class="code" id="room-code"></output>
+          <button type="button" id="copy-code">Copy</button>
+        </div>
+        <p class="note" id="copy-status" aria-live="polite"></p>
+        <p class="waiting">Waiting for opponent</p>
+        <p class="note" id="waiting-character"></p>
+        <button type="button" class="secondary" data-action="backToLobby">Cancel</button>
+      </section>
+
+      <section class="card" data-screen="gameOver">
+        <h2 id="over-title"></h2>
+        <p id="over-detail"></p>
+        <button type="button" data-action="backToLobby">Back to Lobby</button>
+      </section>
+    </div>
+  </div>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

@@ -362,7 +362,7 @@ function drawPanel(ctx, panel) {
   else if (panel.active) drawText(ctx, 'Taking a turn', cx, footerY, { size: 13, color: COLORS.panelActive });
 }
 
-// view: { state, hover, preview, panels, status, message, hint }
+// view: { state, hover, preview, panels, status, message, hint, marker? }
 export function drawGameScreen(ctx, view) {
   const { state, hover, preview, panels = [], status, message, hint } = view;
   drawBackground(ctx);
@@ -379,7 +379,8 @@ export function drawGameScreen(ctx, view) {
   if (preview) drawPreview(ctx, preview);
 
   // Status line: a small stone for the player to move (or the winner).
-  const marker = state.winner ?? (state.draw ? null : state.currentPlayer);
+  // view.marker, when given, overrides it (null for none).
+  const marker = view.marker !== undefined ? view.marker : state.winner ?? (state.draw ? null : state.currentPlayer);
   drawText(ctx, status, INTERNAL_WIDTH / 2 + (marker ? 14 : 0), STATUS_Y);
   if (marker) {
     const textWidth = ctx.measureText(status).width;
@@ -388,10 +389,8 @@ export function drawGameScreen(ctx, view) {
   if (message) drawText(ctx, message, INTERNAL_WIDTH / 2, MESSAGE_Y, { color: COLORS.message, size: 14 });
 }
 
-export function drawTitleScreen(ctx, lines) {
+// Background and title behind the lobby and room screens (DOM overlays).
+export function drawMenuScreen(ctx) {
   drawBackground(ctx);
-  drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, INTERNAL_HEIGHT / 2 - 40, { size: 48 });
-  lines.forEach((line, i) => {
-    drawText(ctx, line, INTERNAL_WIDTH / 2, INTERNAL_HEIGHT / 2 + 20 + i * 26, { size: 16 });
-  });
+  drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 90, { size: 48 });
 }

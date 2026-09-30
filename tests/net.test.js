@@ -289,6 +289,57 @@ test('a lost state message is recovered: the guest resyncs when the host ping sh
   assert.equal(host.state.board[8][7], O);
 });
 
+test('a lost action request is sent again with the next host ping and applied once', () => {
+  const { clock, host, guest, guestTransport } = setup({ character: EARTH_BEAR });
+  guestTransport.setMuted(true);
+  assert.equal(guest.place(7, 7).ok, true); // this request never reaches the host
+  guestTransport.setMuted(false);
+  assert.equal(guest.getView().waiting, true);
+  assert.deepEqual(guest.place(8, 8), { ok: false, error: 'Waiting for the host...' }, 'one request at a time');
+  clock.advance(HEARTBEAT_INTERVAL_MS);
+  assert.equal(host.state.board[7][7], X);
+  assert.deepEqual(guest.state, host.state);
+  assert.equal(guest.getView().waiting, false);
+  const actions = guestTransport.sent.filter((m) => m.type === 'action');
+  assert.deepEqual(actions.map((m) => m.requestId), [1, 1]);
+  // A late copy of an answered request is skipped.
+  guestTransport.send(actions[0]);
+  assert.equal(host.state.currentPlayer, O);
+  assert.equal(host.state.board[7][7], X);
+});
+
+test("a lost answer is recovered: the host ping shows the request was handled, and a repeat is not applied again", () => {
+  const { clock, host, guest, hostTransport, guestTransport, guestEvents } = setup({ character: WIND_RABBIT });
+  host.place(7, 7);
+  hostTransport.setMuted(true);
+  guest.place(7, 7); // taken: the rejection is lost
+  guest.place(0, 0); // still waiting, so not sent
+  hostTransport.setMuted(false);
+  assert.equal(guest.getView().waiting, true);
+  clock.advance(HEARTBEAT_INTERVAL_MS);
+  assert.equal(guest.getView().waiting, false);
+  assert.equal(guest.getView().yourTurn, true);
+  assert.equal(hostTransport.sent.filter((m) => m.type === 'rejected').length, 1, 'the request was handled once');
+  assert.equal(ofType(guestEvents, 'rejected').at(-1).error, 'Waiting for the host...');
+  assert.equal(guest.place(8, 8).ok, true);
+  assert.equal(host.state.board[8][8], O);
+
+  // The state that answers an applied request is lost, and so is the next
+  // ping: the guest waits until it has resynced, and does not send it again.
+  host.place(1, 1);
+  hostTransport.setMuted(true);
+  assert.equal(guest.place(2, 2).ok, true);
+  clock.advance(HEARTBEAT_INTERVAL_MS);
+  hostTransport.setMuted(false);
+  assert.equal(guest.getView().waiting, true);
+  clock.advance(HEARTBEAT_INTERVAL_MS);
+  assert.equal(host.state.board[2][2], O);
+  assert.deepEqual(guest.state, host.state);
+  assert.equal(guest.getView().waiting, false);
+  assert.equal(guest.getView().yourTurn, false);
+  assert.equal(guestTransport.sent.filter((m) => m.type === 'action' && m.requestId === 3).length, 1);
+});
+
 test("the guest's action request is applied by the host and the new state is sent back", () => {
   const { host, guest, hostEvents, guestEvents } = setup({ character: EARTH_BEAR });
   assert.equal(guest.place(7, 7).ok, true);
@@ -373,7 +424,7 @@ test('both sides send a ping every second and stay connected', () => {
   clock.advance(HEARTBEAT_INTERVAL_MS * 30);
   assert.equal(hostTransport.sent.filter((m) => m.type === 'ping').length, 30);
   assert.equal(guestTransport.sent.filter((m) => m.type === 'ping').length, 30);
-  assert.deepEqual(hostTransport.sent.find((m) => m.type === 'ping'), { type: 'ping', to: 'guest', seq: 0, from: 'host' });
+  assert.deepEqual(hostTransport.sent.find((m) => m.type === 'ping'), { type: 'ping', to: 'guest', seq: 0, handled: 0, from: 'host' });
   assert.deepEqual(guestTransport.sent.find((m) => m.type === 'ping'), { type: 'ping', to: 'host', from: 'guest' });
   assert.equal(ofType([...hostEvents, ...guestEvents], 'peer').length, 0);
   assert.equal(host.getView().peer.status, CONNECTED);

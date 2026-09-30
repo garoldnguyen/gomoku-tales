@@ -36,7 +36,9 @@ export function hitTest(px, py) {
 }
 
 // Handlers get internal points { px, py } (onHover gets null when the
-// pointer leaves the canvas). A right click or Escape calls onCancel.
+// pointer leaves the canvas). A right click or Escape calls onCancel. R
+// calls onRestart; leave it out where there is no restart, so R still
+// types into text boxes.
 export function attachGameInput(canvas, { onHover, onClick, onCancel, onRestart }) {
   const pointFromEvent = (event) => {
     const rect = canvas.getBoundingClientRect();
@@ -57,7 +59,7 @@ export function attachGameInput(canvas, { onHover, onClick, onCancel, onRestart 
     if (event.repeat) return;
     if (isCancelKey(event)) {
       onCancel();
-    } else if (isRestartKey(event)) {
+    } else if (onRestart && isRestartKey(event)) {
       event.preventDefault();
       onRestart();
     }
