@@ -1,6 +1,6 @@
 import { INTERNAL_WIDTH, INTERNAL_HEIGHT } from './config.js';
 import { drawGameScreen, drawTitleScreen } from './render/game-renderer.js';
-import { attachBoardInput } from './ui/input.js';
+import { attachGameInput, hitTest } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
 
 const canvas = document.getElementById('game');
@@ -19,20 +19,29 @@ if (params.get('local') === '1') {
   drawTitleScreen(ctx, ['Online rooms are not ready yet.', 'Open this page with ?local=1 to play both sides in one window.']);
 }
 
-// Dev mode: one window plays both sides with the plain core rules.
+// Dev mode: one window plays both sides, skills included.
 function startLocalMode() {
   const game = createLocalGame();
 
-  attachBoardInput(canvas, {
-    onHover: (cell) => game.setHover(cell),
-    onClick: (cell) => game.click(cell),
+  attachGameInput(canvas, {
+    onHover: (point) => {
+      const hit = point ? hitTest(point.px, point.py) : null;
+      game.setHover(hit?.cell ?? null);
+      game.setHoverSkill(hit?.skill ?? null);
+    },
+    onClick: ({ px, py }) => {
+      const hit = hitTest(px, py);
+      if (hit?.skill) game.clickSkill(hit.skill.player, hit.skill.skillId);
+      else if (hit?.cell) game.click(hit.cell);
+    },
+    onCancel: () => game.cancel(),
     onRestart: () => game.restart(),
   });
 
   const frame = () => {
     const view = game.getView();
-    canvas.style.cursor = view.hover ? 'pointer' : 'default';
-    drawGameScreen(ctx, { ...view, hint: 'LOCAL MODE: one window plays both sides. Press R to restart.' });
+    canvas.style.cursor = view.pointer ? 'pointer' : 'default';
+    drawGameScreen(ctx, { ...view, hint: 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts.' });
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

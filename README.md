@@ -22,6 +22,10 @@ don't load from `file://` URLs.
 Open http://localhost:8000/?local=1 to play both sides in one window. Click a cell to
 place a stone for whoever is to move, and press R to restart.
 
+To use a skill, click its button on the mover's panel (Wind Rabbit on the left, Earth
+Bear on the right), then click its target on the board. The status line tells you what
+to pick. Press Esc, right click, or click the same button again to cancel.
+
 ## Run the tests
 
 Tests use the Node built-in test runner (Node 18 or newer):

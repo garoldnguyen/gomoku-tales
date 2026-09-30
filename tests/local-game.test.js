@@ -102,14 +102,14 @@ function playXWin(game) {
 
 test('local mode: status shows whose turn it is and the winner', () => {
   const game = createLocalGame();
-  assert.equal(game.getView().status, 'Blue X to move');
+  assert.equal(game.getView().status, 'Wind Rabbit to move');
   game.click({ x: 7, y: 7 });
-  assert.equal(game.getView().status, 'Red O to move');
+  assert.equal(game.getView().status, 'Earth Bear to move');
 
   const won = createLocalGame();
   playXWin(won);
   assert.equal(won.getState().winner, X);
-  assert.equal(won.getView().status, 'Blue X wins! Press R to restart.');
+  assert.equal(won.getView().status, 'Wind Rabbit wins! Press R to restart.');
   assert.equal(won.getState().winLine.length, 5);
 });
 
