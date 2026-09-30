@@ -3,72 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>First Game</title>
+  <title>Gomoku Tales</title>
   <style>
-    body {
+    html, body {
       margin: 0;
-      min-height: 100vh;
+      height: 100%;
+      overflow: hidden;
+      background: #14121c;
+    }
+    body {
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #222;
     }
+    /* Internal resolution is 960x540; scale to fit the window at 16:9. */
     canvas {
-      background: #fff;
+      display: block;
+      width: min(100vw, calc(100vh * 16 / 9));
+      height: min(100vh, calc(100vw * 9 / 16));
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
     }
   </style>
 </head>
 <body>
-  <canvas id="game" width="640" height="480"></canvas>
-  <script>
-    const canvas = document.getElementById('game');
-    const ctx = canvas.getContext('2d');
-
-    const square = { x: 300, y: 220, size: 40, speed: 240 }; // speed in px/sec
-    const keys = {};
-
-    window.addEventListener('keydown', (e) => {
-      if (e.key.startsWith('Arrow')) {
-        keys[e.key] = true;
-        e.preventDefault();
-      }
-    });
-    window.addEventListener('keyup', (e) => {
-      if (e.key.startsWith('Arrow')) {
-        keys[e.key] = false;
-      }
-    });
-    // keyup is missed if a key is released while the window is unfocused
-    window.addEventListener('blur', () => {
-      for (const key in keys) keys[key] = false;
-    });
-
-    function update(dt) {
-      if (keys.ArrowLeft) square.x -= square.speed * dt;
-      if (keys.ArrowRight) square.x += square.speed * dt;
-      if (keys.ArrowUp) square.y -= square.speed * dt;
-      if (keys.ArrowDown) square.y += square.speed * dt;
-
-      // Keep the square inside the canvas
-      square.x = Math.max(0, Math.min(canvas.width - square.size, square.x));
-      square.y = Math.max(0, Math.min(canvas.height - square.size, square.y));
-    }
-
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = '#e33';
-      ctx.fillRect(square.x, square.y, square.size, square.size);
-    }
-
-    let last = performance.now();
-    function loop(now) {
-      const dt = Math.min((now - last) / 1000, 0.1);
-      last = now;
-      update(dt);
-      draw();
-      requestAnimationFrame(loop);
-    }
-    requestAnimationFrame(loop);
-  </script>
+  <canvas id="game" width="960" height="540"></canvas>
+  <script type="module" src="src/main.js"></script>
 </body>
 </html>
