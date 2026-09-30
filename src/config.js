@@ -13,3 +13,7 @@ export const HEARTBEAT_INTERVAL_MS = 1000;
 export const PEER_TIMEOUT_MS = 3000;
 export const LEAVE_COUNTDOWN_S = 10;
 export const ROOM_CODE_LENGTH = 5;
+
+// Networking timings not listed in docs/design.md section 10.
+export const PRESENCE_CHECK_INTERVAL_MS = 250; // how often the leave countdown is re-checked
+export const JOIN_TIMEOUT_MS = 3000; // no answer to "join" within this time means no such room
