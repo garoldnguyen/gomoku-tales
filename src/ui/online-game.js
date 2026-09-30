@@ -15,11 +15,13 @@ export function createOnlineGame(room) {
   let hoverSkill = null; // { player, skillId } of the button under the pointer
   let targeting = null; // skill target flow in progress, see targeting.js
   let message = null;
+  let pendingEvents = []; // events of applied actions not yet taken for effects
 
   const unsubscribe = room.onEvent((event) => {
     if (event.type === 'state') {
       targeting = null;
       message = describeEvents(event.events);
+      pendingEvents.push(...event.events);
     } else if (event.type === 'rejected') {
       message = event.error;
     }
@@ -51,6 +53,14 @@ export function createOnlineGame(room) {
   return {
     getTargeting() {
       return targeting;
+    },
+
+    // Events the room applied since the last call, oldest first, for the
+    // effects (render/effects.js). Both windows get the same events.
+    takeEvents() {
+      const events = pendingEvents;
+      pendingEvents = [];
+      return events;
     },
 
     setHover(cell) {

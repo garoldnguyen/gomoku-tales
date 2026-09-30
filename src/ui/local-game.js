@@ -15,6 +15,7 @@ export function createLocalGame(options = {}) {
   let hoverSkill = null; // { player, skillId } of the button under the pointer
   let targeting = null; // skill target flow in progress, see targeting.js
   let message = null;
+  let pendingEvents = []; // events of applied actions not yet taken for effects
 
   // Takes the result of a rules action. Returns true if it was applied.
   const apply = (result) => {
@@ -25,6 +26,7 @@ export function createLocalGame(options = {}) {
     state = result.state;
     targeting = null;
     message = describeEvents(result.events);
+    pendingEvents.push(...result.events);
     return true;
   };
 
@@ -35,6 +37,14 @@ export function createLocalGame(options = {}) {
 
     getTargeting() {
       return targeting;
+    },
+
+    // Events of the actions applied since the last call, oldest first, for
+    // the effects (render/effects.js).
+    takeEvents() {
+      const events = pendingEvents;
+      pendingEvents = [];
+      return events;
     },
 
     setHover(cell) {
@@ -96,6 +106,7 @@ export function createLocalGame(options = {}) {
       state = createInitialState();
       targeting = null;
       message = null;
+      pendingEvents = [];
     },
 
     getView() {

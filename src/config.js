@@ -29,3 +29,15 @@ export const SKILL_ICON_PX = 32;
 export const PORTRAIT_PX = 96;
 export const TORNADO_PX = 72; // one frame of the animated overlay
 export const ANIMATION_FRAME_MS = 120; // time per frame of animated sprites
+
+// Placeholder effects from docs/design.md section 8. They only draw; they
+// never change the game state.
+export const SPARKLE_COUNT = 8; // sparkles per placement or skill hit
+export const SPARKLE_MS = 500;
+export const DUST_COUNT = 6; // dust specks per puff
+export const DUST_MS = 450;
+export const SHAKE_MS = 180;
+export const SHAKE_PX = 2; // largest offset of the light screen shake
+export const BANNER_MS = 1200; // how long a skill announcement banner shows
+export const WIND_STREAK_COUNT = 7;
+export const WIND_STREAK_SPEED = 60; // px per second, left to right

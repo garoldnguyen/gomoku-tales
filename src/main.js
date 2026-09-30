@@ -2,6 +2,7 @@ import { INTERNAL_WIDTH, INTERNAL_HEIGHT } from './config.js';
 import { CHARACTERS } from './logic/characters.js';
 import { createBroadcastTransport } from './net/transport.js';
 import { loadAssets } from './render/assets.js';
+import { createEffects } from './render/effects.js';
 import { drawGameScreen, drawMenuScreen, setAssets } from './render/game-renderer.js';
 import { GAME, GAME_OVER, createApp } from './ui/app.js';
 import { attachGameInput, hitTest } from './ui/input.js';
@@ -55,17 +56,25 @@ function startOnlineMode() {
     onCancel: () => playing()?.cancel(),
   });
 
-  const frame = () => {
+  const effects = createEffects();
+  let effectsGame = null; // the game the effects belong to
+
+  const frame = (time) => {
     const screen = app.getScreen();
     const game = app.getGame();
     if ((screen === GAME || screen === GAME_OVER) && game) {
+      if (game !== effectsGame) {
+        effects.clear();
+        effectsGame = game;
+      }
+      effects.trigger(game.takeEvents(), time);
       const view = game.getView();
       canvas.style.cursor = screen === GAME && view.pointer ? 'pointer' : 'default';
       const you = CHARACTERS[app.getView().character]?.name;
-      drawGameScreen(ctx, { ...view, hint: `Room ${view.code}  |  You play ${you} (${view.you})` });
+      drawGameScreen(ctx, { ...view, time, effects, hint: `Room ${view.code}  |  You play ${you} (${view.you})` });
     } else {
       canvas.style.cursor = 'default';
-      drawMenuScreen(ctx);
+      drawMenuScreen(ctx, time);
     }
     requestAnimationFrame(frame);
   };
@@ -75,6 +84,7 @@ function startOnlineMode() {
 // Dev mode: one window plays both sides, skills included.
 function startLocalMode() {
   const game = createLocalGame();
+  const effects = createEffects();
 
   attachGameInput(canvas, {
     onHover: (point) => {
@@ -88,13 +98,17 @@ function startLocalMode() {
       else if (hit?.cell) game.click(hit.cell);
     },
     onCancel: () => game.cancel(),
-    onRestart: () => game.restart(),
+    onRestart: () => {
+      game.restart();
+      effects.clear();
+    },
   });
 
-  const frame = () => {
+  const frame = (time) => {
+    effects.trigger(game.takeEvents(), time);
     const view = game.getView();
     canvas.style.cursor = view.pointer ? 'pointer' : 'default';
-    drawGameScreen(ctx, { ...view, hint: 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts.' });
+    drawGameScreen(ctx, { ...view, time, effects, hint: 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts.' });
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

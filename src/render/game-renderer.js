@@ -13,6 +13,7 @@ import {
   cellCenter, cellOrigin, panelRect, skillButtonRect,
 } from './layout.js';
 import { createAssetStore } from './assets.js';
+import { drawWindStreaks } from './effects.js';
 
 // Manifest names of the sprites drawn here.
 export const SPRITES = {
@@ -89,7 +90,8 @@ const SKILL_ICONS = {
   [STONE_CONVERSION]: { letters: 'SC', color: '#ff9aa4' },
 };
 
-export function drawBackground(ctx) {
+// The Map 1 scene with the wind streaks drifting over it at all times.
+export function drawBackground(ctx, time = performance.now()) {
   assets.draw(ctx, SPRITES.background, 0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT, () => {
     ctx.fillStyle = COLORS.sky;
     ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
@@ -99,6 +101,7 @@ export function drawBackground(ctx) {
     ctx.fillStyle = COLORS.grassDark;
     ctx.fillRect(0, hillTop, INTERNAL_WIDTH, 4);
   });
+  drawWindStreaks(ctx, time);
 }
 
 // The board sprite covers the frame and the grid: its cells must line up
@@ -427,12 +430,19 @@ function drawPanel(ctx, panel) {
   else if (panel.active) drawText(ctx, 'Taking a turn', cx, footerY, { size: 13, color: COLORS.panelActive });
 }
 
-// view: { state, hover, preview, panels, status, message, hint, marker?, time? }
+// view: { state, hover, preview, panels, status, message, hint, marker?, time?, effects? }
 // time (ms) drives animated sprites and defaults to the page clock.
+// effects (see effects.js), when given, adds the screen shake, particles
+// and banners.
 export function drawGameScreen(ctx, view) {
-  const { state, hover, preview, panels = [], status, message, hint } = view;
+  const { state, hover, preview, panels = [], status, message, hint, effects } = view;
   const time = view.time ?? performance.now();
-  drawBackground(ctx);
+  drawBackground(ctx, time);
+
+  // The light screen shake moves everything in front of the scene.
+  const shake = effects ? effects.shake(time) : { dx: 0, dy: 0 };
+  ctx.save();
+  ctx.translate(shake.dx, shake.dy);
   drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 36, { size: 28 });
   if (hint) drawText(ctx, hint, INTERNAL_WIDTH / 2, 66, { size: 12 });
 
@@ -454,10 +464,14 @@ export function drawGameScreen(ctx, view) {
     drawDisc(ctx, INTERNAL_WIDTH / 2 - textWidth / 2, STATUS_Y, marker);
   }
   if (message) drawText(ctx, message, INTERNAL_WIDTH / 2, MESSAGE_Y, { color: COLORS.message, size: 14 });
+  if (effects) effects.drawParticles(ctx, time);
+  ctx.restore();
+
+  if (effects) effects.drawBanner(ctx, time);
 }
 
 // Background and title behind the lobby and room screens (DOM overlays).
-export function drawMenuScreen(ctx) {
-  drawBackground(ctx);
+export function drawMenuScreen(ctx, time = performance.now()) {
+  drawBackground(ctx, time);
   drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 90, { size: 48 });
 }
