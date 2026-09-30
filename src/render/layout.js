@@ -1,8 +1,10 @@
 // Pure screen geometry for the game screen (docs/design.md section 3.1).
 // No DOM access, so it can be unit tested under Node.
 
-import { BOARD_SIZE, CELL_PX, INTERNAL_WIDTH, INTERNAL_HEIGHT } from '../config.js';
+import { BOARD_SIZE, CELL_PX, INTERNAL_WIDTH, INTERNAL_HEIGHT, PORTRAIT_PX, SKILL_ICON_PX } from '../config.js';
 import { X, O } from '../logic/board.js';
+
+export { PORTRAIT_PX, SKILL_ICON_PX }; // sprite sizes, kept in config
 
 export const BOARD_PX = BOARD_SIZE * CELL_PX;
 export const BOARD_X = Math.floor((INTERNAL_WIDTH - BOARD_PX) / 2);
@@ -23,7 +25,6 @@ const PANEL_X = {
 };
 
 // Positions inside a panel, relative to its top-left corner.
-export const PORTRAIT_PX = 96;
 export const PORTRAIT_Y = 20;
 export const NAME_Y = 136;
 export const STONE_LINE_Y = 160;
@@ -32,7 +33,6 @@ const BUTTON_Y = 186;
 export const BUTTON_W = PANEL_W - BUTTON_X * 2;
 export const BUTTON_H = 64;
 const BUTTON_STEP = BUTTON_H + 12;
-export const SKILL_ICON_PX = 32;
 
 export function panelRect(player) {
   return { x: PANEL_X[player], y: PANEL_Y, w: PANEL_W, h: PANEL_H };

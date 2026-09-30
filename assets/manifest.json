@@ -1,0 +1,18 @@
+{
+  "assets": {
+    "background": { "file": "background.png" },
+    "board": { "file": "board.png" },
+    "panel-wind-rabbit": { "file": "panel-wind-rabbit.png" },
+    "panel-earth-bear": { "file": "panel-earth-bear.png" },
+    "portrait-wind-rabbit": { "file": "portrait-wind-rabbit.png" },
+    "portrait-earth-bear": { "file": "portrait-earth-bear.png" },
+    "stone-x": { "file": "stone-x.png" },
+    "stone-o": { "file": "stone-o.png" },
+    "rock": { "file": "rock.png" },
+    "tornado": { "file": "tornado.png", "frames": 4 },
+    "icon-wind-dash": { "file": "icon-wind-dash.png" },
+    "icon-tornado-zone": { "file": "icon-tornado-zone.png" },
+    "icon-terrain-creation": { "file": "icon-terrain-creation.png" },
+    "icon-stone-conversion": { "file": "icon-stone-conversion.png" }
+  }
+}

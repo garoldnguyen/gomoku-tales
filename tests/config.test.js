@@ -18,6 +18,14 @@ test('config holds the design values', () => {
   assert.equal(config.ROOM_CODE_LENGTH, 5);
 });
 
+test('config holds the sprite sizes from docs/design.md section 7', () => {
+  assert.equal(config.STONE_PX, 24);
+  assert.equal(config.ROCK_PX, 24);
+  assert.equal(config.SKILL_ICON_PX, 32);
+  assert.equal(config.PORTRAIT_PX, 96);
+  assert.equal(config.TORNADO_PX, 72);
+});
+
 test('the board fits inside the internal resolution', () => {
   const boardPx = config.BOARD_SIZE * config.CELL_PX;
   assert.ok(boardPx <= config.INTERNAL_WIDTH);

@@ -83,7 +83,7 @@ STONE CONVERSION (long cooldown). Uses your turn.
 - Characters: Wind Rabbit and Earth Bear as described in section 5, as portraits, with a small idle animation if time allows.
 - Skill icons: detailed and faithful to the descriptions in section 5.
 - Panels: old wooden or stone signboard frames.
-- Sprite sizes: stones 24x24, rocks 24x24, skill icons 32x32, portraits 96x96, tornado overlay 72x72 (animated), background 960x540. Sizes may change if the art needs it. Update config and this file together.
+- Sprite sizes: stones 24x24, rocks 24x24, skill icons 32x32, portraits 96x96, tornado overlay 72x72 (animated), background 960x540, board with its frame 372x372, panel signboards 240x372. Sizes may change if the art needs it. Update config and this file together.
 - Loading: assets/manifest.json lists every asset by name. The game must run with no art files present by drawing simple placeholders (a blue disc for X, a red disc for O, letters on icons). Real art is added later by replacing files, without code changes.
 - Generated art must be cleaned to a true pixel grid with a limited palette before it is added.
 

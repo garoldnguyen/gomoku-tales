@@ -44,6 +44,27 @@ To use a skill, click its button on the mover's panel (Wind Rabbit on the left, 
 Bear on the right), then click its target on the board. The status line tells you what
 to pick. Press Esc, right click, or click the same button again to cancel.
 
+## Art
+
+`assets/manifest.json` lists every image by name and file (relative to `assets/`). The
+game runs with no image files: anything missing is drawn as a placeholder (blue disc for
+X, red disc for O, lettered skill icons, and so on). To add real art, save a PNG under
+the file name from the manifest and reload; no code changes are needed. Images are drawn
+scaled to these sizes (px):
+
+| Name | Size |
+| --- | --- |
+| `background` | 960x540 |
+| `board` | 372x372 (the 15x15 grid of 24 px cells starts 6 px in, inside the frame) |
+| `panel-wind-rabbit`, `panel-earth-bear` | 240x372 |
+| `portrait-wind-rabbit`, `portrait-earth-bear` | 96x96 |
+| `stone-x`, `stone-o`, `rock` | 24x24 |
+| `icon-wind-dash`, `icon-tornado-zone`, `icon-terrain-creation`, `icon-stone-conversion` | 32x32 |
+| `tornado` | 72x72 per frame, frames side by side in one strip |
+
+An animated image is a horizontal strip; set its `frames` count in the manifest. Sprite
+sizes and the animation frame time live in `src/config.js`.
+
 ## Run the tests
 
 Tests use the Node built-in test runner (Node 18 or newer):

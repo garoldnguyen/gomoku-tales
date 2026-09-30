@@ -1,7 +1,8 @@
 import { INTERNAL_WIDTH, INTERNAL_HEIGHT } from './config.js';
 import { CHARACTERS } from './logic/characters.js';
 import { createBroadcastTransport } from './net/transport.js';
-import { drawGameScreen, drawMenuScreen } from './render/game-renderer.js';
+import { loadAssets } from './render/assets.js';
+import { drawGameScreen, drawMenuScreen, setAssets } from './render/game-renderer.js';
 import { GAME, GAME_OVER, createApp } from './ui/app.js';
 import { attachGameInput, hitTest } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
@@ -13,6 +14,10 @@ canvas.height = INTERNAL_HEIGHT;
 
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
+
+// Placeholders are drawn until the art from assets/manifest.json has loaded,
+// and for good for any file that is missing.
+loadAssets({ warn: (message) => console.warn(message) }).then(setAssets);
 
 const params = new URLSearchParams(window.location.search);
 

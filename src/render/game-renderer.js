@@ -1,8 +1,10 @@
-// Canvas drawing for the game screen. Placeholder art only: a flat hill
-// scene, a wooden grid, blue discs for X, red discs for O, grey squares for
-// rocks, wooden panel frames and lettered skill icons.
+// Canvas drawing for the game screen. Every sprite comes from the asset
+// store (see assets.js and assets/manifest.json); while its file is missing a
+// placeholder is drawn instead: a flat hill scene, a wooden grid, blue discs
+// for X, red discs for O, grey squares for rocks, wooden panel frames and
+// lettered skill icons.
 
-import { CELL_PX, INTERNAL_WIDTH, INTERNAL_HEIGHT } from '../config.js';
+import { CELL_PX, INTERNAL_WIDTH, INTERNAL_HEIGHT, ROCK_PX, STONE_PX, TORNADO_PX } from '../config.js';
 import { X, O, ROCK } from '../logic/board.js';
 import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../logic/skills.js';
 import {
@@ -10,6 +12,31 @@ import {
   NAME_Y, PORTRAIT_PX, PORTRAIT_Y, SKILL_ICON_PX, STONE_LINE_Y,
   cellCenter, cellOrigin, panelRect, skillButtonRect,
 } from './layout.js';
+import { createAssetStore } from './assets.js';
+
+// Manifest names of the sprites drawn here.
+export const SPRITES = {
+  background: 'background',
+  board: 'board',
+  panel: { [X]: 'panel-wind-rabbit', [O]: 'panel-earth-bear' },
+  portrait: { [X]: 'portrait-wind-rabbit', [O]: 'portrait-earth-bear' },
+  stone: { [X]: 'stone-x', [O]: 'stone-o' },
+  rock: 'rock',
+  tornado: 'tornado',
+  icon: {
+    [WIND_DASH]: 'icon-wind-dash',
+    [TORNADO_ZONE]: 'icon-tornado-zone',
+    [TERRAIN_CREATION]: 'icon-terrain-creation',
+    [STONE_CONVERSION]: 'icon-stone-conversion',
+  },
+};
+
+// Starts empty (all placeholders); main.js swaps in the loaded store.
+let assets = createAssetStore();
+
+export function setAssets(store) {
+  assets = store;
+}
 
 const COLORS = {
   sky: '#8fd3ff',
@@ -63,27 +90,34 @@ const SKILL_ICONS = {
 };
 
 export function drawBackground(ctx) {
-  ctx.fillStyle = COLORS.sky;
-  ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
-  const hillTop = Math.floor(INTERNAL_HEIGHT * 0.3);
-  ctx.fillStyle = COLORS.grass;
-  ctx.fillRect(0, hillTop, INTERNAL_WIDTH, INTERNAL_HEIGHT - hillTop);
-  ctx.fillStyle = COLORS.grassDark;
-  ctx.fillRect(0, hillTop, INTERNAL_WIDTH, 4);
+  assets.draw(ctx, SPRITES.background, 0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT, () => {
+    ctx.fillStyle = COLORS.sky;
+    ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    const hillTop = Math.floor(INTERNAL_HEIGHT * 0.3);
+    ctx.fillStyle = COLORS.grass;
+    ctx.fillRect(0, hillTop, INTERNAL_WIDTH, INTERNAL_HEIGHT - hillTop);
+    ctx.fillStyle = COLORS.grassDark;
+    ctx.fillRect(0, hillTop, INTERNAL_WIDTH, 4);
+  });
 }
 
+// The board sprite covers the frame and the grid: its cells must line up
+// with CELL_PX starting FRAME_PX in from the top-left corner.
 function drawBoard(ctx, size) {
-  ctx.fillStyle = COLORS.boardFrame;
-  ctx.fillRect(BOARD_X - FRAME_PX, BOARD_Y - FRAME_PX, BOARD_PX + FRAME_PX * 2, BOARD_PX + FRAME_PX * 2);
-  ctx.fillStyle = COLORS.board;
-  ctx.fillRect(BOARD_X, BOARD_Y, BOARD_PX, BOARD_PX);
+  const framed = BOARD_PX + FRAME_PX * 2;
+  assets.draw(ctx, SPRITES.board, BOARD_X - FRAME_PX, BOARD_Y - FRAME_PX, framed, framed, () => {
+    ctx.fillStyle = COLORS.boardFrame;
+    ctx.fillRect(BOARD_X - FRAME_PX, BOARD_Y - FRAME_PX, framed, framed);
+    ctx.fillStyle = COLORS.board;
+    ctx.fillRect(BOARD_X, BOARD_Y, BOARD_PX, BOARD_PX);
 
-  ctx.fillStyle = COLORS.grid;
-  for (let i = 0; i <= size; i++) {
-    const offset = Math.min(i * CELL_PX, BOARD_PX - 1);
-    ctx.fillRect(BOARD_X + offset, BOARD_Y, 1, BOARD_PX);
-    ctx.fillRect(BOARD_X, BOARD_Y + offset, BOARD_PX, 1);
-  }
+    ctx.fillStyle = COLORS.grid;
+    for (let i = 0; i <= size; i++) {
+      const offset = Math.min(i * CELL_PX, BOARD_PX - 1);
+      ctx.fillRect(BOARD_X + offset, BOARD_Y, 1, BOARD_PX);
+      ctx.fillRect(BOARD_X, BOARD_Y + offset, BOARD_PX, 1);
+    }
+  });
 }
 
 export function drawStone(ctx, x, y, player, alpha = 1) {
@@ -91,8 +125,15 @@ export function drawStone(ctx, x, y, player, alpha = 1) {
   drawDisc(ctx, px, py, player, alpha);
 }
 
-// Placeholder stone centred on a pixel position.
+// Stone sprite centred on a pixel position.
 function drawDisc(ctx, px, py, player, alpha = 1) {
+  const half = STONE_PX / 2;
+  assets.draw(ctx, SPRITES.stone[player], px - half, py - half, STONE_PX, STONE_PX,
+    () => drawPlaceholderDisc(ctx, px, py, player, alpha), { alpha });
+}
+
+// Placeholder stone: a blue (X) or red (O) disc with an outline.
+function drawPlaceholderDisc(ctx, px, py, player, alpha) {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.beginPath();
@@ -107,8 +148,15 @@ function drawDisc(ctx, px, py, player, alpha = 1) {
   ctx.restore();
 }
 
-// Placeholder rock: a grey square with an outline.
 function drawRock(ctx, x, y, alpha = 1) {
+  const { px, py } = cellCenter(x, y);
+  const half = ROCK_PX / 2;
+  assets.draw(ctx, SPRITES.rock, px - half, py - half, ROCK_PX, ROCK_PX,
+    () => drawPlaceholderRock(ctx, x, y, alpha), { alpha });
+}
+
+// Placeholder rock: a grey square with an outline.
+function drawPlaceholderRock(ctx, x, y, alpha) {
   const { px, py } = cellOrigin(x, y);
   const inset = 3;
   const size = CELL_PX - inset * 2;
@@ -136,33 +184,41 @@ function drawCells(ctx, board) {
 }
 
 // Translucent overlay over a group of cells (the Tornado Zone), drawn as
-// their bounding box because the zone is always a clipped square.
-function drawZone(ctx, cells, alpha = 1) {
+// their bounding box because the zone is always a clipped square. The
+// animated tornado sprite is centred on the box and clipped to it.
+function drawZone(ctx, cells, time, alpha = 1) {
   if (cells.length === 0) return;
   const xs = cells.map((c) => c.x);
   const ys = cells.map((c) => c.y);
   const { px, py } = cellOrigin(Math.min(...xs), Math.min(...ys));
   const w = (Math.max(...xs) - Math.min(...xs) + 1) * CELL_PX;
   const h = (Math.max(...ys) - Math.min(...ys) + 1) * CELL_PX;
+  const cx = px + w / 2;
+  const cy = py + h / 2;
   ctx.save();
   ctx.globalAlpha = alpha;
-  ctx.fillStyle = COLORS.tornadoFill;
-  ctx.fillRect(px, py, w, h);
+  ctx.beginPath();
+  ctx.rect(px, py, w, h);
+  ctx.clip();
+  assets.draw(ctx, SPRITES.tornado, cx - TORNADO_PX / 2, cy - TORNADO_PX / 2, TORNADO_PX, TORNADO_PX, () => {
+    ctx.fillStyle = COLORS.tornadoFill;
+    ctx.fillRect(px, py, w, h);
+    // A few swirl arcs so it reads as wind.
+    ctx.strokeStyle = COLORS.whirl;
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      const r = 6 + i * 8;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, i * 2.1, i * 2.1 + Math.PI * 1.2);
+      ctx.stroke();
+    }
+  }, { time });
+  // Dashed edge so the zone reads clearly with or without art.
   ctx.strokeStyle = COLORS.tornadoEdge;
   ctx.lineWidth = 2;
   ctx.setLineDash([4, 3]);
   ctx.strokeRect(px + 1, py + 1, w - 2, h - 2);
   ctx.setLineDash([]);
-  // A few swirl arcs so it reads as wind.
-  ctx.strokeStyle = COLORS.whirl;
-  const cx = px + w / 2;
-  const cy = py + h / 2;
-  for (let i = 0; i < 3; i++) {
-    const r = 6 + i * 8;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, i * 2.1, i * 2.1 + Math.PI * 1.2);
-    ctx.stroke();
-  }
   ctx.restore();
 }
 
@@ -202,8 +258,8 @@ function drawSelectRing(ctx, x, y) {
 
 // Announced skills that are still waiting: the Tornado Zone and a pending
 // Wind Dash.
-function drawAnnouncements(ctx, state) {
-  if (state.tornado) drawZone(ctx, state.tornado.cells);
+function drawAnnouncements(ctx, state, time) {
+  if (state.tornado) drawZone(ctx, state.tornado.cells, time);
   if (state.pendingDash) {
     drawDashTarget(ctx, state.pendingDash.to.x, state.pendingDash.to.y);
     drawWhirl(ctx, state.pendingDash.from.x, state.pendingDash.from.y);
@@ -211,7 +267,7 @@ function drawAnnouncements(ctx, state) {
 }
 
 // Hover preview for the skill target flow (see ui/targeting.js).
-function drawPreview(ctx, preview) {
+function drawPreview(ctx, preview, time) {
   switch (preview.type) {
     case 'select':
       drawSelectRing(ctx, preview.x, preview.y);
@@ -222,7 +278,7 @@ function drawPreview(ctx, preview) {
       if (preview.to) drawDashTarget(ctx, preview.to.x, preview.to.y, 0.7);
       break;
     case 'zone':
-      drawZone(ctx, preview.cells, 0.6);
+      drawZone(ctx, preview.cells, time, 0.6);
       break;
     case 'rock':
       drawRock(ctx, preview.x, preview.y, 0.5);
@@ -256,12 +312,17 @@ export function drawText(ctx, text, px, py, { color = COLORS.text, size = 18, al
   ctx.fillText(text, px, py);
 }
 
-// Old wooden signboard placeholder: a dark frame, planks and grain lines.
-function drawWoodFrame(ctx, { x, y, w, h }, active) {
+// Signboard behind a player's panel, with a highlight on that player's turn.
+function drawWoodFrame(ctx, { x, y, w, h }, player, active) {
   if (active) {
     ctx.fillStyle = COLORS.panelActive;
     ctx.fillRect(x - 4, y - 4, w + 8, h + 8);
   }
+  assets.draw(ctx, SPRITES.panel[player], x, y, w, h, () => drawPlaceholderWood(ctx, { x, y, w, h }));
+}
+
+// Old wooden signboard placeholder: a dark frame, planks and grain lines.
+function drawPlaceholderWood(ctx, { x, y, w, h }) {
   ctx.fillStyle = COLORS.panelFrame;
   ctx.fillRect(x, y, w, h);
   ctx.fillStyle = COLORS.panelWood;
@@ -275,25 +336,29 @@ function drawWoodFrame(ctx, { x, y, w, h }, active) {
   }
 }
 
-// Placeholder portrait: a framed square with the character's initial.
+// Framed portrait. Placeholder: a square with the character's initial.
 function drawPortrait(ctx, px, py, panel) {
   ctx.fillStyle = COLORS.outline;
   ctx.fillRect(px - 2, py - 2, PORTRAIT_PX + 4, PORTRAIT_PX + 4);
-  ctx.fillStyle = panel.player === X ? COLORS.portraitX : COLORS.portraitO;
-  ctx.fillRect(px, py, PORTRAIT_PX, PORTRAIT_PX);
-  ctx.fillStyle = panel.player === X ? COLORS.stoneX : COLORS.stoneO;
-  ctx.fillRect(px, py + PORTRAIT_PX - 12, PORTRAIT_PX, 12);
-  drawText(ctx, panel.name[0], px + PORTRAIT_PX / 2, py + PORTRAIT_PX / 2 - 4, { size: 48, color: COLORS.buttonText });
+  assets.draw(ctx, SPRITES.portrait[panel.player], px, py, PORTRAIT_PX, PORTRAIT_PX, () => {
+    ctx.fillStyle = panel.player === X ? COLORS.portraitX : COLORS.portraitO;
+    ctx.fillRect(px, py, PORTRAIT_PX, PORTRAIT_PX);
+    ctx.fillStyle = panel.player === X ? COLORS.stoneX : COLORS.stoneO;
+    ctx.fillRect(px, py + PORTRAIT_PX - 12, PORTRAIT_PX, 12);
+    drawText(ctx, panel.name[0], px + PORTRAIT_PX / 2, py + PORTRAIT_PX / 2 - 4, { size: 48, color: COLORS.buttonText });
+  });
 }
 
-// Placeholder skill icon: a coloured square with two letters.
+// Framed skill icon. Placeholder: a coloured square with two letters.
 function drawSkillIcon(ctx, px, py, skillId) {
-  const icon = SKILL_ICONS[skillId] ?? { letters: '?', color: COLORS.button };
   ctx.fillStyle = COLORS.outline;
   ctx.fillRect(px - 1, py - 1, SKILL_ICON_PX + 2, SKILL_ICON_PX + 2);
-  ctx.fillStyle = icon.color;
-  ctx.fillRect(px, py, SKILL_ICON_PX, SKILL_ICON_PX);
-  drawText(ctx, icon.letters, px + SKILL_ICON_PX / 2, py + SKILL_ICON_PX / 2, { size: 13 });
+  assets.draw(ctx, SPRITES.icon[skillId], px, py, SKILL_ICON_PX, SKILL_ICON_PX, () => {
+    const icon = SKILL_ICONS[skillId] ?? { letters: '?', color: COLORS.button };
+    ctx.fillStyle = icon.color;
+    ctx.fillRect(px, py, SKILL_ICON_PX, SKILL_ICON_PX);
+    drawText(ctx, icon.letters, px + SKILL_ICON_PX / 2, py + SKILL_ICON_PX / 2, { size: 13 });
+  });
 }
 
 function drawSkillButton(ctx, rect, skill, panelActive) {
@@ -336,7 +401,7 @@ function drawSkillButton(ctx, rect, skill, panelActive) {
 // view panel: see panelView in ui/local-game.js.
 function drawPanel(ctx, panel) {
   const rect = panelRect(panel.player);
-  drawWoodFrame(ctx, rect, panel.active);
+  drawWoodFrame(ctx, rect, panel.player, panel.active);
   const cx = rect.x + rect.w / 2;
   drawPortrait(ctx, cx - PORTRAIT_PX / 2, rect.y + PORTRAIT_Y, panel);
   drawText(ctx, panel.name, cx, rect.y + NAME_Y, { size: 18 });
@@ -362,9 +427,11 @@ function drawPanel(ctx, panel) {
   else if (panel.active) drawText(ctx, 'Taking a turn', cx, footerY, { size: 13, color: COLORS.panelActive });
 }
 
-// view: { state, hover, preview, panels, status, message, hint, marker? }
+// view: { state, hover, preview, panels, status, message, hint, marker?, time? }
+// time (ms) drives animated sprites and defaults to the page clock.
 export function drawGameScreen(ctx, view) {
   const { state, hover, preview, panels = [], status, message, hint } = view;
+  const time = view.time ?? performance.now();
   drawBackground(ctx);
   drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 36, { size: 28 });
   if (hint) drawText(ctx, hint, INTERNAL_WIDTH / 2, 66, { size: 12 });
@@ -373,10 +440,10 @@ export function drawGameScreen(ctx, view) {
 
   drawBoard(ctx, state.board.length);
   drawCells(ctx, state.board);
-  drawAnnouncements(ctx, state);
+  drawAnnouncements(ctx, state, time);
   if (state.winLine) drawWinLine(ctx, state.winLine);
   if (hover) drawHover(ctx, hover, state.currentPlayer);
-  if (preview) drawPreview(ctx, preview);
+  if (preview) drawPreview(ctx, preview, time);
 
   // Status line: a small stone for the player to move (or the winner).
   // view.marker, when given, overrides it (null for none).
