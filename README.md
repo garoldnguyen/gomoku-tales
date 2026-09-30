@@ -17,6 +17,11 @@ python3 -m http.server 8000
 Then open http://localhost:8000 in your browser. You need the server because ES modules
 don't load from `file://` URLs.
 
+### Local dev mode
+
+Open http://localhost:8000/?local=1 to play both sides in one window. Click a cell to
+place a stone for whoever is to move, and press R to restart.
+
 ## Run the tests
 
 Tests use the Node built-in test runner (Node 18 or newer):
