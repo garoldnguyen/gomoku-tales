@@ -1,0 +1,52 @@
+three.js 0.186.1 (npm package "three", version 0.186.1)
+
+Downloaded on 2026-10-01 with curl from
+https://cdn.jsdelivr.net/npm/three@0.186.1/<path>
+The folder layout under vendor/three/ matches the package layout.
+Licence: vendor/three/LICENSE (MIT).
+
+Files kept:
+  build/three.module.js
+  build/three.core.js                                (imported by three.module.js)
+  examples/jsm/postprocessing/EffectComposer.js
+  examples/jsm/postprocessing/RenderPass.js
+  examples/jsm/postprocessing/ShaderPass.js
+  examples/jsm/postprocessing/OutputPass.js
+  examples/jsm/postprocessing/BokehPass.js
+  examples/jsm/postprocessing/UnrealBloomPass.js
+  examples/jsm/postprocessing/Pass.js                (dependency)
+  examples/jsm/postprocessing/MaskPass.js            (dependency of EffectComposer)
+  examples/jsm/shaders/HorizontalTiltShiftShader.js
+  examples/jsm/shaders/VerticalTiltShiftShader.js
+  examples/jsm/shaders/VignetteShader.js
+  examples/jsm/shaders/CopyShader.js                 (dependency)
+  examples/jsm/shaders/OutputShader.js               (dependency of OutputPass)
+  examples/jsm/shaders/BokehShader.js                (dependency of BokehPass)
+  examples/jsm/shaders/LuminosityHighPassShader.js   (dependency of UnrealBloomPass)
+
+Import map (in hd2d-lab.html):
+  "three":         "./vendor/three/build/three.module.js"
+  "three/addons/": "./vendor/three/examples/jsm/"
+
+To upgrade: download the same paths for the new version, update this file,
+and check that every file still only imports files in this list.
+
+SHA-256 checksums (run from vendor/: sha256sum -c can read these lines):
+8b378ebe60e2fe500158cb0ac71cb5e8b7d92953c2abcc63a0eb90499653b5bc  three/LICENSE
+9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6  three/build/three.core.js
+9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea  three/build/three.module.js
+5b9b0bc5cee6e24b2417da95f40eb2d178943c2ffbacbc4c2993a89d0597bfb3  three/examples/jsm/postprocessing/BokehPass.js
+4e079a5886152d7e529a59aef644e968ab4d32c6a33ce016b36bf29b2eac26f7  three/examples/jsm/postprocessing/EffectComposer.js
+7cd08eee9d5d6f5578beaddbdcbe9c384f6873810af27f22ab7db3ceeb127aa3  three/examples/jsm/postprocessing/MaskPass.js
+02e4a261af34de71338185e9e87f0cbe5cba9115608d984363e1269dec1d2272  three/examples/jsm/postprocessing/OutputPass.js
+444b409c235ead986893c472e720da1b779a56985c7d10b279c7944b52bd61c5  three/examples/jsm/postprocessing/Pass.js
+817f6c3cdcd0fd41515d112359ea0532568eefb5aabd3b33903957ebca1b8a6a  three/examples/jsm/postprocessing/RenderPass.js
+e2500a5913b26bbf5148ceaae644c6edcff06a18b01494ee37bf856353d2ab9d  three/examples/jsm/postprocessing/ShaderPass.js
+ba8f2fcadfa6588384c9473498f974d81d120f02f0e63a0e59c265202a006b5a  three/examples/jsm/postprocessing/UnrealBloomPass.js
+bd8525158e3574a803f2e2ce5d5e263349a80ee41bf789e71446b9caa256aa9a  three/examples/jsm/shaders/BokehShader.js
+a33057d5ac91c43304c186ac0e8816e62bb2ed471d3a00ff3018dfd5c0389718  three/examples/jsm/shaders/CopyShader.js
+772f0865e95c4ecd7e6b016191b5d544d23ea4f048ff0efdc33898ee52fb3fa2  three/examples/jsm/shaders/HorizontalTiltShiftShader.js
+5044f780b6e6cf863947f64c36fe1587132f7fbe395ada863cd1e5f0388dcf1e  three/examples/jsm/shaders/LuminosityHighPassShader.js
+353479f77a8d7e2629d49ccac9fc2f5dbfdda5442e0adf867b00377a2fcb0cb2  three/examples/jsm/shaders/OutputShader.js
+96bed3fafdea8370d1330dc9854f9d604a6def8554db554368c917ee66403742  three/examples/jsm/shaders/VerticalTiltShiftShader.js
+5b122990efab55aa39ac5c72a09bc840e572773f5037b9127acfc8e31ee08b83  three/examples/jsm/shaders/VignetteShader.js
