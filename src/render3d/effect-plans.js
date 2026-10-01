@@ -77,6 +77,42 @@ export function visualsForEvents(events) {
   return specs;
 }
 
+// The visuals for events that piled up while the page was hidden (see
+// frame-gap.js): only where the lingering marks end up, with no sparkles,
+// flights, shakes or banners. At most one spec for the Wind Dash marks
+// ('dashMark' to show them, 'dashClear' to hide them at once) and one for
+// the Tornado Zone ('tornado' or 'tornadoClear'), each left out if no event
+// touched it.
+export function catchUpVisuals(events) {
+  let dash; // undefined: untouched
+  let tornado;
+  for (const spec of visualsForEvents(events)) {
+    switch (spec.kind) {
+      case 'dashMark':
+        dash = spec;
+        break;
+      case 'dashStreak':
+      case 'dashFizzle':
+        dash = null;
+        break;
+      case 'tornado':
+        tornado = spec;
+        break;
+      case 'tornadoEnd':
+        tornado = null;
+        break;
+      case 'endLingering':
+        dash = null;
+        tornado = null;
+        break;
+    }
+  }
+  const specs = [];
+  if (dash !== undefined) specs.push(dash ?? { kind: 'dashClear' });
+  if (tornado !== undefined) specs.push(tornado ?? { kind: 'tornadoClear' });
+  return specs;
+}
+
 // The cell whose piece stays hidden while a flying copy is on its way
 // there, and for how long: { x, y, ms }, or null. The board already holds
 // the piece; the effect shows it arriving.

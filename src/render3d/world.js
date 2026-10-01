@@ -19,9 +19,10 @@ import { createFpsMeter } from './fps.js';
 import { cellToWorld, pickCell } from './picking.js';
 import { rockGrid, stoneGrid } from './placeholder-art.js';
 import { createPostProcessing } from './post-processing.js';
-import { cappedPixelRatio, createSlowFrameWatch, cycleQuality, lowerQuality, QUALITY_LEVELS } from './quality.js';
+import { createSlowFrameWatch, cycleQuality, lowerQuality, QUALITY_LEVELS } from './quality.js';
 import { seededRandom } from './seeded-random.js';
 import { PixelSprite, pixelTexture, sheetCanvas } from './sprites.js';
+import { sameViewSize, viewSize } from './view-size.js';
 
 export const WORLD_ASPECT = 16 / 9;
 const BOARD_TEXTURE_PX = 480; // section D: 480x480, so one cell is 32 px
@@ -41,7 +42,6 @@ const COLORS = {
 // WebGL is not available. Returns the world; call render(now) every frame.
 export function createWorld(canvas, { quality: startQuality = QUALITY_DEFAULT } = {}) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.setPixelRatio(cappedPixelRatio(window.devicePixelRatio, RENDER_SCALE));
   renderer.shadowMap.enabled = true; // the sun casts shadows only on HIGH (see setQuality)
   // PCFShadowMap with a radius gives soft edges (this release removed PCFSoftShadowMap).
   renderer.shadowMap.type = THREE.PCFShadowMap;
@@ -113,15 +113,25 @@ export function createWorld(canvas, { quality: startQuality = QUALITY_DEFAULT } 
   }
   setQuality(startQuality);
 
+  // The drawing buffer follows the canvas's CSS box and this window's
+  // devicePixelRatio (capped by RENDER_SCALE). It is checked every frame
+  // (see view-size.js): a window moved to another screen or zoomed does not
+  // always get a resize event, and a canvas laid out after the world was
+  // built has no size at first. clientWidth ignores CSS transforms, so the
+  // blurred backdrop behind the menus (index.html) does not resize it.
+  let viewSizeNow = null;
   function resize() {
-    renderer.setPixelRatio(cappedPixelRatio(window.devicePixelRatio, RENDER_SCALE));
-    renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+    const next = viewSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio, RENDER_SCALE);
+    if (next === null || sameViewSize(viewSizeNow, next)) return;
+    viewSizeNow = next;
+    renderer.setPixelRatio(next.pixelRatio);
+    renderer.setSize(next.width, next.height, false);
     postProcessing.resize();
   }
-  window.addEventListener('resize', resize);
   resize();
 
-  const fpsMeter = createFpsMeter(FPS_SAMPLE_MS);
+  // A hidden page stops requestAnimationFrame; that gap is not a slow frame.
+  const fpsMeter = createFpsMeter(FPS_SAMPLE_MS, QUALITY_STALL_MS);
   let lastNow = null;
 
   return {
@@ -196,6 +206,7 @@ export function createWorld(canvas, { quality: startQuality = QUALITY_DEFAULT } 
     // Advances the scene to `now` (a requestAnimationFrame timestamp) and
     // draws it. Steps the quality down when frames stay slow.
     render(now) {
+      resize();
       fpsMeter.tick(now);
       if (slowFrames.tick(now) && quality !== lowerQuality(quality)) setQuality(lowerQuality(quality), true);
       // Clamp the step so a hidden tab does not make everything jump on return.

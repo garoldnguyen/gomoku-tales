@@ -5,6 +5,13 @@ disconnect handling. The rules are in [design.md](design.md); the unit tests
 (`node --test`) cover the rules in detail, so this test focuses on what you see
 and what reaches the other window.
 
+Online play draws the game in the HD-2D 3D world by default
+([art-direction-hd2d.md](art-direction-hd2d.md)): pieces, rocks, characters and skill
+visuals are 3D, and the HUD and the lobby and room screens are 2D layers above it. Where
+this guide names a look, the 3D look comes first and the old 2D look follows in brackets;
+the 2D game is still reachable with `?render=2d` (see section 10.6). Section 10 holds the
+checks that only the 3D renderer needs.
+
 Tick each box as you go. If a step fails, note the step, what you did and what you saw.
 
 Cells are named (column, row) counted from the top-left corner, starting at 1. For
@@ -29,7 +36,8 @@ example (8, 8) is the centre of the 15x15 board.
 3. Leave the terminal open. It prints a line for every file the browser loads.
 
 - [ ] Open http://localhost:8000 in Chrome. The lobby shows the title "Gomoku Tales" over
-      the hill scene with the buttons Create Room and Join Room.
+      the 3D Breeze Hill scene (blurred behind the card) with the buttons Create Room and
+      Join Room.
 - [ ] Open DevTools (F12) and check the Console. There are no script errors. A "404 (File
       not found)" line for each missing art file is expected while `assets/` holds only
       `manifest.json`; placeholders are drawn instead.
@@ -47,7 +55,9 @@ example (8, 8) is the centre of the 15x15 board.
 Call the left window **A** (it creates the room and is the host) and the right window
 **B** (it joins).
 
-- [ ] Both windows show the lobby, scaled to fit the window with sharp (pixelated) edges.
+- [ ] Both windows show the lobby over the 3D scene, scaled to fit the window at 16:9
+      (letterboxed if needed). Each window shows its own "Quality MEDIUM [Q]  FPS NN" in the
+      top-left corner.
 
 ## 4. Create and join a room
 
@@ -79,7 +89,7 @@ Call the left window **A** (it creates the room and is the host) and the right w
 - [ ] Window A's top line says "Room CODE | You play Wind Rabbit (X)"; window B's says
       "... You play Earth Bear (O)". The joiner got the other character.
 - [ ] The Wind Rabbit panel is on the left and the Earth Bear panel on the right in both
-      windows. Each panel shows a portrait (placeholder square with a letter), the name,
+      windows, with the board between them and the rabbit and bear sprites standing beside it. Each panel shows a portrait (placeholder square with a letter), the name,
       "Stone: X" or "Stone: O", and two skill buttons with an icon, the name and "Ready".
 - [ ] Only your own panel has the green "You" tag (left in A, right in B).
 - [ ] The Wind Rabbit panel has the yellow turn highlight and "Taking a turn". The status
@@ -94,12 +104,12 @@ Call the left window **A** (it creates the room and is the host) and the right w
 ## 5. Basic play
 
 - [ ] In A, move the mouse over the board: the cell under the pointer lights up with a
-      faint X stone. Click (8, 8): a blue disc appears in both windows, with sparkles, a
-      dust puff and a light screen shake.
+      faint X stone. Click (8, 8): an X stone (a sprout that pops in; 2D: a blue disc)
+      appears in both windows, with sparkles, a dust puff and a light screen shake.
 - [ ] In A, click another cell now: "It is your opponent's turn." shows and nothing is
       placed.
-- [ ] In B, click (8, 8) (taken): "That cell is not empty." shows. Click (9, 9): a red
-      disc appears in both windows. The turn highlight moves each turn.
+- [ ] In B, click (8, 8) (taken): "That cell is not empty." shows. Click (9, 9): an O
+      stone (a flower bud; 2D: a red disc) appears in both windows. The turn highlight moves each turn.
 - [ ] In B, click one of Wind Rabbit's skill buttons: "That is your opponent's skill."
 - [ ] Right-click or Esc does nothing harmful when no skill is being targeted.
 - [ ] Faint wind streaks drift left to right across the scene all the time.
@@ -199,8 +209,8 @@ Resolve cases (announce a new dash each time the cooldown allows):
 
 - [ ] B clicks Terrain Creation: "Terrain Creation: choose an empty cell". Hovering an
       empty cell shows a faint rock. Clicking a stone shows "Choose an empty cell."
-- [ ] B picks an empty cell: a grey square rock appears at once in both windows, with
-      dust and a light screen shake. "Terrain Creation! A rock fell." Terrain Creation is
+- [ ] B picks an empty cell: a rock appears in both windows (it falls from above with a
+      growing shadow; 2D: a grey square at once), with dust and a light screen shake. "Terrain Creation! A rock fell." Terrain Creation is
       locked for 3 turns.
 - [ ] **Blocks placing:** clicking the rock (either player, on their turn) shows "That
       cell is not empty." A skill cannot target it: Wind Dash to it, Stone Conversion on
@@ -215,7 +225,8 @@ Resolve cases (announce a new dash each time the cooldown allows):
 
 - [ ] B clicks Stone Conversion: "Stone Conversion: choose an opponent's stone". Clicking
       an empty cell, a rock or an O stone shows "Choose one of your opponent's stones."
-- [ ] B picks an X stone: it turns into an O stone at once in both windows, with sparkles.
+- [ ] B picks an X stone: it turns into an O stone in both windows (it glows, lifts, flips
+      and lands as a flower bud; 2D: at once), with sparkles.
       "Stone Conversion! The stone changed sides." Stone Conversion is locked for 6 turns.
 - [ ] **Conversion wins:** with O O _ O O in a row and an X stone in the gap, converting
       that X stone gives five and B wins at once.
@@ -262,3 +273,75 @@ Start a fresh room for each case and play a few moves first.
 - [ ] Open http://localhost:8000/?local=1. One window plays both sides; the "You" tag is on
       the panel of the player to move. All the skill checks in section 6 can be repeated
       here without a room. Press R to restart.
+
+## 10. 3D checks (two WebGL windows)
+
+The unit tests cannot see the 3D scene, so check these by eye. Use the two windows A and B
+from section 3, side by side and both visible.
+
+### 10.1 Both windows draw the scene
+
+- [ ] Both windows show the 3D scene at the same time, each with its own FPS counter
+      moving in the top-left corner. Neither window turns black, freezes or falls back to
+      the flat 2D board.
+- [ ] DevTools Console in both windows: no WebGL errors and no "Too many active WebGL
+      contexts" or "WebGL context lost" warnings.
+- [ ] Pixels stay crisp in both windows: the sprites, the board grid and the HUD text have
+      hard pixel edges, and nothing shimmers while the scene idles.
+
+### 10.2 Screens over the scene
+
+- [ ] Lobby, Create Room, Join Room and Waiting are wooden cards above the 3D scene. On
+      MEDIUM and HIGH the scene behind them is blurred; on LOW it is sharp (the blur is
+      skipped to save GPU time). The title and the quality line are never blurred, and no
+      dark fringe shows at the edges of the blurred scene.
+- [ ] The scene behind the screens shows an empty board, both characters idling, clouds
+      and wind streaks moving.
+- [ ] Game over: the card shows over a dimmed but sharp scene, with the final board, the
+      yellow winning line and the winner's and loser's poses in view.
+- [ ] Back to Lobby: the board behind the lobby is empty again, the characters idle and no
+      skill marks or effects are left over. A new game starts from a clean board.
+
+### 10.3 Quality is per window
+
+- [ ] Press Q in A (click A's scene first so it has focus): A's level goes MEDIUM -> LOW ->
+      HIGH -> MEDIUM, and B's stays as it was. Then press Q in B: only B changes.
+- [ ] Leave A on HIGH and B on LOW and play a few moves: both keep their level and draw the
+      same board.
+- [ ] On the Join Room screen, type a code with a Q in it (for example `QWERT`): the letter
+      goes into the box and the quality level does not change.
+- [ ] Reload a window (this leaves any room): it starts again on MEDIUM. The other window
+      keeps its level.
+
+### 10.4 Resize and pixel ratio
+
+- [ ] Drag the edge of A to make it narrow and tall, then wide and short: the scene keeps
+      16:9 with dark bars, stays sharp (not stretched or blurry), and B is not affected.
+- [ ] After resizing, hover the board in A: the highlight is on the cell under the pointer,
+      including the corner cells (1, 1) and (15, 15).
+- [ ] Zoom A with Ctrl+Plus and Ctrl+Minus, then Ctrl+0: the scene re-renders sharp at
+      each zoom step and picking still hits the right cell.
+- [ ] If you have two screens with different scaling (for example a laptop at 150% and a
+      monitor at 100%), drag A from one screen to the other: the scene is sharp on both
+      without resizing the window.
+
+### 10.5 Hidden windows
+
+Hidden tabs get no animation frames, but the room keeps running on timers.
+
+- [ ] Start a game. On A's turn, open a new tab in B (Ctrl+T) so B's game tab is hidden.
+      In A, place a stone. Wait about 10 seconds, then close the new tab in B: B's board
+      shows A's stone at once, and A never showed a leave countdown.
+- [ ] Hide B again on A's turn and in A use Tornado Zone (or announce a Wind Dash). Show B
+      again: the zone overlay and its swirling column (or the red frame and the whirl) are
+      there at once, without a burst of old sparkles, a stack of old banners, or a camera
+      shake.
+- [ ] While B was hidden, its FPS counter did not drop to a tiny number when it came back,
+      and its quality did not step down to "(auto)".
+- [ ] Minimise A for a few seconds and restore it: the same holds for A.
+
+### 10.6 The 2D renderer still works
+
+- [ ] Open http://localhost:8000/?render=2d in two windows and play a few moves and one
+      skill: the flat 2D board works online as before, with no quality line and no blur.
+

@@ -43,7 +43,7 @@ import { X } from '../logic/board.js';
 import { createBanners } from '../render/effects.js';
 import { drawDashTarget, drawWhirl, drawZone } from './decal-art.js';
 import {
-  convertPose, crumblePose, dashPose, heldCell, rockFallPose, shakeLeft, shakeOffset3d, shakeStrength,
+  catchUpVisuals, convertPose, crumblePose, dashPose, heldCell, rockFallPose, shakeLeft, shakeOffset3d, shakeStrength,
   throwPose, visualsForEvents,
 } from './effect-plans.js';
 import {
@@ -77,7 +77,8 @@ const MAX_STEP_MS = 100; // a hidden tab does not make the effects jump on retur
 const TWO_PI = Math.PI * 2;
 
 // Builds the effects on `world` (world.js). Call trigger() with the events
-// of each applied action, update(time) every frame before world.render(),
+// of each applied action (catchUp() for events that piled up while the
+// page was hidden), update(time) every frame before world.render(),
 // drawBanner(ctx, time) after the HUD, and reset() for a new game.
 export function createEffects3d(world) {
   const fx = {
@@ -409,6 +410,12 @@ export function createEffects3d(world) {
       case 'tornadoEnd':
         column.end();
         break;
+      case 'dashClear':
+        dashMark.reset();
+        break;
+      case 'tornadoClear':
+        column.reset();
+        break;
       case 'endLingering':
         column.end();
         dashMark.end();
@@ -456,6 +463,13 @@ export function createEffects3d(world) {
       frame.time = time;
       frame.scale = particleScale();
       for (const spec of visualsForEvents(events)) start(spec);
+    },
+
+    // Events that piled up while the page was hidden: only the Wind Dash
+    // marks and the Tornado Zone are brought up to date (catchUpVisuals).
+    catchUp(events, time) {
+      frame.time = time;
+      for (const spec of catchUpVisuals(events)) start(spec);
     },
 
     // True while the piece on cell index `i` (y * BOARD_SIZE + x) is shown

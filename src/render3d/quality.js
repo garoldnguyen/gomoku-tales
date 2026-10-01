@@ -10,6 +10,9 @@
 // Tone mapping is on at every level. Blob shadows under sprites are always on.
 // `particles` scales the particle counts and rates of the 3D effects
 // (src/render3d/effects3d.js): full at HIGH, fewer at MEDIUM and LOW.
+// `menuBlur` blurs the scene behind the lobby and room screens (a CSS
+// filter in index.html, section F; not behind Game over, which keeps the
+// final board in view); LOW skips it to save the GPU work.
 
 export const QUALITY_ORDER = ['HIGH', 'MEDIUM', 'LOW']; // best first
 
@@ -23,6 +26,7 @@ export const QUALITY_LEVELS = Object.freeze({
     vignette: true,
     shadowMaps: true,
     particles: 1,
+    menuBlur: true,
   }),
   MEDIUM: Object.freeze({
     name: 'MEDIUM',
@@ -33,6 +37,7 @@ export const QUALITY_LEVELS = Object.freeze({
     vignette: true,
     shadowMaps: false,
     particles: 0.6,
+    menuBlur: true,
   }),
   LOW: Object.freeze({
     name: 'LOW',
@@ -43,6 +48,7 @@ export const QUALITY_LEVELS = Object.freeze({
     vignette: false,
     shadowMaps: false,
     particles: 0.35,
+    menuBlur: false,
   }),
 });
 

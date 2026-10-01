@@ -22,9 +22,19 @@ export function isCancelKey(event) {
   return event.key === 'Escape';
 }
 
-// True for a plain Q press: cycles the 3D quality level.
+// True for a plain Q press: cycles the 3D quality level. Not while typing
+// in a text box, such as the room code on the Join Room screen.
 export function isQualityKey(event) {
-  return (event.key === 'q' || event.key === 'Q') && !event.ctrlKey && !event.metaKey && !event.altKey;
+  return (event.key === 'q' || event.key === 'Q') && !event.ctrlKey && !event.metaKey && !event.altKey
+    && !isTextEntry(event.target);
+}
+
+// True for an element that takes typed text.
+export function isTextEntry(target) {
+  if (!target) return false;
+  if (target.isContentEditable) return true;
+  const tag = target.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
 
 // What is under an internal point: { cell: { x, y } } for a board cell,

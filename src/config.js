@@ -93,6 +93,7 @@ export const RENDER_SCALE = 1.5; // largest pixel ratio (1 to 1.5); high-DPI scr
 export const TARGET_FRAME_MS = 20;
 export const QUALITY_STEP_DOWN_MS = 3000; // the average must stay above TARGET_FRAME_MS this long
 export const QUALITY_STALL_MS = 250; // a longer frame is a stall (hidden tab, shader compile), not load
+export const RESUME_GAP_MS = 1000; // a longer gap between frames means the page was hidden; events from meanwhile show settled, without replaying their effects
 export const DOF_APERTURE = 0.0002; // HIGH, depth of field focused on the board centre
 export const DOF_MAX_BLUR = 0.006; // in screen widths
 export const TILT_SHIFT_BLUR = 1.5; // MEDIUM, tilt shift; the widest blur tap is 2x this many pixels away at the top and bottom edges

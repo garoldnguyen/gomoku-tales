@@ -26,6 +26,7 @@
       width: min(100vw, calc(100vh * 16 / 9));
       height: min(100vh, calc(100vw * 9 / 16));
       --u: calc(min(100vw, 100vh * 16 / 9) / 960);
+      overflow: hidden;
     }
     /* The WebGL world (#world) lies under the 2D canvas (#game), which
        draws the whole 2D game or, over the 3D world, a transparent HUD. */
@@ -39,6 +40,13 @@
     #game {
       image-rendering: pixelated;
       image-rendering: crisp-edges;
+    }
+    /* Behind the lobby and room screens the 3D world is blurred (not on
+       LOW quality, see src/render3d/quality.js menuBlur). The slight zoom
+       hides the dark fringe a blur leaves at the edges; #stage clips it. */
+    #stage.backdrop-blur #world {
+      filter: blur(calc(var(--u) * 2.5));
+      transform: scale(1.04);
     }
   </style>
   <!-- Three.js is vendored (see vendor/VERSION.txt); nothing loads from the network. -->
