@@ -2,7 +2,7 @@
 // 960x540 internal resolution and forwards internal points to the handlers.
 
 import { characterForStone } from '../logic/characters.js';
-import { cellAtPoint, skillButtonAt } from '../render/layout.js';
+import { HUD_2D, cellAtPoint, skillButtonAt } from '../render/layout.js';
 
 // Maps a client (window) point to internal canvas pixels, given the canvas
 // bounding rect and its internal size.
@@ -22,12 +22,23 @@ export function isCancelKey(event) {
   return event.key === 'Escape';
 }
 
+// True for a plain Q press: cycles the 3D quality level.
+export function isQualityKey(event) {
+  return (event.key === 'q' || event.key === 'Q') && !event.ctrlKey && !event.metaKey && !event.altKey;
+}
+
 // What is under an internal point: { cell: { x, y } } for a board cell,
 // { skill: { player, skillId } } for a skill button, or null.
 export function hitTest(px, py) {
   const cell = cellAtPoint(px, py);
   if (cell) return { cell };
-  const button = skillButtonAt(px, py);
+  return skillHitTest(px, py, HUD_2D);
+}
+
+// The skill button of a HUD layout (render/layout.js) under an internal
+// point as { skill: { player, skillId } }, or null.
+export function skillHitTest(px, py, layout) {
+  const button = skillButtonAt(px, py, 2, layout);
   if (button) {
     const skillId = characterForStone(button.player)?.skills[button.index];
     if (skillId) return { skill: { player: button.player, skillId } };

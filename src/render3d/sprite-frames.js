@@ -3,6 +3,17 @@
 // around the vertical axis to face the camera. No Three.js imports, so they
 // run under node --test.
 
+// Sprite materials discard fragments whose alpha is below this (cutout edges).
+export const SPRITE_ALPHA_TEST = 0.5;
+
+// Cutout threshold for a sprite drawn at `opacity`. Three.js multiplies the
+// texel alpha by the material opacity before the alpha test, so a faded
+// sprite needs a threshold scaled the same way: opaque art pixels still pass
+// and fully transparent ones are still cut out.
+export function fadedAlphaTest(opacity, alphaTest = SPRITE_ALPHA_TEST) {
+  return alphaTest * opacity;
+}
+
 // Index of the sprite sheet frame to show `timeMs` after the animation
 // started. Every frame lasts `frameMs`. A looping animation wraps around; a
 // one-shot animation (loop: false) holds its last frame. Times before the

@@ -27,18 +27,34 @@
       height: min(100vh, calc(100vw * 9 / 16));
       --u: calc(min(100vw, 100vh * 16 / 9) / 960);
     }
-    canvas {
+    /* The WebGL world (#world) lies under the 2D canvas (#game), which
+       draws the whole 2D game or, over the 3D world, a transparent HUD. */
+    #stage canvas {
+      position: absolute;
+      inset: 0;
       display: block;
       width: 100%;
       height: 100%;
+    }
+    #game {
       image-rendering: pixelated;
       image-rendering: crisp-edges;
     }
   </style>
+  <!-- Three.js is vendored (see vendor/VERSION.txt); nothing loads from the network. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/": "./vendor/three/examples/jsm/"
+      }
+    }
+  </script>
   <link rel="stylesheet" href="src/ui/screens.css">
 </head>
 <body>
   <div id="stage">
+    <canvas id="world" hidden></canvas>
     <canvas id="game" width="960" height="540"></canvas>
 
     <!-- Lobby and room screens (docs/design.md section 3), shown over the canvas. -->

@@ -5,7 +5,7 @@ import { loadAssets } from './render/assets.js';
 import { createEffects } from './render/effects.js';
 import { drawGameScreen, drawMenuScreen, setAssets } from './render/game-renderer.js';
 import { GAME, GAME_OVER, createApp } from './ui/app.js';
-import { attachGameInput, hitTest } from './ui/input.js';
+import { attachGameInput, hitTest, isQualityKey } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
 import { attachScreens } from './ui/screens.js';
 
@@ -22,10 +22,29 @@ loadAssets({ warn: (message) => console.warn(message) }).then(setAssets);
 
 const params = new URLSearchParams(window.location.search);
 
+// The 2D renderer. The 3D one (src/render3d/world-renderer.js) has the same
+// interface and draws the world on the WebGL canvas under this one.
+const RENDERER_2D = { drawGameScreen, hitTest };
+const worldCanvas = document.getElementById('world');
+
 if (params.get('local') === '1') {
-  startLocalMode();
+  startLocalMode(params.get('render') === '2d' ? RENDERER_2D : await load3dRenderer());
 } else {
   startOnlineMode();
+}
+
+// The 3D renderer, or the 2D one if WebGL or the 3D code fails to load.
+// Three.js loads only when the 3D renderer is used.
+async function load3dRenderer() {
+  try {
+    worldCanvas.hidden = false; // it must be laid out before the renderer sizes it
+    const { createWorldRenderer } = await import('./render3d/world-renderer.js');
+    return createWorldRenderer(worldCanvas);
+  } catch (err) {
+    console.warn('The 3D renderer is not available, using the 2D one.', err);
+    worldCanvas.hidden = true;
+    return RENDERER_2D;
+  }
 }
 
 // Online rooms over a BroadcastChannel: the lobby and room screens are DOM
@@ -81,34 +100,46 @@ function startOnlineMode() {
   requestAnimationFrame(frame);
 }
 
-// Dev mode: one window plays both sides, skills included.
-function startLocalMode() {
+// Dev mode: one window plays both sides, skills included. renderer is
+// RENDERER_2D or the 3D renderer; the 2D placeholder effects belong to the
+// 2D renderer only.
+function startLocalMode(renderer) {
   const game = createLocalGame();
-  const effects = createEffects();
+  const effects = renderer === RENDERER_2D ? createEffects() : null;
+  const hint = renderer === RENDERER_2D
+    ? 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts.'
+    : 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts. Q quality.';
 
   attachGameInput(canvas, {
     onHover: (point) => {
-      const hit = point ? hitTest(point.px, point.py) : null;
+      const hit = point ? renderer.hitTest(point.px, point.py) : null;
       game.setHover(hit?.cell ?? null);
       game.setHoverSkill(hit?.skill ?? null);
     },
     onClick: ({ px, py }) => {
-      const hit = hitTest(px, py);
+      const hit = renderer.hitTest(px, py);
       if (hit?.skill) game.clickSkill(hit.skill.player, hit.skill.skillId);
       else if (hit?.cell) game.click(hit.cell);
     },
     onCancel: () => game.cancel(),
     onRestart: () => {
       game.restart();
-      effects.clear();
+      effects?.clear();
     },
   });
 
+  if (renderer.cycleQuality) {
+    window.addEventListener('keydown', (event) => {
+      if (!event.repeat && isQualityKey(event)) renderer.cycleQuality();
+    });
+  }
+
   const frame = (time) => {
-    effects.trigger(game.takeEvents(), time);
+    const events = game.takeEvents();
+    effects?.trigger(events, time);
     const view = game.getView();
     canvas.style.cursor = view.pointer ? 'pointer' : 'default';
-    drawGameScreen(ctx, { ...view, time, effects, hint: 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts.' });
+    renderer.drawGameScreen(ctx, { ...view, time, effects, hint });
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

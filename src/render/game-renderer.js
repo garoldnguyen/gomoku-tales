@@ -8,8 +8,7 @@ import { CELL_PX, INTERNAL_WIDTH, INTERNAL_HEIGHT, ROCK_PX, STONE_PX, TORNADO_PX
 import { X, O, ROCK } from '../logic/board.js';
 import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../logic/skills.js';
 import {
-  BOARD_FRAME_PX, BOARD_PX, BOARD_X, BOARD_Y, STATUS_Y, MESSAGE_Y,
-  NAME_Y, PORTRAIT_PX, PORTRAIT_Y, SKILL_ICON_PX, STONE_LINE_Y,
+  BOARD_FRAME_PX, BOARD_PX, BOARD_X, BOARD_Y, HUD_2D, PORTRAIT_PX, SKILL_ICON_PX,
   cellCenter, cellOrigin, panelRect, skillButtonRect,
 } from './layout.js';
 import { createAssetStore } from './assets.js';
@@ -401,18 +400,19 @@ function drawSkillButton(ctx, rect, skill, panelActive) {
   }
 }
 
-// view panel: see panelView in ui/local-game.js.
-function drawPanel(ctx, panel) {
-  const rect = panelRect(panel.player);
+// view panel: see panelView in ui/local-game.js. layout: a HUD layout
+// from layout.js.
+function drawPanel(ctx, panel, layout) {
+  const rect = panelRect(panel.player, layout);
   drawWoodFrame(ctx, rect, panel.player, panel.active);
   const cx = rect.x + rect.w / 2;
-  drawPortrait(ctx, cx - PORTRAIT_PX / 2, rect.y + PORTRAIT_Y, panel);
-  drawText(ctx, panel.name, cx, rect.y + NAME_Y, { size: 18 });
+  if (layout.portraitY !== null) drawPortrait(ctx, cx - PORTRAIT_PX / 2, rect.y + layout.portraitY, panel);
+  drawText(ctx, panel.name, cx, rect.y + layout.nameY, { size: layout.nameSize });
 
   const stoneText = `Stone: ${panel.stone}`;
-  drawText(ctx, stoneText, cx + 12, rect.y + STONE_LINE_Y, { size: 13 });
+  drawText(ctx, stoneText, cx + 12, rect.y + layout.stoneLineY, { size: 13 });
   const textWidth = ctx.measureText(stoneText).width;
-  drawDisc(ctx, cx + 12 - textWidth / 2 - 16, rect.y + STONE_LINE_Y, panel.player);
+  drawDisc(ctx, cx + 12 - textWidth / 2 - 16, rect.y + layout.stoneLineY, panel.player);
 
   if (panel.you) {
     ctx.fillStyle = COLORS.outline;
@@ -422,12 +422,33 @@ function drawPanel(ctx, panel) {
     drawText(ctx, 'You', rect.x + 30, rect.y + 20, { size: 11 });
   }
 
-  panel.skills.forEach((skill, index) => drawSkillButton(ctx, skillButtonRect(panel.player, index), skill, panel.active));
+  panel.skills.forEach((skill, index) => drawSkillButton(ctx, skillButtonRect(panel.player, index, layout), skill, panel.active));
 
-  const lastButton = skillButtonRect(panel.player, panel.skills.length - 1);
+  const lastButton = skillButtonRect(panel.player, panel.skills.length - 1, layout);
   const footerY = (lastButton.y + lastButton.h + rect.y + rect.h) / 2;
   if (panel.winner) drawText(ctx, 'WINNER!', cx, footerY, { size: 18, color: COLORS.panelActive });
   else if (panel.active) drawText(ctx, 'Taking a turn', cx, footerY, { size: 13, color: COLORS.panelActive });
+}
+
+// Title, hint line and the player panels.
+function drawHeaderAndPanels(ctx, view, layout) {
+  const { panels = [], hint } = view;
+  drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 36, { size: 28 });
+  if (hint) drawText(ctx, hint, INTERNAL_WIDTH / 2, 66, { size: 12 });
+  for (const panel of panels) drawPanel(ctx, panel, layout);
+}
+
+// Status line: a small stone for the player to move (or the winner).
+// view.marker, when given, overrides it (null for none). Then the message.
+function drawStatusLines(ctx, view, layout) {
+  const { state, status, message } = view;
+  const marker = view.marker !== undefined ? view.marker : state.winner ?? (state.draw ? null : state.currentPlayer);
+  drawText(ctx, status, INTERNAL_WIDTH / 2 + (marker ? 14 : 0), layout.statusY);
+  if (marker) {
+    const textWidth = ctx.measureText(status).width;
+    drawDisc(ctx, INTERNAL_WIDTH / 2 - textWidth / 2, layout.statusY, marker);
+  }
+  if (message) drawText(ctx, message, INTERNAL_WIDTH / 2, layout.messageY, { color: COLORS.message, size: 14 });
 }
 
 // view: { state, hover, preview, panels, status, message, hint, marker?, time?, effects? }
@@ -435,7 +456,7 @@ function drawPanel(ctx, panel) {
 // effects (see effects.js), when given, adds the screen shake, particles
 // and banners.
 export function drawGameScreen(ctx, view) {
-  const { state, hover, preview, panels = [], status, message, hint, effects } = view;
+  const { state, hover, preview, effects } = view;
   const time = view.time ?? performance.now();
   drawBackground(ctx, time);
 
@@ -443,10 +464,7 @@ export function drawGameScreen(ctx, view) {
   const shake = effects ? effects.shake(time) : { dx: 0, dy: 0 };
   ctx.save();
   ctx.translate(shake.dx, shake.dy);
-  drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 36, { size: 28 });
-  if (hint) drawText(ctx, hint, INTERNAL_WIDTH / 2, 66, { size: 12 });
-
-  for (const panel of panels) drawPanel(ctx, panel);
+  drawHeaderAndPanels(ctx, view, HUD_2D);
 
   drawBoard(ctx, state.board.length);
   drawCells(ctx, state.board);
@@ -455,19 +473,21 @@ export function drawGameScreen(ctx, view) {
   if (hover) drawHover(ctx, hover, state.currentPlayer);
   if (preview) drawPreview(ctx, preview, time);
 
-  // Status line: a small stone for the player to move (or the winner).
-  // view.marker, when given, overrides it (null for none).
-  const marker = view.marker !== undefined ? view.marker : state.winner ?? (state.draw ? null : state.currentPlayer);
-  drawText(ctx, status, INTERNAL_WIDTH / 2 + (marker ? 14 : 0), STATUS_Y);
-  if (marker) {
-    const textWidth = ctx.measureText(status).width;
-    drawDisc(ctx, INTERNAL_WIDTH / 2 - textWidth / 2, STATUS_Y, marker);
-  }
-  if (message) drawText(ctx, message, INTERNAL_WIDTH / 2, MESSAGE_Y, { color: COLORS.message, size: 14 });
+  drawStatusLines(ctx, view, HUD_2D);
   if (effects) effects.drawParticles(ctx, time);
   ctx.restore();
 
   if (effects) effects.drawBanner(ctx, time);
+}
+
+// The 2D HUD alone (title, hint, player panels with skill buttons and
+// cooldowns, status line and message, winner text) on a transparent canvas
+// over the 3D world (docs/art-direction-hd2d.md section F). Takes the same
+// view as drawGameScreen and a HUD layout from layout.js. It does not clear
+// the canvas first.
+export function drawGameHud(ctx, view, layout) {
+  drawHeaderAndPanels(ctx, view, layout);
+  drawStatusLines(ctx, view, layout);
 }
 
 // Background and title behind the lobby and room screens (DOM overlays).

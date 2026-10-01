@@ -4,7 +4,7 @@ import {
   BOARD_SIZE, CAMERA_PITCH_DEG, CELL_SIZE, CHARACTER_SPRITE_PX, CHARACTER_X, PIECE_SPRITE_PX, PX_WORLD,
   SPRITE_STRETCH_Y,
 } from '../src/config.js';
-import { faceYaw, frameAt } from '../src/render3d/sprite-frames.js';
+import { faceYaw, fadedAlphaTest, frameAt, SPRITE_ALPHA_TEST } from '../src/render3d/sprite-frames.js';
 import {
   bearFrames, cloudGrid, FLOWER_PX, FLOWER_VARIANTS, flowerGrid, IDLE_BOB, rabbitFrames, rockGrid, stoneGrid,
 } from '../src/render3d/placeholder-art.js';
@@ -124,4 +124,16 @@ test('the hill falls away behind the board and never rises above the board top n
   for (let x = -20; x <= 20; x += 1) {
     for (let z = -14; z <= 14; z += 1) assert.ok(terrainHeight(x, z) < 0.5);
   }
+});
+
+test('faded sprites keep opaque art pixels and cut out transparent ones', () => {
+  for (const opacity of [1, 0.45, 0.2]) {
+    const threshold = fadedAlphaTest(opacity);
+    // Three.js tests texelAlpha * opacity against alphaTest and discards below it.
+    assert.ok(1 * opacity >= threshold, `opaque pixel survives at opacity ${opacity}`);
+    assert.ok(0 * opacity < threshold, `transparent pixel is cut at opacity ${opacity}`);
+  }
+  assert.equal(fadedAlphaTest(1), SPRITE_ALPHA_TEST);
+  // The bug this guards: an unscaled threshold discards a 0.45 ghost entirely.
+  assert.ok(1 * 0.45 < SPRITE_ALPHA_TEST);
 });

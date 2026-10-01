@@ -9,9 +9,8 @@
 
 import * as THREE from 'three';
 import { PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
-import { faceYaw, frameAt } from './sprite-frames.js';
+import { faceYaw, frameAt, SPRITE_ALPHA_TEST } from './sprite-frames.js';
 
-const ALPHA_TEST = 0.5;
 const SHADOW_LIFT = 0.005; // keeps the blob shadow just above the ground
 const SHADOW_OPACITY = 0.35;
 const SHADOW_DEPTH = 0.8; // the blob is an ellipse this much shorter in z
@@ -73,7 +72,7 @@ export function uprightPlaneGeometry(widthPx, heightPx, pxWorld = PX_WORLD, stre
 
 // Lit cutout material for sprites and billboards.
 export function spriteMaterial(map) {
-  return new THREE.MeshLambertMaterial({ map, alphaTest: ALPHA_TEST });
+  return new THREE.MeshLambertMaterial({ map, alphaTest: SPRITE_ALPHA_TEST });
 }
 
 // Soft round shadow texture shared by every blob shadow.
