@@ -89,8 +89,11 @@ Call the left window **A** (it creates the room and is the host) and the right w
 - [ ] Window A's top line says "Room CODE | You play Wind Rabbit (X)"; window B's says
       "... You play Earth Bear (O)". The joiner got the other character.
 - [ ] The Wind Rabbit panel is on the left and the Earth Bear panel on the right in both
-      windows, with the board between them and the rabbit and bear sprites standing beside it. Each panel shows a portrait (placeholder square with a letter), the name,
-      "Stone: X" or "Stone: O", and two skill buttons with an icon, the name and "Ready".
+      windows, with the board between them. In 3D the panels are wooden signboards in the
+      bottom corners and the rabbit and bear sprites stand beside the board above them;
+      each panel shows the name, "Stone: X" or "Stone: O", and two skill buttons with an
+      icon, the name and "Ready". [2D: tall panels beside the board, each with a portrait
+      (placeholder square with a letter) above the name.]
 - [ ] Only your own panel has the green "You" tag (left in A, right in B).
 - [ ] The Wind Rabbit panel has the yellow turn highlight and "Taking a turn". The status
       line under the board says "Your turn" in A and "Opponent's turn" in B.
@@ -304,6 +307,20 @@ from section 3, side by side and both visible.
 
 ### 10.3 Quality is per window
 
+The levels (the README has the full table): HIGH has depth of field, bloom, a vignette and
+real sun shadows; MEDIUM (the default) has a cheaper tilt shift blur, half resolution
+bloom and the vignette; LOW has no post-processing. Every level keeps the blob shadows
+under sprites.
+
+- [ ] In A press Q until it shows HIGH: distant hills and sky are soft, the board centre
+      is sharp, the trees and the board cast soft sun shadows on the grass, the corners are
+      a little darker and the white rabbit and the hover glow have a faint bloom.
+- [ ] MEDIUM: the top and bottom of the view are softer than the middle (a miniature
+      look); no sun shadows, only the blobs under the sprites.
+- [ ] LOW: everything is sharp, no vignette, no bloom; colours look about the same as on
+      MEDIUM (no sudden brighter decals, glow or sky).
+- [ ] On every level the pieces, characters and board grid keep hard pixel edges, and a
+      level change hitches at most once.
 - [ ] Press Q in A (click A's scene first so it has focus): A's level goes MEDIUM -> LOW ->
       HIGH -> MEDIUM, and B's stays as it was. Then press Q in B: only B changes.
 - [ ] Leave A on HIGH and B on LOW and play a few moves: both keep their level and draw the
@@ -344,4 +361,23 @@ Hidden tabs get no animation frames, but the room keeps running on timers.
 
 - [ ] Open http://localhost:8000/?render=2d in two windows and play a few moves and one
       skill: the flat 2D board works online as before, with no quality line and no blur.
+      Pressing Q does nothing.
+- [ ] Open http://localhost:8000/?render=2d&local=1: local mode works in 2D too.
+
+### 10.7 Slow frames step down
+
+- [ ] Make A slow: put it on HIGH on a weak laptop, or in DevTools open the Performance
+      tab, click the gear icon and set CPU to "6x slowdown" (if that is not enough to drop
+      the FPS, also make the window full screen on a large monitor). Whenever the FPS stays
+      below about 50 for 3 seconds, the corner shows the next lower level with "(auto)";
+      it steps one level at a time and never below LOW. A short hitch (a shader compile,
+      switching tabs) does not step down. Turn the slowdown off: the level stays where it
+      is until you press Q, which clears "(auto)".
+
+### 10.8 The look lab
+
+- [ ] Open http://localhost:8000/hd2d-lab.html. It shows the same Breeze Hill scene with a
+      few sample stones and a rock, and "Quality MEDIUM [Q]", the FPS and the hovered cell
+      in the top-left corner. Q cycles the levels as in 10.3, and the hover glow follows the
+      pointer. [docs/lab.md](lab.md) lists what to look at.
 

@@ -54,7 +54,8 @@ export function createCharacters(addSprite) {
     material.emissiveIntensity = 0;
 
     // The halo hangs behind the plane and turns with it; the opaque sprite
-    // pixels hide its middle, so it shows as a rim of light.
+    // pixels hide its middle, so it shows as a rim of light. It is tone
+    // mapped like the rest, so it looks the same at every quality level.
     const halo = new THREE.Mesh(haloGeometry, new THREE.MeshBasicMaterial({
       map: haloMap,
       color: GLOW_COLOR,
@@ -62,7 +63,6 @@ export function createCharacters(addSprite) {
       opacity: 0,
       blending: THREE.AdditiveBlending,
       depthWrite: false,
-      toneMapped: false,
     }));
     halo.position.z = -HALO_BEHIND;
     halo.visible = false;

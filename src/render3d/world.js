@@ -247,12 +247,13 @@ export function placeOnCell(object, x, y) {
 }
 
 // Unlit see-through material for flat decals drawn from a canvas or image.
+// Tone mapped like everything else, so decals look the same on LOW (tone
+// mapped by the renderer) as on MEDIUM and HIGH (tone mapped by OutputPass).
 export function decalMaterial(source) {
   return new THREE.MeshBasicMaterial({
     map: pixelTexture(source),
     transparent: true,
     depthWrite: false,
-    toneMapped: false,
   });
 }
 
