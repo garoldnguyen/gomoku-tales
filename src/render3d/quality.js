@@ -8,6 +8,8 @@
 //   LOW     no post-processing, blob shadows only
 //
 // Tone mapping is on at every level. Blob shadows under sprites are always on.
+// `particles` scales the particle counts and rates of the 3D effects
+// (src/render3d/effects3d.js): full at HIGH, fewer at MEDIUM and LOW.
 
 export const QUALITY_ORDER = ['HIGH', 'MEDIUM', 'LOW']; // best first
 
@@ -20,6 +22,7 @@ export const QUALITY_LEVELS = Object.freeze({
     bloomResolution: 1, // share of the full render size
     vignette: true,
     shadowMaps: true,
+    particles: 1,
   }),
   MEDIUM: Object.freeze({
     name: 'MEDIUM',
@@ -29,6 +32,7 @@ export const QUALITY_LEVELS = Object.freeze({
     bloomResolution: 0.5,
     vignette: true,
     shadowMaps: false,
+    particles: 0.6,
   }),
   LOW: Object.freeze({
     name: 'LOW',
@@ -38,6 +42,7 @@ export const QUALITY_LEVELS = Object.freeze({
     bloomResolution: 0,
     vignette: false,
     shadowMaps: false,
+    particles: 0.35,
   }),
 });
 

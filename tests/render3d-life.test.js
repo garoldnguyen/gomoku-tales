@@ -97,10 +97,10 @@ test('the director follows real events from src/logic', () => {
   assert.equal(director.poseAt(X, 300).pose, 'idle');
   // Feeding events to the director never changes them or the game.
   assert.deepEqual(popCellsForEvents(placed.events), [{ x: 0, y: 0 }]);
-  assert.deepEqual(popCellsForEvents(skill.events), [{ x: 7, y: 7 }]);
+  assert.deepEqual(popCellsForEvents(skill.events), [], 'the rock falls in (effects3d.js) instead of popping');
 });
 
-test('pieces pop in where a logic event puts one, and nowhere else', () => {
+test('placed stones pop in; pieces that arrive by a skill are left to the skill visuals', () => {
   const cells = popCellsForEvents([
     { type: 'stonePlaced', player: X, x: 1, y: 2 },
     { type: 'rockPlaced', player: O, x: 3, y: 4, breaksAfterTurn: 6 },
@@ -116,7 +116,7 @@ test('pieces pop in where a logic event puts one, and nowhere else', () => {
     { type: 'turnEnded', player: X, turn: 3 },
     { type: 'win', player: X, line: [] },
   ]);
-  assert.deepEqual(cells, [{ x: 1, y: 2 }, { x: 3, y: 4 }, { x: 5, y: 6 }, { x: 7, y: 8 }, { x: 10, y: 11 }]);
+  assert.deepEqual(cells, [{ x: 1, y: 2 }]);
   assert.deepEqual(popCellsForEvents([]), []);
 });
 

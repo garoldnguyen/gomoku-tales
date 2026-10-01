@@ -68,21 +68,13 @@ export function createCharacterDirector() {
   };
 }
 
-// Cells where a piece appears because of a logic event, so it pops in.
+// Cells where a placed stone pops in. Pieces that arrive another way (a
+// Wind Dash, a thrown stone, a falling rock, a converted stone) are shown
+// arriving by their skill visuals instead (src/render3d/effects3d.js).
 export function popCellsForEvents(events) {
   const cells = [];
   for (const event of events) {
-    switch (event.type) {
-      case 'stonePlaced':
-      case 'rockPlaced':
-      case 'stoneConverted':
-        cells.push({ x: event.x, y: event.y });
-        break;
-      case 'dashResolved':
-      case 'stoneThrown':
-        cells.push({ x: event.to.x, y: event.to.y });
-        break;
-    }
+    if (event.type === 'stonePlaced') cells.push({ x: event.x, y: event.y });
   }
   return cells;
 }
@@ -94,13 +86,25 @@ const POP_OVERSHOOT = 1.7; // how far past full size the bounce goes (ease out b
 // small, overshoots a little (stretched taller than wide), settles back and
 // is exactly { x: 1, y: 1 } from PIECE_POP_IN_MS on.
 export function popInScale(ageMs, durationMs = PIECE_POP_IN_MS) {
-  if (!(ageMs < durationMs)) return { x: 1, y: 1 };
+  return popInScaleInto(ageMs, { x: 1, y: 1 }, durationMs);
+}
+
+// popInScale writing into out.x and out.y, for per-frame use without
+// allocations.
+export function popInScaleInto(ageMs, out, durationMs = PIECE_POP_IN_MS) {
+  if (!(ageMs < durationMs)) {
+    out.x = 1;
+    out.y = 1;
+    return out;
+  }
   const t = Math.max(0, ageMs) / durationMs;
   const u = t - 1;
   const grow = 1 + (POP_OVERSHOOT + 1) * u * u * u + POP_OVERSHOOT * u * u; // ease out back
   const s = POP_MIN_SCALE + (1 - POP_MIN_SCALE) * grow;
   const stretch = 0.12 * Math.sin(Math.PI * t); // squash and stretch
-  return { x: s * (1 - stretch), y: s * (1 + stretch) };
+  out.x = s * (1 - stretch);
+  out.y = s * (1 + stretch);
+  return out;
 }
 
 // The glow of a character moves towards 1 while its player is to move and

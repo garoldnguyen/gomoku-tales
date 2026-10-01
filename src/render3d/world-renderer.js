@@ -12,8 +12,10 @@
 //
 // The world also comes alive from the logic events (sections D and G):
 //   trigger(events, time)  placed pieces pop in, a character casts when its
-//                          player uses a skill, win and lose poses at the end
-//   reset()                a new game: no pops, both characters idle
+//                          player uses a skill, win and lose poses at the
+//                          end, and the skill visuals, sparkles, dust,
+//                          camera shake and HUD banners (effects3d.js)
+//   reset()                a new game: no pops or effects, both characters idle
 // The player to move has a gentle glow. None of this changes the rules.
 
 import { BOARD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH } from '../config.js';
@@ -23,6 +25,8 @@ import { drawGameHud, drawText } from '../render/game-renderer.js';
 import { HUD_3D } from '../render/layout.js';
 import { boardMarks } from './board-marks.js';
 import { popCellsForEvents, popInScale } from './character-poses.js';
+import { drawDashTarget, drawFrame, drawWhirl, drawZone } from './decal-art.js';
+import { createEffects3d } from './effects3d.js';
 import { createWorldHitTest } from './hit-test.js';
 import { fadedAlphaTest } from './sprite-frames.js';
 import { createCellDecal, createPieceSprite, createWorld, decalCanvas, decalMaterial, placeOnCell } from './world.js';
@@ -35,20 +39,23 @@ export function createWorldRenderer(worldCanvas) {
   const pieces = createPieceLayer(world);
   const decals = createDecalLayer(world);
   const ghosts = createGhosts(world);
+  const effects = createEffects3d(world);
 
   return {
     drawGameScreen(ctx, view) {
       const time = view.time ?? performance.now();
-      pieces.sync(view.state.board, time);
+      pieces.sync(view.state.board, time, effects);
       world.characters.setActive(isGameOver(view.state) ? null : view.state.currentPlayer);
       const marks = boardMarks(view);
       decals.show(marks.decals);
       ghosts.show(marks.ghost);
       world.setHoveredCell(view.hover ?? null);
+      effects.update(time);
       world.render(time);
 
       ctx.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
       drawGameHud(ctx, view, HUD_3D);
+      effects.drawBanner(ctx, time);
       const autoText = world.autoStepped ? ' (auto)' : '';
       drawText(ctx, `Quality ${world.quality}${autoText} [Q]  FPS ${Math.round(world.fps)}`, 8, 12, { size: 11, align: 'left' });
     },
@@ -63,11 +70,13 @@ export function createWorldRenderer(worldCanvas) {
       if (events.length === 0) return;
       pieces.pop(popCellsForEvents(events), time);
       world.characters.trigger(events, time);
+      effects.trigger(events, time);
     },
 
     reset() {
       pieces.clearPops();
       world.characters.reset();
+      effects.reset();
     },
   };
 }
@@ -80,7 +89,8 @@ function pieceKind(cell) {
 
 // Stone and rock sprites that follow the board. Sprites are reused: a
 // removed piece goes back to its kind's pool, hidden. A piece on a cell
-// given to pop() grows in with a small bounce.
+// given to pop() grows in with a small bounce. A piece stays hidden while
+// the effects show a flying copy arriving on its cell.
 function createPieceLayer(world) {
   const shownKind = []; // per cell index: 'X', 'O', 'rock' or null
   const shownSprite = [];
@@ -97,7 +107,7 @@ function createPieceLayer(world) {
       pops.clear();
     },
 
-    sync(board, time) {
+    sync(board, time, effects) {
       const size = board.length;
       for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
@@ -113,12 +123,14 @@ function createPieceLayer(world) {
           shownSprite[i] = null;
           if (kind) {
             const sprite = free[kind].pop() ?? world.addSprite(createPieceSprite(kind));
-            sprite.object.visible = true;
             sprite.object.scale.set(1, 1, 1);
             placeOnCell(sprite, x, y);
             shownSprite[i] = sprite;
           }
         }
+      }
+      for (let i = 0; i < shownSprite.length; i++) {
+        if (shownSprite[i]) shownSprite[i].object.visible = !effects.holds(i, time);
       }
       for (const [i, start] of pops) {
         const sprite = shownSprite[i];
@@ -134,11 +146,10 @@ function createPieceLayer(world) {
 // textures like the 2D placeholders. renderOrder keeps overlapping decals
 // in a fixed order.
 const DECALS = {
-  zone: { order: 1, opacity: 1, draw: drawZone },
   zonePreview: { order: 1, opacity: 0.6, draw: drawZone },
-  win: { order: 2, opacity: 1, draw: (ctx) => frame(ctx, '#ffe14d', 'rgba(255, 225, 77, 0.25)') },
-  dashTarget: { order: 3, opacity: 1, draw: (ctx) => frame(ctx, '#ff2a3a', 'rgba(255, 42, 58, 0.28)') },
-  select: { order: 4, opacity: 1, draw: (ctx) => frame(ctx, '#fff27a', null) },
+  win: { order: 2, opacity: 1, draw: (ctx) => drawFrame(ctx, '#ffe14d', 'rgba(255, 225, 77, 0.25)') },
+  dashTarget: { order: 3, opacity: 1, draw: drawDashTarget },
+  select: { order: 4, opacity: 1, draw: (ctx) => drawFrame(ctx, '#fff27a', null) },
   whirl: { order: 5, opacity: 1, draw: drawWhirl },
 };
 
@@ -203,47 +214,4 @@ function createGhosts(world) {
       }
     },
   };
-}
-
-// A 2 px frame around the cell, with an optional fill inside.
-function frame(ctx, color, fill) {
-  const size = ctx.canvas.width;
-  if (fill) {
-    ctx.fillStyle = fill;
-    ctx.fillRect(0, 0, size, size);
-  }
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, size, 2);
-  ctx.fillRect(0, size - 2, size, 2);
-  ctx.fillRect(0, 0, 2, size);
-  ctx.fillRect(size - 2, 0, 2, size);
-}
-
-// Pale translucent wind over a Tornado Zone cell with a light edge.
-function drawZone(ctx) {
-  const size = ctx.canvas.width;
-  ctx.fillStyle = 'rgba(200, 236, 255, 0.45)';
-  ctx.fillRect(0, 0, size, size);
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-  for (let i = 0; i < size; i += 4) {
-    // A dashed edge, so neighbouring zone cells read as one area.
-    ctx.fillRect(i, 0, 2, 1);
-    ctx.fillRect(i + 2, size - 1, 2, 1);
-    ctx.fillRect(0, i + 2, 1, 2);
-    ctx.fillRect(size - 1, i, 1, 2);
-  }
-}
-
-// Three pale blue arcs around the cell centre, set pixel by pixel.
-function drawWhirl(ctx) {
-  const size = ctx.canvas.width;
-  const c = (size - 1) / 2;
-  ctx.fillStyle = '#bfe8ff';
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const r = Math.hypot(x - c, y - c);
-      const angle = (Math.atan2(y - c, x - c) + Math.PI * 2) % ((Math.PI * 2) / 3);
-      if (r >= 6 && r < 7.6 && angle < Math.PI / 2) ctx.fillRect(x, y, 1, 1);
-    }
-  }
 }

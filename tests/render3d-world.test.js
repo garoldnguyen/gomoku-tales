@@ -152,7 +152,7 @@ test('hovering an empty cell shows a ghost stone of the player to move', () => {
   assert.deepEqual(boardMarks(game.getView()).ghost, { kind: O, x: 8, y: 8 });
 });
 
-test('the Wind Dash flow shows the select ring, whirl and target frame, then the announcement', () => {
+test('the Wind Dash flow shows the select ring, whirl and target frame while choosing', () => {
   const game = createLocalGame();
   game.click({ x: 7, y: 7 });
   game.click({ x: 0, y: 0 });
@@ -165,17 +165,19 @@ test('the Wind Dash flow shows the select ring, whirl and target frame, then the
   assert.deepEqual(kinds(boardMarks(game.getView())), ['dashTarget@9,9', 'select@7,7', 'whirl@7,7']);
   game.click({ x: 9, y: 9 });
   game.setHover(null);
-  assert.deepEqual(kinds(boardMarks(game.getView())), ['dashTarget@9,9', 'whirl@7,7']);
+  // The announced dash is shown by the skill visuals (effects3d.js) from its event.
+  assert.deepEqual(kinds(boardMarks(game.getView())), []);
 });
 
-test('the Tornado Zone flow previews the clipped zone, then shows the announced zone', () => {
+test('the Tornado Zone flow previews the clipped zone while choosing the centre', () => {
   const game = createLocalGame();
   game.clickSkill(X, TORNADO_ZONE);
   game.setHover({ x: 0, y: 0 });
   assert.deepEqual(kinds(boardMarks(game.getView())), ['zonePreview@0,0', 'zonePreview@0,1', 'zonePreview@1,0', 'zonePreview@1,1']);
   game.click({ x: 0, y: 0 });
   game.setHover(null);
-  assert.deepEqual(kinds(boardMarks(game.getView())), ['zone@0,0', 'zone@0,1', 'zone@1,0', 'zone@1,1']);
+  // The announced zone is shown by the skill visuals (effects3d.js) from its event.
+  assert.deepEqual(kinds(boardMarks(game.getView())), []);
 });
 
 test('Terrain Creation previews a ghost rock and Stone Conversion a select ring', () => {

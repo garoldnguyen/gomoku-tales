@@ -107,15 +107,77 @@ export function drawWindStreaks(ctx, time) {
   ctx.restore();
 }
 
+// Skill announcement banners, HUD text shared by the 2D renderer and the
+// 3D one (src/render3d/effects3d.js). They queue up so every announcement
+// shows for its full BANNER_MS, one after another, even when one action
+// gives several of them (a skill used on the turn a pending Wind Dash
+// resolves) or actions come fast.
+export function createBanners() {
+  const banners = []; // { text, start }, in the order they show
+
+  // Banners start in order and all last BANNER_MS, so the finished ones
+  // are always at the front.
+  const prune = (time) => {
+    while (banners.length > 0 && time - banners[0].start >= BANNER_MS) banners.shift();
+  };
+
+  return {
+    add(text, time) {
+      const last = banners[banners.length - 1];
+      const start = last ? Math.max(time, last.start + BANNER_MS) : time;
+      banners.push({ text, start });
+    },
+
+    clear() {
+      banners.length = 0;
+    },
+
+    // The one showing and the ones still waiting their turn.
+    texts(time) {
+      prune(time);
+      return banners.map((b) => b.text);
+    },
+
+    // The banner whose turn it is, centred, its top edge at y, sliding in
+    // and fading out.
+    draw(ctx, time, y) {
+      prune(time);
+      const banner = banners[0];
+      if (!banner || banner.start > time) return;
+      const age = time - banner.start;
+      const slide = Math.min(1, age / 150);
+      const fade = age > BANNER_MS - 250 ? (BANNER_MS - age) / 250 : 1;
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, fade);
+      ctx.font = 'bold 22px monospace';
+      const w = Math.ceil(ctx.measureText(banner.text).width) + 40;
+      const h = 36;
+      const x = Math.round(INTERNAL_WIDTH / 2 - w / 2);
+      const top = Math.round(y - (1 - slide) * 20);
+      ctx.fillStyle = COLORS.bannerEdge;
+      ctx.fillRect(x - 2, top - 2, w + 4, h + 4);
+      ctx.fillStyle = COLORS.bannerBack;
+      ctx.fillRect(x, top, w, h);
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = COLORS.bannerText;
+      ctx.fillText(banner.text, INTERNAL_WIDTH / 2, top + h / 2 + 1);
+      ctx.restore();
+    },
+  };
+}
+
+// Banner texts for the events of one action, in order.
+export function bannerTexts(events) {
+  return effectsForEvents(events).filter((spec) => spec.kind === 'banner').map((spec) => spec.text);
+}
+
 // Live effects. options.random (default Math.random) scatters the sparkles
 // and dust; it is for looks only and never touches the game.
 export function createEffects(options = {}) {
   const { random = Math.random } = options;
   let particles = []; // { kind, px, py, vx, vy, start, life, color, size }
-  // Banners queue up so every announcement shows for its full BANNER_MS,
-  // one after another, even when one action gives several of them (a skill
-  // used on the turn a pending Wind Dash resolves) or actions come fast.
-  let banners = []; // { text, start }, in the order they show
+  const banners = createBanners();
   let shakeStart = null;
 
   const burst = (spec, time) => {
@@ -141,7 +203,6 @@ export function createEffects(options = {}) {
 
   const prune = (time) => {
     particles = particles.filter((p) => time - p.start < p.life);
-    banners = banners.filter((b) => time - b.start < BANNER_MS);
     if (shakeStart !== null && time - shakeStart >= SHAKE_MS) shakeStart = null;
   };
 
@@ -151,17 +212,13 @@ export function createEffects(options = {}) {
       for (const spec of effectsForEvents(events)) {
         if (spec.kind === 'sparkle' || spec.kind === 'dust') burst(spec, time);
         else if (spec.kind === 'shake') shakeStart = time;
-        else if (spec.kind === 'banner') {
-          const last = banners[banners.length - 1];
-          const start = last ? Math.max(time, last.start + BANNER_MS) : time;
-          banners.push({ text: spec.text, start });
-        }
+        else if (spec.kind === 'banner') banners.add(spec.text, time);
       }
     },
 
     clear() {
       particles = [];
-      banners = [];
+      banners.clear();
       shakeStart = null;
     },
 
@@ -173,7 +230,7 @@ export function createEffects(options = {}) {
     // one showing and the ones still waiting their turn.
     active(time) {
       prune(time);
-      return { particles: particles.length, banners: banners.map((b) => b.text), shaking: shakeStart !== null };
+      return { particles: particles.length, banners: banners.texts(time), shaking: shakeStart !== null };
     },
 
     // Particles, drawn over the board.
@@ -201,28 +258,7 @@ export function createEffects(options = {}) {
 
     // The banner whose turn it is, sliding in above the board and fading out.
     drawBanner(ctx, time) {
-      prune(time);
-      const banner = banners[0];
-      if (!banner || banner.start > time) return;
-      const age = time - banner.start;
-      const slide = Math.min(1, age / 150);
-      const fade = age > BANNER_MS - 250 ? (BANNER_MS - age) / 250 : 1;
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, fade);
-      ctx.font = 'bold 22px monospace';
-      const w = Math.ceil(ctx.measureText(banner.text).width) + 40;
-      const h = 36;
-      const x = Math.round(INTERNAL_WIDTH / 2 - w / 2);
-      const y = Math.round(BOARD_Y + 40 - (1 - slide) * 20);
-      ctx.fillStyle = COLORS.bannerEdge;
-      ctx.fillRect(x - 2, y - 2, w + 4, h + 4);
-      ctx.fillStyle = COLORS.bannerBack;
-      ctx.fillRect(x, y, w, h);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = COLORS.bannerText;
-      ctx.fillText(banner.text, INTERNAL_WIDTH / 2, y + h / 2 + 1);
-      ctx.restore();
+      banners.draw(ctx, time, BOARD_Y + 40);
     },
   };
 }

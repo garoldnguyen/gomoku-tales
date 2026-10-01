@@ -104,3 +104,29 @@ export const BLOOM_THRESHOLD = 0.85; // linear brightness a pixel needs before i
 export const VIGNETTE_OFFSET = 0.6;
 export const VIGNETTE_DARKNESS = 1.0;
 export const TONE_MAPPING_EXPOSURE = 1.0;
+
+// Skill visuals and placement effects in 3D (section G). They only draw; they
+// never change the game state. Particle counts and rates are for HIGH; the
+// quality levels scale them down (src/render3d/quality.js).
+export const EFFECT_PARTICLE_CAPACITY = 1500; // pooled particles shared by every 3D effect
+export const PLACE_SPARKLE_COUNT = 12; // sparkles when a stone lands
+export const PLACE_DUST_COUNT = 10; // specks in a dust puff
+export const DASH_STREAK_MS = 420; // a resolved Wind Dash streaks to its target this fast
+export const DASH_TRAIL_RATE = 160; // trail particles per second behind a dashing stone
+export const DASH_SWIRL_RATE = 40; // swirl particles per second around a dash source
+export const MARK_FADE_MS = 300; // the Wind Dash marks and the Tornado Zone fade out this fast when they end
+export const TORNADO_PARTICLE_RATE = 110; // particles per second rising in a Tornado Zone column
+export const THROW_DELAY_MS = 180; // a stone placed in a zone shows this long before it is thrown
+export const THROW_MS = 560; // flight time of a thrown stone
+export const THROW_ARC_HEIGHT = 1.6; // world units at the top of the arc
+export const ROCK_FALL_MS = 460; // a Terrain Creation rock falls this long
+export const ROCK_FALL_HEIGHT = 9; // world units above the board where it starts
+export const ROCK_SETTLE_MS = 160; // the squash after the impact
+export const ROCK_CRUMBLE_MS = 380; // a breaking rock sinks into rubble this long
+export const CONVERT_MS = 900; // Stone Conversion: glow, lift, flip and land
+export const CONVERT_LIFT = 0.7; // world units the converted stone rises
+export const CONVERT_SPARKLE_RATE = 36; // rising sparkles per second while it glows
+export const SHAKE3D_MS = 240; // camera shake length
+export const SHAKE3D_LIGHT = 0.04; // world units at the start of a light shake (placements, landings)
+export const SHAKE3D_HEAVY = 0.13; // a falling rock
+export const BANNER_3D_Y = 84; // top of the skill banner on the 3D HUD, under the title and hint

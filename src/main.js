@@ -138,7 +138,7 @@ function startLocalMode(renderer) {
   const frame = (time) => {
     const events = game.takeEvents();
     effects?.trigger(events, time);
-    renderer.trigger?.(events, time); // the 3D world: pop-ins and character poses
+    renderer.trigger?.(events, time); // the 3D world: pop-ins, character poses and skill visuals
     const view = game.getView();
     canvas.style.cursor = view.pointer ? 'pointer' : 'default';
     renderer.drawGameScreen(ctx, { ...view, time, effects, hint });

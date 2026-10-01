@@ -14,6 +14,7 @@ import {
 import { buildBreezeHill } from './breeze-hill.js';
 import { cameraPosition, cameraRay } from './camera.js';
 import { createCharacters } from './characters3d.js';
+import { snapToStep, worldUnitsPerPixel } from './effect-plans.js';
 import { createFpsMeter } from './fps.js';
 import { cellToWorld, pickCell } from './picking.js';
 import { rockGrid, stoneGrid } from './placeholder-art.js';
@@ -54,6 +55,10 @@ export function createWorld(canvas, { quality: startQuality = QUALITY_DEFAULT } 
   camera.position.set(cameraPos.x, cameraPos.y, cameraPos.z);
   camera.lookAt(cameraTarget.x, cameraTarget.y, cameraTarget.z);
   const cameraSetup = { position: cameraPos, target: cameraTarget, fovDeg: CAMERA_FOV, aspect: WORLD_ASPECT };
+  // The camera's own right and up directions, for the screen shake.
+  camera.updateMatrixWorld();
+  const cameraRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
+  const cameraUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
 
   // Lights: a warm sun with soft shadows and a cool hemisphere fill (section D).
   const sun = new THREE.DirectionalLight(COLORS.sun, 2.6);
@@ -150,6 +155,22 @@ export function createWorld(canvas, { quality: startQuality = QUALITY_DEFAULT } 
     pickCellAtNdc(ndcX, ndcY) {
       const ray = cameraRay(ndcX, ndcY, cameraSetup);
       return pickCell(ray.origin, ray.direction);
+    },
+
+    // Moves the camera offset.x and offset.y world units along its right
+    // and up directions for the screen shake (section B), snapped to whole
+    // screen pixels at the board so sprite pixels never shimmer. { x: 0,
+    // y: 0 } puts it back. Picking keeps using the unshaken camera.
+    setCameraShake(offset) {
+      const step = worldUnitsPerPixel(CAMERA_DISTANCE, CAMERA_FOV, canvas.height);
+      camera.position.set(cameraPos.x, cameraPos.y, cameraPos.z)
+        .addScaledVector(cameraRight, snapToStep(offset.x, step))
+        .addScaledVector(cameraUp, snapToStep(offset.y, step));
+    },
+
+    // Height of the drawing buffer in device pixels.
+    get drawingHeight() {
+      return canvas.height;
     },
 
     get quality() {
