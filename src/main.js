@@ -102,7 +102,7 @@ function startOnlineMode() {
 
 // Dev mode: one window plays both sides, skills included. renderer is
 // RENDERER_2D or the 3D renderer; the 2D placeholder effects belong to the
-// 2D renderer only.
+// 2D renderer only, and the 3D renderer takes the events itself.
 function startLocalMode(renderer) {
   const game = createLocalGame();
   const effects = renderer === RENDERER_2D ? createEffects() : null;
@@ -125,6 +125,7 @@ function startLocalMode(renderer) {
     onRestart: () => {
       game.restart();
       effects?.clear();
+      renderer.reset?.();
     },
   });
 
@@ -137,6 +138,7 @@ function startLocalMode(renderer) {
   const frame = (time) => {
     const events = game.takeEvents();
     effects?.trigger(events, time);
+    renderer.trigger?.(events, time); // the 3D world: pop-ins and character poses
     const view = game.getView();
     canvas.style.cursor = view.pointer ? 'pointer' : 'default';
     renderer.drawGameScreen(ctx, { ...view, time, effects, hint });

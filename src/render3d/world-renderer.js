@@ -9,12 +9,20 @@
 // skill buttons, cooldowns, status line and winner text. Board picking is a
 // ray from the camera (src/render3d/hit-test.js). The Q key calls
 // cycleQuality().
+//
+// The world also comes alive from the logic events (sections D and G):
+//   trigger(events, time)  placed pieces pop in, a character casts when its
+//                          player uses a skill, win and lose poses at the end
+//   reset()                a new game: no pops, both characters idle
+// The player to move has a gentle glow. None of this changes the rules.
 
-import { INTERNAL_HEIGHT, INTERNAL_WIDTH } from '../config.js';
+import { BOARD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
+import { isGameOver } from '../logic/game.js';
 import { drawGameHud, drawText } from '../render/game-renderer.js';
 import { HUD_3D } from '../render/layout.js';
 import { boardMarks } from './board-marks.js';
+import { popCellsForEvents, popInScale } from './character-poses.js';
 import { createWorldHitTest } from './hit-test.js';
 import { fadedAlphaTest } from './sprite-frames.js';
 import { createCellDecal, createPieceSprite, createWorld, decalCanvas, decalMaterial, placeOnCell } from './world.js';
@@ -31,7 +39,8 @@ export function createWorldRenderer(worldCanvas) {
   return {
     drawGameScreen(ctx, view) {
       const time = view.time ?? performance.now();
-      pieces.sync(view.state.board);
+      pieces.sync(view.state.board, time);
+      world.characters.setActive(isGameOver(view.state) ? null : view.state.currentPlayer);
       const marks = boardMarks(view);
       decals.show(marks.decals);
       ghosts.show(marks.ghost);
@@ -49,6 +58,17 @@ export function createWorldRenderer(worldCanvas) {
     cycleQuality() {
       world.cycleQuality();
     },
+
+    trigger(events, time) {
+      if (events.length === 0) return;
+      pieces.pop(popCellsForEvents(events), time);
+      world.characters.trigger(events, time);
+    },
+
+    reset() {
+      pieces.clearPops();
+      world.characters.reset();
+    },
   };
 }
 
@@ -59,13 +79,25 @@ function pieceKind(cell) {
 }
 
 // Stone and rock sprites that follow the board. Sprites are reused: a
-// removed piece goes back to its kind's pool, hidden.
+// removed piece goes back to its kind's pool, hidden. A piece on a cell
+// given to pop() grows in with a small bounce.
 function createPieceLayer(world) {
   const shownKind = []; // per cell index: 'X', 'O', 'rock' or null
   const shownSprite = [];
   const free = { [X]: [], [O]: [], rock: [] };
+  const pops = new Map(); // cell index -> pop start time
   return {
-    sync(board) {
+    // Cells { x, y } whose piece pops in from `time` on.
+    pop(cells, time) {
+      for (const { x, y } of cells) pops.set(y * BOARD_SIZE + x, time);
+    },
+
+    clearPops() {
+      for (const i of pops.keys()) shownSprite[i]?.object.scale.set(1, 1, 1);
+      pops.clear();
+    },
+
+    sync(board, time) {
       const size = board.length;
       for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
@@ -82,10 +114,17 @@ function createPieceLayer(world) {
           if (kind) {
             const sprite = free[kind].pop() ?? world.addSprite(createPieceSprite(kind));
             sprite.object.visible = true;
+            sprite.object.scale.set(1, 1, 1);
             placeOnCell(sprite, x, y);
             shownSprite[i] = sprite;
           }
         }
+      }
+      for (const [i, start] of pops) {
+        const sprite = shownSprite[i];
+        const scale = popInScale(time - start);
+        sprite?.object.scale.set(scale.x, scale.y, scale.x);
+        if (!sprite || (scale.x === 1 && scale.y === 1)) pops.delete(i);
       }
     },
   };

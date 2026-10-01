@@ -8,25 +8,24 @@
 import * as THREE from 'three';
 import {
   BOARD_SIZE, BOARD_THICKNESS, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE,
-  CHARACTER_IDLE_FRAME_MS, CHARACTER_X, FPS_SAMPLE_MS, QUALITY_DEFAULT, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS,
+  FPS_SAMPLE_MS, QUALITY_DEFAULT, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS,
   RENDER_SCALE, TARGET_FRAME_MS,
 } from '../config.js';
 import { buildBreezeHill } from './breeze-hill.js';
 import { cameraPosition, cameraRay } from './camera.js';
+import { createCharacters } from './characters3d.js';
 import { createFpsMeter } from './fps.js';
 import { cellToWorld, pickCell } from './picking.js';
-import { bearFrames, IDLE_BOB, rabbitFrames, rockGrid, stoneGrid } from './placeholder-art.js';
+import { rockGrid, stoneGrid } from './placeholder-art.js';
 import { createPostProcessing } from './post-processing.js';
 import { cappedPixelRatio, createSlowFrameWatch, cycleQuality, lowerQuality, QUALITY_LEVELS } from './quality.js';
 import { seededRandom } from './seeded-random.js';
 import { PixelSprite, pixelTexture, sheetCanvas } from './sprites.js';
-import { GROUND_Y } from './terrain.js';
 
 export const WORLD_ASPECT = 16 / 9;
 const BOARD_TEXTURE_PX = 480; // section D: 480x480, so one cell is 32 px
 export const DECAL_LIFT = 0.01; // keeps flat decals just above the board
 const SHADOW_EXTENT = 20; // the sun's shadow map covers the board, characters and trees
-const CHARACTER_SHADOW_RADIUS = 0.95;
 const PIECE_SHADOW_RADIUS = 0.36;
 const ROCK_SHADOW_RADIUS = PIECE_SHADOW_RADIUS * 1.2;
 
@@ -77,30 +76,16 @@ export function createWorld(canvas, { quality: startQuality = QUALITY_DEFAULT } 
   scene.add(hover);
   let hoveredCell = null;
 
-  // Pixel sprites (section D). The characters stand beside the board with
-  // a 4 frame idle bob, Wind Rabbit (X) on the left and Earth Bear (O) on
-  // the right.
+  // Pixel sprites (section D). Wind Rabbit (X) stands on the left of the
+  // board and Earth Bear (O) on the right, with idle, cast, win and lose
+  // poses and a glow for the player to move (src/render3d/characters3d.js).
   const sprites = new Set();
   const addSprite = (sprite) => {
     sprites.add(sprite);
     scene.add(sprite.object);
     return sprite;
   };
-  const characters = {
-    X: addSprite(new PixelSprite({
-      sheet: sheetCanvas(rabbitFrames()),
-      frameCount: IDLE_BOB.length,
-      frameMs: CHARACTER_IDLE_FRAME_MS,
-      shadowRadius: CHARACTER_SHADOW_RADIUS,
-    }).placeAt(-CHARACTER_X, GROUND_Y, 0)),
-    O: addSprite(new PixelSprite({
-      sheet: sheetCanvas(bearFrames()),
-      frameCount: IDLE_BOB.length,
-      frameMs: CHARACTER_IDLE_FRAME_MS,
-      shadowRadius: CHARACTER_SHADOW_RADIUS,
-      phaseMs: CHARACTER_IDLE_FRAME_MS * 2, // so the two do not bob in step
-    }).placeAt(CHARACTER_X, GROUND_Y, 0)),
-  };
+  const characters = createCharacters(addSprite);
 
   // Post-processing focused on the board centre, with quality levels (section E).
   const postProcessing = createPostProcessing(renderer, scene, camera, CAMERA_DISTANCE);
@@ -138,6 +123,7 @@ export function createWorld(canvas, { quality: startQuality = QUALITY_DEFAULT } 
     scene,
     camera,
     cameraSetup,
+    // The character controller: trigger(events, now), reset(), setActive(player).
     characters,
 
     // Adds a PixelSprite: it turns to the camera and animates every frame.
@@ -195,6 +181,7 @@ export function createWorld(canvas, { quality: startQuality = QUALITY_DEFAULT } 
       const dtMs = lastNow === null ? 0 : Math.min(now - lastNow, 100);
       lastNow = now;
       scenery.update(now, dtMs);
+      characters.update(now, dtMs);
       for (const sprite of sprites) sprite.update(now, camera.position);
       // A gentle glow pulse; only the opacity changes, so pixels never move.
       hoverMaterial.opacity = 0.75 + 0.25 * Math.sin(now / 250);
@@ -203,8 +190,8 @@ export function createWorld(canvas, { quality: startQuality = QUALITY_DEFAULT } 
   };
 }
 
-// A board piece sprite standing on the centre of cell (x, y): 'X' or 'O'
-// for a stone, 'rock' for a rock. Sprites of a kind share one texture.
+// A board piece sprite: 'X' (a sprout) or 'O' (a flower bud) for a stone,
+// 'rock' for a rock. Sprites of a kind share one texture.
 const pieceSheets = {};
 export function createPieceSprite(kind) {
   pieceSheets[kind] ??= sheetCanvas([kind === 'rock' ? rockGrid() : stoneGrid(kind)]);

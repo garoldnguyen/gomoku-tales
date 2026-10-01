@@ -65,6 +65,15 @@ export const SPRITE_STRETCH_Y = 1 / Math.cos((CAMERA_PITCH_DEG * Math.PI) / 180)
 export const CHARACTER_IDLE_FRAME_MS = 220; // time per frame of the 4 frame idle bob
 export const CHARACTER_X = 9.75; // characters stand this far left and right of the board centre
 
+// Living pieces and characters (sections D and G). They only animate; they
+// never change the game state.
+export const PIECE_POP_IN_MS = 320; // a placed stone or rock grows in with a small bounce
+export const CHARACTER_CAST_FRAME_MS = 140; // time per frame of the 4 frame cast animation
+export const CHARACTER_CAST_MS = 1000; // a cast shows this long (it holds its last frame), then idle again
+export const CHARACTER_POSE_FRAME_MS = 300; // time per frame of the 2 frame win and lose poses
+export const CHARACTER_GLOW_FADE_MS = 400; // the current player's glow fades in and out this fast
+export const CHARACTER_GLOW_PULSE_MS = 2400; // one slow breath of the glow
+
 // Map 1, Windy Spring Breeze Hill (section C).
 export const WILDFLOWER_COUNT = 280; // instanced flower and grass tuft billboards
 export const CLOUD_COUNT = 7;

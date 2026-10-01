@@ -1,0 +1,132 @@
+// Wind Rabbit and Earth Bear beside the board (docs/art-direction-hd2d.md
+// sections C, D and G): pixel sprites whose sheet holds every pose (idle
+// bob, cast, win and lose, see character-poses.js), and a gentle glow on the
+// current player's character: a soft halo behind the sprite and a little
+// extra brightness, both breathing slowly. The poses follow the events
+// returned by src/logic through trigger(); nothing here touches the rules.
+
+import * as THREE from 'three';
+import { CHARACTER_IDLE_FRAME_MS, CHARACTER_X } from '../config.js';
+import { CHARACTER_FRAME_COUNT, characterFrame, createCharacterDirector, glowPulse, stepGlow } from './character-poses.js';
+import { bearFrames, rabbitFrames } from './placeholder-art.js';
+import { PixelSprite, pixelTexture, sheetCanvas, uprightPlaneGeometry } from './sprites.js';
+import { GROUND_Y } from './terrain.js';
+
+const SHADOW_RADIUS = 0.95;
+const GLOW_COLOR = 0xfff0b8;
+const GLOW_EMISSIVE = 0.22; // extra brightness of the sprite at full glow
+const HALO_OPACITY = 0.5;
+// The halo is drawn in art pixels like the sprites (one texel is PX_WORLD),
+// a little wider than the 96 px character and resting on its feet.
+const HALO_WIDTH_PX = 120;
+const HALO_HEIGHT_PX = 100;
+const HALO_STEPS = 5; // the halo fades out in a few flat bands, pixel-art style
+const HALO_BEHIND = 0.05; // world units behind the sprite plane
+
+// Builds both characters and adds their sprites with `addSprite` (see
+// world.js). Returns the controller; call update(now, dtMs) every frame
+// before the sprites update.
+export function createCharacters(addSprite) {
+  const director = createCharacterDirector();
+  const haloGeometry = uprightPlaneGeometry(HALO_WIDTH_PX, HALO_HEIGHT_PX);
+  const haloMap = pixelTexture(drawHalo());
+  let active = null;
+
+  const make = (player, frames, x, phaseMs) => {
+    const sprite = addSprite(new PixelSprite({
+      sheet: sheetCanvas(frames),
+      frameCount: CHARACTER_FRAME_COUNT,
+      shadowRadius: SHADOW_RADIUS,
+      frameFor: (timeMs) => {
+        const { pose, ageMs } = director.poseAt(player, timeMs);
+        return characterFrame(pose, pose === 'idle' ? ageMs + phaseMs : ageMs);
+      },
+    }).placeAt(x, GROUND_Y, 0));
+
+    // The glow brightens the sprite's own colours: the emissive map is the
+    // sprite sheet, so the frame offset applies to it too. It is set up
+    // once here, so changing the glow never rebuilds a shader.
+    const material = sprite.plane.material;
+    material.emissive.set(GLOW_COLOR);
+    material.emissiveMap = sprite.texture;
+    material.emissiveIntensity = 0;
+
+    // The halo hangs behind the plane and turns with it; the opaque sprite
+    // pixels hide its middle, so it shows as a rim of light.
+    const halo = new THREE.Mesh(haloGeometry, new THREE.MeshBasicMaterial({
+      map: haloMap,
+      color: GLOW_COLOR,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+    }));
+    halo.position.z = -HALO_BEHIND;
+    halo.visible = false;
+    sprite.plane.add(halo);
+    return { sprite, material, halo, glow: 0 };
+  };
+
+  // Wind Rabbit (X) on the left, Earth Bear (O) on the right; their idle
+  // bobs are offset so they do not move in step.
+  const parts = {
+    X: make('X', rabbitFrames('all'), -CHARACTER_X, 0),
+    O: make('O', bearFrames('all'), CHARACTER_X, CHARACTER_IDLE_FRAME_MS * 2),
+  };
+
+  return {
+    X: parts.X.sprite,
+    O: parts.O.sprite,
+
+    // Logic events at time `now`: 'skillUsed' casts, 'win' sets the win and
+    // lose poses.
+    trigger(events, now) {
+      director.trigger(events, now);
+    },
+
+    // A new game: both idle.
+    reset() {
+      director.reset();
+    },
+
+    // The player to move ('X' or 'O') glows; null for nobody.
+    setActive(player) {
+      active = player;
+    },
+
+    update(now, dtMs) {
+      for (const [player, part] of Object.entries(parts)) {
+        part.glow = stepGlow(part.glow, active === player, dtMs);
+        const strength = part.glow * glowPulse(now);
+        part.material.emissiveIntensity = GLOW_EMISSIVE * strength;
+        part.halo.material.opacity = HALO_OPACITY * strength;
+        part.halo.visible = strength > 0;
+      }
+    },
+  };
+}
+
+// A soft oval of light, brightest at the middle of the body, in flat bands.
+function drawHalo() {
+  const canvas = document.createElement('canvas');
+  canvas.width = HALO_WIDTH_PX;
+  canvas.height = HALO_HEIGHT_PX;
+  const ctx = canvas.getContext('2d');
+  const image = ctx.createImageData(HALO_WIDTH_PX, HALO_HEIGHT_PX);
+  const cx = (HALO_WIDTH_PX - 1) / 2;
+  const cy = (HALO_HEIGHT_PX - 1) / 2;
+  for (let y = 0; y < HALO_HEIGHT_PX; y++) {
+    for (let x = 0; x < HALO_WIDTH_PX; x++) {
+      const d = Math.hypot((x - cx) / (HALO_WIDTH_PX / 2), (y - cy) / (HALO_HEIGHT_PX / 2));
+      const level = Math.ceil(Math.max(0, 1 - d) * HALO_STEPS) / HALO_STEPS;
+      const i = (y * HALO_WIDTH_PX + x) * 4;
+      image.data[i] = 255;
+      image.data[i + 1] = 255;
+      image.data[i + 2] = 255;
+      image.data[i + 3] = Math.round(255 * level * level);
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}

@@ -137,11 +137,14 @@ function sharedGeometry(widthPx, heightPx) {
 //   frameMs     time per frame; 0 or 1 frame means a still sprite
 //   shadowRadius  blob shadow radius in world units
 //   phaseMs     offsets the animation so neighbours do not move in step
+//   frameFor    optional (timeMs) => frame index; replaces the looping
+//               animation, for sheets that hold several animations
 export class PixelSprite {
-  constructor({ sheet, frameCount = 1, frameMs = 0, shadowRadius, phaseMs = 0 }) {
+  constructor({ sheet, frameCount = 1, frameMs = 0, shadowRadius, phaseMs = 0, frameFor = null }) {
     this.frameCount = frameCount;
     this.frameMs = frameMs;
     this.phaseMs = phaseMs;
+    this.frameFor = frameFor;
     this.frame = -1;
 
     const frameWidth = sheet.width / frameCount;
@@ -173,7 +176,7 @@ export class PixelSprite {
 
   // Advances the animation and turns the sprite towards the camera.
   update(timeMs, cameraPosition) {
-    this.setFrame(frameAt(timeMs + this.phaseMs, this.frameCount, this.frameMs));
+    this.setFrame(this.frameFor ? this.frameFor(timeMs) : frameAt(timeMs + this.phaseMs, this.frameCount, this.frameMs));
     this.plane.rotation.y = faceYaw(this.object.position, cameraPosition);
   }
 }
