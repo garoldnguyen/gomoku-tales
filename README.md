@@ -49,24 +49,15 @@ to pick. Press Esc, right click, or click the same button again to cancel.
 
 ## Art
 
-`assets/manifest.json` lists every image by name and file (relative to `assets/`). The
-game runs with no image files: anything missing is drawn as a placeholder (blue disc for
-X, red disc for O, lettered skill icons, and so on). To add real art, save a PNG under
-the file name from the manifest and reload; no code changes are needed. Images are drawn
-scaled to these sizes (px):
+`assets/manifest.json` lists every texture and sprite sheet by name, with its file
+(relative to `assets/`), pixel size, frame count and frame time. The game runs with no
+image files: anything missing is drawn as a generated placeholder. To add real art, save
+a PNG of exactly the listed size under the file name from the manifest and reload; no code
+changes are needed. A file of the wrong size is refused with a console warning and the
+placeholder stays. Animations are sprite sheets with all frames in one row.
 
-| Name | Size |
-| --- | --- |
-| `background` | 960x540 |
-| `board` | 372x372 (the 15x15 grid of 24 px cells starts 6 px in, inside the frame) |
-| `panel-wind-rabbit`, `panel-earth-bear` | 240x372 |
-| `portrait-wind-rabbit`, `portrait-earth-bear` | 96x96 |
-| `stone-x`, `stone-o`, `rock` | 24x24 |
-| `icon-wind-dash`, `icon-tornado-zone`, `icon-terrain-creation`, `icon-stone-conversion` | 32x32 |
-| `tornado` | 72x72 per frame, frames side by side in one strip |
-
-An animated image is a horizontal strip; set its `frames` count in the manifest. Sprite
-sizes and the animation frame time live in `src/config.js`.
+[docs/art-spec.md](docs/art-spec.md) lists every file with its size and frames, the pixel
+density and palette rules, and a prompt template for each asset.
 
 ## Run the tests
 

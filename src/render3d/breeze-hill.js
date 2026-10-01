@@ -9,13 +9,15 @@
 
 import * as THREE from 'three';
 import {
-  CHARACTER_X, CLOUD_COUNT, CLOUD_PX_WORLD, CLOUD_SPEED, FOG_FAR, FOG_NEAR, WILDFLOWER_COUNT,
+  CHARACTER_X, CLOUD_COUNT, CLOUD_PX_WORLD, CLOUD_SPEED, CLOUD_VARIANTS, FOG_FAR, FOG_NEAR, WILDFLOWER_COUNT,
   WIND3D_STREAK_COUNT, WIND3D_STREAK_SPEED,
 } from '../config.js';
-import { cloudGrid, FLOWER_VARIANTS, flowerGrid } from './placeholder-art.js';
+import { artFrame, artSource } from './art.js';
+import { ART } from './art-assets.js';
+import { FLOWER_VARIANTS } from './placeholder-art.js';
 import { seededRandom } from './seeded-random.js';
 import { faceYaw } from './sprite-frames.js';
-import { createInstancedBillboards, pixelTexture, sheetCanvas, uprightPlaneGeometry } from './sprites.js';
+import { createInstancedBillboards, pixelTexture, uprightPlaneGeometry } from './sprites.js';
 import { GROUND_Y, plateauDistance, terrainHeight } from './terrain.js';
 
 const COLORS = {
@@ -226,7 +228,7 @@ function createWildflowers(cameraPosition) {
   const meshes = [];
   for (const [variant, positions] of byVariant) {
     if (positions.length === 0) continue;
-    meshes.push(createInstancedBillboards({ sheet: sheetCanvas([flowerGrid(variant)]), positions, cameraPosition }));
+    meshes.push(createInstancedBillboards({ sheet: artSource(ART.flower[variant]), positions, cameraPosition }));
   }
   return meshes;
 }
@@ -244,12 +246,12 @@ function createClouds(cameraPosition) {
   const random = seededRandom(23);
   const clouds = [];
   for (let i = 0; i < CLOUD_COUNT; i++) {
-    const grid = cloudGrid(100 + i);
+    const shape = artFrame(ART.cloud, i % CLOUD_VARIANTS);
     const material = new THREE.MeshBasicMaterial({
-      map: pixelTexture(sheetCanvas([grid])),
+      map: pixelTexture(shape),
       alphaTest: 0.5,
     });
-    const mesh = new THREE.Mesh(uprightPlaneGeometry(grid.width, grid.height, CLOUD_PX_WORLD, 1), material);
+    const mesh = new THREE.Mesh(uprightPlaneGeometry(shape.width, shape.height, CLOUD_PX_WORLD, 1), material);
     const z = -40 - random() * 30;
     const x = -CLOUD_RANGE_X + ((i + random() * 0.6) / CLOUD_COUNT) * CLOUD_RANGE_X * 2;
     const depression = CLOUD_DEPRESSION_DEG[i % CLOUD_DEPRESSION_DEG.length];

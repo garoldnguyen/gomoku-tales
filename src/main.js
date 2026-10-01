@@ -18,9 +18,12 @@ canvas.height = INTERNAL_HEIGHT;
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
-// Placeholders are drawn until the art from assets/manifest.json has loaded,
-// and for good for any file that is missing.
-loadAssets({ warn: (message) => console.warn(message) }).then(setAssets);
+// The 2D renderer and HUD draw placeholders until the art from
+// assets/manifest.json has loaded, and for good for any file that is
+// missing. The 3D world waits for the art before it is built.
+const warn = (message) => console.warn(message);
+const assetsLoaded = loadAssets({ warn });
+assetsLoaded.then(setAssets);
 
 const params = new URLSearchParams(window.location.search);
 
@@ -52,8 +55,8 @@ if (params.get('local') === '1') {
 async function load3dRenderer() {
   try {
     worldCanvas.hidden = false; // it must be laid out before the renderer sizes it
-    const { createWorldRenderer } = await import('./render3d/world-renderer.js');
-    return createWorldRenderer(worldCanvas);
+    const [{ createWorldRenderer }, assets] = await Promise.all([import('./render3d/world-renderer.js'), assetsLoaded]);
+    return createWorldRenderer(worldCanvas, { assets, warn });
   } catch (err) {
     console.warn('The 3D renderer is not available, using the 2D one.', err);
     worldCanvas.hidden = true;

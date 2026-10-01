@@ -41,7 +41,8 @@ import {
 } from '../config.js';
 import { X } from '../logic/board.js';
 import { createBanners } from '../render/effects.js';
-import { drawDashTarget, drawWhirl, drawZone } from './decal-art.js';
+import { artSource } from './art.js';
+import { ART } from './art-assets.js';
 import {
   catchUpVisuals, convertPose, crumblePose, dashPose, heldCell, rockFallPose, shakeLeft, shakeOffset3d, shakeStrength,
   throwPose, visualsForEvents,
@@ -52,7 +53,7 @@ import {
 import { cellToWorld } from './picking.js';
 import { QUALITY_LEVELS } from './quality.js';
 import { effectRandom } from './seeded-random.js';
-import { createCellDecal, createPieceSprite, decalCanvas, decalMaterial, placeOnCell } from './world.js';
+import { createCellDecal, createPieceSprite, decalMaterial, placeOnCell } from './world.js';
 
 const COLORS = {
   sparkle: 0xfffbe0,
@@ -592,16 +593,14 @@ function markFade(mark, time) {
 // target cell, from 'dashAnnounced' until the dash resolves, fails or the
 // game ends.
 function createDashMark({ world, pool, sp, random, u, frame }) {
-  const make = (draw, order) => {
-    const source = decalCanvas();
-    draw(source.getContext('2d'));
-    const mesh = createCellDecal(decalMaterial(source));
+  const make = (art, order) => {
+    const mesh = createCellDecal(decalMaterial(artSource(art)));
     mesh.renderOrder = order;
     world.scene.add(mesh);
     return mesh;
   };
-  const target = make(drawDashTarget, 3);
-  const whirl = make(drawWhirl, 5);
+  const target = make(ART.decal.dashTarget, 3);
+  const whirl = make(ART.decal.whirl, 5);
   // endStart is NaN while the mark shows; carry is the emission remainder.
   const mark = { active: false, endStart: NaN, x: 0.5, z: 0.5, carry: 0.5 };
 
@@ -668,9 +667,7 @@ function createDashMark({ world, pool, sp, random, u, frame }) {
 // (clipped at the board edges) and a column of particles swirling up over
 // the zone centre, from 'tornadoAnnounced' until it ends.
 function createTornadoColumn({ world, pool, sp, random, u, frame }) {
-  const source = decalCanvas();
-  drawZone(source.getContext('2d'));
-  const material = decalMaterial(source);
+  const material = decalMaterial(artSource(ART.decal.zone));
   const decals = [];
   for (let i = 0; i < TORNADO_SIZE * TORNADO_SIZE; i++) {
     const mesh = createCellDecal(material);

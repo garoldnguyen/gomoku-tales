@@ -1,17 +1,24 @@
-// Asset loading (docs/design.md section 7). assets/manifest.json lists every
-// asset by name. An asset whose file is missing or fails to load stays
-// unloaded, and drawing it calls a placeholder function instead, so the game
-// runs with no art files and real art is added by replacing files.
+// Asset loading (docs/design.md section 7 and docs/art-direction-hd2d.md
+// section H). assets/manifest.json lists every texture and sprite sheet by
+// name with its pixel size and frame data; docs/art-spec.md lists the same
+// files for the artist. An asset whose file is missing, fails to load or
+// does not have the size the manifest gives stays unloaded, and the game
+// draws a generated placeholder instead, so it runs with no art files and
+// real art is added by replacing files.
 //
 // No browser globals are touched at import time, so this runs under Node with
 // injected loaders.
 
-import { ANIMATION_FRAME_MS } from '../config.js';
-
 export const MANIFEST_URL = 'assets/manifest.json';
 
-// Checks the manifest shape and returns a list of { name, file, frames }.
-// frames > 1 means the file is a horizontal strip of equal-width frames.
+// Checks the manifest shape and returns a list of
+//   { name, file, use, width, height, frames, frameMs }
+// width and height are the size of one frame in pixels. frames > 1 means
+// the file is a sprite sheet with all frames in one row, so the whole file
+// is width * frames by height. frameMs is the time per frame of an
+// animation; 0 means the frames are still (variants, not an animation).
+// use says what draws it: '2d' (the 2D renderer), 'hud' (the 2D HUD, in
+// both renderers) or '3d' (the 3D world).
 export function parseManifest(data) {
   if (!data || typeof data !== 'object' || !data.assets || typeof data.assets !== 'object') {
     throw new Error('Asset manifest needs an "assets" object');
@@ -20,19 +27,35 @@ export function parseManifest(data) {
     if (!entry || typeof entry.file !== 'string' || entry.file === '') {
       throw new Error(`Asset "${name}" needs a "file" string`);
     }
-    const frames = entry.frames ?? 1;
-    if (!Number.isInteger(frames) || frames < 1) {
-      throw new Error(`Asset "${name}" has a bad "frames" value`);
+    for (const key of ['width', 'height', 'frames']) {
+      if (!Number.isInteger(entry[key]) || entry[key] < 1) {
+        throw new Error(`Asset "${name}" needs a whole "${key}" of 1 or more`);
+      }
     }
-    return { name, file: entry.file, frames };
+    if (typeof entry.frameMs !== 'number' || !(entry.frameMs >= 0)) {
+      throw new Error(`Asset "${name}" needs a "frameMs" of 0 or more`);
+    }
+    const { file, width, height, frames, frameMs, use = '' } = entry;
+    return { name, file, use, width, height, frames, frameMs };
   });
 }
 
-// images: { [name]: { image, frames } } for the assets that loaded.
+// Why `image` cannot be used for manifest `entry`, or null if it fits: the
+// file must be exactly `frames` frames of width x height side by side.
+export function sizeProblem(entry, image) {
+  const width = entry.width * entry.frames;
+  if (image.width === width && image.height === entry.height) return null;
+  const frames = entry.frames > 1 ? ` (${entry.frames} frames of ${entry.width}x${entry.height})` : '';
+  return `${entry.file} is ${image.width}x${image.height}, the manifest says ${width}x${entry.height}${frames}`;
+}
+
+// images: { [name]: { image, ...manifest entry } } for the assets that loaded.
 export function createAssetStore(images = {}) {
   return {
     has: (name) => Boolean(images[name]),
     get: (name) => images[name]?.image ?? null,
+    // The manifest entry of a loaded asset, or null.
+    entry: (name) => images[name] ?? null,
 
     // Draws the asset into the rect (x, y, w, h), or calls placeholder() if
     // it has no image. Animated assets pick their frame from `time` in ms.
@@ -43,9 +66,9 @@ export function createAssetStore(images = {}) {
         placeholder?.();
         return false;
       }
-      const { image, frames } = loaded;
+      const { image, frames = 1, frameMs = 0 } = loaded;
       const frameW = image.width / frames;
-      const frame = Math.floor(time / ANIMATION_FRAME_MS) % frames;
+      const frame = frames > 1 && frameMs > 0 ? Math.floor(Math.max(0, time) / frameMs) % frames : 0;
       ctx.save();
       ctx.globalAlpha *= alpha;
       ctx.drawImage(image, frame * frameW, 0, frameW, image.height, x, y, w, h);
@@ -56,7 +79,8 @@ export function createAssetStore(images = {}) {
 }
 
 // Loads the manifest and every image in it. Never rejects: a missing or bad
-// manifest gives an empty store, a missing image leaves that asset unloaded.
+// manifest gives an empty store, a missing image leaves that asset unloaded,
+// and an image of the wrong size is left unloaded with a warning.
 //   fetchJson(url) -> Promise of parsed JSON
 //   loadImage(url) -> Promise of an image with width and height
 export async function loadAssets({
@@ -75,12 +99,19 @@ export async function loadAssets({
 
   const base = manifestUrl.slice(0, manifestUrl.lastIndexOf('/') + 1);
   const images = {};
-  await Promise.all(entries.map(async ({ name, file, frames }) => {
+  await Promise.all(entries.map(async (entry) => {
+    let image;
     try {
-      images[name] = { image: await loadImage(base + file), frames };
+      image = await loadImage(base + entry.file);
     } catch {
-      // Missing art: the placeholder is drawn instead.
+      return; // Missing art: the placeholder is drawn instead.
     }
+    const problem = sizeProblem(entry, image);
+    if (problem) {
+      warn(`${problem}; using the placeholder for "${entry.name}"`);
+      return;
+    }
+    images[entry.name] = { image, ...entry };
   }));
   return createAssetStore(images);
 }

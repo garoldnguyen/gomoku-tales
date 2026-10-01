@@ -21,8 +21,9 @@ export const JOIN_TIMEOUT_MS = 3000; // no answer to "join" within this time mea
 // Screen timings not listed in docs/design.md section 10.
 export const GAME_OVER_DELAY_MS = 1500; // time to see the final board before the Game over screen
 
-// Sprite sizes in px from docs/design.md section 7. Art files may be any
-// size; they are drawn scaled to these.
+// Sprite sizes in px from docs/design.md section 7. They are drawn scaled
+// to these; the art files themselves must have the size listed in
+// assets/manifest.json (see docs/art-spec.md).
 export const STONE_PX = 24;
 export const ROCK_PX = 24;
 export const SKILL_ICON_PX = 32;
@@ -57,6 +58,9 @@ export const BOARD_THICKNESS = 0.4; // the wooden slab; its top face is y = 0
 export const PX_WORLD = 1 / 32;
 export const PIECE_SPRITE_PX = 32; // X and O stones and the rock, square frames
 export const CHARACTER_SPRITE_PX = 96; // Wind Rabbit and Earth Bear, square frames
+export const BOARD_TEXTURE_PX = 480; // the board top texture, square, so one cell is 32 px
+export const DECAL_PX = 16; // flat cell decals (hover, marks, skill targets), square
+export const CLOUD_VARIANTS = 4; // cloud shapes, the frames of the cloud sheet
 // The camera looks down CAMERA_PITCH_DEG, so an upright sprite looks only
 // cos(pitch) as tall as it is. Sprites stay upright but are stretched in
 // height by this factor, so their art pixels look square on screen. Set it

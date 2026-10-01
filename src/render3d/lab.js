@@ -6,6 +6,7 @@
 // with a few sample stones and a rock, an FPS counter and a hover highlight
 // found by raycast picking. The Q key cycles the quality. See docs/lab.md.
 
+import { loadAssets } from '../render/assets.js';
 import { createPieceSprite, createWorld, placeOnCell } from './world.js';
 import { pointerToNdc } from './picking.js';
 
@@ -19,9 +20,13 @@ const LAB_PIECES = [
 const canvas = document.getElementById('scene');
 const hud = document.getElementById('hud');
 
+// Art files from assets/manifest.json; missing ones are placeholders.
+const warn = (message) => console.warn(message);
+const assets = await loadAssets({ warn });
+
 let world;
 try {
-  world = createWorld(canvas);
+  world = createWorld(canvas, { assets, warn });
 } catch (err) {
   hud.textContent = 'WebGL is not available in this browser.';
   throw err;

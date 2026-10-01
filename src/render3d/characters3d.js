@@ -1,15 +1,17 @@
 // Wind Rabbit and Earth Bear beside the board (docs/art-direction-hd2d.md
 // sections C, D and G): pixel sprites whose sheet holds every pose (idle
-// bob, cast, win and lose, see character-poses.js), and a gentle glow on the
+// bob, cast, win and lose, see character-poses.js; one art file per pose,
+// see art-assets.js), and a gentle glow on the
 // current player's character: a soft halo behind the sprite and a little
 // extra brightness, both breathing slowly. The poses follow the events
 // returned by src/logic through trigger(); nothing here touches the rules.
 
 import * as THREE from 'three';
 import { CHARACTER_IDLE_FRAME_MS, CHARACTER_X } from '../config.js';
+import { combinedSheet } from './art.js';
+import { ART } from './art-assets.js';
 import { CHARACTER_FRAME_COUNT, characterFrame, createCharacterDirector, glowPulse, stepGlow } from './character-poses.js';
-import { bearFrames, rabbitFrames } from './placeholder-art.js';
-import { PixelSprite, pixelTexture, sheetCanvas, uprightPlaneGeometry } from './sprites.js';
+import { PixelSprite, pixelTexture, uprightPlaneGeometry } from './sprites.js';
 import { GROUND_Y } from './terrain.js';
 
 const SHADOW_RADIUS = 0.95;
@@ -32,9 +34,9 @@ export function createCharacters(addSprite) {
   const haloMap = pixelTexture(drawHalo());
   let active = null;
 
-  const make = (player, frames, x, phaseMs) => {
+  const make = (player, x, phaseMs) => {
     const sprite = addSprite(new PixelSprite({
-      sheet: sheetCanvas(frames),
+      sheet: combinedSheet(Object.values(ART.character[player])),
       frameCount: CHARACTER_FRAME_COUNT,
       shadowRadius: SHADOW_RADIUS,
       frameFor: (timeMs) => {
@@ -71,8 +73,8 @@ export function createCharacters(addSprite) {
   // Wind Rabbit (X) on the left, Earth Bear (O) on the right; their idle
   // bobs are offset so they do not move in step.
   const parts = {
-    X: make('X', rabbitFrames('all'), -CHARACTER_X, 0),
-    O: make('O', bearFrames('all'), CHARACTER_X, CHARACTER_IDLE_FRAME_MS * 2),
+    X: make('X', -CHARACTER_X, 0),
+    O: make('O', CHARACTER_X, CHARACTER_IDLE_FRAME_MS * 2),
   };
 
   return {

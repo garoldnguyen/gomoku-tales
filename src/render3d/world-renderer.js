@@ -29,21 +29,23 @@ import { O, ROCK, X } from '../logic/board.js';
 import { createInitialState, isGameOver } from '../logic/game.js';
 import { drawGameHud, drawText } from '../render/game-renderer.js';
 import { HUD_3D } from '../render/layout.js';
+import { artSource } from './art.js';
+import { ART } from './art-assets.js';
 import { boardMarks } from './board-marks.js';
 import { popCellsForEvents, popInScale } from './character-poses.js';
-import { drawDashTarget, drawFrame, drawWhirl, drawZone } from './decal-art.js';
 import { createEffects3d } from './effects3d.js';
 import { createWorldHitTest } from './hit-test.js';
 import { fadedAlphaTest } from './sprite-frames.js';
-import { createCellDecal, createPieceSprite, createWorld, decalCanvas, decalMaterial, placeOnCell } from './world.js';
+import { createCellDecal, createPieceSprite, createWorld, decalMaterial, placeOnCell } from './world.js';
 
 const GHOST_OPACITY = 0.45; // see-through stone or rock where it would go
 const EMPTY_BOARD = createInitialState().board; // the menus show the board bare
 const NO_DECALS = [];
 
-// Throws if WebGL is not available.
-export function createWorldRenderer(worldCanvas) {
-  const world = createWorld(worldCanvas);
+// Throws if WebGL is not available. `options.assets` is the loaded art
+// (see createWorld in world.js); missing files show placeholders.
+export function createWorldRenderer(worldCanvas, options = {}) {
+  const world = createWorld(worldCanvas, options);
   const pieces = createPieceLayer(world);
   const decals = createDecalLayer(world);
   const ghosts = createGhosts(world);
@@ -180,15 +182,15 @@ function createPieceLayer(world) {
   };
 }
 
-// Decal looks per kind (see board-marks.js), drawn into 16x16 pixel
-// textures like the 2D placeholders. renderOrder keeps overlapping decals
-// in a fixed order.
+// Decal looks per kind (see board-marks.js): 16x16 pixel textures from
+// assets/manifest.json, or placeholders like the 2D ones (art.js).
+// renderOrder keeps overlapping decals in a fixed order.
 const DECALS = {
-  zonePreview: { order: 1, opacity: 0.6, draw: drawZone },
-  win: { order: 2, opacity: 1, draw: (ctx) => drawFrame(ctx, '#ffe14d', 'rgba(255, 225, 77, 0.25)') },
-  dashTarget: { order: 3, opacity: 1, draw: drawDashTarget },
-  select: { order: 4, opacity: 1, draw: (ctx) => drawFrame(ctx, '#fff27a', null) },
-  whirl: { order: 5, opacity: 1, draw: drawWhirl },
+  zonePreview: { order: 1, opacity: 0.6, art: ART.decal.zone },
+  win: { order: 2, opacity: 1, art: ART.decal.win },
+  dashTarget: { order: 3, opacity: 1, art: ART.decal.dashTarget },
+  select: { order: 4, opacity: 1, art: ART.decal.select },
+  whirl: { order: 5, opacity: 1, art: ART.decal.whirl },
 };
 
 // Pools of flat cell decals; show() places this frame's decals and hides
@@ -196,9 +198,7 @@ const DECALS = {
 function createDecalLayer(world) {
   const pools = {};
   for (const [kind, look] of Object.entries(DECALS)) {
-    const source = decalCanvas();
-    look.draw(source.getContext('2d'));
-    const material = decalMaterial(source);
+    const material = decalMaterial(artSource(look.art));
     material.opacity = look.opacity;
     pools[kind] = { material, order: look.order, meshes: [], used: 0 };
   }
