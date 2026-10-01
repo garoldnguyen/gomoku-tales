@@ -49,3 +49,28 @@ export const CAMERA_PITCH_DEG = 55; // how far the camera looks down, 90 is stra
 export const CAMERA_DISTANCE = 30; // from the board centre, in world units
 export const CELL_SIZE = 1;
 export const FPS_SAMPLE_MS = 500; // the on-screen FPS counter averages over this
+export const BOARD_THICKNESS = 0.4; // the wooden slab; its top face is y = 0
+
+// HD-2D sprites from docs/art-direction-hd2d.md section D. One art pixel is
+// PX_WORLD world units for every sprite, so all sprite pixels look the same
+// size. 1/32 matches the 480 px board texture (32 px per cell).
+export const PX_WORLD = 1 / 32;
+export const PIECE_SPRITE_PX = 32; // X and O stones and the rock, square frames
+export const CHARACTER_SPRITE_PX = 96; // Wind Rabbit and Earth Bear, square frames
+// The camera looks down CAMERA_PITCH_DEG, so an upright sprite looks only
+// cos(pitch) as tall as it is. Sprites stay upright but are stretched in
+// height by this factor, so their art pixels look square on screen. Set it
+// to 1 to turn the correction off.
+export const SPRITE_STRETCH_Y = 1 / Math.cos((CAMERA_PITCH_DEG * Math.PI) / 180);
+export const CHARACTER_IDLE_FRAME_MS = 220; // time per frame of the 4 frame idle bob
+export const CHARACTER_X = 9.75; // characters stand this far left and right of the board centre
+
+// Map 1, Windy Spring Breeze Hill (section C).
+export const WILDFLOWER_COUNT = 280; // instanced flower and grass tuft billboards
+export const CLOUD_COUNT = 7;
+export const CLOUD_SPEED = 0.6; // world units per second, drifting towards +x
+export const CLOUD_PX_WORLD = 1 / 8; // clouds are far away, so their art pixels are bigger
+export const WIND3D_STREAK_COUNT = 10;
+export const WIND3D_STREAK_SPEED = 5; // world units per second, towards +x
+export const FOG_NEAR = 45; // light fog for depth, in world units from the camera
+export const FOG_FAR = 140;

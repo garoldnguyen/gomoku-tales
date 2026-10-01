@@ -1,23 +1,40 @@
-// HD-2D look lab (docs/art-direction-hd2d.md sections A, B and F): a test
+// HD-2D look lab (docs/art-direction-hd2d.md sections A to D and F): a test
 // scene for the 3D look, separate from the game. Open /hd2d-lab.html.
-// It shows the wooden board under a fixed camera with a warm sun, soft
-// shadows, an FPS counter and a hover highlight found by raycast picking.
+// It shows the wooden board on Windy Spring Breeze Hill under a fixed camera
+// with a warm sun, soft shadows, pixel sprites (Wind Rabbit, Earth Bear, a
+// few stones and a rock), an FPS counter and a hover highlight found by
+// raycast picking.
 
 import * as THREE from 'three';
-import { BOARD_SIZE, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE, FPS_SAMPLE_MS } from '../config.js';
+import {
+  BOARD_SIZE, BOARD_THICKNESS, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE,
+  CHARACTER_IDLE_FRAME_MS, CHARACTER_X, FPS_SAMPLE_MS,
+} from '../config.js';
+import { buildBreezeHill } from './breeze-hill.js';
 import { cameraPosition, cameraRay } from './camera.js';
 import { createFpsMeter } from './fps.js';
 import { cellToWorld, pickCell, pointerToNdc } from './picking.js';
+import { bearFrames, IDLE_BOB, rabbitFrames, rockGrid, stoneGrid } from './placeholder-art.js';
+import { seededRandom } from './seeded-random.js';
+import { PixelSprite, pixelTexture, sheetCanvas } from './sprites.js';
+import { GROUND_Y } from './terrain.js';
 
 const ASPECT = 16 / 9;
 const MAX_PIXEL_RATIO = 1.5; // keeps high-DPI screens affordable
 const BOARD_TEXTURE_PX = 480; // section D: 480x480, so one cell is 32 px
-const BOARD_THICKNESS = 0.4; // the slab's top face is the y = 0 picking plane
 const HOVER_LIFT = 0.01; // keeps the highlight decal just above the board
+const SHADOW_EXTENT = 20; // the sun's shadow map covers the board, characters and trees
+const CHARACTER_SHADOW_RADIUS = 0.95;
+const PIECE_SHADOW_RADIUS = 0.36;
+
+// Sample pieces on the board: { x, y } are logic cells (src/logic).
+const LAB_STONES = [
+  { x: 7, y: 7, player: 'X' }, { x: 8, y: 7, player: 'O' }, { x: 6, y: 8, player: 'X' },
+  { x: 8, y: 6, player: 'O' }, { x: 6, y: 6, player: 'X' }, { x: 9, y: 8, player: 'O' },
+];
+const LAB_ROCK = { x: 5, y: 7 };
 
 const COLORS = {
-  sky: 0xa8d8f0,
-  grass: 0x7cbf5a,
   boardSide: 0x8a5a2b,
   sun: 0xffe0b0,
   hemiSky: 0xcfe8ff,
@@ -40,7 +57,6 @@ renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(COLORS.sky);
 
 // Fixed camera: no rotation or zoom (section B).
 const cameraTarget = { x: 0, y: 0, z: 0 };
@@ -58,20 +74,12 @@ sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.radius = 4;
 sun.shadow.bias = -0.0005;
 sun.shadow.normalBias = 0.02;
-const shadowExtent = BOARD_SIZE * CELL_SIZE;
-Object.assign(sun.shadow.camera, { left: -shadowExtent, right: shadowExtent, top: shadowExtent, bottom: -shadowExtent, near: 1, far: 70 });
+Object.assign(sun.shadow.camera, { left: -SHADOW_EXTENT, right: SHADOW_EXTENT, top: SHADOW_EXTENT, bottom: -SHADOW_EXTENT, near: 1, far: 70 });
 scene.add(sun);
 scene.add(new THREE.HemisphereLight(COLORS.hemiSky, COLORS.hemiGround, 1.2));
 
-// Plain ground so the board's shadow has somewhere to fall.
-const ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(200, 200),
-  new THREE.MeshStandardMaterial({ color: COLORS.grass, roughness: 1 }),
-);
-ground.rotation.x = -Math.PI / 2;
-ground.position.y = -BOARD_THICKNESS;
-ground.receiveShadow = true;
-scene.add(ground);
+// Windy Spring Breeze Hill around the board (section C).
+const scenery = buildBreezeHill(scene, cameraPos);
 
 // The board: a wooden slab whose top face carries the grid texture. On a
 // BoxGeometry top face the texture's top row lies at -z, so row 0 is the far
@@ -102,6 +110,35 @@ hover.position.y = HOVER_LIFT;
 hover.visible = false;
 scene.add(hover);
 
+// Pixel sprites (section D): the two characters beside the board, with a
+// 4 frame idle bob, and some stones and a rock on it.
+const sprites = [];
+const rabbit = new PixelSprite({
+  sheet: sheetCanvas(rabbitFrames()),
+  frameCount: IDLE_BOB.length,
+  frameMs: CHARACTER_IDLE_FRAME_MS,
+  shadowRadius: CHARACTER_SHADOW_RADIUS,
+}).placeAt(-CHARACTER_X, GROUND_Y, 0);
+const bear = new PixelSprite({
+  sheet: sheetCanvas(bearFrames()),
+  frameCount: IDLE_BOB.length,
+  frameMs: CHARACTER_IDLE_FRAME_MS,
+  shadowRadius: CHARACTER_SHADOW_RADIUS,
+  phaseMs: CHARACTER_IDLE_FRAME_MS * 2, // so the two do not bob in step
+}).placeAt(CHARACTER_X, GROUND_Y, 0);
+sprites.push(rabbit, bear);
+
+const stoneSheets = { X: sheetCanvas([stoneGrid('X')]), O: sheetCanvas([stoneGrid('O')]) };
+for (const stone of LAB_STONES) {
+  const { x, z } = cellToWorld(stone.x, stone.y);
+  sprites.push(new PixelSprite({ sheet: stoneSheets[stone.player], shadowRadius: PIECE_SHADOW_RADIUS }).placeAt(x, 0, z));
+}
+{
+  const { x, z } = cellToWorld(LAB_ROCK.x, LAB_ROCK.y);
+  sprites.push(new PixelSprite({ sheet: sheetCanvas([rockGrid()]), shadowRadius: PIECE_SHADOW_RADIUS * 1.2 }).placeAt(x, 0, z));
+}
+for (const sprite of sprites) scene.add(sprite.object);
+
 let hoveredCell = null;
 
 function setHoveredCell(cell) {
@@ -129,9 +166,15 @@ resize();
 
 const fpsMeter = createFpsMeter(FPS_SAMPLE_MS);
 let hudText = '';
+let lastNow = null;
 
 function frame(now) {
   const fps = fpsMeter.tick(now);
+  // Clamp the step so a hidden tab does not make everything jump on return.
+  const dtMs = lastNow === null ? 0 : Math.min(now - lastNow, 100);
+  lastNow = now;
+  scenery.update(now, dtMs);
+  for (const sprite of sprites) sprite.update(now, camera.position);
   const cellText = hoveredCell ? `${hoveredCell.x}, ${hoveredCell.y}` : '-';
   const text = `FPS ${Math.round(fps)}\nCell ${cellText}`;
   if (text !== hudText) {
@@ -144,25 +187,6 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-
-// Canvas texture with crisp pixels: NearestFilter both ways, no mipmaps.
-function pixelTexture(source) {
-  const texture = new THREE.CanvasTexture(source);
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.generateMipmaps = false;
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-// Small seeded random so the wood grain is the same on every load.
-function seededRandom(seed) {
-  let s = seed >>> 0;
-  return () => {
-    s = (s * 1664525 + 1013904223) >>> 0;
-    return s / 4294967296;
-  };
-}
 
 // Pixel-art wooden board: horizontal planks with grain, a dark grid line
 // between cells and a darker outer border.
