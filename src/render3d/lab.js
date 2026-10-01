@@ -1,26 +1,29 @@
-// HD-2D look lab (docs/art-direction-hd2d.md sections A to D and F): a test
+// HD-2D look lab (docs/art-direction-hd2d.md sections A to F): a test
 // scene for the 3D look, separate from the game. Open /hd2d-lab.html.
 // It shows the wooden board on Windy Spring Breeze Hill under a fixed camera
 // with a warm sun, soft shadows, pixel sprites (Wind Rabbit, Earth Bear, a
-// few stones and a rock), an FPS counter and a hover highlight found by
-// raycast picking.
+// few stones and a rock), post-processing with quality levels (the Q key
+// cycles them), an FPS counter and a hover highlight found by raycast
+// picking. See docs/lab.md.
 
 import * as THREE from 'three';
 import {
   BOARD_SIZE, BOARD_THICKNESS, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE,
-  CHARACTER_IDLE_FRAME_MS, CHARACTER_X, FPS_SAMPLE_MS,
+  CHARACTER_IDLE_FRAME_MS, CHARACTER_X, FPS_SAMPLE_MS, QUALITY_DEFAULT, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS,
+  RENDER_SCALE, TARGET_FRAME_MS,
 } from '../config.js';
 import { buildBreezeHill } from './breeze-hill.js';
 import { cameraPosition, cameraRay } from './camera.js';
 import { createFpsMeter } from './fps.js';
 import { cellToWorld, pickCell, pointerToNdc } from './picking.js';
 import { bearFrames, IDLE_BOB, rabbitFrames, rockGrid, stoneGrid } from './placeholder-art.js';
+import { createPostProcessing } from './post-processing.js';
+import { cappedPixelRatio, createSlowFrameWatch, cycleQuality, lowerQuality, QUALITY_LEVELS } from './quality.js';
 import { seededRandom } from './seeded-random.js';
 import { PixelSprite, pixelTexture, sheetCanvas } from './sprites.js';
 import { GROUND_Y } from './terrain.js';
 
 const ASPECT = 16 / 9;
-const MAX_PIXEL_RATIO = 1.5; // keeps high-DPI screens affordable
 const BOARD_TEXTURE_PX = 480; // section D: 480x480, so one cell is 32 px
 const HOVER_LIFT = 0.01; // keeps the highlight decal just above the board
 const SHADOW_EXTENT = 20; // the sun's shadow map covers the board, characters and trees
@@ -51,8 +54,8 @@ try {
   hud.textContent = 'WebGL is not available in this browser.';
   throw err;
 }
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, MAX_PIXEL_RATIO));
-renderer.shadowMap.enabled = true;
+renderer.setPixelRatio(cappedPixelRatio(window.devicePixelRatio, RENDER_SCALE));
+renderer.shadowMap.enabled = true; // the sun casts shadows only on HIGH (see setQuality)
 // PCFShadowMap with a radius gives soft edges (this release removed PCFSoftShadowMap).
 renderer.shadowMap.type = THREE.PCFShadowMap;
 
@@ -69,7 +72,6 @@ const cameraSetup = { position: cameraPos, target: cameraTarget, fovDeg: CAMERA_
 // Lights: a warm sun with soft shadows and a cool hemisphere fill (section D).
 const sun = new THREE.DirectionalLight(COLORS.sun, 2.6);
 sun.position.set(-12, 20, 10);
-sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 sun.shadow.radius = 4;
 sun.shadow.bias = -0.0005;
@@ -158,8 +160,36 @@ canvas.addEventListener('pointermove', (event) => {
 });
 canvas.addEventListener('pointerleave', () => setHoveredCell(null));
 
+// Post-processing focused on the board centre, with quality levels (section E).
+const postProcessing = createPostProcessing(renderer, scene, camera, CAMERA_DISTANCE);
+const slowFrames = createSlowFrameWatch({
+  targetFrameMs: TARGET_FRAME_MS,
+  holdMs: QUALITY_STEP_DOWN_MS,
+  stallMs: QUALITY_STALL_MS,
+});
+let quality = null;
+let autoStepped = false; // true after the last change was an automatic step down
+
+function setQuality(level, auto = false) {
+  quality = level;
+  autoStepped = auto;
+  // Real shadow maps only on HIGH; sprites always have their blob shadows.
+  // Changing castShadow makes Three.js rebuild the lit materials once.
+  sun.castShadow = QUALITY_LEVELS[level].shadowMaps;
+  postProcessing.setLevel(level);
+  slowFrames.reset();
+}
+setQuality(QUALITY_DEFAULT);
+
+window.addEventListener('keydown', (event) => {
+  if (event.repeat || event.ctrlKey || event.metaKey || event.altKey) return;
+  if (event.key === 'q' || event.key === 'Q') setQuality(cycleQuality(quality));
+});
+
 function resize() {
+  renderer.setPixelRatio(cappedPixelRatio(window.devicePixelRatio, RENDER_SCALE));
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false);
+  postProcessing.resize();
 }
 window.addEventListener('resize', resize);
 resize();
@@ -170,20 +200,22 @@ let lastNow = null;
 
 function frame(now) {
   const fps = fpsMeter.tick(now);
+  if (slowFrames.tick(now) && quality !== lowerQuality(quality)) setQuality(lowerQuality(quality), true);
   // Clamp the step so a hidden tab does not make everything jump on return.
   const dtMs = lastNow === null ? 0 : Math.min(now - lastNow, 100);
   lastNow = now;
   scenery.update(now, dtMs);
   for (const sprite of sprites) sprite.update(now, camera.position);
   const cellText = hoveredCell ? `${hoveredCell.x}, ${hoveredCell.y}` : '-';
-  const text = `FPS ${Math.round(fps)}\nCell ${cellText}`;
+  const autoText = autoStepped ? ' (auto, slow frames)' : '';
+  const text = `Quality ${quality}${autoText}  [Q]\nFPS ${Math.round(fps)}\nCell ${cellText}`;
   if (text !== hudText) {
     hudText = text;
     hud.textContent = text;
   }
   // A gentle glow pulse; only the opacity changes, so pixels never move.
   hoverMaterial.opacity = 0.75 + 0.25 * Math.sin(now / 250);
-  renderer.render(scene, camera);
+  postProcessing.render(dtMs / 1000);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

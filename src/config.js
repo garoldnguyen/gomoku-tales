@@ -74,3 +74,24 @@ export const WIND3D_STREAK_COUNT = 10;
 export const WIND3D_STREAK_SPEED = 5; // world units per second, towards +x
 export const FOG_NEAR = 45; // light fog for depth, in world units from the camera
 export const FOG_FAR = 140;
+
+// Post-processing and quality levels (docs/art-direction-hd2d.md section E).
+// The levels themselves live in src/render3d/quality.js.
+export const QUALITY_DEFAULT = 'MEDIUM';
+export const RENDER_SCALE = 1.5; // largest pixel ratio (1 to 1.5); high-DPI screens are capped to this
+// 60 fps is 16.7 ms a frame. The step-down limit leaves some headroom so the
+// normal jitter of a 60 Hz screen and a rare dropped frame never step down.
+export const TARGET_FRAME_MS = 20;
+export const QUALITY_STEP_DOWN_MS = 3000; // the average must stay above TARGET_FRAME_MS this long
+export const QUALITY_STALL_MS = 250; // a longer frame is a stall (hidden tab, shader compile), not load
+export const DOF_APERTURE = 0.0002; // HIGH, depth of field focused on the board centre
+export const DOF_MAX_BLUR = 0.006; // in screen widths
+export const TILT_SHIFT_BLUR = 1.5; // MEDIUM, tilt shift; the widest blur tap is 2x this many pixels away at the top and bottom edges
+export const BLOOM_STRENGTH = 0.3; // subtle bloom on bright things only
+export const BLOOM_RADIUS = 0.3;
+export const BLOOM_THRESHOLD = 0.85; // linear brightness a pixel needs before it blooms
+// Light vignette: corners are mixed VIGNETTE_OFFSET^2 / 2 of the way (18%)
+// towards the colour 1 - VIGNETTE_DARKNESS (black), the centre not at all.
+export const VIGNETTE_OFFSET = 0.6;
+export const VIGNETTE_DARKNESS = 1.0;
+export const TONE_MAPPING_EXPOSURE = 1.0;
