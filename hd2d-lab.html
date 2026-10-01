@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gomoku Tales - HD-2D Look Lab</title>
+  <!-- Three.js is vendored (see vendor/VERSION.txt); nothing loads from the network. -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/build/three.module.js",
+        "three/addons/": "./vendor/three/examples/jsm/"
+      }
+    }
+  </script>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #14121c;
+    }
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    /* Keep 16:9 and letterbox in other window shapes. */
+    #stage {
+      position: relative;
+      width: min(100vw, calc(100vh * 16 / 9));
+      height: min(100vh, calc(100vw * 9 / 16));
+    }
+    #scene {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    #hud {
+      position: absolute;
+      left: 8px;
+      top: 6px;
+      margin: 0;
+      font: bold 14px/1.4 monospace;
+      color: #fff8e8;
+      text-shadow: 1px 1px 0 #1a1020, -1px -1px 0 #1a1020, 1px -1px 0 #1a1020, -1px 1px 0 #1a1020;
+      white-space: pre;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <canvas id="scene"></canvas>
+    <pre id="hud">Loading...</pre>
+  </div>
+  <script type="module" src="src/render3d/lab.js"></script>
+</body>
+</html>

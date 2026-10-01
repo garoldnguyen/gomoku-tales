@@ -41,3 +41,11 @@ export const SHAKE_PX = 2; // largest offset of the light screen shake
 export const BANNER_MS = 1200; // how long a skill announcement banner shows
 export const WIND_STREAK_COUNT = 7;
 export const WIND_STREAK_SPEED = 60; // px per second, left to right
+
+// HD-2D 3D scene from docs/art-direction-hd2d.md sections B and C. World
+// units: one board cell is CELL_SIZE wide.
+export const CAMERA_FOV = 35; // vertical field of view in degrees
+export const CAMERA_PITCH_DEG = 55; // how far the camera looks down, 90 is straight down
+export const CAMERA_DISTANCE = 30; // from the board centre, in world units
+export const CELL_SIZE = 1;
+export const FPS_SAMPLE_MS = 500; // the on-screen FPS counter averages over this
