@@ -8,17 +8,27 @@
 import { createAssetStore } from '../render/assets.js';
 import { artProblem, PLACEHOLDERS_3D, placeholderShape, UNKNOWN_PLACEHOLDER } from './art-assets.js';
 import { sheetCanvas } from './sprites.js';
+import { parseV3Meta } from './v3-meta.js';
 
 let store = createAssetStore();
 let warn = () => {};
+let tuning = parseV3Meta({});
 const sources = new Map(); // name -> canvas or image
 
-// Uses the loaded `assets` from now on. Call it before building the world;
-// sources handed out before stay as they were.
-export function setArtAssets(assets = createAssetStore(), { warn: warnFn = () => {} } = {}) {
+// Uses the loaded `assets` and v3 tuning data `meta` (from loadV3Meta in
+// v3-meta.js) from now on. Call it before building the world; sources
+// handed out before stay as they were.
+export function setArtAssets(assets = createAssetStore(), { warn: warnFn = () => {}, meta = parseV3Meta({}) } = {}) {
   store = assets;
   warn = warnFn;
+  tuning = meta;
   sources.clear();
+}
+
+// The v3 tuning data (anchors, stage times, looks); read it with the
+// helpers in v3-meta.js.
+export function artMeta() {
+  return tuning;
 }
 
 // The image of asset `name`, all frames in one row.
@@ -67,7 +77,7 @@ function loadedArt(name) {
 function placeholderCanvas(name) {
   const placeholder = PLACEHOLDERS_3D[name] ?? UNKNOWN_PLACEHOLDER;
   if (!placeholder.paint) return sheetCanvas(placeholder.frames());
-  const canvas = newCanvas(placeholder.width, placeholder.height);
+  const canvas = newCanvas(placeholder.width * placeholder.frames, placeholder.height);
   placeholder.paint(canvas.getContext('2d'));
   return canvas;
 }

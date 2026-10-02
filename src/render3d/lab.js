@@ -9,6 +9,7 @@
 import { loadAssets } from '../render/assets.js';
 import { createPieceSprite, createWorld, placeOnCell } from './world.js';
 import { pointerToNdc } from './picking.js';
+import { loadV3Meta } from './v3-meta.js';
 
 // Sample pieces on the board: { x, y } are logic cells (src/logic).
 const LAB_PIECES = [
@@ -22,11 +23,11 @@ const hud = document.getElementById('hud');
 
 // Art files from assets/manifest.json; missing ones are placeholders.
 const warn = (message) => console.warn(message);
-const assets = await loadAssets({ warn });
+const [assets, meta] = await Promise.all([loadAssets({ warn }), loadV3Meta({ warn })]);
 
 let world;
 try {
-  world = createWorld(canvas, { assets, warn });
+  world = createWorld(canvas, { assets, meta, warn });
 } catch (err) {
   hud.textContent = 'WebGL is not available in this browser.';
   throw err;

@@ -6,6 +6,7 @@ import { createEffects } from './render/effects.js';
 import { drawGameScreen, drawMenuScreen, setAssets } from './render/game-renderer.js';
 import { createResumeWatch } from './render3d/frame-gap.js';
 import { QUALITY_LEVELS } from './render3d/quality.js';
+import { loadV3Meta } from './render3d/v3-meta.js';
 import { GAME, GAME_OVER, createApp } from './ui/app.js';
 import { attachGameInput, hitTest, isQualityKey } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
@@ -24,6 +25,7 @@ ctx.imageSmoothingEnabled = false;
 const warn = (message) => console.warn(message);
 const assetsLoaded = loadAssets({ warn });
 assetsLoaded.then(setAssets);
+const metaLoaded = loadV3Meta({ warn });
 
 const params = new URLSearchParams(window.location.search);
 
@@ -55,8 +57,10 @@ if (params.get('local') === '1') {
 async function load3dRenderer() {
   try {
     worldCanvas.hidden = false; // it must be laid out before the renderer sizes it
-    const [{ createWorldRenderer }, assets] = await Promise.all([import('./render3d/world-renderer.js'), assetsLoaded]);
-    return createWorldRenderer(worldCanvas, { assets, warn });
+    const [{ createWorldRenderer }, assets, meta] = await Promise.all([
+      import('./render3d/world-renderer.js'), assetsLoaded, metaLoaded,
+    ]);
+    return createWorldRenderer(worldCanvas, { assets, meta, warn });
   } catch (err) {
     console.warn('The 3D renderer is not available, using the 2D one.', err);
     worldCanvas.hidden = true;

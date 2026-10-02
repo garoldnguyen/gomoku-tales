@@ -42,12 +42,14 @@ const COLORS = {
 // WebGL is not available. Returns the world; call render(now) every frame.
 // `assets` is the store from loadAssets (src/render/assets.js); textures
 // whose file is missing are generated placeholders (src/render3d/art.js).
+// `meta` is the v3 tuning data from loadV3Meta (src/render3d/v3-meta.js).
 export function createWorld(canvas, {
   quality: startQuality = QUALITY_DEFAULT,
   assets = createAssetStore(),
+  meta,
   warn = () => {},
 } = {}) {
-  setArtAssets(assets, { warn });
+  setArtAssets(assets, { warn, meta });
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
   renderer.shadowMap.enabled = true; // the sun casts shadows only on HIGH (see setQuality)
   // PCFShadowMap with a radius gives soft edges (this release removed PCFSoftShadowMap).

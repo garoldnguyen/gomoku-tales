@@ -83,8 +83,11 @@ test('every asset name used in the code exists in the manifest', () => {
 test('the manifest lists only assets the code uses, each tagged with what draws it', () => {
   const used2d = new Set(spriteNames());
   const used3d = new Set(artNames());
+  // The v3 pack (HUD portraits included) is loaded through ART.v3; the v3
+  // HUD is a DOM overlay, not the 2D renderer.
+  const v3 = new Set(artNames(ART.v3));
   for (const entry of entries) {
-    if (entry.use === '3d') assert.ok(used3d.has(entry.name), `"${entry.name}" is not drawn by the 3D world`);
+    if (entry.use === '3d' || v3.has(entry.name)) assert.ok(used3d.has(entry.name), `"${entry.name}" is not drawn by the 3D world`);
     else assert.ok(used2d.has(entry.name), `"${entry.name}" is not drawn by the 2D renderer or HUD`);
   }
   const hud = [...spriteNames(SPRITES.panel), ...spriteNames(SPRITES.portrait), ...spriteNames(SPRITES.icon)];

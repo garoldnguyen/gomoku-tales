@@ -197,7 +197,8 @@ test('dropped-in art replaces every 2D and HUD placeholder without code changes'
     const ctx = fakeContext();
     drawGameScreen(ctx, busyView());
     const drawn = new Set(ctx.images.map(([image]) => image.name));
-    for (const e of parseManifest(manifest).filter((e) => e.use !== '3d')) {
+    // v3 files (assets/3d/v3/) belong to the 3D world and the DOM HUD.
+    for (const e of parseManifest(manifest).filter((e) => e.use !== '3d' && !e.file.startsWith('3d/v3/'))) {
       assert.ok(drawn.has(`assets/${e.file}`), `${e.name} was not drawn`);
     }
   } finally {
