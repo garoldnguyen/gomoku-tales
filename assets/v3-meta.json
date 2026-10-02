@@ -1,0 +1,218 @@
+{
+ "bushes": {
+  "anchor": [
+   11,
+   14
+  ]
+ },
+ "curb-wood": {
+  "tile": "repeat-x"
+ },
+ "farm-board": {
+  "cell": 32,
+  "gutter": 2,
+  "plot": 30
+ },
+ "farm-board-low": {
+  "cell": 32,
+  "gutter": 2,
+  "plot": 30
+ },
+ "fence-rail": {
+  "tile": "repeat-x"
+ },
+ "flower-bluebell": {
+  "anchor": [
+   15,
+   33
+  ],
+  "looks": [
+   "Violet",
+   "Sky",
+   "White"
+  ]
+ },
+ "flower-clover": {
+  "anchor": [
+   9,
+   13
+  ],
+  "looks": [
+   "Green"
+  ]
+ },
+ "flower-cosmos": {
+  "anchor": [
+   15,
+   31
+  ],
+  "looks": [
+   "Magenta",
+   "White",
+   "Violet"
+  ]
+ },
+ "flower-daisy": {
+  "anchor": [
+   14,
+   29
+  ],
+  "looks": [
+   "White",
+   "Pink",
+   "Cream with orange centre"
+  ]
+ },
+ "flower-dandelion": {
+  "anchor": [
+   10,
+   25
+  ],
+  "looks": [
+   "Yellow bloom",
+   "White seed puff"
+  ]
+ },
+ "flower-forgetmenot": {
+  "anchor": [
+   13,
+   15
+  ],
+  "looks": [
+   "Sky",
+   "Pink"
+  ]
+ },
+ "flower-hollyhock": {
+  "anchor": [
+   15,
+   45
+  ],
+  "looks": [
+   "Magenta",
+   "Yellow",
+   "White"
+  ]
+ },
+ "flower-lavender": {
+  "anchor": [
+   11,
+   37
+  ],
+  "looks": [
+   "Violet",
+   "Sky"
+  ]
+ },
+ "flower-marigold": {
+  "anchor": [
+   13,
+   25
+  ],
+  "looks": [
+   "Orange",
+   "Yellow"
+  ]
+ },
+ "flower-mushroom": {
+  "anchor": [
+   12,
+   19
+  ],
+  "looks": [
+   "Red with dots",
+   "Tan",
+   "Violet"
+  ]
+ },
+ "flower-poppy": {
+  "anchor": [
+   14,
+   27
+  ],
+  "looks": [
+   "Red",
+   "Orange",
+   "Coral"
+  ]
+ },
+ "flower-sunflower": {
+  "anchor": [
+   15,
+   43
+  ],
+  "looks": [
+   "Gold"
+  ]
+ },
+ "flower-tulip": {
+  "anchor": [
+   14,
+   31
+  ],
+  "looks": [
+   "Red",
+   "Yellow",
+   "Violet"
+  ]
+ },
+ "grass-tufts": {
+  "anchor": [
+   6,
+   8
+  ]
+ },
+ "hay-bale": {
+  "anchor": [
+   12,
+   15
+  ]
+ },
+ "path-tile": {
+  "tile": "repeat-y"
+ },
+ "plant-o": {
+  "anchor": [
+   18,
+   36
+  ],
+  "note": "anchor is the pixel that sits on the plot centre; the old lab frame had the plot at x 3..32, y 21..50",
+  "stageStartMs": [
+   0,
+   150,
+   450,
+   850,
+   1200
+  ]
+ },
+ "plant-x": {
+  "anchor": [
+   18,
+   36
+  ],
+  "note": "anchor is the pixel that sits on the plot centre; the old lab frame had the plot at x 3..32, y 21..50",
+  "stageStartMs": [
+   0,
+   150,
+   450,
+   850,
+   1200
+  ]
+ },
+ "trees": {
+  "anchor": [
+   17,
+   46
+  ]
+ },
+ "wind-bits": {
+  "kinds": [
+   "petal-pink",
+   "petal-white",
+   "petal-yellow",
+   "petal-lilac",
+   "leaf",
+   "seed"
+  ]
+ }
+}

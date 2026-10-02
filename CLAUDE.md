@@ -24,3 +24,16 @@ A two-player browser game. Read docs/design.md before every task. It is the sour
 - Pixels must stay crisp: NearestFilter textures, no mipmaps, no sub-pixel jitter.
 - Performance matters. Target 60 fps on integrated graphics. Every heavy effect needs a quality switch.
 - Tests cannot judge how the scene looks. In your summary, say which URL a human should open and what to look at.
+
+<!-- GOMOKU-V3-FARMLAND -->
+## FARMLAND ART UPDATE (v3), overrides older art rules
+
+Read `docs/art-direction-v3.md` before any work in `src/render3d` or `src/ui`. It replaces the wood board, the wood HUD panels, and the old sky, cloud and wind rules from `docs/art-direction-hd2d.md`. Game rules, networking and cell numbering do not change.
+
+1. The board is a farm field of 15 by 15 tilled plots, never wood. A move is a seed; the X or O is the plant that grows from it (stages Drop, Land, Sprout, Open, Rest, 1.2 seconds in total).
+2. The shape rule: X is always a blue four-petal cross bloom, O is always a red round bloom. Colour never carries the team alone.
+3. Quality levels come from ONE table in `src/render3d/quality.js` (section 5 of the doc). No other code tests the level name. Each level only adds to the one below it.
+4. The HUD is a DOM overlay of quiet glass cards (`docs/reference/v3/hud.css`), not a canvas. Text is English and uses the exact strings in section 8.
+5. One wind and one sun: everything moves from the upper left toward the lower right, shadows fall toward the lower right. No straight streak lines, no outlined clouds, no wood except the curb and fence.
+6. All art is vendored under `assets/` (sprites in `assets/3d/v3/`, tuning data in `assets/v3-meta.json`, font in `assets/fonts/`). Missing or wrong-size assets only warn, never crash. No new libraries or network requests for art.
+7. Pure helpers get unit tests. All existing tests must keep passing. Do not allocate per frame in the render loop.
