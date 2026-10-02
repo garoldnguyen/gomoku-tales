@@ -1,56 +1,166 @@
-// Quality levels for the HD-2D scene (docs/art-direction-hd2d.md section E)
-// and the pure logic that steps down a level when frames are too slow.
-// No Three.js imports, so this runs under node --test.
-//
-//   HIGH    depth of field (BokehPass), bloom, vignette, real shadow maps
-//   MEDIUM  cheaper blur (tilt shift), bloom at half resolution, vignette,
-//           blob shadows only (the default)
-//   LOW     no post-processing, blob shadows only
-//
-// Tone mapping is on at every level. Blob shadows under sprites are always on.
-// `particles` scales the particle counts and rates of the 3D effects
-// (src/render3d/effects3d.js): full at HIGH, fewer at MEDIUM and LOW.
-// `menuBlur` blurs the scene behind the lobby and room screens (a CSS
-// filter in index.html, section F; not behind Game over, which keeps the
-// final board in view); LOW skips it to save the GPU work.
+// Quality levels for the farmland scene: ONE feature table, exactly as
+// docs/art-direction-v3.md section 5 lists it, plus the pure logic that
+// picks, saves and steps down a level. Every render3d module reads its
+// switches from QUALITY_LEVELS (through qualityFeatures); nothing else tests
+// a level name. Each level only adds to the one below it, except the board
+// texture, which Low swaps for a lighter one. No Three.js imports, so this
+// runs under node --test.
 
-export const QUALITY_ORDER = ['HIGH', 'MEDIUM', 'LOW']; // best first
+export const QUALITY_ORDER = ['high', 'medium', 'low']; // best first
+export const QUALITY_FALLBACK = 'medium'; // unknown values use this
+export const QUALITY_STORAGE_KEY = 'gomoku-tales.quality';
 
-export const QUALITY_LEVELS = Object.freeze({
-  HIGH: Object.freeze({
-    name: 'HIGH',
-    postProcessing: true,
-    depthOfField: 'bokeh',
-    bloom: true,
-    bloomResolution: 1, // share of the full render size
-    vignette: true,
-    shadowMaps: true,
-    particles: 1,
-    menuBlur: true,
-  }),
-  MEDIUM: Object.freeze({
-    name: 'MEDIUM',
-    postProcessing: true,
-    depthOfField: 'tiltShift',
-    bloom: true,
-    bloomResolution: 0.5,
-    vignette: true,
-    shadowMaps: false,
-    particles: 0.6,
-    menuBlur: true,
-  }),
-  LOW: Object.freeze({
-    name: 'LOW',
-    postProcessing: false,
-    depthOfField: 'none',
-    bloom: false,
-    bloomResolution: 0,
-    vignette: false,
-    shadowMaps: false,
-    particles: 0.35,
-    menuBlur: false,
-  }),
+export const QUALITY_LEVELS = deepFreeze({
+  low: {
+    name: 'low',
+    goal: 'clear and easy to play',
+    pixelRatioCap: 1,
+    boardTexture: 'farm-board-low',
+    ground: 'mown', // flat mown meadow: two greens in 3-cell stripes, nothing else
+    scenery: false, // trees, bushes, hay, fence, path, stepping stones (the curb always shows)
+    meadowFlowers: 'off',
+    farHills: 'off',
+    sky: 'gradient',
+    shadows: 'none',
+    postEffects: { bloom: false, depthOfField: false, warmGrade: false, vignette: false },
+    wind: false,
+    growthExtras: { openSparkles: false, soilPuff: false, rockShake: false },
+    skillEffects: 'simple', // marks and a short slide, no particles
+    particleCap: 0,
+    hudFrost: { blurPx: 0, shadow: 'none' },
+    backgroundMotion: false,
+  },
+  medium: {
+    name: 'medium',
+    goal: 'shades and a lived-in farm',
+    pixelRatioCap: 1.5,
+    boardTexture: 'farm-board',
+    ground: 'painted', // painted mottled meadow, grass tufts
+    scenery: true,
+    meadowFlowers: 'still',
+    farHills: 'on',
+    sky: 'still-clouds', // gradient plus 4 still painted clouds
+    shadows: 'blob', // soft blob shadow under every plant, rock, post, tree, bush, bale
+    postEffects: { bloom: false, depthOfField: false, warmGrade: false, vignette: false }, // no blur at all
+    wind: false,
+    growthExtras: { openSparkles: true, soilPuff: false, rockShake: false },
+    skillEffects: 'particles', // marks, slides, a few particles
+    particleCap: 60,
+    hudFrost: { blurPx: 10, shadow: 'small' },
+    backgroundMotion: false,
+  },
+  high: {
+    name: 'high',
+    goal: 'shades, depth, clouds and wind',
+    pixelRatioCap: 2,
+    boardTexture: 'farm-board',
+    ground: 'painted-ripples', // painted meadow plus slow lighter wind ripples
+    scenery: true,
+    meadowFlowers: 'sway', // swaying, dandelion puffs lift off
+    farHills: 'haze',
+    sky: 'drifting-clouds', // 8 drifting clouds in 2 layers, wisps, sun rays
+    shadows: 'sun', // long sun shadows plus slow cloud shadows
+    postEffects: { bloom: true, depthOfField: true, warmGrade: true, vignette: true },
+    wind: true, // petals, leaves and seed fluff in 3 lanes; grass, flowers and plants sway
+    growthExtras: { openSparkles: true, soilPuff: true, rockShake: true },
+    skillEffects: 'full',
+    particleCap: 220,
+    hudFrost: { blurPx: 18, shadow: 'soft' },
+    backgroundMotion: true, // clouds, wind, sway, rays
+  },
 });
+
+// The most live particles any level allows; effect counts are written for it.
+export const MAX_PARTICLE_CAP = Math.max(...QUALITY_ORDER.map((level) => QUALITY_LEVELS[level].particleCap));
+
+function deepFreeze(value) {
+  if (value && typeof value === 'object') {
+    for (const inner of Object.values(value)) deepFreeze(inner);
+    Object.freeze(value);
+  }
+  return value;
+}
+
+// A known level name for any value: case and spaces are ignored, anything
+// else (null, '', 'ultra') is QUALITY_FALLBACK.
+export function normalizeQuality(value) {
+  const name = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return Object.hasOwn(QUALITY_LEVELS, name) ? name : QUALITY_FALLBACK;
+}
+
+// The feature row of a level; unknown values get the QUALITY_FALLBACK row.
+export function qualityFeatures(level) {
+  return QUALITY_LEVELS[normalizeQuality(level)];
+}
+
+// Share of the full effect particle counts a level spawns (0 to 1).
+export function particleScale(features) {
+  return features.particleCap / MAX_PARTICLE_CAP;
+}
+
+// True when the scene behind the lobby and room menus is blurred: on
+// levels whose HUD glass is frosted. features is undefined for the 2D
+// renderer, which never blurs.
+export function blursMenus(features) {
+  return (features?.hudFrost.blurPx ?? 0) > 0;
+}
+
+// The top-level feature keys whose values differ between two rows, so a
+// switch rebuilds only those.
+export function changedFeatures(from, to) {
+  const changed = [];
+  for (const key of Object.keys(to)) {
+    if (!from || !sameValue(from[key], to[key])) changed.push(key);
+  }
+  return changed;
+}
+
+function sameValue(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => sameValue(a[key], b[key]));
+}
+
+// localStorage, or null where there is none or reading it throws (some
+// browsers throw for blocked storage). The game works without it.
+export function browserStorage() {
+  try {
+    return globalThis.localStorage ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// The saved level, or null when nothing (valid) is saved or storage fails.
+export function loadSavedQuality(storage) {
+  try {
+    const saved = storage?.getItem(QUALITY_STORAGE_KEY);
+    return typeof saved === 'string' && Object.hasOwn(QUALITY_LEVELS, saved) ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+// Saves a level; returns false when storage is missing or throws (full,
+// private mode, blocked).
+export function saveQuality(storage, level) {
+  try {
+    if (!storage) return false;
+    storage.setItem(QUALITY_STORAGE_KEY, normalizeQuality(level));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// The level to start with: ?quality= from the URL when given (unknown
+// values become QUALITY_FALLBACK), else the saved choice, else
+// QUALITY_FALLBACK. fromUrl is true when the URL chose it.
+export function startQuality(urlValue, storage) {
+  if (urlValue !== null && urlValue !== undefined) return { level: normalizeQuality(urlValue), fromUrl: true };
+  return { level: loadSavedQuality(storage) ?? QUALITY_FALLBACK, fromUrl: false };
+}
 
 function indexOf(level) {
   const i = QUALITY_ORDER.indexOf(level);
@@ -58,20 +168,20 @@ function indexOf(level) {
   return i;
 }
 
-// The Q key: HIGH -> MEDIUM -> LOW -> HIGH.
+// The Q key: high -> medium -> low -> high.
 export function cycleQuality(level) {
   return QUALITY_ORDER[(indexOf(level) + 1) % QUALITY_ORDER.length];
 }
 
-// One level lower; LOW stays LOW.
+// One level lower; low stays low.
 export function lowerQuality(level) {
   return QUALITY_ORDER[Math.min(indexOf(level) + 1, QUALITY_ORDER.length - 1)];
 }
 
-// Pixel ratio for the renderer: the screen's, capped at renderScale.
-export function cappedPixelRatio(devicePixelRatio, renderScale) {
+// Pixel ratio for the renderer: the screen's, capped at the level's pixelRatioCap.
+export function cappedPixelRatio(devicePixelRatio, cap) {
   const ratio = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
-  return Math.min(ratio, renderScale);
+  return Math.min(ratio, cap);
 }
 
 // Watches frame times and says when to step down a level. Feed tick() the

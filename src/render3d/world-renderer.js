@@ -11,7 +11,7 @@
 // stacked above it, where the existing 2D HUD code draws the player panels,
 // skill buttons, cooldowns, status line and winner text. Board picking is a
 // ray from the camera (src/render3d/hit-test.js). The Q key calls
-// cycleQuality().
+// setQuality(cycleQuality(quality)) through cycleQuality().
 //
 // The world also comes alive from the logic events (sections D and G):
 //   trigger(events, time)  placed pieces pop in, a character casts when its
@@ -91,13 +91,24 @@ export function createWorldRenderer(worldCanvas, options = {}) {
 
     hitTest: createWorldHitTest(world.cameraSetup, HUD_3D),
 
+    // Switches this window's quality level ('low', 'medium' or 'high';
+    // unknown values are medium), saves it and keeps the game as it is.
+    setQuality(level) {
+      world.setQuality(level);
+    },
+
     cycleQuality() {
       world.cycleQuality();
     },
 
-    // This window's quality level ('HIGH', 'MEDIUM' or 'LOW').
+    // This window's quality level ('low', 'medium' or 'high').
     get quality() {
       return world.quality;
+    },
+
+    // Its row of the quality table (src/render3d/quality.js).
+    get features() {
+      return world.features;
     },
 
     trigger(events, time) {
@@ -239,6 +250,7 @@ function createGhosts(world) {
     // threshold (0.5) would discard every pixel of a 0.45 ghost.
     material.alphaTest = fadedAlphaTest(GHOST_OPACITY);
     material.depthWrite = false;
+    sprite.noBlobShadow = true;
     sprite.shadow.visible = false;
     sprite.object.visible = false;
     ghosts[kind] = sprite;

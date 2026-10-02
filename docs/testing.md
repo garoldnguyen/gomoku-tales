@@ -56,7 +56,7 @@ Call the left window **A** (it creates the room and is the host) and the right w
 **B** (it joins).
 
 - [ ] Both windows show the lobby over the 3D scene, scaled to fit the window at 16:9
-      (letterboxed if needed). Each window shows its own "Quality MEDIUM [Q]  FPS NN" in the
+      (letterboxed if needed). Each window shows its own "Quality medium [Q]  FPS NN" in the
       top-left corner.
 
 ## 4. Create and join a room
@@ -295,7 +295,7 @@ from section 3, side by side and both visible.
 ### 10.2 Screens over the scene
 
 - [ ] Lobby, Create Room, Join Room and Waiting are wooden cards above the 3D scene. On
-      MEDIUM and HIGH the scene behind them is blurred; on LOW it is sharp (the blur is
+      medium and high the scene behind them is blurred; on low it is sharp (the blur is
       skipped to save GPU time). The title and the quality line are never blurred, and no
       dark fringe shows at the edges of the blurred scene.
 - [ ] The scene behind the screens shows an empty board, both characters idling, clouds
@@ -307,28 +307,34 @@ from section 3, side by side and both visible.
 
 ### 10.3 Quality is per window
 
-The levels (the README has the full table): HIGH has depth of field, bloom, a vignette and
-real sun shadows; MEDIUM (the default) has a cheaper tilt shift blur, half resolution
-bloom and the vignette; LOW has no post-processing. Every level keeps the blob shadows
-under sprites.
+The levels (the README has the full table, src/render3d/quality.js has the switches):
+high has depth of field, bloom, a vignette, real sun shadows, drifting clouds and wind;
+medium (the default) has no post effects and no blur at all, blob shadows and still
+clouds; low has no shadows, no scenery, flowers, hills or clouds and no effect particles.
 
-- [ ] In A press Q until it shows HIGH: distant hills and sky are soft, the board centre
+- [ ] In A press Q until it shows high: distant hills and sky are soft, the board centre
       is sharp, the trees and the board cast soft sun shadows on the grass, the corners are
       a little darker and the white rabbit and the hover glow have a faint bloom.
-- [ ] MEDIUM: the top and bottom of the view are softer than the middle (a miniature
-      look); no sun shadows, only the blobs under the sprites.
-- [ ] LOW: everything is sharp, no vignette, no bloom; colours look about the same as on
-      MEDIUM (no sudden brighter decals, glow or sky).
+- [ ] medium: everything is sharp, no vignette; no sun shadows, only the blobs under the
+      sprites; the clouds stand still and the wind streaks are gone.
+- [ ] low: no shadows, trees, flowers, hills or clouds; placing a stone or using a skill
+      shows no particles and no screen shake; colours look about the same as on medium.
+- [ ] Switching level in the middle of a game keeps every stone, rock, cooldown and the
+      turn exactly as they were.
 - [ ] On every level the pieces, characters and board grid keep hard pixel edges, and a
       level change hitches at most once.
-- [ ] Press Q in A (click A's scene first so it has focus): A's level goes MEDIUM -> LOW ->
-      HIGH -> MEDIUM, and B's stays as it was. Then press Q in B: only B changes.
-- [ ] Leave A on HIGH and B on LOW and play a few moves: both keep their level and draw the
+- [ ] Press Q in A (click A's scene first so it has focus): A's level goes medium -> low ->
+      high -> medium, and B's stays as it was. Then press Q in B: only B changes.
+- [ ] Leave A on high and B on low and play a few moves: both keep their level and draw the
       same board.
 - [ ] On the Join Room screen, type a code with a Q in it (for example `QWERT`): the letter
       goes into the box and the quality level does not change.
-- [ ] Reload a window (this leaves any room): it starts again on MEDIUM. The other window
-      keeps its level.
+- [ ] Reload a window (this leaves any room): it starts on the level last chosen with Q
+      in either window (the choice is saved per site), or medium if none was. The other
+      window keeps its level until it reloads.
+- [ ] Open `http://localhost:8000/?quality=low`: it starts on low and remembers it. With
+      `?quality=banana` it starts on medium. With storage blocked (private window with
+      site data blocked) the game still starts and Q still works.
 
 ### 10.4 Resize and pixel ratio
 
@@ -366,18 +372,18 @@ Hidden tabs get no animation frames, but the room keeps running on timers.
 
 ### 10.7 Slow frames step down
 
-- [ ] Make A slow: put it on HIGH on a weak laptop, or in DevTools open the Performance
+- [ ] Make A slow: put it on high on a weak laptop, or in DevTools open the Performance
       tab, click the gear icon and set CPU to "6x slowdown" (if that is not enough to drop
       the FPS, also make the window full screen on a large monitor). Whenever the FPS stays
       below about 50 for 3 seconds, the corner shows the next lower level with "(auto)";
-      it steps one level at a time and never below LOW. A short hitch (a shader compile,
+      it steps one level at a time and never below low. A short hitch (a shader compile,
       switching tabs) does not step down. Turn the slowdown off: the level stays where it
       is until you press Q, which clears "(auto)".
 
 ### 10.8 The look lab
 
 - [ ] Open http://localhost:8000/hd2d-lab.html. It shows the same Breeze Hill scene with a
-      few sample stones and a rock, and "Quality MEDIUM [Q]", the FPS and the hovered cell
+      few sample stones and a rock, and "Quality medium [Q]", the FPS and the hovered cell
       in the top-left corner. Q cycles the levels as in 10.3, and the hover glow follows the
       pointer. [docs/lab.md](lab.md) lists what to look at.
 

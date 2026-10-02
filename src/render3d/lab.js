@@ -4,7 +4,8 @@
 // Windy Spring Breeze Hill under a fixed camera with a warm sun, soft
 // shadows, Wind Rabbit and Earth Bear, post-processing with quality levels)
 // with a few sample stones and a rock, an FPS counter and a hover highlight
-// found by raycast picking. The Q key cycles the quality. See docs/lab.md.
+// found by raycast picking. The Q key cycles the quality; ?quality=low,
+// medium or high picks one. See docs/lab.md.
 
 import { loadAssets } from '../render/assets.js';
 import { createPieceSprite, createWorld, placeOnCell } from './world.js';
@@ -28,6 +29,8 @@ const [assets, meta] = await Promise.all([loadAssets({ warn }), loadV3Meta({ war
 let world;
 try {
   world = createWorld(canvas, { assets, meta, warn });
+  const urlQuality = new URLSearchParams(window.location.search).get('quality');
+  if (urlQuality !== null) world.setQuality(urlQuality);
 } catch (err) {
   hud.textContent = 'WebGL is not available in this browser.';
   throw err;

@@ -28,7 +28,8 @@
 // (seeded-random.js effectRandom), and
 // per-frame numbers are shared through the `frame` object rather than
 // passed between functions, so the JS engine never boxes them. The quality
-// level scales particle counts and rates (quality.js `particles`).
+// level scales particle counts and rates and caps the live particles
+// (quality.js `particleCap`).
 //
 // While a flying copy of a piece is on its way to a cell, holds(cellIndex,
 // time) is true and the piece layer hides the real piece there.
@@ -36,7 +37,7 @@
 import * as THREE from 'three';
 import {
   BANNER_3D_Y, BOARD_SIZE, CAMERA_FOV, CONVERT_SPARKLE_RATE, DASH_SWIRL_RATE, DASH_TRAIL_RATE,
-  EFFECT_PARTICLE_CAPACITY, MARK_FADE_MS, PLACE_DUST_COUNT, PLACE_SPARKLE_COUNT, PX_WORLD, THROW_ARC_HEIGHT,
+  MARK_FADE_MS, PLACE_DUST_COUNT, PLACE_SPARKLE_COUNT, PX_WORLD, THROW_ARC_HEIGHT,
   TORNADO_PARTICLE_RATE, TORNADO_SIZE,
 } from '../config.js';
 import { X } from '../logic/board.js';
@@ -51,7 +52,7 @@ import {
   createParticlePool, createSpawnParams, emit, scaledCount, SHAPE_PLUS, SHAPE_SQUARE,
 } from './particle-pool.js';
 import { cellToWorld } from './picking.js';
-import { QUALITY_LEVELS } from './quality.js';
+import { MAX_PARTICLE_CAP, particleScale } from './quality.js';
 import { effectRandom } from './seeded-random.js';
 import { createCellDecal, createPieceSprite, decalMaterial, placeOnCell } from './world.js';
 
@@ -84,7 +85,7 @@ const TWO_PI = Math.PI * 2;
 export function createEffects3d(world) {
   const fx = {
     world,
-    pool: createParticlePool(EFFECT_PARTICLE_CAPACITY),
+    pool: createParticlePool(MAX_PARTICLE_CAP),
     sp: createSpawnParams(),
     // Every emitter calls random.fill(u) per particle and reads u[0],
     // u[1], ... in [0, 1). For looks only; it never touches the game.
@@ -98,7 +99,7 @@ export function createEffects3d(world) {
   };
   const { pool, sp, random, u, frame } = fx;
 
-  const points = createParticlePoints(EFFECT_PARTICLE_CAPACITY);
+  const points = createParticlePoints(MAX_PARTICLE_CAP);
   world.scene.add(points.mesh);
   const banners = createBanners();
   const actors = createActorPool(world);
@@ -114,7 +115,6 @@ export function createEffects3d(world) {
   const at = { x: 0.5, y: 0.5, z: 0.5 }; // where a trail is left this frame
   const pointScaleFactor = 1 / (2 * Math.tan((CAMERA_FOV * Math.PI) / 360));
 
-  const particleScale = () => QUALITY_LEVELS[world.quality]?.particles ?? 1;
 
   // --- Particle bursts ---
 
@@ -260,8 +260,9 @@ export function createEffects3d(world) {
   }
 
   // A new shake replaces the current one only if it is stronger than what
-  // is left of it.
+  // is left of it. Only levels with the rockShake growth extra shake.
   function startShake(strength) {
+    if (!world.features.growthExtras.rockShake) return;
     if (strength > 0 && shakeLeft(frame.time - shake.start, shake.strength) < strength) {
       shake.start = frame.time;
       shake.strength = strength;
@@ -381,8 +382,9 @@ export function createEffects3d(world) {
     switch (spec.kind) {
       case 'place': {
         const { x, z } = cellToWorld(spec.x, spec.y);
-        sparkles(x, z, spec.player, PLACE_SPARKLE_COUNT);
-        dustPuff(x, z, PLACE_DUST_COUNT, 1);
+        const extras = world.features.growthExtras;
+        if (extras.openSparkles) sparkles(x, z, spec.player, PLACE_SPARKLE_COUNT);
+        if (extras.soilPuff) dustPuff(x, z, PLACE_DUST_COUNT, 1);
         startShake(shakeStrength(spec));
         break;
       }
@@ -462,7 +464,8 @@ export function createEffects3d(world) {
     // Starts the visuals for the events of one applied action at `time`.
     trigger(events, time) {
       frame.time = time;
-      frame.scale = particleScale();
+      frame.scale = particleScale(world.features);
+      pool.limit = Math.min(pool.capacity, world.features.particleCap);
       for (const spec of visualsForEvents(events)) start(spec);
     },
 
@@ -484,7 +487,8 @@ export function createEffects3d(world) {
       frame.dtS = Number.isNaN(frame.last) ? 0 : Math.min(Math.max(0, time - frame.last), MAX_STEP_MS) / 1000;
       frame.last = time;
       frame.time = time;
-      frame.scale = particleScale();
+      frame.scale = particleScale(world.features);
+      pool.limit = Math.min(pool.capacity, world.features.particleCap);
       frame.pointScale = world.drawingHeight * pointScaleFactor;
 
       dashMark.update();

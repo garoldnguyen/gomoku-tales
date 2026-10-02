@@ -2,14 +2,14 @@
 // the game (src/render3d/world-renderer.js) and the look lab (lab.js): a
 // WebGL renderer, the fixed camera, a warm sun and a cool hemisphere fill,
 // Windy Spring Breeze Hill, the wooden board, Wind Rabbit and Earth Bear
-// beside it, a glowing hover decal, post-processing with quality levels and
-// automatic step down, and an FPS meter. Pieces are added as sprites.
+// beside it, a glowing hover decal, post-processing, the quality levels of
+// src/render3d/quality.js with automatic step down, and an FPS meter.
+// Pieces are added as sprites.
 
 import * as THREE from 'three';
 import {
   BOARD_SIZE, BOARD_THICKNESS, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE,
-  FPS_SAMPLE_MS, QUALITY_DEFAULT, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS,
-  RENDER_SCALE, TARGET_FRAME_MS,
+  FPS_SAMPLE_MS, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS, TARGET_FRAME_MS,
 } from '../config.js';
 import { createAssetStore } from '../render/assets.js';
 import { artSource, setArtAssets } from './art.js';
@@ -21,7 +21,10 @@ import { snapToStep, worldUnitsPerPixel } from './effect-plans.js';
 import { createFpsMeter } from './fps.js';
 import { cellToWorld, pickCell } from './picking.js';
 import { createPostProcessing } from './post-processing.js';
-import { createSlowFrameWatch, cycleQuality, lowerQuality, QUALITY_LEVELS } from './quality.js';
+import {
+  browserStorage, changedFeatures, createSlowFrameWatch, cycleQuality, loadSavedQuality, lowerQuality,
+  normalizeQuality, QUALITY_FALLBACK, QUALITY_LEVELS, saveQuality,
+} from './quality.js';
 import { PixelSprite, pixelTexture } from './sprites.js';
 import { sameViewSize, viewSize } from './view-size.js';
 
@@ -30,6 +33,9 @@ export const DECAL_LIFT = 0.01; // keeps flat decals just above the board
 const SHADOW_EXTENT = 20; // the sun's shadow map covers the board, characters and trees
 const PIECE_SHADOW_RADIUS = 0.36;
 const ROCK_SHADOW_RADIUS = PIECE_SHADOW_RADIUS * 1.2;
+
+// The switches the scenery around the board reads (breeze-hill.js).
+const SCENERY_FEATURES = new Set(['scenery', 'meadowFlowers', 'farHills', 'sky', 'wind', 'backgroundMotion']);
 
 const COLORS = {
   boardSide: 0x8a5a2b,
@@ -43,15 +49,18 @@ const COLORS = {
 // `assets` is the store from loadAssets (src/render/assets.js); textures
 // whose file is missing are generated placeholders (src/render3d/art.js).
 // `meta` is the v3 tuning data from loadV3Meta (src/render3d/v3-meta.js).
+// `quality` is the level to start with (default: the one saved in
+// `storage`, else medium); `storage` is localStorage or null.
 export function createWorld(canvas, {
-  quality: startQuality = QUALITY_DEFAULT,
+  storage = browserStorage(),
+  quality: startLevel = loadSavedQuality(storage) ?? QUALITY_FALLBACK,
   assets = createAssetStore(),
   meta,
   warn = () => {},
 } = {}) {
   setArtAssets(assets, { warn, meta });
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.shadowMap.enabled = true; // the sun casts shadows only on HIGH (see setQuality)
+  renderer.shadowMap.enabled = true; // the sun casts shadows only with the 'sun' shadow mode (see applyQuality)
   // PCFShadowMap with a radius gives soft edges (this release removed PCFSoftShadowMap).
   renderer.shadowMap.type = THREE.PCFShadowMap;
 
@@ -94,14 +103,20 @@ export function createWorld(canvas, {
   // board and Earth Bear (O) on the right, with idle, cast, win and lose
   // poses and a glow for the player to move (src/render3d/characters3d.js).
   const sprites = new Set();
+  let blobShadows = true; // false when the quality level has no shadows
+  // A sprite with noBlobShadow set (the see-through ghosts) never shows one.
+  const showBlobShadow = (sprite) => {
+    sprite.shadow.visible = blobShadows && !sprite.noBlobShadow;
+  };
   const addSprite = (sprite) => {
     sprites.add(sprite);
+    showBlobShadow(sprite);
     scene.add(sprite.object);
     return sprite;
   };
   const characters = createCharacters(addSprite);
 
-  // Post-processing focused on the board centre, with quality levels (section E).
+  // Post-processing focused on the board centre.
   const postProcessing = createPostProcessing(renderer, scene, camera, CAMERA_DISTANCE);
   const slowFrames = createSlowFrameWatch({
     targetFrameMs: TARGET_FRAME_MS,
@@ -109,35 +124,58 @@ export function createWorld(canvas, {
     stallMs: QUALITY_STALL_MS,
   });
   let quality = null;
+  let features = null; // the quality table row of `quality`
   let autoStepped = false; // true after the last change was an automatic step down
 
-  function setQuality(level, auto = false) {
-    quality = level;
-    autoStepped = auto;
-    // Real shadow maps only on HIGH; sprites always have their blob shadows.
-    // Changing castShadow makes Three.js rebuild the lit materials once.
-    sun.castShadow = QUALITY_LEVELS[level].shadowMaps;
-    postProcessing.setLevel(level);
-    slowFrames.reset();
-  }
-  setQuality(startQuality);
-
   // The drawing buffer follows the canvas's CSS box and this window's
-  // devicePixelRatio (capped by RENDER_SCALE). It is checked every frame
-  // (see view-size.js): a window moved to another screen or zoomed does not
-  // always get a resize event, and a canvas laid out after the world was
-  // built has no size at first. clientWidth ignores CSS transforms, so the
-  // blurred backdrop behind the menus (index.html) does not resize it.
+  // devicePixelRatio (capped by the level's pixelRatioCap). It is checked
+  // every frame (see view-size.js): a window moved to another screen or
+  // zoomed does not always get a resize event, and a canvas laid out after
+  // the world was built has no size at first. clientWidth ignores CSS
+  // transforms, so the blurred backdrop behind the menus (index.html) does
+  // not resize it.
   let viewSizeNow = null;
   function resize() {
-    const next = viewSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio, RENDER_SCALE);
+    const next = viewSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio, features.pixelRatioCap);
     if (next === null || sameViewSize(viewSizeNow, next)) return;
     viewSizeNow = next;
     renderer.setPixelRatio(next.pixelRatio);
     renderer.setSize(next.width, next.height, false);
     postProcessing.resize();
   }
-  resize();
+
+  // Switches to a level (unknown values are medium) and rebuilds only the
+  // parts whose switches changed; pieces, effects and the game are left
+  // alone. `auto` marks an automatic step down.
+  function applyQuality(level, auto) {
+    const next = normalizeQuality(level);
+    const nextFeatures = QUALITY_LEVELS[next];
+    const changed = changedFeatures(features, nextFeatures);
+    quality = next;
+    features = nextFeatures;
+    autoStepped = auto;
+    slowFrames.reset();
+    if (changed.includes('shadows')) {
+      // Real shadow maps only with the sun mode. Changing castShadow makes
+      // Three.js rebuild the lit materials once.
+      sun.castShadow = features.shadows === 'sun';
+      blobShadows = features.shadows !== 'none';
+      for (const sprite of sprites) showBlobShadow(sprite);
+    }
+    if (changed.includes('postEffects')) postProcessing.setEffects(features.postEffects);
+    if (changed.some((key) => SCENERY_FEATURES.has(key))) scenery.setFeatures(features);
+    if (changed.includes('pixelRatioCap')) {
+      viewSizeNow = null;
+      resize();
+    }
+  }
+  applyQuality(startLevel, false);
+
+  // A choice made by hand (the Q key, ?quality=): applied and saved.
+  function setQuality(level) {
+    applyQuality(level, false);
+    saveQuality(storage, quality);
+  }
 
   // A hidden page stops requestAnimationFrame; that gap is not a slow frame.
   const fpsMeter = createFpsMeter(FPS_SAMPLE_MS, QUALITY_STALL_MS);
@@ -192,8 +230,14 @@ export function createWorld(canvas, {
       return canvas.height;
     },
 
+    // This window's quality level: 'low', 'medium' or 'high'.
     get quality() {
       return quality;
+    },
+
+    // The quality table row of the current level (src/render3d/quality.js).
+    get features() {
+      return features;
     },
 
     // True when the current level was chosen by the automatic step down.
@@ -207,7 +251,7 @@ export function createWorld(canvas, {
 
     setQuality,
 
-    // The Q key: the next quality level.
+    // The Q key: the next quality level, through setQuality.
     cycleQuality() {
       setQuality(cycleQuality(quality));
     },
@@ -217,7 +261,7 @@ export function createWorld(canvas, {
     render(now) {
       resize();
       fpsMeter.tick(now);
-      if (slowFrames.tick(now) && quality !== lowerQuality(quality)) setQuality(lowerQuality(quality), true);
+      if (slowFrames.tick(now) && quality !== lowerQuality(quality)) applyQuality(lowerQuality(quality), true);
       // Clamp the step so a hidden tab does not make everything jump on return.
       const dtMs = lastNow === null ? 0 : Math.min(now - lastNow, 100);
       lastNow = now;
@@ -249,8 +293,8 @@ export function placeOnCell(object, x, y) {
 }
 
 // Unlit see-through material for flat decals drawn from a canvas or image.
-// Tone mapped like everything else, so decals look the same on LOW (tone
-// mapped by the renderer) as on MEDIUM and HIGH (tone mapped by OutputPass).
+// Tone mapped like everything else, so decals look the same without post
+// effects (tone mapped by the renderer) as with them (by OutputPass).
 export function decalMaterial(source) {
   return new THREE.MeshBasicMaterial({
     map: pixelTexture(source),

@@ -1,10 +1,13 @@
-// Post-processing for the HD-2D scene (docs/art-direction-hd2d.md section E),
-// using only passes that ship with Three.js:
-//   render -> depth of field (BokehPass on HIGH, tilt shift pair on MEDIUM)
-//          -> bloom (UnrealBloomPass) -> vignette -> tone mapping and sRGB (OutputPass)
-// Every pass is built once; a quality level (src/render3d/quality.js) only
-// turns passes on and off. LOW skips the composer and renders straight to
-// the screen, where the renderer applies the same tone mapping.
+// Post-processing for the farmland scene, using only passes that ship with
+// Three.js:
+//   render -> depth of field (BokehPass) -> bloom (UnrealBloomPass)
+//          -> vignette -> tone mapping and sRGB (OutputPass)
+// Every pass is built once; the postEffects switches of the quality table
+// (src/render3d/quality.js) only turn passes on and off. With every switch
+// off (low and medium: no blur at all) the composer is skipped and the
+// scene renders straight to the screen, where the renderer applies the same
+// tone mapping. The warm grade switch is drawn by a later part
+// (docs/art-direction-v3.md section 5 and task part 9).
 
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -13,17 +16,11 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { BokehPass } from 'three/addons/postprocessing/BokehPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { HorizontalTiltShiftShader } from 'three/addons/shaders/HorizontalTiltShiftShader.js';
-import { VerticalTiltShiftShader } from 'three/addons/shaders/VerticalTiltShiftShader.js';
 import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 import {
-  BLOOM_RADIUS, BLOOM_STRENGTH, BLOOM_THRESHOLD, DOF_APERTURE, DOF_MAX_BLUR, TILT_SHIFT_BLUR,
+  BLOOM_RADIUS, BLOOM_STRENGTH, BLOOM_THRESHOLD, DOF_APERTURE, DOF_MAX_BLUR,
   TONE_MAPPING_EXPOSURE, VIGNETTE_DARKNESS, VIGNETTE_OFFSET,
 } from '../config.js';
-import { QUALITY_LEVELS } from './quality.js';
-
-// The camera looks at the board centre, so it sits in the middle of the screen.
-const TILT_SHIFT_FOCUS_LINE = 0.5;
 
 // renderer   a THREE.WebGLRenderer
 // focusDistance  distance from the camera to the board centre (depth of field focus)
@@ -42,20 +39,7 @@ export function createPostProcessing(renderer, scene, camera, focusDistance) {
   });
   composer.addPass(bokeh);
 
-  const tiltH = new ShaderPass(HorizontalTiltShiftShader);
-  const tiltV = new ShaderPass(VerticalTiltShiftShader);
-  tiltH.uniforms.r.value = TILT_SHIFT_FOCUS_LINE;
-  tiltV.uniforms.r.value = TILT_SHIFT_FOCUS_LINE;
-  composer.addPass(tiltH);
-  composer.addPass(tiltV);
-
-  let bloomResolution = 1;
   const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
-  // The composer sizes every pass to the full render size; bloom may run smaller.
-  const fullBloomSetSize = bloom.setSize.bind(bloom);
-  bloom.setSize = (width, height) => {
-    fullBloomSetSize(Math.max(1, Math.round(width * bloomResolution)), Math.max(1, Math.round(height * bloomResolution)));
-  };
   composer.addPass(bloom);
 
   const vignette = new ShaderPass(VignetteShader);
@@ -65,7 +49,7 @@ export function createPostProcessing(renderer, scene, camera, focusDistance) {
 
   composer.addPass(new OutputPass());
 
-  let level = QUALITY_LEVELS.LOW;
+  let useComposer = false;
   const size = new THREE.Vector2();
 
   // Matches the composer to the renderer's drawing buffer size.
@@ -73,30 +57,19 @@ export function createPostProcessing(renderer, scene, camera, focusDistance) {
     renderer.getSize(size);
     composer.setPixelRatio(renderer.getPixelRatio());
     composer.setSize(size.x, size.y);
-    // The tilt shift blur is in pixels, so it follows the buffer size.
-    const width = size.x * renderer.getPixelRatio();
-    const height = size.y * renderer.getPixelRatio();
-    tiltH.uniforms.h.value = TILT_SHIFT_BLUR / width;
-    tiltV.uniforms.v.value = TILT_SHIFT_BLUR / height;
   }
 
   return {
-    // levelName is a key of QUALITY_LEVELS.
-    setLevel(levelName) {
-      level = QUALITY_LEVELS[levelName];
-      bokeh.enabled = level.depthOfField === 'bokeh';
-      tiltH.enabled = level.depthOfField === 'tiltShift';
-      tiltV.enabled = level.depthOfField === 'tiltShift';
-      bloom.enabled = level.bloom;
-      vignette.enabled = level.vignette;
-      if (level.bloom && level.bloomResolution !== bloomResolution) {
-        bloomResolution = level.bloomResolution;
-        resize();
-      }
+    // postEffects is the postEffects row of a quality level.
+    setEffects(postEffects) {
+      bokeh.enabled = postEffects.depthOfField;
+      bloom.enabled = postEffects.bloom;
+      vignette.enabled = postEffects.vignette;
+      useComposer = postEffects.depthOfField || postEffects.bloom || postEffects.vignette || postEffects.warmGrade;
     },
     resize,
     render(deltaSeconds) {
-      if (level.postProcessing) composer.render(deltaSeconds);
+      if (useComposer) composer.render(deltaSeconds);
       else renderer.render(scene, camera);
     },
   };

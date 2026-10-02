@@ -11,26 +11,26 @@ Everything loads from the local server; no internet is needed.
 
 ## Keys
 
-- **Q**: cycle the quality level HIGH, MEDIUM, LOW, back to HIGH. The level name and the FPS show in the top left corner.
+- **Q**: cycle the quality level high, medium, low, back to high (`?quality=low|medium|high` picks one at start). The level name and the FPS show in the top left corner.
 - **Mouse**: move over the board to see the hover highlight on the cell under the pointer. The cell shows in the top left corner.
 
-## Quality levels (section E)
+## Quality levels (docs/art-direction-v3.md section 5)
 
-| Level | Blur | Bloom | Vignette | Shadows |
-|---|---|---|---|---|
-| HIGH | depth of field (BokehPass) | yes | yes | real shadow maps and blob shadows |
-| MEDIUM (default) | tilt shift | half resolution | yes | blob shadows only |
-| LOW | none | no | no | blob shadows only |
+| Level | Pixel ratio cap | Post effects | Shadows | Sky and background | Effect particles (live cap) | Blur behind menus |
+|---|---|---|---|---|---|---|
+| high | 2 | bloom, depth of field, vignette (warm grade comes later) | sun shadow maps and blob shadows | clouds, wind and moving background | all (220) | yes |
+| medium (default) | 1.5 | none, no blur at all | blob shadows | still clouds, no wind | about a quarter (60) | yes |
+| low | 1 | none | none | plain sky, no scenery, flowers or hills | none (0) | no |
 
-Tone mapping is on at every level. When the average frame time stays above TARGET_FRAME_MS for 3 seconds, the lab steps down one level by itself and the corner shows "(auto, slow frames)". The pixel ratio is capped at RENDER_SCALE. All values are in src/config.js.
+Tone mapping is on at every level. When the average frame time stays above TARGET_FRAME_MS for 3 seconds, the lab steps down one level by itself and the corner shows "(auto, slow frames)". The levels are one table in src/render3d/quality.js; the timings are in src/config.js.
 
 ## What to look at
 
 - **Crisp pixels**: the rabbit, the bear, the stones, the rock and the board grid stay sharp with no shimmer, at every level.
-- **Focus**: the board centre is sharp. On HIGH the distant hills, clouds and sky are soft and the board edges very slightly soft. On MEDIUM the top and bottom of the screen are softer than the middle, a miniature diorama feel.
+- **Focus**: the board centre is sharp. On high the distant hills, clouds and sky are soft and the board edges very slightly soft. Medium and low have no blur at all.
 - **Bloom**: subtle. Only bright things (white clouds, the white rabbit, the hover highlight) get a faint glow. Nothing should look washed out.
-- **Vignette**: corners a little darker on HIGH and MEDIUM, gone on LOW.
-- **Tone mapping**: colours stay bright and candy coloured, no harsh clipped whites, and they look about the same on LOW as on MEDIUM.
-- **Shadows**: on HIGH the board, trees and terrain cast soft sun shadows. On MEDIUM and LOW only the soft blobs under sprites remain.
-- **Speed**: FPS near 60 at MEDIUM or LOW at 1080p on integrated graphics. Pressing Q may hitch once while shaders rebuild.
+- **Vignette**: corners a little darker on high, gone on medium and low.
+- **Tone mapping**: colours stay bright and candy coloured, no harsh clipped whites, and they look about the same on low as on medium.
+- **Shadows**: on high the board, trees and terrain cast soft sun shadows. On medium only the soft blobs under sprites remain; low has no shadows.
+- **Speed**: FPS near 60 at medium or low at 1080p on integrated graphics. Pressing Q may hitch once while shaders rebuild.
 - **Hover**: the glowing decal sits on the cell under the pointer at every level.

@@ -65,6 +65,9 @@ export function createParticlePool(capacity) {
 
   const pool = {
     capacity,
+    // Live particles allowed at once (the quality level's particle cap),
+    // at most capacity. Lowering it keeps the live ones; new ones wait.
+    limit: capacity,
     count: 0,
     x, y, z, vx, vy, vz, gravity, drag, cx, cz, angle, spin, radius, radiusGrow,
     age, life, size, sizeGrow, r, g, b, alpha, motion, shape,
@@ -73,7 +76,7 @@ export function createParticlePool(capacity) {
   // Takes the next free slot and sets what every particle has. Returns its
   // index, or -1 when the pool is full.
   function take(kind, lifeS, sizeWorld, grow, color, opacity, look) {
-    if (pool.count >= capacity) return -1;
+    if (pool.count >= capacity || pool.count >= pool.limit) return -1;
     const i = pool.count++;
     motion[i] = kind;
     shape[i] = look;
@@ -205,10 +208,11 @@ export function createParticlePool(capacity) {
   return pool;
 }
 
-// How many particles to spawn for `base` at HIGH when the quality level
-// scales particles by `scale`: never fewer than one.
+// How many particles to spawn for `base` at the highest level when the
+// quality level scales particles by `scale`: never fewer than one, except
+// none at all for a scale of 0.
 export function scaledCount(base, scale) {
-  return Math.max(1, Math.round(base * scale));
+  return scale > 0 ? Math.max(1, Math.round(base * scale)) : 0;
 }
 
 // Continuous emission at ratePerS particles a second: returns how many

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, FPS_SAMPLE_MS, INTERNAL_HEIGHT, INTERNAL_WIDTH,
-  QUALITY_STALL_MS, RENDER_SCALE, RESUME_GAP_MS,
+  QUALITY_STALL_MS, RESUME_GAP_MS,
 } from '../src/config.js';
 import { X, O } from '../src/logic/board.js';
 import { WIND_RABBIT } from '../src/logic/characters.js';
@@ -16,7 +16,7 @@ import { catchUpVisuals, visualsForEvents } from '../src/render3d/effect-plans.j
 import { createFpsMeter } from '../src/render3d/fps.js';
 import { createResumeWatch } from '../src/render3d/frame-gap.js';
 import { createWorldHitTest } from '../src/render3d/hit-test.js';
-import { QUALITY_LEVELS, QUALITY_ORDER } from '../src/render3d/quality.js';
+import { blursMenus, QUALITY_LEVELS } from '../src/render3d/quality.js';
 import { sameViewSize, viewSize } from '../src/render3d/view-size.js';
 import { GAME, createApp } from '../src/ui/app.js';
 import { isQualityKey, isTextEntry } from '../src/ui/input.js';
@@ -184,16 +184,16 @@ test('the FPS meter does not count a hidden tab as a slow frame', () => {
 // --- Sizes and per-window quality ---
 
 test('viewSize follows the canvas box and this window\'s capped devicePixelRatio', () => {
-  assert.deepEqual(viewSize(960, 540, 1, RENDER_SCALE), { width: 960, height: 540, pixelRatio: 1 });
-  assert.deepEqual(viewSize(960, 540, 2, RENDER_SCALE), { width: 960, height: 540, pixelRatio: RENDER_SCALE });
+  assert.deepEqual(viewSize(960, 540, 1, 1.5), { width: 960, height: 540, pixelRatio: 1 });
+  assert.deepEqual(viewSize(960, 540, 2, 1.5), { width: 960, height: 540, pixelRatio: 1.5 });
   assert.deepEqual(viewSize(800, 450, 1.25, 1.5), { width: 800, height: 450, pixelRatio: 1.25 });
-  assert.equal(viewSize(0, 0, 1, RENDER_SCALE), null, 'a hidden canvas keeps its last size');
-  assert.equal(viewSize(960, 0, 1, RENDER_SCALE), null);
+  assert.equal(viewSize(0, 0, 1, 1.5), null, 'a hidden canvas keeps its last size');
+  assert.equal(viewSize(960, 0, 1, 1.5), null);
 
-  const a = viewSize(960, 540, 1, RENDER_SCALE);
-  assert.equal(sameViewSize(a, viewSize(960, 540, 1, RENDER_SCALE)), true);
-  assert.equal(sameViewSize(a, viewSize(960, 540, 1.25, RENDER_SCALE)), false, 'a window moved to another screen');
-  assert.equal(sameViewSize(a, viewSize(961, 540, 1, RENDER_SCALE)), false);
+  const a = viewSize(960, 540, 1, 1.5);
+  assert.equal(sameViewSize(a, viewSize(960, 540, 1, 1.5)), true);
+  assert.equal(sameViewSize(a, viewSize(960, 540, 1.25, 1.5)), false, 'a window moved to another screen');
+  assert.equal(sameViewSize(a, viewSize(961, 540, 1, 1.5)), false);
   assert.equal(sameViewSize(null, a), false);
   assert.equal(sameViewSize(null, null), true);
 });
@@ -209,11 +209,11 @@ test('Q does not change the quality while typing a room code', () => {
   assert.equal(isTextEntry(input), true);
 });
 
-test('the scene behind the menus is blurred except on LOW', () => {
-  assert.equal(QUALITY_LEVELS.HIGH.menuBlur, true);
-  assert.equal(QUALITY_LEVELS.MEDIUM.menuBlur, true);
-  assert.equal(QUALITY_LEVELS.LOW.menuBlur, false);
-  for (const name of QUALITY_ORDER) assert.equal(typeof QUALITY_LEVELS[name].menuBlur, 'boolean');
+test('the scene behind the menus is blurred where the HUD glass is frosted, not on low', () => {
+  assert.equal(blursMenus(QUALITY_LEVELS.high), true);
+  assert.equal(blursMenus(QUALITY_LEVELS.medium), true);
+  assert.equal(blursMenus(QUALITY_LEVELS.low), false);
+  assert.equal(blursMenus(undefined), false, 'the 2D renderer never blurs');
 });
 
 test('the new pure helpers do not import Three.js', () => {

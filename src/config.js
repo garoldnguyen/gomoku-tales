@@ -88,19 +88,17 @@ export const WIND3D_STREAK_SPEED = 5; // world units per second, towards +x
 export const FOG_NEAR = 45; // light fog for depth, in world units from the camera
 export const FOG_FAR = 140;
 
-// Post-processing and quality levels (docs/art-direction-hd2d.md section E).
-// The levels themselves live in src/render3d/quality.js.
-export const QUALITY_DEFAULT = 'MEDIUM';
-export const RENDER_SCALE = 1.5; // largest pixel ratio (1 to 1.5); high-DPI screens are capped to this
+// Post-processing and quality levels. The levels themselves (pixel ratio
+// cap, particle caps and every other switch) live in ONE table in
+// src/render3d/quality.js (docs/art-direction-v3.md section 5).
 // 60 fps is 16.7 ms a frame. The step-down limit leaves some headroom so the
 // normal jitter of a 60 Hz screen and a rare dropped frame never step down.
 export const TARGET_FRAME_MS = 20;
 export const QUALITY_STEP_DOWN_MS = 3000; // the average must stay above TARGET_FRAME_MS this long
 export const QUALITY_STALL_MS = 250; // a longer frame is a stall (hidden tab, shader compile), not load
 export const RESUME_GAP_MS = 1000; // a longer gap between frames means the page was hidden; events from meanwhile show settled, without replaying their effects
-export const DOF_APERTURE = 0.0002; // HIGH, depth of field focused on the board centre
+export const DOF_APERTURE = 0.0002; // high, depth of field focused on the board centre
 export const DOF_MAX_BLUR = 0.006; // in screen widths
-export const TILT_SHIFT_BLUR = 1.5; // MEDIUM, tilt shift; the widest blur tap is 2x this many pixels away at the top and bottom edges
 export const BLOOM_STRENGTH = 0.3; // subtle bloom on bright things only
 export const BLOOM_RADIUS = 0.3;
 export const BLOOM_THRESHOLD = 0.85; // linear brightness a pixel needs before it blooms
@@ -111,9 +109,9 @@ export const VIGNETTE_DARKNESS = 1.0;
 export const TONE_MAPPING_EXPOSURE = 1.0;
 
 // Skill visuals and placement effects in 3D (section G). They only draw; they
-// never change the game state. Particle counts and rates are for HIGH; the
-// quality levels scale them down (src/render3d/quality.js).
-export const EFFECT_PARTICLE_CAPACITY = 1500; // pooled particles shared by every 3D effect
+// never change the game state. Particle counts and rates are for high; the
+// quality levels scale them down and cap the live particles
+// (particleCap in src/render3d/quality.js).
 export const PLACE_SPARKLE_COUNT = 12; // sparkles when a stone lands
 export const PLACE_DUST_COUNT = 10; // specks in a dust puff
 export const DASH_STREAK_MS = 420; // a resolved Wind Dash streaks to its target this fast

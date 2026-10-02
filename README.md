@@ -36,21 +36,25 @@ warning.
 
 ### Quality levels and the Q key
 
-Each window has its own 3D quality level. It starts on MEDIUM. Press **Q** to cycle
-HIGH -> MEDIUM -> LOW -> HIGH; the level and the FPS show in the top-left corner as
-"Quality MEDIUM [Q]  FPS 60". Q does nothing while you type in a text box (the room code)
-and nothing in the 2D renderer.
+Each window has its own 3D quality level. Press **Q** to cycle high -> medium -> low ->
+high; the level and the FPS show in the top-left corner as "Quality medium [Q]  FPS 60".
+Q does nothing while you type in a text box (the room code) and nothing in the 2D renderer.
+`?quality=low`, `?quality=medium` or `?quality=high` in the URL picks a level (anything
+else means medium). A choice made with Q or the URL is saved in `localStorage` and used at
+the next start; without a saved choice the game starts on medium. The game works when
+storage is blocked. Switching never resets the game.
 
-| Level | Blur | Bloom | Vignette | Shadows | Effect particles | Blur behind menus |
+| Level | Pixel ratio cap | Post effects | Shadows | Sky and background | Effect particles (live cap) | Blur behind menus |
 |---|---|---|---|---|---|---|
-| HIGH | depth of field (BokehPass) | yes | yes | sun shadow maps and blob shadows | all | yes |
-| MEDIUM (default) | tilt shift | half resolution | yes | blob shadows only | fewer | yes |
-| LOW | none (no post-processing) | no | no | blob shadows only | fewest | no |
+| high | 2 | bloom, depth of field, vignette (warm grade comes later) | sun shadow maps and blob shadows | clouds, wind and moving background | all (220) | yes |
+| medium (default) | 1.5 | none, no blur at all | blob shadows | still clouds, no wind | about a quarter (60) | yes |
+| low | 1 | none | none | plain sky, no scenery, flowers or hills | none (0) | no |
 
 Tone mapping is on at every level. When the average frame time stays above
 `TARGET_FRAME_MS` for 3 seconds, the window steps down one level by itself and the corner
-shows "(auto)". The pixel ratio is capped at `RENDER_SCALE`. These values and the camera
-are in `src/config.js`; the levels themselves are in `src/render3d/quality.js`.
+shows "(auto)"; an automatic step down is not saved. Every switch lives in ONE table in
+`src/render3d/quality.js` (docs/art-direction-v3.md section 5); the camera and timings are
+in `src/config.js`.
 
 ### The look lab
 

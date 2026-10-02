@@ -72,23 +72,40 @@ const STREAK_LENGTH = 3;
 const STREAK_THICKNESS = 0.06;
 const STREAK_OPACITY = 0.35;
 
-// Builds the scene around the board and returns { update(timeMs, dtMs) }
-// for the moving parts. `cameraPosition` is the fixed camera's position.
+// Builds the scene around the board and returns { update(timeMs, dtMs),
+// setFeatures(features) } for the moving parts and the quality switches
+// (a row of src/render3d/quality.js). `cameraPosition` is the fixed
+// camera's position.
 export function buildBreezeHill(scene, cameraPosition) {
   scene.background = skyTexture();
   scene.fog = new THREE.Fog(COLORS.haze, FOG_NEAR, FOG_FAR);
   scene.add(createTerrain());
-  scene.add(createDistantHills(cameraPosition));
-  for (const tree of TREES) scene.add(createTree(tree));
-  for (const mesh of createWildflowers(cameraPosition)) scene.add(mesh);
+  const hills = createDistantHills(cameraPosition);
+  scene.add(hills);
+  const trees = new THREE.Group();
+  for (const tree of TREES) trees.add(createTree(tree));
+  scene.add(trees);
+  const flowers = new THREE.Group();
+  for (const mesh of createWildflowers(cameraPosition)) flowers.add(mesh);
+  scene.add(flowers);
   const clouds = createClouds(cameraPosition);
   scene.add(clouds.group);
   const wind = createWindStreaks(cameraPosition);
   scene.add(wind.group);
+  let moving = true;
   return {
     update(timeMs, dtMs) {
+      if (!moving) return;
       clouds.update(dtMs);
       wind.update(timeMs, dtMs);
+    },
+    setFeatures(features) {
+      hills.visible = features.farHills !== 'off';
+      trees.visible = features.scenery;
+      flowers.visible = features.meadowFlowers !== 'off';
+      clouds.group.visible = features.sky !== 'gradient';
+      wind.group.visible = features.wind;
+      moving = features.backgroundMotion;
     },
   };
 }

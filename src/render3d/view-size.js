@@ -11,9 +11,9 @@ import { cappedPixelRatio } from './quality.js';
 // { width, height, pixelRatio } for a canvas whose CSS box is cssWidth x
 // cssHeight, or null while it has no size (hidden, or not laid out yet),
 // when the buffer should keep its last size.
-export function viewSize(cssWidth, cssHeight, devicePixelRatio, renderScale) {
+export function viewSize(cssWidth, cssHeight, devicePixelRatio, pixelRatioCap) {
   if (!(cssWidth > 0 && cssHeight > 0)) return null;
-  return { width: cssWidth, height: cssHeight, pixelRatio: cappedPixelRatio(devicePixelRatio, renderScale) };
+  return { width: cssWidth, height: cssHeight, pixelRatio: cappedPixelRatio(devicePixelRatio, pixelRatioCap) };
 }
 
 // True when two view sizes (or nulls) are the same, so nothing needs resizing.

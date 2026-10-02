@@ -5,7 +5,7 @@ import { loadAssets } from './render/assets.js';
 import { createEffects } from './render/effects.js';
 import { drawGameScreen, drawMenuScreen, setAssets } from './render/game-renderer.js';
 import { createResumeWatch } from './render3d/frame-gap.js';
-import { QUALITY_LEVELS } from './render3d/quality.js';
+import { blursMenus, browserStorage, cycleQuality, startQuality } from './render3d/quality.js';
 import { loadV3Meta } from './render3d/v3-meta.js';
 import { GAME, GAME_OVER, createApp } from './ui/app.js';
 import { attachGameInput, hitTest, isQualityKey } from './ui/input.js';
@@ -43,7 +43,11 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // Each window has its own renderer, WebGL context and quality level; Q
-// changes only the window it is pressed in.
+// changes only the window it is pressed in. ?quality=low|medium|high picks
+// the level (unknown values are medium) and saves it; otherwise the saved
+// choice is used, else medium. The game works without storage.
+const storage = browserStorage();
+const quality = startQuality(params.get('quality'), storage);
 const renderer = params.get('render') === '2d' ? RENDERER_2D : await load3dRenderer();
 
 if (params.get('local') === '1') {
@@ -60,7 +64,9 @@ async function load3dRenderer() {
     const [{ createWorldRenderer }, assets, meta] = await Promise.all([
       import('./render3d/world-renderer.js'), assetsLoaded, metaLoaded,
     ]);
-    return createWorldRenderer(worldCanvas, { assets, meta, warn });
+    const world = createWorldRenderer(worldCanvas, { assets, meta, warn, storage, quality: quality.level });
+    if (quality.fromUrl) world.setQuality(quality.level);
+    return world;
   } catch (err) {
     console.warn('The 3D renderer is not available, using the 2D one.', err);
     worldCanvas.hidden = true;
@@ -68,11 +74,12 @@ async function load3dRenderer() {
   }
 }
 
-// The Q key cycles this window's 3D quality level.
+// The Q key steps this window's 3D quality level (high, medium, low and
+// round again) through setQuality.
 function attachQualityKey() {
-  if (!renderer.cycleQuality) return;
+  if (!renderer.setQuality) return;
   window.addEventListener('keydown', (event) => {
-    if (!event.repeat && isQualityKey(event)) renderer.cycleQuality();
+    if (!event.repeat && isQualityKey(event)) renderer.setQuality(cycleQuality(renderer.quality));
   });
 }
 
@@ -93,7 +100,8 @@ function showEvents(events, effects, time, resumed) {
 // Online rooms over a BroadcastChannel: the lobby and room screens are DOM
 // overlays above the canvases, the game is drawn on them. With the 3D
 // renderer the world stays on behind the overlays, blurred behind the
-// lobby and room screens when this window's quality level allows it.
+// lobby and room screens when this window's quality level has frosted
+// HUD glass (hudFrost in src/render3d/quality.js).
 function startOnlineMode() {
   const app = createApp({ openTransport: (code) => createBroadcastTransport(code) });
   attachScreens(document.getElementById('screens'), app);
@@ -153,7 +161,7 @@ function startOnlineMode() {
       renderer.drawMenuScreen(ctx, time);
     }
     // The Game over screen keeps the final board and the poses in view.
-    const blur = screen !== GAME && screen !== GAME_OVER && QUALITY_LEVELS[renderer.quality]?.menuBlur === true;
+    const blur = screen !== GAME && screen !== GAME_OVER && blursMenus(renderer.features);
     if (blur !== blurred) {
       blurred = blur;
       stage.classList.toggle('backdrop-blur', blur);

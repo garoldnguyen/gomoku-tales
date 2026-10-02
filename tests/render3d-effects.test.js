@@ -15,7 +15,7 @@ import {
 import {
   createParticlePool, createSpawnParams, emit, FLOOR_Y, scaledCount, SHAPE_PLUS, SHAPE_SQUARE,
 } from '../src/render3d/particle-pool.js';
-import { QUALITY_LEVELS, QUALITY_ORDER } from '../src/render3d/quality.js';
+import { particleScale, QUALITY_LEVELS, QUALITY_ORDER } from '../src/render3d/quality.js';
 import { effectRandom } from '../src/render3d/seeded-random.js';
 
 function ok(result) {
@@ -384,13 +384,30 @@ test('emission spreads a rate over frames without losing particles', () => {
   assert.equal(emit({ carry: 0.5 }, 30, 1 / 60), 1, 'the carried fraction adds up');
 });
 
-test('the quality level scales particle counts down, never to zero', () => {
-  const scales = QUALITY_ORDER.map((level) => QUALITY_LEVELS[level].particles);
-  assert.equal(scales[0], 1, 'HIGH has the full counts');
-  for (let i = 1; i < scales.length; i++) assert.ok(scales[i] < scales[i - 1] && scales[i] > 0);
+test('the quality level scales particle counts down, to none on low', () => {
+  const scales = QUALITY_ORDER.map((level) => particleScale(QUALITY_LEVELS[level]));
+  assert.equal(scales[0], 1, 'high has the full counts');
+  for (let i = 1; i < scales.length; i++) assert.ok(scales[i] < scales[i - 1]);
+  assert.equal(particleScale(QUALITY_LEVELS.low), 0);
   assert.equal(scaledCount(12, 1), 12);
-  assert.equal(scaledCount(12, QUALITY_LEVELS.LOW.particles), Math.round(12 * QUALITY_LEVELS.LOW.particles));
-  assert.equal(scaledCount(1, 0.01), 1);
+  const medium = particleScale(QUALITY_LEVELS.medium);
+  assert.equal(scaledCount(12, medium), Math.max(1, Math.round(12 * medium)));
+  assert.equal(scaledCount(1, 0.01), 1, 'never fewer than one while particles are on');
+  assert.equal(scaledCount(12, 0), 0, 'none at all on low');
+});
+
+test('the pool never holds more live particles than its limit (the particle cap)', () => {
+  const pool = createParticlePool(220);
+  const p = createSpawnParams();
+  pool.limit = 60;
+  for (let i = 0; i < 100; i++) pool.spawnFall(p);
+  assert.equal(pool.count, 60);
+  pool.limit = 0;
+  assert.equal(pool.spawnFall(p), -1, 'a limit of 0 spawns nothing');
+  assert.equal(pool.count, 60, 'lowering the limit keeps the live particles');
+  pool.limit = 220;
+  for (let i = 0; i < 500; i++) pool.spawnFall(p);
+  assert.equal(pool.count, 220);
 });
 
 test('the effect random is deterministic, in [0, 1) and well spread', () => {
