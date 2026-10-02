@@ -8,6 +8,8 @@ import { createResumeWatch } from './render3d/frame-gap.js';
 import { blursMenus, browserStorage, cycleQuality, startQuality } from './render3d/quality.js';
 import { loadV3Meta } from './render3d/v3-meta.js';
 import { GAME, GAME_OVER, createApp } from './ui/app.js';
+import { createHud } from './ui/hud.js';
+import { hudViewModel } from './ui/hud-view.js';
 import { attachGameInput, hitTest, isQualityKey } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
 import { attachScreens } from './ui/screens.js';
@@ -50,6 +52,17 @@ const storage = browserStorage();
 const quality = startQuality(params.get('quality'), storage);
 const renderer = params.get('render') === '2d' ? RENDERER_2D : await load3dRenderer();
 
+// The 3D game's HUD is the DOM glass overlay (src/ui/hud.js); the 2D
+// renderer draws its own panels on the canvas. The game modes set the
+// handlers below.
+const hudHandlers = { onSkill: () => {}, onCancel: () => {} };
+const hud = renderer === RENDERER_2D ? null : createHud(document.getElementById('hud'), {
+  onSkill: (player, skillId) => hudHandlers.onSkill(player, skillId),
+  onQuality: (level) => setQuality(level),
+  onCancel: () => hudHandlers.onCancel(),
+});
+assetsLoaded.then((store) => hud?.setAssets(store));
+
 if (params.get('local') === '1') {
   startLocalMode();
 } else {
@@ -74,13 +87,36 @@ async function load3dRenderer() {
   }
 }
 
+// A quality level chosen by hand (the Q key or the HUD switch): the
+// renderer's setQuality, and the HUD glass follows it.
+function setQuality(level) {
+  if (!renderer.setQuality) return;
+  renderer.setQuality(level);
+  hud?.setQuality(renderer.quality);
+}
+
 // The Q key steps this window's 3D quality level (high, medium, low and
 // round again) through setQuality.
 function attachQualityKey() {
   if (!renderer.setQuality) return;
   window.addEventListener('keydown', (event) => {
-    if (!event.repeat && isQualityKey(event)) renderer.setQuality(cycleQuality(renderer.quality));
+    if (!event.repeat && isQualityKey(event)) setQuality(cycleQuality(renderer.quality));
   });
+}
+
+// Shows a game on the HUD. localPlayer is this window's stone online, or
+// null in local mode. The automatic step down changes the level without
+// setQuality, so the level is passed every frame.
+function showHud(game, view, localPlayer, winner, hint) {
+  hud.render(hudViewModel(view.state, {
+    targeting: game.getTargeting(),
+    status: view.status,
+    message: view.message,
+    peerCountdown: view.peerCountdown ?? null,
+    winner,
+    quality: renderer.quality,
+    hint,
+  }, localPlayer));
 }
 
 // Hands the events of applied actions to the effects. On the first frame
@@ -127,6 +163,8 @@ function startOnlineMode() {
     },
     onCancel: () => playing()?.cancel(),
   });
+  hudHandlers.onSkill = (player, skillId) => playing()?.clickSkill(player, skillId);
+  hudHandlers.onCancel = () => playing()?.cancel();
   attachQualityKey();
 
   const effects = renderer === RENDERER_2D ? createEffects() : null;
@@ -151,7 +189,12 @@ function startOnlineMode() {
       const view = game.getView();
       canvas.style.cursor = screen === GAME && view.pointer ? 'pointer' : 'default';
       const you = CHARACTERS[app.getView().character]?.name;
-      renderer.drawGameScreen(ctx, { ...view, time, effects, hint: `Room ${view.code}  |  You play ${you} (${view.you})` });
+      const hint = `Room ${view.code}  |  You play ${you} (${view.you})`;
+      renderer.drawGameScreen(ctx, { ...view, time, effects, hint });
+      if (hud) {
+        showHud(game, view, view.you, game.getOutcome()?.winner ?? null, hint);
+        hud.show(true);
+      }
     } else {
       if (shownGame) {
         forgetGame();
@@ -159,6 +202,7 @@ function startOnlineMode() {
       }
       canvas.style.cursor = 'default';
       renderer.drawMenuScreen(ctx, time);
+      hud?.show(false);
     }
     // The Game over screen keeps the final board and the poses in view.
     const blur = screen !== GAME && screen !== GAME_OVER && blursMenus(renderer.features);
@@ -199,6 +243,9 @@ function startLocalMode() {
       renderer.reset?.();
     },
   });
+  hudHandlers.onSkill = (player, skillId) => game.clickSkill(player, skillId);
+  hudHandlers.onCancel = () => game.cancel();
+  hud?.show(true);
   attachQualityKey();
 
   const frame = (time) => {
@@ -206,6 +253,7 @@ function startLocalMode() {
     const view = game.getView();
     canvas.style.cursor = view.pointer ? 'pointer' : 'default';
     renderer.drawGameScreen(ctx, { ...view, time, effects, hint });
+    if (hud) showHud(game, view, null, null, hint);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

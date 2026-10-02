@@ -29,7 +29,8 @@
       overflow: hidden;
     }
     /* The WebGL world (#world) lies under the 2D canvas (#game), which
-       draws the whole 2D game or, over the 3D world, a transparent HUD. */
+       draws the whole 2D game or, over the 3D world, only small overlays.
+       The 3D game's HUD is the DOM glass overlay #hud (src/ui/hud.css). */
     #stage canvas {
       position: absolute;
       inset: 0;
@@ -59,6 +60,7 @@
     }
   </script>
   <link rel="stylesheet" href="src/ui/screens.css">
+  <link rel="stylesheet" href="src/ui/hud.css">
 </head>
 <body>
   <div id="stage">
@@ -111,6 +113,8 @@
       </section>
     </div>
   </div>
+  <!-- Glass HUD over the 3D world (docs/art-direction-v3.md section 8), built by src/ui/hud.js. -->
+  <div id="hud" hidden></div>
   <script type="module" src="src/main.js"></script>
 </body>
 </html>

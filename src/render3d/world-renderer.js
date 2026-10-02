@@ -4,14 +4,16 @@
 //                              and ui/online-game.js)
 //   drawMenuScreen(ctx, time)  the world with an empty board behind the
 //                              DOM lobby and room screens, and the title
-//   hitTest(px, py)            what is under an internal HUD point
+//   hitTest(px, py)            the board cell under an internal point
 // The WebGL canvas shows the world (src/render3d/world.js) with the board's
 // stones and rocks as sprites on the farmland board, and the v3 flat
 // decals (docs/art-direction-v3.md section 3) for hover, skill targeting,
-// announced skills, the last move and the winning line. ctx is the transparent 2D canvas
-// stacked above it, where the existing 2D HUD code draws the player panels,
-// skill buttons, cooldowns, status line and winner text. Board picking is a
-// ray from the camera (src/render3d/hit-test.js). The Q key calls
+// announced skills, the last move and the winning line. ctx is the
+// transparent 2D canvas stacked above it, which only shows the skill
+// banners, the quality and FPS line and the menu title: the player cards,
+// skill buttons, turn and messages are the DOM glass HUD (src/ui/hud.js,
+// docs/art-direction-v3.md section 8). Board picking is a ray from the
+// camera (src/render3d/hit-test.js). The Q key calls
 // setQuality(cycleQuality(quality)) through cycleQuality().
 //
 // The world also comes alive from the logic events (sections D and G):
@@ -28,8 +30,7 @@
 import { BOARD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
 import { createInitialState, isGameOver } from '../logic/game.js';
-import { drawGameHud, drawText } from '../render/game-renderer.js';
-import { HUD_3D } from '../render/layout.js';
+import { drawText } from '../render/game-renderer.js';
 import { artMeta, artSource } from './art.js';
 import { ART } from './art-assets.js';
 import { boardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
@@ -74,7 +75,6 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       world.render(time);
 
       ctx.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
-      drawGameHud(ctx, view, HUD_3D);
       effects.drawBanner(ctx, time);
       drawQuality(ctx);
     },
@@ -94,7 +94,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       drawQuality(ctx);
     },
 
-    hitTest: createWorldHitTest(world.cameraSetup, HUD_3D),
+    hitTest: createWorldHitTest(world.cameraSetup),
 
     // Switches this window's quality level ('low', 'medium' or 'high';
     // unknown values are medium), saves it and keeps the game as it is.

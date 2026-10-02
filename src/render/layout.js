@@ -51,35 +51,6 @@ export const HUD_2D = Object.freeze({
   messageY: MESSAGE_Y,
 });
 
-// HUD over the 3D world (docs/art-direction-hd2d.md section F). The board
-// fills the middle of the screen and the characters stand beside it, so
-// smaller panels without portraits (the characters stand in the world
-// above them) sit in the bottom corners and the status lines go below the
-// board's near edge.
-const HUD_3D_PANEL_W = 212;
-const HUD_3D_PANEL_H = 222;
-const HUD_3D_MARGIN = 6;
-export const HUD_3D = Object.freeze({
-  panelX: Object.freeze({
-    [X]: HUD_3D_MARGIN + 2,
-    [O]: INTERNAL_WIDTH - HUD_3D_MARGIN - 2 - HUD_3D_PANEL_W,
-  }),
-  panelY: INTERNAL_HEIGHT - HUD_3D_MARGIN - HUD_3D_PANEL_H,
-  panelW: HUD_3D_PANEL_W,
-  panelH: HUD_3D_PANEL_H,
-  portraitY: null,
-  nameY: 22,
-  nameSize: 16,
-  stoneLineY: 44,
-  buttonX: BUTTON_X,
-  buttonY: 60,
-  buttonW: HUD_3D_PANEL_W - BUTTON_X * 2,
-  buttonH: BUTTON_H,
-  buttonStep: BUTTON_H + 12,
-  statusY: INTERNAL_HEIGHT - 40,
-  messageY: INTERNAL_HEIGHT - 17,
-});
-
 export function panelRect(player, layout = HUD_2D) {
   return { x: layout.panelX[player], y: layout.panelY, w: layout.panelW, h: layout.panelH };
 }

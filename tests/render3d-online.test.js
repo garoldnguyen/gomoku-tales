@@ -6,10 +6,9 @@ import {
   QUALITY_STALL_MS, RESUME_GAP_MS,
 } from '../src/config.js';
 import { X, O } from '../src/logic/board.js';
-import { WIND_RABBIT } from '../src/logic/characters.js';
+import { WIND_RABBIT, characterForStone } from '../src/logic/characters.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
-import { HUD_3D, skillButtonRect } from '../src/render/layout.js';
 import { boardMarks } from '../src/render3d/board-marks.js';
 import { cameraPosition } from '../src/render3d/camera.js';
 import { catchUpVisuals, visualsForEvents } from '../src/render3d/effect-plans.js';
@@ -41,7 +40,8 @@ for (let py = 0; py < INTERNAL_HEIGHT; py += 3) {
 
 // Two windows of one profile: a host playing Wind Rabbit and a guest, on
 // one fake network and clock, each with a pointer that goes through the
-// 3D hit test like src/main.js online mode.
+// 3D hit test like src/main.js online mode. Skill rows are DOM buttons on
+// the glass HUD (src/ui/hud.js) that call clickSkill.
 function twoWindows() {
   const network = createFakeNetwork();
   const clock = createFakeClock();
@@ -65,8 +65,7 @@ function twoWindows() {
       return this.click(px, py);
     },
     skill(player, index) {
-      const r = skillButtonRect(player, index, HUD_3D);
-      return this.click(r.x + r.w / 2, r.y + r.h / 2);
+      return app.getGame().clickSkill(player, characterForStone(player).skills[index]);
     },
     hover(x, y) {
       const { px, py } = cellPoints.get(`${x},${y}`);

@@ -480,16 +480,6 @@ export function drawGameScreen(ctx, view) {
   if (effects) effects.drawBanner(ctx, time);
 }
 
-// The 2D HUD alone (title, hint, player panels with skill buttons and
-// cooldowns, status line and message, winner text) on a transparent canvas
-// over the 3D world (docs/art-direction-hd2d.md section F). Takes the same
-// view as drawGameScreen and a HUD layout from layout.js. It does not clear
-// the canvas first.
-export function drawGameHud(ctx, view, layout) {
-  drawHeaderAndPanels(ctx, view, layout);
-  drawStatusLines(ctx, view, layout);
-}
-
 // Background and title behind the lobby and room screens (DOM overlays).
 export function drawMenuScreen(ctx, time = performance.now()) {
   drawBackground(ctx, time);
