@@ -45,3 +45,29 @@ function normalize(v) {
   const len = Math.hypot(v.x, v.y, v.z);
   return { x: v.x / len, y: v.y / len, z: v.z / len };
 }
+
+// Where world point `point` { x, y, z } shows on screen for the camera of
+// cameraRay: { x, y } in normalized device coordinates (-1 to 1, y up), or
+// null when it is behind the camera. The inverse of cameraRay.
+export function projectToNdc(point, { position, target, fovDeg, aspect }) {
+  const forward = normalize(sub(target, position));
+  const right = normalize(cross(forward, { x: 0, y: 1, z: 0 }));
+  const up = cross(right, forward);
+  const d = sub(point, position);
+  const depth = dot(d, forward);
+  if (!(depth > 0)) return null;
+  const halfH = Math.tan((fovDeg * DEG) / 2);
+  const halfW = halfH * aspect;
+  return { x: dot(d, right) / (depth * halfW), y: dot(d, up) / (depth * halfH) };
+}
+
+function dot(a, b) {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+// Height at which something `depressionDeg` below the horizon, seen from
+// the camera at `position`, appears at horizontal position (x, z).
+export function heightAtDepression(position, x, z, depressionDeg) {
+  const distance = Math.hypot(x - position.x, z - position.z);
+  return position.y - distance * Math.tan(depressionDeg * DEG);
+}

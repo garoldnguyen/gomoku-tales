@@ -43,3 +43,63 @@ export function terrainHeight(x, z) {
   const rate = (DROP_BACK * back + DROP_FRONT * front + DROP_SIDE * side) / (back + front + side);
   return Math.max(GROUND_Y + rolling * ramp * ramp - rate * d * d, LOWEST_Y);
 }
+
+// The drawn ground: a PlaneGeometry grid over this area with `cell`-sized
+// squares, its vertices at terrainHeight (meadow-scene.js builds it).
+export const TERRAIN_GRID = Object.freeze({ minX: -48, maxX: 48, minZ: -36, maxZ: 26, cell: 1 });
+
+// Height at (x, z) of the drawn ground of `grid`: terrainHeight at the grid
+// vertices and flat across each triangle in between, split along the same
+// diagonal as Three.js's PlaneGeometry laid flat. Things stood on this
+// height sit exactly on the ground mesh, never above or inside it.
+// Outside the grid the nearest edge is used.
+export function groundMeshHeight(x, z, grid = TERRAIN_GRID) {
+  const { minX, maxX, minZ, maxZ, cell } = grid;
+  const columns = Math.round((maxX - minX) / cell);
+  const rows = Math.round((maxZ - minZ) / cell);
+  const gx = Math.min(Math.max((x - minX) / cell, 0), columns);
+  const gz = Math.min(Math.max((z - minZ) / cell, 0), rows);
+  const ix = Math.min(Math.floor(gx), columns - 1);
+  const iz = Math.min(Math.floor(gz), rows - 1);
+  const fx = gx - ix;
+  const fz = gz - iz;
+  const at = (i, j) => terrainHeight(minX + i * cell, minZ + j * cell);
+  // Each square is two triangles split on the diagonal from (ix, iz + 1)
+  // to (ix + 1, iz).
+  if (fx + fz <= 1) {
+    const h = at(ix, iz);
+    return h + (at(ix + 1, iz) - h) * fx + (at(ix, iz + 1) - h) * fz;
+  }
+  const h = at(ix + 1, iz + 1);
+  return h + (at(ix, iz + 1) - h) * (1 - fx) + (at(ix + 1, iz) - h) * (1 - fz);
+}
+
+// A grid draped on the ground, for a blob shadow `halfX` by `halfZ` world
+// units around (x, z): vertices every `step` units (at most), each `lift`
+// above heightAt(x, z), with uv 0 to 1 across. Returns { positions, uvs,
+// indices } as plain arrays to append to a bigger geometry.
+export function drapedGrid(x, z, halfX, halfZ, step, heightAt, lift) {
+  const nx = Math.max(1, Math.ceil((2 * halfX) / step));
+  const nz = Math.max(1, Math.ceil((2 * halfZ) / step));
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  for (let j = 0; j <= nz; j++) {
+    for (let i = 0; i <= nx; i++) {
+      const u = i / nx;
+      const v = j / nz;
+      const px = x - halfX + 2 * halfX * u;
+      const pz = z - halfZ + 2 * halfZ * v;
+      positions.push(px, heightAt(px, pz) + lift, pz);
+      uvs.push(u, 1 - v);
+    }
+  }
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      const a = j * (nx + 1) + i;
+      const b = a + nx + 1;
+      indices.push(a, b, a + 1, a + 1, b, b + 1);
+    }
+  }
+  return { positions, uvs, indices };
+}

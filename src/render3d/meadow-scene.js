@@ -1,0 +1,538 @@
+// The meadow around the farm field (docs/art-direction-v3.md section 6),
+// drawn from the pure plan of meadow.js: the ground, the far hills, trees,
+// bushes, hay bales, grass tufts and the 13 flower kinds. Every kind is one
+// instanced mesh of upright billboards (one draw call each) whose instances
+// pick their look (sheet frame) in the shader. Per quality row
+// (src/render3d/quality.js):
+//   ground         'mown' flat stripes in two greens, 'painted' a mottled
+//                  meadow with grass tufts, 'painted-ripples' plus slow
+//                  lighter wind ripples
+//   scenery        trees, bushes and hay bales
+//   meadowFlowers  'off', 'still' or 'sway' (a vertex shader lean, and
+//                  dandelion puffs letting seed flecks go)
+//   farHills       'off', 'on' or 'haze'
+//   shadows        soft blob shadows under every tree, bush, bale and
+//                  flower patch unless 'none'
+// Nothing here allocates per frame.
+
+import * as THREE from 'three';
+import {
+  DANDELION_FLECK_MS, DANDELION_FLECK_POOL, GROUND_STRIPE_CELLS, MEADOW_SEED, MEADOW_SHADOW_LIFT,
+  MEADOW_SHADOW_STEP, PX_WORLD,
+  SPRITE_STRETCH_Y, SWAY_PERIOD_MS,
+} from '../config.js';
+import { artMeta, artSource } from './art.js';
+import { ART, placeholderShape } from './art-assets.js';
+import { heightAtDepression } from './camera.js';
+import {
+  dandelionPuffs, FAR_HILLS, hazeMix, HILL_FOOT_HAZE, hillLift, meadowInstanceGroups, meadowShadowSpots, planMeadow,
+} from './meadow.js';
+import { effectRandom, seededRandom } from './seeded-random.js';
+import { anchorForward, anchorShift, faceYaw, SPRITE_ALPHA_TEST } from './sprite-frames.js';
+import { blobShadowMaterial, pixelTexture, PLANT_SWAY, SHADOW_DEPTH, uprightPlaneGeometry } from './sprites.js';
+import { drapedGrid, groundMeshHeight, TERRAIN_GRID, terrainHeight } from './terrain.js';
+import { bitKinds, metaAnchor } from './v3-meta.js';
+import {
+  createGustClock, createPuffReleases, fleckSpeed, plantSwayAmplitudePx, swayAmplitudePx, swayLeanSide, swayPhase,
+  swayRowFraction, WIND_GROUND,
+} from './wind.js';
+
+const PAINT_TILE_CELLS = 8; // the painted meadow texture repeats every 8 cells
+const PAINT_TILE_PX = PAINT_TILE_CELLS * 32; // one texel per art pixel
+const COLORS = {
+  stripes: ['#5fb247', '#4fa13f'], // Low: two mown greens
+  paint: ['#4a9a40', '#58aa45', '#66b94b', '#74c255'], // dark to light
+};
+// The far hills themselves (FAR_HILLS, colours and sums of sines) are in meadow.js.
+const HILL_SPAN = 130; // x from -HILL_SPAN to HILL_SPAN
+const HILL_COLUMNS = 160;
+const HILL_DEPTH = 40; // world units the silhouette reaches down below its top
+const RIPPLE_SPEED = 0.55; // radians of the ripple wave per second
+const RIPPLE_WAVE = 0.85; // radians per world unit along the wind
+const PATCH_SHADOW_OPACITY = 0.55; // a patch shadow is fainter than a sprite's
+const FLECK_RISE = 0.35; // world units per second a seed fleck rises
+const FLECK_BOB = 0.12; // world units of up and down while it drifts
+const PUFF_TOP = 0.8; // the seed head is this far up the dandelion
+
+// Builds the meadow into `scene`. `haze` is the sky colour at the horizon.
+// On High it also drives PLANT_SWAY, the sway of the resting X and O
+// plants on the board (half the meadow's amplitude, same wind and gusts).
+// Returns { setFeatures(features), update(timeMs, dtMs) }.
+export function createMeadow(scene, cameraPosition, { haze }) {
+  const plan = planMeadow(MEADOW_SEED);
+  const ground = createGround();
+  scene.add(ground.mesh);
+  const hills = createFarHills(cameraPosition, haze);
+  scene.add(hills.group);
+
+  // Shared sway state: every swaying material reads these uniforms.
+  const sway = { uSwayAngle: { value: 0 }, uSwayPx: { value: 0 } };
+
+  const scenery = new THREE.Group();
+  const trees = billboards(ART.v3.trees, plan.trees, cameraPosition, null); // mirrored and shaded per tree
+  const bushes = billboards(ART.v3.bushes, plan.bushes, cameraPosition, null);
+  const bales = billboards(ART.v3.hayBale, plan.bales.map((b) => ({ ...b, look: 0 })), cameraPosition, null);
+  scenery.add(trees, bushes, bales);
+  const shadowSpots = meadowShadowSpots(plan);
+  const sceneryShadows = blobShadows(shadowSpots.scenery, 1);
+  scenery.add(sceneryShadows);
+  scene.add(scenery);
+
+  const tufts = billboards(ART.v3.grassTufts, plan.tufts, cameraPosition, sway);
+  scene.add(tufts);
+
+  const flowers = new THREE.Group();
+  for (const group of meadowInstanceGroups(plan)) {
+    flowers.add(billboards(ART.v3.flower[group.species], group.items, cameraPosition, sway));
+  }
+  const flowerShadows = blobShadows(shadowSpots.patches, PATCH_SHADOW_OPACITY);
+  flowers.add(flowerShadows);
+  scene.add(flowers);
+
+  const flecks = createSeedFlecks(dandelionPuffs(plan), cameraPosition);
+  flowers.add(flecks.mesh);
+
+  const gusts = createGustClock(effectRandom(MEADOW_SEED + 1));
+  let swaying = false;
+  let rippling = false;
+
+  return {
+    setFeatures(features) {
+      ground.setStyle(features.ground);
+      rippling = features.ground === 'painted-ripples';
+      tufts.visible = features.ground !== 'mown';
+      scenery.visible = features.scenery;
+      flowers.visible = features.meadowFlowers !== 'off';
+      swaying = features.meadowFlowers === 'sway';
+      if (!swaying) {
+        sway.uSwayPx.value = 0;
+        PLANT_SWAY.uSwayPx.value = 0;
+      }
+      flecks.mesh.visible = swaying;
+      if (!swaying) flecks.clear();
+      hills.setStyle(features.farHills);
+      const shadows = features.shadows !== 'none';
+      sceneryShadows.visible = shadows;
+      flowerShadows.visible = shadows;
+    },
+
+    update(timeMs, dtMs) {
+      if (rippling) ground.setRipple(timeMs);
+      if (!swaying) return;
+      const gust = gusts.strength(timeMs);
+      sway.uSwayAngle.value = ((timeMs % SWAY_PERIOD_MS) / SWAY_PERIOD_MS) * Math.PI * 2;
+      sway.uSwayPx.value = swayAmplitudePx(gust);
+      PLANT_SWAY.uSwayAngle.value = sway.uSwayAngle.value;
+      PLANT_SWAY.uSwayPx.value = plantSwayAmplitudePx(gust);
+      flecks.update(timeMs, dtMs, gust);
+    },
+  };
+}
+
+// The ground: the hill's height field on TERRAIN_GRID (groundMeshHeight
+// gives its height anywhere), textured in world space. Low uses
+// two greens in GROUND_STRIPE_CELLS-wide stripes across the view; Medium
+// and High a painted mottled tile, and High adds slow lighter ripples in
+// the shader that travel with the wind.
+function createGround() {
+  const { minX, maxX, minZ, maxZ, cell } = TERRAIN_GRID;
+  const geometry = new THREE.PlaneGeometry(maxX - minX, maxZ - minZ, (maxX - minX) / cell, (maxZ - minZ) / cell)
+    .rotateX(-Math.PI / 2)
+    .translate((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
+  const position = geometry.attributes.position;
+  const uv = geometry.attributes.uv;
+  for (let i = 0; i < position.count; i++) {
+    const x = position.getX(i);
+    const z = position.getZ(i);
+    position.setY(i, terrainHeight(x, z));
+    uv.setXY(i, x, z); // world units; each texture scales them with repeat
+  }
+  geometry.computeVertexNormals();
+
+  const stripes = repeating(stripeCanvas());
+  // Two texels per period: stripes GROUND_STRIPE_CELLS wide whose edges lie
+  // on cell edges of the field.
+  stripes.repeat.set(1, 1 / (2 * GROUND_STRIPE_CELLS));
+  stripes.offset.set(0, 0.25);
+  const mown = new THREE.MeshLambertMaterial({ map: stripes });
+
+  const paint = repeating(paintCanvas());
+  paint.repeat.set(1 / PAINT_TILE_CELLS, 1 / PAINT_TILE_CELLS);
+  const painted = new THREE.MeshLambertMaterial({ map: paint });
+  const ripple = { uRipple: { value: 0 }, uRipplePhase: { value: 0 }, uWind: { value: new THREE.Vector2(WIND_GROUND.x, WIND_GROUND.z) } };
+  painted.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, ripple);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec2 vGroundXZ;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundXZ = position.xz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec2 vGroundXZ;
+uniform float uRipple;
+uniform float uRipplePhase;
+uniform vec2 uWind;`)
+      .replace('#include <map_fragment>', `#include <map_fragment>
+if (uRipple > 0.0) {
+  // Snapped to the art pixel grid so the ripples stay crisp pixels.
+  vec2 p = floor(vGroundXZ * 32.0) / 32.0;
+  float along = dot(p, uWind);
+  float across = dot(p, vec2(-uWind.y, uWind.x));
+  float wave = sin(along * ${RIPPLE_WAVE.toFixed(3)} - uRipplePhase + 1.7 * sin(across * 0.31) + 0.6 * sin(across * 0.83 + along * 0.2));
+  float light = step(0.9, wave) * 0.6 + step(0.97, wave) * 0.4;
+  diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.16 + vec3(0.015, 0.03, 0.0), light * uRipple * 0.7);
+}`);
+  };
+  painted.customProgramCacheKey = () => 'meadow-ground-ripple';
+
+  const mesh = new THREE.Mesh(geometry, painted);
+  mesh.receiveShadow = true;
+  return {
+    mesh,
+    setStyle(style) {
+      mesh.material = style === 'mown' ? mown : painted;
+      ripple.uRipple.value = style === 'painted-ripples' ? 1 : 0;
+    },
+    setRipple(timeMs) {
+      ripple.uRipplePhase.value = ((timeMs / 1000) * RIPPLE_SPEED) % (Math.PI * 2);
+    },
+  };
+}
+
+function repeating(canvas) {
+  const texture = pixelTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+}
+
+function newCanvas(width, height) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  return canvas;
+}
+
+function stripeCanvas() {
+  const canvas = newCanvas(1, 2);
+  const ctx = canvas.getContext('2d');
+  COLORS.stripes.forEach((color, i) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(0, i, 1, 1);
+  });
+  return canvas;
+}
+
+// The painted meadow tile: soft blotches of four greens from tileable
+// value noise, with a little per-pixel grain so the edges look painted.
+function paintCanvas() {
+  const size = PAINT_TILE_PX;
+  const canvas = newCanvas(size, size);
+  const ctx = canvas.getContext('2d');
+  const image = ctx.createImageData(size, size);
+  const random = seededRandom(MEADOW_SEED + 7);
+  const lattice = (period) => {
+    const values = new Float32Array(period * period);
+    for (let i = 0; i < values.length; i++) values[i] = random();
+    return (x, y) => values[((y % period) + period) % period * period + ((x % period) + period) % period];
+  };
+  // Smooth tileable noise with `period` lattice cells across the tile.
+  const octave = (period) => {
+    const at = lattice(period);
+    const step = size / period;
+    return (px, py) => {
+      const gx = px / step;
+      const gy = py / step;
+      const x0 = Math.floor(gx);
+      const y0 = Math.floor(gy);
+      const fx = smooth(gx - x0);
+      const fy = smooth(gy - y0);
+      const top = at(x0, y0) + (at(x0 + 1, y0) - at(x0, y0)) * fx;
+      const bottom = at(x0, y0 + 1) + (at(x0 + 1, y0 + 1) - at(x0, y0 + 1)) * fx;
+      return top + (bottom - top) * fy;
+    };
+  };
+  const big = octave(4);
+  const mid = octave(8);
+  const small = octave(16);
+  const rgb = COLORS.paint.map((hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)));
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const n = 0.55 * big(x, y) + 0.3 * mid(x, y) + 0.15 * small(x, y) + (random() - 0.5) * 0.06;
+      const shade = n < 0.36 ? 0 : n < 0.5 ? 1 : n < 0.64 ? 2 : 3;
+      const i = (y * size + x) * 4;
+      const color = rgb[shade];
+      image.data[i] = color[0];
+      image.data[i + 1] = color[1];
+      image.data[i + 2] = color[2];
+      image.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(image, 0, 0);
+  return canvas;
+}
+
+function smooth(t) {
+  return t * t * (3 - 2 * t);
+}
+
+// Two far hill silhouettes, far and near, each a strip whose top edge is a
+// sum of sines, coloured flat with some haze ('on') or with more haze
+// toward the foot ('haze', High).
+function createFarHills(cameraPosition, haze) {
+  const group = new THREE.Group();
+  const styles = [];
+  for (const hill of FAR_HILLS) {
+    const positions = new Float32Array((HILL_COLUMNS + 1) * 2 * 3);
+    for (let c = 0; c <= HILL_COLUMNS; c++) {
+      const x = -HILL_SPAN + (2 * HILL_SPAN * c) / HILL_COLUMNS;
+      const top = heightAtDepression(cameraPosition, x, hill.z, hill.depressionDeg - hillLift(hill, x));
+      positions.set([x, top, hill.z, x, top - HILL_DEPTH, hill.z], c * 6);
+    }
+    const index = [];
+    for (let c = 0; c < HILL_COLUMNS; c++) {
+      const a = c * 2;
+      index.push(a, a + 1, a + 2, a + 2, a + 1, a + 3);
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setIndex(index);
+    const base = new THREE.Color().setRGB(...hazeMix(hill.color, haze, hill.haze), THREE.SRGBColorSpace);
+    const foot = new THREE.Color().setRGB(...hazeMix(hill.color, haze, 1 - (1 - hill.haze) * (1 - HILL_FOOT_HAZE)), THREE.SRGBColorSpace);
+    const flat = new Float32Array(positions.length);
+    const hazy = new Float32Array(positions.length);
+    for (let v = 0; v < positions.length / 3; v++) {
+      base.toArray(flat, v * 3);
+      (v % 2 ? foot : base).toArray(hazy, v * 3);
+    }
+    const color = new THREE.BufferAttribute(flat, 3);
+    geometry.setAttribute('color', color);
+    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
+    group.add(mesh);
+    styles.push({ color, flat, hazy });
+  }
+  return {
+    group,
+    setStyle(style) {
+      group.visible = style !== 'off';
+      for (const { color, flat, hazy } of styles) {
+        color.array.set(style === 'haze' ? hazy : flat);
+        color.needsUpdate = true;
+      }
+    },
+  };
+}
+
+// One instanced mesh of upright billboards of sheet `name`, one per item
+// { x, z, look, scale?, mirror?, brightness? }: each stands on the ground at (x, z) with the
+// sheet's anchor pixel (v3-meta.json) on it, turned to face the fixed
+// camera, showing frame `look`, flipped left to right when `mirror` (in
+// the shader: a negative instance scale would turn the plane's back to
+// the camera) and its colour times `brightness`. With `sway` (the shared sway uniforms) it
+// leans downwind in the vertex shader: whole art pixels, growing with the
+// square of the height, the root fixed, each plant with its own phase.
+function billboards(name, items, cameraPosition, sway) {
+  const { width, height, frames } = placeholderShape(name);
+  const anchor = metaAnchor(artMeta(), name);
+  const geometry = sway ? swayPlaneGeometry(width, height, anchor) : uprightPlaneGeometry(width, height);
+  if (!sway) geometry.setAttribute('aSwayH', new THREE.BufferAttribute(new Float32Array(geometry.attributes.position.count), 1));
+  const looks = new Float32Array(items.length);
+  const phases = new Float32Array(items.length);
+  const windSide = new Float32Array(items.length);
+  const mirrors = new Float32Array(items.length);
+  const tinted = items.some((item) => item.brightness !== undefined);
+  const tint = new THREE.Color();
+  const material = meadowMaterial(artSource(name), frames, sway);
+  const mesh = new THREE.InstancedMesh(geometry, material, items.length);
+  const { side, lift } = anchorShift(width, height, anchor, PX_WORLD, SPRITE_STRETCH_Y);
+  const matrix = new THREE.Matrix4();
+  const rotation = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+  const scale = new THREE.Vector3();
+  const position = new THREE.Vector3();
+  items.forEach((item, i) => {
+    const y = groundMeshHeight(item.x, item.z);
+    const ground = { x: item.x, y, z: item.z };
+    const yaw = faceYaw(ground, cameraPosition);
+    const s = item.scale ?? 1;
+    const forward = anchorForward(lift * s, ground, cameraPosition);
+    const cos = Math.cos(yaw);
+    const sin = Math.sin(yaw);
+    // A mirrored frame has its anchor pixel on the other side.
+    const shift = (item.mirror ? -side : side) * s;
+    position.set(item.x + shift * cos + forward * sin, y, item.z + forward * cos - shift * sin);
+    mirrors[i] = item.mirror ? 1 : 0;
+    if (tinted) mesh.setColorAt(i, tint.setScalar(item.brightness ?? 1));
+    rotation.setFromAxisAngle(up, yaw);
+    matrix.compose(position, rotation, scale.set(s, s, s));
+    mesh.setMatrixAt(i, matrix);
+    looks[i] = Math.min(Math.max(item.look ?? 0, 0), frames - 1);
+    phases[i] = swayPhase(item.x, item.z);
+    // Which way downwind lies along the plane's own width: +1 or -1, so
+    // the lean stays whole art pixels.
+    windSide[i] = swayLeanSide(cos, sin);
+  });
+  geometry.setAttribute('aLook', new THREE.InstancedBufferAttribute(looks, 1));
+  geometry.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases, 1));
+  geometry.setAttribute('aWindSide', new THREE.InstancedBufferAttribute(windSide, 1));
+  geometry.setAttribute('aMirror', new THREE.InstancedBufferAttribute(mirrors, 1));
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.computeBoundingSphere();
+  return mesh;
+}
+
+// An upright plane like uprightPlaneGeometry, but one quad per art pixel
+// row with its own vertices, each carrying aSwayH, the row's height
+// fraction (swayRowFraction, measured from the anchor row). A whole row
+// then leans by the same whole number of pixels: no row is sheared by a
+// part of a pixel.
+function swayPlaneGeometry(width, height, anchor) {
+  const geometry = uprightPlaneGeometry(width, height, PX_WORLD, SPRITE_STRETCH_Y, height).toNonIndexed();
+  const position = geometry.attributes.position;
+  const rowHeight = PX_WORLD * SPRITE_STRETCH_Y;
+  const rootRow = anchor ? height - 1 - anchor.y : 0;
+  const swayH = new Float32Array(position.count);
+  for (let i = 0; i < position.count; i += 3) {
+    const bottom = Math.min(position.getY(i), position.getY(i + 1), position.getY(i + 2));
+    swayH.fill(swayRowFraction(Math.round(bottom / rowHeight), height, rootRow), i, i + 3);
+  }
+  geometry.setAttribute('aSwayH', new THREE.BufferAttribute(swayH, 1));
+  return geometry;
+}
+
+// Lit cutout material for meadow billboards: picks frame aLook of a sheet
+// of `frames` frames and, given the sway uniforms, leans the plant.
+function meadowMaterial(sheet, frames, sway) {
+  const material = new THREE.MeshLambertMaterial({ map: pixelTexture(sheet), alphaTest: SPRITE_ALPHA_TEST });
+  const uniforms = {
+    uFrameWidth: { value: 1 / frames },
+    uSwayAngle: sway?.uSwayAngle ?? { value: 0 },
+    uSwayPx: sway?.uSwayPx ?? { value: 0 },
+  };
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+attribute float aLook;
+attribute float aPhase;
+attribute float aWindSide;
+attribute float aSwayH;
+attribute float aMirror;
+uniform float uFrameWidth;
+uniform float uSwayAngle;
+uniform float uSwayPx;`)
+      .replace('#include <uv_vertex>', `#include <uv_vertex>
+#ifdef USE_MAP
+vMapUv.x = (mix(vMapUv.x, 1.0 - vMapUv.x, aMirror) + aLook) * uFrameWidth;
+#endif`)
+      // Same formula as swayLeanPx in wind.js.
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+if (uSwayPx > 0.0) {
+  float h = aSwayH;
+  float wave = 0.5 + 0.5 * sin(uSwayAngle + aPhase);
+  float leanPx = floor(uSwayPx * h * h * wave + 0.5);
+  transformed.x += leanPx * ${PX_WORLD.toFixed(6)} * aWindSide;
+}`);
+  };
+  material.customProgramCacheKey = () => 'meadow-billboard';
+  return material;
+}
+
+// One mesh of soft blob shadows { x, z, r }, each draped over the ground
+// mesh (drapedGrid), so on the slopes it neither sinks into the hill nor
+// hangs in the air. Built once, one draw call.
+function blobShadows(spots, opacity) {
+  const material = blobShadowMaterial().clone();
+  material.opacity *= opacity;
+  material.polygonOffset = true; // drawn over the ground it lies on
+  material.polygonOffsetFactor = -1;
+  material.polygonOffsetUnits = -4;
+  const positions = [];
+  const uvs = [];
+  const indices = [];
+  for (const spot of spots) {
+    const grid = drapedGrid(spot.x, spot.z, spot.r, spot.r * SHADOW_DEPTH, MEADOW_SHADOW_STEP, groundMeshHeight, MEADOW_SHADOW_LIFT);
+    const base = positions.length / 3;
+    positions.push(...grid.positions);
+    uvs.push(...grid.uvs);
+    for (const index of grid.indices) indices.push(base + index);
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setIndex(indices);
+  geometry.computeBoundingSphere();
+  return new THREE.Mesh(geometry, material);
+}
+
+// Seed flecks from the dandelion seed puffs: each puff lets one go every
+// 6 to 10 seconds; it rises a little and drifts away on the wind (three
+// times as fast in a gust), then is gone. A fixed pool, no allocation.
+function createSeedFlecks(puffs, cameraPosition) {
+  const name = ART.v3.windBits;
+  const { width, height, frames } = placeholderShape(name);
+  const kinds = bitKinds(artMeta(), name);
+  const seedFrame = kinds.includes('seed') ? kinds.indexOf('seed') : frames - 1;
+  const texture = pixelTexture(artSource(name)).clone();
+  texture.repeat.set(1 / frames, 1);
+  texture.offset.set(seedFrame / frames, 0);
+  const material = new THREE.MeshLambertMaterial({ map: texture, alphaTest: SPRITE_ALPHA_TEST });
+  const mesh = new THREE.InstancedMesh(uprightPlaneGeometry(width, height), material, DANDELION_FLECK_POOL);
+  mesh.frustumCulled = false;
+
+  const puffHeight = placeholderShape(ART.v3.flower.dandelion).height * PX_WORLD * SPRITE_STRETCH_Y * PUFF_TOP;
+  const random = effectRandom(MEADOW_SEED + 2);
+  const releases = createPuffReleases(puffs.length, random);
+  const x = new Float32Array(DANDELION_FLECK_POOL);
+  const y = new Float32Array(DANDELION_FLECK_POOL);
+  const z = new Float32Array(DANDELION_FLECK_POOL);
+  const age = new Float32Array(DANDELION_FLECK_POOL).fill(Infinity); // Infinity: free
+  const bob = new Float32Array(DANDELION_FLECK_POOL);
+  const matrix = new THREE.Matrix4();
+  const hidden = new THREE.Matrix4().makeScale(0, 0, 0);
+  const yaw = faceYaw({ x: 0, z: 0 }, cameraPosition);
+  for (let i = 0; i < DANDELION_FLECK_POOL; i++) mesh.setMatrixAt(i, hidden);
+
+  const release = (p) => {
+    const puff = puffs[p];
+    for (let i = 0; i < DANDELION_FLECK_POOL; i++) {
+      if (age[i] !== Infinity) continue;
+      x[i] = puff.x;
+      y[i] = groundMeshHeight(puff.x, puff.z) + puffHeight;
+      z[i] = puff.z;
+      age[i] = 0;
+      bob[i] = random() * Math.PI * 2;
+      return;
+    }
+  };
+
+  return {
+    mesh,
+    clear() {
+      age.fill(Infinity);
+      releases.clear();
+      for (let i = 0; i < DANDELION_FLECK_POOL; i++) mesh.setMatrixAt(i, hidden);
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+    update(timeMs, dtMs, gust) {
+      releases.step(timeMs, release);
+      const dt = dtMs / 1000;
+      const speed = fleckSpeed(gust);
+      for (let i = 0; i < DANDELION_FLECK_POOL; i++) {
+        if (age[i] === Infinity) continue;
+        age[i] += dtMs;
+        if (age[i] >= DANDELION_FLECK_MS) {
+          age[i] = Infinity;
+          mesh.setMatrixAt(i, hidden);
+          continue;
+        }
+        x[i] += WIND_GROUND.x * speed * dt;
+        z[i] += WIND_GROUND.z * speed * dt;
+        y[i] += FLECK_RISE * dt;
+        matrix.makeRotationY(yaw);
+        matrix.setPosition(x[i], y[i] + FLECK_BOB * Math.sin(age[i] / 400 + bob[i]), z[i]);
+        mesh.setMatrixAt(i, matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+    },
+  };
+}

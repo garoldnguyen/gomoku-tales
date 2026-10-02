@@ -39,8 +39,9 @@ const SHADOW_EXTENT = 20; // the sun's shadow map covers the board, characters a
 const PIECE_SHADOW_RADIUS = 0.36;
 const ROCK_SHADOW_RADIUS = PIECE_SHADOW_RADIUS * 1.2;
 
-// The switches the scenery around the board reads (breeze-hill.js).
-const SCENERY_FEATURES = new Set(['scenery', 'meadowFlowers', 'farHills', 'sky', 'wind', 'backgroundMotion']);
+// The switches the scenery around the board reads (breeze-hill.js and
+// the meadow, meadow-scene.js).
+const SCENERY_FEATURES = new Set(['ground', 'scenery', 'meadowFlowers', 'farHills', 'shadows', 'sky', 'wind', 'backgroundMotion']);
 // The switches the farmland board reads (farm-field.js).
 const FARM_FEATURES = new Set(['boardTexture', 'scenery']);
 
@@ -299,6 +300,7 @@ export function createPieceSprite(kind) {
     frameCount: placeholderShape(name).frames,
     shadowRadius: PIECE_SHADOW_RADIUS,
     anchor: metaAnchor(artMeta(), name),
+    swayFrame: STAGE_REST, // resting plants sway on High (PLANT_SWAY)
   });
   sprite.setFrame(STAGE_REST);
   return sprite;

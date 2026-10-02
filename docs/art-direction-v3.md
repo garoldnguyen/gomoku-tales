@@ -155,7 +155,7 @@ Sway (High only): a vertex shader lean. Offset in x grows with the square of hei
 
 Scenery (Medium and High):
 
-- Trees: 12 to 14 along the far edge of the meadow where it meets the hills, irregular spacing, scale 0.9 to 1.15, plus 4 to 6 along the left and right edges. Mix the three trees.
+- Trees: 12 to 14 along the far edge of the meadow where it meets the hills, irregular spacing, always scale 1 (never fractional: vary them with random mirroring and a plus or minus 6 percent brightness shift), plus 4 to 6 along the left and right edges. Mix the three trees.
 - Bushes: 8 to 10, near trees and the fence. The flowering one more near the flower patches.
 - Hay bales: 3, near the fence, one on its own beside a patch.
 - Grass tufts: 120 to 160 scattered on the meadow outside the keep-out area.

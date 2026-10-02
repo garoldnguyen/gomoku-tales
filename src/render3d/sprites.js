@@ -10,10 +10,11 @@
 import * as THREE from 'three';
 import { PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
 import { anchorForward, anchorShift, faceYaw, frameAt, SPRITE_ALPHA_TEST } from './sprite-frames.js';
+import { swayLeanSide, swayPhase } from './wind.js';
 
 const SHADOW_LIFT = 0.005; // keeps the blob shadow just above the ground
 const SHADOW_OPACITY = 0.35;
-const SHADOW_DEPTH = 0.8; // the blob is an ellipse this much shorter in z
+export const SHADOW_DEPTH = 0.8; // the blob is an ellipse this much shorter in z
 // Sprite normals lean back towards the sky, so the sun and the hemisphere
 // light an upright sprite about as brightly as the ground it stands on.
 const NORMAL_LEAN_RAD = Math.PI / 4;
@@ -58,10 +59,11 @@ export function sheetCanvas(frames) {
 // Upright plane geometry `widthPx` x `heightPx` art pixels at `pxWorld`
 // units per pixel (stretched in height by `stretchY`), with its origin at the
 // bottom centre (the feet) and its normals leaning back towards the sky.
-export function uprightPlaneGeometry(widthPx, heightPx, pxWorld = PX_WORLD, stretchY = SPRITE_STRETCH_Y) {
+// `rows` splits it into rows of vertices, for planes a shader bends.
+export function uprightPlaneGeometry(widthPx, heightPx, pxWorld = PX_WORLD, stretchY = SPRITE_STRETCH_Y, rows = 1) {
   const width = widthPx * pxWorld;
   const height = heightPx * pxWorld * stretchY;
-  const geometry = new THREE.PlaneGeometry(width, height);
+  const geometry = new THREE.PlaneGeometry(width, height, 1, rows);
   geometry.translate(0, height / 2, 0);
   const normals = geometry.attributes.normal;
   for (let i = 0; i < normals.count; i++) {
@@ -73,6 +75,60 @@ export function uprightPlaneGeometry(widthPx, heightPx, pxWorld = PX_WORLD, stre
 // Lit cutout material for sprites and billboards.
 export function spriteMaterial(map) {
   return new THREE.MeshLambertMaterial({ map, alphaTest: SPRITE_ALPHA_TEST });
+}
+
+// The sway of the resting X and O plants (docs/art-direction-v3.md section
+// 6, High only), shared by every swaying sprite: the wave angle and the
+// amplitude in art pixels (0: still). The meadow (meadow-scene.js) sets
+// them each frame from the same wind and gusts as the flowers, at half
+// their amplitude.
+export const PLANT_SWAY = { uSwayAngle: { value: 0 }, uSwayPx: { value: 0 } };
+
+// A sprite material that, while uSwayOn is 1, leans each art pixel row of
+// the frame downwind by whole pixels: the lean grows with the square of
+// the row's height above the root row (rootRow from the bottom), the same
+// formula as plantSwayLeanPx in wind.js. It shifts where each row reads the
+// sheet, so the single quad stays put and no pixel is ever split.
+function swayingSpriteMaterial(map, { frames, widthPx, heightPx, rootRow }) {
+  const material = spriteMaterial(map);
+  const uniforms = {
+    ...PLANT_SWAY,
+    uSwayOn: { value: 0 },
+    uSwayPhase: { value: 0 },
+    uWindSide: { value: 1 },
+  };
+  material.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, uniforms);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>
+uniform float uSwayAngle;
+uniform float uSwayPx;
+uniform float uSwayOn;
+uniform float uSwayPhase;
+uniform float uWindSide;`)
+      .replace('#include <map_fragment>', `#ifdef USE_MAP
+vec2 swayUv = vMapUv;
+float swayPx = uSwayPx * uSwayOn;
+if (swayPx > 0.0) {
+  float row = floor(vMapUv.y * ${heightPx.toFixed(1)});
+  float h = clamp((row - ${rootRow.toFixed(1)}) / ${Math.max(heightPx - 1 - rootRow, 1).toFixed(1)}, 0.0, 1.0);
+  // Same formula as plantSwayLeanPx in wind.js.
+  float reach = swayPx * h * h;
+  float wave = sin(uSwayAngle + uSwayPhase);
+  float leanPx = reach >= 1.0
+    ? floor(reach * (0.5 + 0.5 * wave) + 0.5)
+    : (reach > 0.0 && wave >= cos(${(Math.PI / 2).toFixed(6)} * reach) ? 1.0 : 0.0);
+  swayUv.x -= leanPx * uWindSide / ${(widthPx * frames).toFixed(1)};
+}
+vec4 sampledDiffuseColor = texture2D(map, swayUv);
+// A row never reads from the next frame of the sheet.
+if (floor(swayUv.x * ${frames.toFixed(1)}) != floor(vMapUv.x * ${frames.toFixed(1)})) sampledDiffuseColor.a = 0.0;
+diffuseColor *= sampledDiffuseColor;
+#endif`);
+  };
+  material.customProgramCacheKey = () => `sprite-sway-${frames}-${widthPx}-${heightPx}-${rootRow}`;
+  material.userData.sway = uniforms;
+  return material;
 }
 
 // Soft round shadow texture shared by every blob shadow.
@@ -97,8 +153,8 @@ function blobShadowTexture() {
 let blobMaterial = null;
 let blobGeometry = null;
 
-// A flat soft blob shadow, `radius` world units wide, lying on y = 0 of its parent.
-export function createBlobShadow(radius) {
+// The material of every blob shadow: soft, dark plum, see-through.
+export function blobShadowMaterial() {
   blobMaterial ??= new THREE.MeshBasicMaterial({
     map: blobShadowTexture(),
     color: 0x1a1030,
@@ -106,8 +162,18 @@ export function createBlobShadow(radius) {
     opacity: SHADOW_OPACITY,
     depthWrite: false,
   });
+  return blobMaterial;
+}
+
+// A flat 1 x 1 square lying on y = 0, the shape of every blob shadow.
+export function blobShadowGeometry() {
   blobGeometry ??= new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-  const shadow = new THREE.Mesh(blobGeometry, blobMaterial);
+  return blobGeometry;
+}
+
+// A flat soft blob shadow, `radius` world units wide, lying on y = 0 of its parent.
+export function createBlobShadow(radius) {
+  const shadow = new THREE.Mesh(blobShadowGeometry(), blobShadowMaterial());
   shadow.scale.set(radius * 2, 1, radius * 2 * SHADOW_DEPTH);
   shadow.position.y = SHADOW_LIFT;
   return shadow;
@@ -142,8 +208,10 @@ function sharedGeometry(widthPx, heightPx) {
 //               animation, for sheets that hold several animations
 //   anchor      optional art pixel { x, y } of a frame that stands on the
 //               ground point (default: the bottom centre)
+//   swayFrame   optional frame that sways with PLANT_SWAY (the Rest frame
+//               of an X or O plant); its root (the anchor row) never moves
 export class PixelSprite {
-  constructor({ sheet, frameCount = 1, frameMs = 0, shadowRadius, phaseMs = 0, frameFor = null, anchor = null }) {
+  constructor({ sheet, frameCount = 1, frameMs = 0, shadowRadius, phaseMs = 0, frameFor = null, anchor = null, swayFrame = null }) {
     this.frameCount = frameCount;
     this.frameMs = frameMs;
     this.phaseMs = phaseMs;
@@ -157,7 +225,15 @@ export class PixelSprite {
     this.texture = frameCount > 1 ? base.clone() : base;
     this.texture.repeat.set(1 / frameCount, 1);
 
-    this.plane = new THREE.Mesh(sharedGeometry(frameWidth, sheet.height), spriteMaterial(this.texture));
+    this.swayFrame = swayFrame;
+    const material = swayFrame === null ? spriteMaterial(this.texture) : swayingSpriteMaterial(this.texture, {
+      frames: frameCount,
+      widthPx: frameWidth,
+      heightPx: sheet.height,
+      rootRow: anchor ? sheet.height - 1 - anchor.y : 0,
+    });
+    this.sway = material.userData.sway ?? null;
+    this.plane = new THREE.Mesh(sharedGeometry(frameWidth, sheet.height), material);
     this.anchor = anchorShift(frameWidth, sheet.height, anchor, PX_WORLD, SPRITE_STRETCH_Y);
     this.shadow = createBlobShadow(shadowRadius ?? (frameWidth * PX_WORLD) / 3);
 
@@ -176,6 +252,7 @@ export class PixelSprite {
     if (frame === this.frame) return;
     this.frame = frame;
     this.texture.offset.x = frame / this.frameCount;
+    if (this.sway) this.sway.uSwayOn.value = frame === this.swayFrame ? 1 : 0;
   }
 
   // Advances the animation and turns the sprite towards the camera. An
@@ -187,6 +264,11 @@ export class PixelSprite {
     else if (this.frameMs > 0) this.setFrame(frameAt(timeMs + this.phaseMs, this.frameCount, this.frameMs));
     const yaw = faceYaw(this.object.position, cameraPosition);
     this.plane.rotation.y = yaw;
+    if (this.sway) {
+      // Per-plant phase from where it stands; downwind along its width.
+      this.sway.uSwayPhase.value = swayPhase(this.object.position.x, this.object.position.z);
+      this.sway.uWindSide.value = swayLeanSide(Math.cos(yaw), Math.sin(yaw));
+    }
     const { side, lift } = this.anchor;
     if (side !== 0 || lift !== 0) {
       const forward = anchorForward(lift, this.object.position, cameraPosition);

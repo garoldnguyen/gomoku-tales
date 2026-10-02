@@ -101,7 +101,6 @@ export const CHARACTER_GLOW_FADE_MS = 400; // the current player's glow fades in
 export const CHARACTER_GLOW_PULSE_MS = 2400; // one slow breath of the glow
 
 // Map 1, Windy Spring Breeze Hill (section C).
-export const WILDFLOWER_COUNT = 280; // instanced flower and grass tuft billboards
 export const CLOUD_COUNT = 7;
 export const CLOUD_SPEED = 0.6; // world units per second, drifting towards +x
 export const CLOUD_PX_WORLD = 1 / 8; // clouds are far away, so their art pixels are bigger
@@ -109,6 +108,51 @@ export const WIND3D_STREAK_COUNT = 10;
 export const WIND3D_STREAK_SPEED = 5; // world units per second, towards +x
 export const FOG_NEAR = 45; // light fog for depth, in world units from the camera
 export const FOG_FAR = 140;
+
+// The meadow around the field (docs/art-direction-v3.md section 6). Plan
+// distances are in cells (world units).
+export const MEADOW_SEED = 20261002; // planMeadow gives the same meadow every game
+export const MEADOW_PATCHES = 36; // flower patches, about
+export const MEADOW_PATCH_PLANTS = [5, 14]; // plants in one patch, min and max
+export const MEADOW_SPACING = 0.7; // Poisson-disc minimum between two meadow plants
+export const MEADOW_MARGIN = 1; // keep-out margin around the field, curb, fence, path and characters
+export const MEADOW_TREES_BACK = [12, 14]; // trees along the far edge, min and max
+export const MEADOW_TREES_SIDE = [4, 6]; // trees along the left and right edges together
+// Trees are always scale 1 (section 1: never a non-integer scale at
+// rest); they vary by random mirroring and a brightness shift of up to
+// plus or minus this share.
+export const MEADOW_TREE_SCALE = 1;
+export const MEADOW_TREE_BRIGHTNESS = 0.06;
+export const MEADOW_BUSHES = [8, 10];
+export const MEADOW_BALES = 3;
+export const MEADOW_TUFTS = [120, 160]; // grass tufts in all, edges of patches included
+export const GROUND_STRIPE_CELLS = 3; // Low: mown stripes this many cells wide
+// Blob shadows in the meadow are draped over the ground mesh: vertices
+// this far apart, lifted this much above it (more than the most a draped
+// triangle dips below the mesh where it crosses one of its creases).
+export const MEADOW_SHADOW_STEP = 0.2;
+export const MEADOW_SHADOW_LIFT = 0.06;
+// The two HUD glass cards (docs/art-direction-v3.md section 8) at 1920 x
+// 1080: no tall flowers or trees may show behind them. The height is the
+// card with both skill rows.
+export const HUD_CARD_SIDE_PX = 56;
+export const HUD_CARD_TOP_PX = 120;
+export const HUD_CARD_WIDTH_PX = 332;
+export const HUD_CARD_HEIGHT_PX = 430;
+export const HUD_SCREEN_PX = [1920, 1080];
+
+// Wind and sway (section 6, High only). Everything moves along WIND_DIR.
+export const WIND_DIR = [1, 0, 0.35]; // x, y, z; normalised on the ground where used
+export const SWAY_CALM_PX = 1; // the top of a meadow plant leans this many art pixels
+export const SWAY_GUST_PX = 2; // in a gust
+export const PLANT_SWAY_SHARE = 0.5; // resting X and O plants sway at half the meadow's amplitude
+export const SWAY_PERIOD_MS = 2600; // one slow sway back and forth
+export const GUST_EVERY_MS = [7000, 11000]; // time from one gust start to the next
+export const GUST_MS = 1200; // a gust lasts this long
+export const DANDELION_RELEASE_MS = [6000, 10000]; // a seed puff lets a seed fleck go this often
+export const DANDELION_FLECK_MS = 4500; // a seed fleck drifts this long before it is gone
+export const DANDELION_FLECK_SPEED = 0.7; // world units per second along the wind, tripled in a gust
+export const DANDELION_FLECK_POOL = 24; // most seed flecks in the air at once
 
 // Post-processing and quality levels. The levels themselves (pixel ratio
 // cap, particle caps and every other switch) live in ONE table in
