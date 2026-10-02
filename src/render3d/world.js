@@ -9,14 +9,14 @@
 
 import * as THREE from 'three';
 import {
-  CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE,
+  CAMERA_DISTANCE, CAMERA_FOV, CELL_SIZE,
   FPS_SAMPLE_MS, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS, TARGET_FRAME_MS,
 } from '../config.js';
 import { createAssetStore } from '../render/assets.js';
 import { artMeta, artSource, setArtAssets } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
 import { buildBreezeHill } from './breeze-hill.js';
-import { cameraPosition, cameraRay } from './camera.js';
+import { cameraRay, createGameCamera, gameCamera } from './camera.js';
 import { createCharacters } from './characters3d.js';
 import { createFarmField } from './farm-field.js';
 import { zonePieceUv } from './farm-layout.js';
@@ -74,12 +74,9 @@ export function createWorld(canvas, {
   const scene = new THREE.Scene();
 
   // Fixed camera: no rotation or zoom (section B).
-  const cameraTarget = { x: 0, y: 0, z: 0 };
-  const cameraPos = cameraPosition(CAMERA_PITCH_DEG, CAMERA_DISTANCE, cameraTarget);
-  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, WORLD_ASPECT, 0.5, 200);
-  camera.position.set(cameraPos.x, cameraPos.y, cameraPos.z);
-  camera.lookAt(cameraTarget.x, cameraTarget.y, cameraTarget.z);
-  const cameraSetup = { position: cameraPos, target: cameraTarget, fovDeg: CAMERA_FOV, aspect: WORLD_ASPECT };
+  const cameraSetup = gameCamera(WORLD_ASPECT);
+  const cameraPos = cameraSetup.position;
+  const camera = createGameCamera(THREE, WORLD_ASPECT);
   // The camera's own right and up directions, for the screen shake.
   camera.updateMatrixWorld();
   const cameraRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);

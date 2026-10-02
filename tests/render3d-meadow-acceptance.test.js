@@ -10,9 +10,11 @@ import { readFileSync } from 'node:fs';
 import {
   DANDELION_FLECK_MS, DANDELION_FLECK_POOL, GUST_EVERY_MS, GUST_MS, MEADOW_BALES, MEADOW_BUSHES, MEADOW_MARGIN,
   MEADOW_PATCH_PLANTS, MEADOW_SEED, MEADOW_SPACING, MEADOW_TREE_BRIGHTNESS, MEADOW_TREES_BACK, MEADOW_TREES_SIDE,
-  MEADOW_TUFTS, PLANT_SWAY_SHARE, SWAY_CALM_PX, SWAY_GUST_PX, WIND_DIR,
+  MEADOW_TREES_BACK_MAX, MEADOW_TUFTS, PLANT_SWAY_SHARE, PX_WORLD, SPRITE_STRETCH_Y, SWAY_CALM_PX, SWAY_GUST_PX, WIND_DIR,
 } from '../src/config.js';
 import { placeholderShape } from '../src/render3d/art-assets.js';
+import { gameCamera, projectToNdc } from '../src/render3d/camera.js';
+import { SIDE_TREE_MAX_Z, TREE_ROW_Z } from '../src/render3d/horizon.js';
 import { CURB, FIELD, fencePosts, fenceRails, PATH } from '../src/render3d/farm-layout.js';
 import {
   dandelionPuffs, EDGE_GAP, FAR_HILLS, flowerSpecies, FLOWER_SPECIES, hazeMix, hillLift, isKeptOut, LOW_FRONT_Z,
@@ -114,7 +116,7 @@ test('(4) planMeadow is pure and deterministic, Poisson spacing 0.7, species wei
 });
 
 test('(5) tall flowers at the back and sides, low ones at the front, no tall flower behind a HUD card', () => {
-  const tallHeight = (name) => placeholderShape(`flower-${name}`).height / 32 / Math.cos((55 * Math.PI) / 180);
+  const tallHeight = (name) => placeholderShape(`flower-${name}`).height * PX_WORLD * SPRITE_STRETCH_Y;
   for (const [seed, p] of plans) {
     for (const patch of p.patches) {
       const { height } = flowerSpecies(patch.species);
@@ -158,15 +160,20 @@ test('(6) one instanced draw call per species at most, upright billboards with f
   }
 });
 
-test('(7) trees: 12 to 14 at the back, 4 to 6 at the sides, three types, scale 1, mirrored and shaded', () => {
+test('(7) trees: 12 to 14 of the back row on screen, 4 to 6 at the sides, three types, scale 1, mirrored and shaded', () => {
   assert.deepEqual(MEADOW_TREES_BACK, [12, 14]);
   assert.deepEqual(MEADOW_TREES_SIDE, [4, 6]);
   assert.equal(MEADOW_TREE_BRIGHTNESS, 0.06);
   for (const [seed, p] of plans) {
-    const back = p.trees.filter((t) => t.z < MEADOW_BOUNDS.minZ + 2.35);
-    const side = p.trees.filter((t) => t.z >= MEADOW_BOUNDS.minZ + 2.35);
-    assert.ok(back.length >= 12 && back.length <= 14, `seed ${seed}: ${back.length} back trees`);
+    // Part 6c: the back row stands just in front of the far edge and runs
+    // past both screen edges; 12 to 14 of it show on the 16:9 screen.
+    const back = p.trees.filter((t) => t.z <= TREE_ROW_Z[1]);
+    const side = p.trees.filter((t) => t.z > TREE_ROW_Z[1]);
+    const onScreen = back.filter((t) => Math.abs(projectToNdc({ x: t.x, y: 0, z: t.z }, gameCamera()).x) <= 1);
+    assert.ok(onScreen.length >= 12 && onScreen.length <= 14, `seed ${seed}: ${onScreen.length} back trees on screen`);
+    assert.ok(back.length <= MEADOW_TREES_BACK_MAX, `seed ${seed}: ${back.length} back trees`);
     assert.ok(side.length >= 4 && side.length <= 6, `seed ${seed}: ${side.length} side trees`);
+    for (const tree of side) assert.ok(tree.z <= SIDE_TREE_MAX_Z, `seed ${seed}: side tree in the back third`);
     assert.ok(side.some((t) => t.x < -FIELD_EDGE) && side.some((t) => t.x > FIELD_EDGE));
     assert.equal(new Set(p.trees.map((t) => t.look)).size, TREE_LOOKS);
     for (const tree of p.trees) {

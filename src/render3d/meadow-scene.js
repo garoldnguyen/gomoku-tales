@@ -17,20 +17,20 @@
 
 import * as THREE from 'three';
 import {
-  DANDELION_FLECK_MS, DANDELION_FLECK_POOL, GROUND_STRIPE_CELLS, MEADOW_SEED, MEADOW_SHADOW_LIFT,
-  MEADOW_SHADOW_STEP, PX_WORLD,
+  DANDELION_FLECK_MS, DANDELION_FLECK_POOL, GROUND_STRIPE_CELLS, MEADOW_SEED, MEADOW_SHADOW_LIFT, PX_WORLD,
   SPRITE_STRETCH_Y, SWAY_PERIOD_MS,
 } from '../config.js';
 import { artMeta, artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
 import { heightAtDepression } from './camera.js';
 import {
-  dandelionPuffs, FAR_HILLS, hazeMix, HILL_FOOT_HAZE, hillLift, meadowInstanceGroups, meadowShadowSpots, planMeadow,
+  dandelionPuffs, FAR_HILLS, hazeMix, HILL_DEPTH, HILL_FOOT_HAZE, hillLift, meadowInstanceGroups, meadowShadowSpots, planMeadow,
 } from './meadow.js';
 import { effectRandom, seededRandom } from './seeded-random.js';
 import { anchorForward, anchorShift, faceYaw, SPRITE_ALPHA_TEST } from './sprite-frames.js';
 import { blobShadowMaterial, pixelTexture, PLANT_SWAY, SHADOW_DEPTH, uprightPlaneGeometry } from './sprites.js';
-import { drapedGrid, groundMeshHeight, TERRAIN_GRID, terrainHeight } from './terrain.js';
+import { farEdgeWave } from './horizon.js';
+import { GROUND_Y, TERRAIN_GRID } from './terrain.js';
 import { bitKinds, metaAnchor } from './v3-meta.js';
 import {
   createGustClock, createPuffReleases, fleckSpeed, plantSwayAmplitudePx, swayAmplitudePx, swayLeanSide, swayPhase,
@@ -46,7 +46,10 @@ const COLORS = {
 // The far hills themselves (FAR_HILLS, colours and sums of sines) are in meadow.js.
 const HILL_SPAN = 130; // x from -HILL_SPAN to HILL_SPAN
 const HILL_COLUMNS = 160;
-const HILL_DEPTH = 40; // world units the silhouette reaches down below its top
+const GROUND_EDGE_STEP = 0.5; // world units between the ground's columns, for the wavy far edge
+// The ground and the field share the plane y = 0: the ground is drawn a
+// little deeper so the field always wins.
+const BEHIND_FIELD = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 };
 const RIPPLE_SPEED = 0.55; // radians of the ripple wave per second
 const RIPPLE_WAVE = 0.85; // radians per world unit along the wind
 const PATCH_SHADOW_OPACITY = 0.55; // a patch shadow is fainter than a sprite's
@@ -129,36 +132,39 @@ export function createMeadow(scene, cameraPosition, { haze }) {
   };
 }
 
-// The ground: the hill's height field on TERRAIN_GRID (groundMeshHeight
-// gives its height anywhere), textured in world space. Low uses
-// two greens in GROUND_STRIPE_CELLS-wide stripes across the view; Medium
-// and High a painted mottled tile, and High adds slow lighter ripples in
-// the shader that travel with the wind.
+// The ground: one flat rectangle at y = 0 (TERRAIN_GRID) that reaches past
+// the left, right and bottom of the screen and ends at the far edge, the
+// horizon (horizon.js farEdgeZ), drawn there as a gentle wavy line
+// (farEdgeWave). No heights, no rim, no dome. Textured in world space. Low
+// uses two greens in GROUND_STRIPE_CELLS-wide stripes across the whole
+// ground; Medium and High a painted mottled tile, and High adds slow
+// lighter ripples in the shader that travel with the wind. The field lies
+// on the same plane, so the ground is pushed back in depth under it.
 function createGround() {
-  const { minX, maxX, minZ, maxZ, cell } = TERRAIN_GRID;
-  const geometry = new THREE.PlaneGeometry(maxX - minX, maxZ - minZ, (maxX - minX) / cell, (maxZ - minZ) / cell)
+  const { minX, maxX, minZ, maxZ } = TERRAIN_GRID;
+  const geometry = new THREE.PlaneGeometry(maxX - minX, maxZ - minZ, Math.round((maxX - minX) / GROUND_EDGE_STEP), 1)
     .rotateX(-Math.PI / 2)
     .translate((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
   const position = geometry.attributes.position;
   const uv = geometry.attributes.uv;
   for (let i = 0; i < position.count; i++) {
     const x = position.getX(i);
-    const z = position.getZ(i);
-    position.setY(i, terrainHeight(x, z));
-    uv.setXY(i, x, z); // world units; each texture scales them with repeat
+    position.setY(i, GROUND_Y); // exactly flat, without the rounding of the turn above
+    // The far row follows the wavy far edge; the other edges stay straight.
+    if (Math.abs(position.getZ(i) - minZ) < 1e-6) position.setZ(i, minZ + farEdgeWave(x));
+    uv.setXY(i, x, position.getZ(i)); // world units; each texture scales them with repeat
   }
-  geometry.computeVertexNormals();
 
   const stripes = repeating(stripeCanvas());
   // Two texels per period: stripes GROUND_STRIPE_CELLS wide whose edges lie
   // on cell edges of the field.
   stripes.repeat.set(1, 1 / (2 * GROUND_STRIPE_CELLS));
   stripes.offset.set(0, 0.25);
-  const mown = new THREE.MeshLambertMaterial({ map: stripes });
+  const mown = new THREE.MeshLambertMaterial({ map: stripes, ...BEHIND_FIELD });
 
   const paint = repeating(paintCanvas());
   paint.repeat.set(1 / PAINT_TILE_CELLS, 1 / PAINT_TILE_CELLS);
-  const painted = new THREE.MeshLambertMaterial({ map: paint });
+  const painted = new THREE.MeshLambertMaterial({ map: paint, ...BEHIND_FIELD });
   const ripple = { uRipple: { value: 0 }, uRipplePhase: { value: 0 }, uWind: { value: new THREE.Vector2(WIND_GROUND.x, WIND_GROUND.z) } };
   painted.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, ripple);
@@ -275,8 +281,9 @@ function smooth(t) {
   return t * t * (3 - 2 * t);
 }
 
-// Two far hill silhouettes, far and near, each a strip whose top edge is a
-// sum of sines, coloured flat with some haze ('on') or with more haze
+// Two far hill silhouettes behind the far edge, far and near, each a strip
+// whose top edge is a sum of sines (its crest 15 to 19 percent down the
+// view, its foot hidden by the meadow), coloured flat with some haze ('on') or with more haze
 // toward the foot ('haze', High).
 function createFarHills(cameraPosition, haze) {
   const group = new THREE.Group();
@@ -285,7 +292,9 @@ function createFarHills(cameraPosition, haze) {
     const positions = new Float32Array((HILL_COLUMNS + 1) * 2 * 3);
     for (let c = 0; c <= HILL_COLUMNS; c++) {
       const x = -HILL_SPAN + (2 * HILL_SPAN * c) / HILL_COLUMNS;
-      const top = heightAtDepression(cameraPosition, x, hill.z, hill.depressionDeg - hillLift(hill, x));
+      // Measured straight ahead (the camera's own x), so a level line of the
+      // hill stays one screen row from edge to edge; the sines add the crest.
+      const top = heightAtDepression(cameraPosition, cameraPosition.x, hill.z, hill.depressionDeg - hillLift(hill, x));
       positions.set([x, top, hill.z, x, top - HILL_DEPTH, hill.z], c * 6);
     }
     const index = [];
@@ -350,7 +359,7 @@ function billboards(name, items, cameraPosition, sway) {
   const scale = new THREE.Vector3();
   const position = new THREE.Vector3();
   items.forEach((item, i) => {
-    const y = groundMeshHeight(item.x, item.z);
+    const y = GROUND_Y;
     const ground = { x: item.x, y, z: item.z };
     const yaw = faceYaw(ground, cameraPosition);
     const s = item.scale ?? 1;
@@ -437,28 +446,31 @@ if (uSwayPx > 0.0) {
   return material;
 }
 
-// One mesh of soft blob shadows { x, z, r }, each draped over the ground
-// mesh (drapedGrid), so on the slopes it neither sinks into the hill nor
-// hangs in the air. Built once, one draw call.
+// One mesh of soft blob shadows { x, z, r }: flat quads lying
+// MEADOW_SHADOW_LIFT above the flat ground. Built once, one draw call.
 function blobShadows(spots, opacity) {
   const material = blobShadowMaterial().clone();
   material.opacity *= opacity;
   material.polygonOffset = true; // drawn over the ground it lies on
   material.polygonOffsetFactor = -1;
   material.polygonOffsetUnits = -4;
-  const positions = [];
-  const uvs = [];
+  const positions = new Float32Array(spots.length * 12);
+  const uvs = new Float32Array(spots.length * 8);
   const indices = [];
-  for (const spot of spots) {
-    const grid = drapedGrid(spot.x, spot.z, spot.r, spot.r * SHADOW_DEPTH, MEADOW_SHADOW_STEP, groundMeshHeight, MEADOW_SHADOW_LIFT);
-    const base = positions.length / 3;
-    positions.push(...grid.positions);
-    uvs.push(...grid.uvs);
-    for (const index of grid.indices) indices.push(base + index);
-  }
+  const y = GROUND_Y + MEADOW_SHADOW_LIFT;
+  spots.forEach((spot, i) => {
+    const halfZ = spot.r * SHADOW_DEPTH;
+    positions.set([
+      spot.x - spot.r, y, spot.z - halfZ, spot.x + spot.r, y, spot.z - halfZ,
+      spot.x - spot.r, y, spot.z + halfZ, spot.x + spot.r, y, spot.z + halfZ,
+    ], i * 12);
+    uvs.set([0, 1, 1, 1, 0, 0, 1, 0], i * 8);
+    const a = i * 4;
+    indices.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); // facing up
+  });
   const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
   geometry.setIndex(indices);
   geometry.computeBoundingSphere();
   return new THREE.Mesh(geometry, material);
@@ -497,7 +509,7 @@ function createSeedFlecks(puffs, cameraPosition) {
     for (let i = 0; i < DANDELION_FLECK_POOL; i++) {
       if (age[i] !== Infinity) continue;
       x[i] = puff.x;
-      y[i] = groundMeshHeight(puff.x, puff.z) + puffHeight;
+      y[i] = GROUND_Y + puffHeight;
       z[i] = puff.z;
       age[i] = 0;
       bob[i] = random() * Math.PI * 2;

@@ -2,7 +2,42 @@
 // section B). No Three.js imports, so it runs under node --test.
 // Vectors are plain { x, y, z } objects; the world is y-up.
 
+import { CAMERA_POSE } from './framing.js';
+
 const DEG = Math.PI / 180;
+
+// The aim point on the board's centre line the fixed camera looks at,
+// CAMERA_POSE.aimBehind behind the board centre.
+export const CAMERA_TARGET = Object.freeze({ x: 0, y: 0, z: -CAMERA_POSE.aimBehind });
+
+// The game's fixed camera as { position, target, fovDeg, aspect }, from
+// CAMERA_POSE (framing.js): it looks down pitchDeg at CAMERA_TARGET from
+// distance away. world.js
+// builds the Three.js camera from it; everything that projects through the
+// camera (picking, the HUD layout, the meadow plan, the framing) uses it.
+export function gameCamera(aspect = 16 / 9) {
+  return {
+    position: cameraPosition(CAMERA_POSE.pitchDeg, CAMERA_POSE.distance, CAMERA_TARGET),
+    target: { ...CAMERA_TARGET },
+    fovDeg: CAMERA_POSE.fovDeg,
+    aspect,
+  };
+}
+
+const CAMERA_NEAR = 0.5;
+const CAMERA_FAR = 260; // past the far hills
+
+// The fixed Three.js camera of gameCamera at `aspect`, built with the
+// Three.js module `three` passed in (this file stays free of Three.js
+// imports), so world.js and the tests project through the same camera.
+export function createGameCamera(three, aspect = 16 / 9) {
+  const { position, target, fovDeg } = gameCamera(aspect);
+  const camera = new three.PerspectiveCamera(fovDeg, aspect, CAMERA_NEAR, CAMERA_FAR);
+  camera.position.set(position.x, position.y, position.z);
+  camera.lookAt(target.x, target.y, target.z);
+  camera.updateMatrixWorld();
+  return camera;
+}
 
 // Camera position looking down at `target` by `pitchDeg` degrees from
 // `distance` away, from the +z side (the near edge of the board).

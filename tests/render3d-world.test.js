@@ -2,24 +2,18 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  BOARD_SIZE, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, INTERNAL_HEIGHT, INTERNAL_WIDTH,
+  BOARD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH,
 } from '../src/config.js';
 import { X, O } from '../src/logic/board.js';
 import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../src/logic/skills.js';
 import { HUD_2D, panelRect, skillButtonRect } from '../src/render/layout.js';
 import { boardMarks } from '../src/render3d/board-marks.js';
-import { cameraPosition } from '../src/render3d/camera.js';
+import { gameCamera, projectToNdc } from '../src/render3d/camera.js';
 import { createWorldHitTest } from '../src/render3d/hit-test.js';
 import { hitTest, isQualityKey, skillHitTest } from '../src/ui/input.js';
 import { createLocalGame } from '../src/ui/local-game.js';
 
-const TARGET = { x: 0, y: 0, z: 0 };
-const CAMERA = {
-  position: cameraPosition(CAMERA_PITCH_DEG, CAMERA_DISTANCE, TARGET),
-  target: TARGET,
-  fovDeg: CAMERA_FOV,
-  aspect: 16 / 9,
-};
+const CAMERA = gameCamera(16 / 9);
 const worldHitTest = createWorldHitTest(CAMERA);
 
 // --- HUD layout ---
@@ -44,7 +38,9 @@ test('the 3D hit test only finds board cells: skills are DOM buttons on the glas
 });
 
 test('the 3D hit test reaches every board cell by raycast, with the centre in the middle', () => {
-  assert.deepEqual(worldHitTest(INTERNAL_WIDTH / 2, INTERNAL_HEIGHT / 2), { cell: { x: 7, y: 7 } });
+  const centre = projectToNdc({ x: 0, y: 0, z: 0 }, CAMERA); // the board centre, just below the screen's middle
+  const hud = (ndc) => [((ndc.x + 1) / 2) * INTERNAL_WIDTH, ((1 - ndc.y) / 2) * INTERNAL_HEIGHT];
+  assert.deepEqual(worldHitTest(...hud(centre)), { cell: { x: 7, y: 7 } });
   const seen = new Set();
   for (let py = 0; py < INTERNAL_HEIGHT; py += 2) {
     for (let px = 0; px < INTERNAL_WIDTH; px += 2) {
@@ -54,8 +50,8 @@ test('the 3D hit test reaches every board cell by raycast, with the centre in th
   }
   assert.equal(seen.size, BOARD_SIZE * BOARD_SIZE);
   // Row 0 is the far edge, so it is higher on screen than the last row.
-  const top = worldHitTest(INTERNAL_WIDTH / 2, 125);
-  const bottom = worldHitTest(INTERNAL_WIDTH / 2, 465);
+  const top = worldHitTest(INTERNAL_WIDTH / 2, 180);
+  const bottom = worldHitTest(INTERNAL_WIDTH / 2, 475);
   assert.equal(top.cell.y, 0);
   assert.equal(bottom.cell.y, BOARD_SIZE - 1);
 });

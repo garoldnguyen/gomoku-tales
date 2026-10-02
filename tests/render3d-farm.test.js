@@ -2,13 +2,13 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  BOARD_SIZE, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE, CURB_PX, FENCE_OFFSET_CELLS,
+  BOARD_SIZE, CELL_SIZE, CURB_HEIGHT, CURB_HEIGHT_PX, CURB_PX, FENCE_OFFSET_CELLS,
   FENCE_POST_EVERY, PATH_WIDTH_CELLS, PX_WORLD,
 } from '../src/config.js';
 import { boardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from '../src/render3d/board-marks.js';
-import { cameraPosition, cameraRay } from '../src/render3d/camera.js';
+import { cameraRay, gameCamera, projectToNdc } from '../src/render3d/camera.js';
 import {
-  CURB, CURB_SIDES, curbTopCorners, FENCE_RAIL_HEIGHTS, fencePosts, fenceRails, FIELD, fieldTexel, PATH, pathStones,
+  CURB, CURB_FACES, CURB_SIDES, curbTopCorners, FENCE_RAIL_HEIGHTS, fencePosts, fenceRails, FIELD, fieldTexel, PATH, pathStones,
   zonePieceUv,
 } from '../src/render3d/farm-layout.js';
 import { cellAtHudPoint } from '../src/render3d/hit-test.js';
@@ -16,24 +16,21 @@ import { cellToWorld, pickCell } from '../src/render3d/picking.js';
 import { TORNADO_ZONE } from '../src/logic/skills.js';
 import { createLocalGame } from '../src/ui/local-game.js';
 
-const TARGET = { x: 0, y: 0, z: 0 };
-const CAMERA = {
-  position: cameraPosition(CAMERA_PITCH_DEG, CAMERA_DISTANCE, TARGET),
-  target: TARGET,
-  fovDeg: CAMERA_FOV,
-  aspect: 16 / 9,
-};
+const CAMERA = gameCamera(16 / 9);
 const HALF = (BOARD_SIZE * CELL_SIZE) / 2;
 const STAGES = [0, 150, 450, 850, 1200];
 
 // The four corners and the centre, with the world centre and the internal
-// HUD point (960x540) that picked them before the farmland board.
+// HUD point (960x540) that shows them through the camera framed as in
+// docs/art-direction-v3.md "Framing numbers" (part 6c moved the camera, so
+// the board sits lower on screen; the cells and their world spots did not
+// change).
 const PINNED = [
-  { cell: { x: 0, y: 0 }, world: { x: -7, z: -7 }, hud: [304, 126] },
-  { cell: { x: 14, y: 0 }, world: { x: 7, z: -7 }, hud: [656, 126] },
-  { cell: { x: 0, y: 14 }, world: { x: -7, z: 7 }, hud: [249, 459] },
-  { cell: { x: 14, y: 14 }, world: { x: 7, z: 7 }, hud: [711, 459] },
-  { cell: { x: 7, y: 7 }, world: { x: 0, z: 0 }, hud: [480, 270] },
+  { cell: { x: 0, y: 0 }, world: { x: -7, z: -7 }, hud: [296, 181] },
+  { cell: { x: 14, y: 0 }, world: { x: 7, z: -7 }, hud: [664, 181] },
+  { cell: { x: 0, y: 14 }, world: { x: -7, z: 7 }, hud: [266, 469] },
+  { cell: { x: 14, y: 14 }, world: { x: 7, z: 7 }, hud: [694, 469] },
+  { cell: { x: 7, y: 7 }, world: { x: 0, z: 0 }, hud: [480, 314] },
 ];
 
 test('cell numbering and raycast picking return the same cells for the corners and the centre', () => {
@@ -48,8 +45,8 @@ test('cell numbering and raycast picking return the same cells for the corners a
       assert.deepEqual(pickCell(CAMERA.position, ray), cell);
     }
   }
-  assert.deepEqual(cellAtHudPoint(480, 270, CAMERA), { x: 7, y: 7 });
-  assert.deepEqual(pickCell(CAMERA.position, cameraRay(0, 0, CAMERA).direction), { x: 7, y: 7 });
+  const centre = projectToNdc({ x: 0, y: 0, z: 0 }, CAMERA);
+  assert.deepEqual(pickCell(CAMERA.position, cameraRay(centre.x, centre.y, CAMERA).direction), { x: 7, y: 7 });
 });
 
 test('the field lies on the picking plane and its plots line up with the picked cells', () => {
@@ -65,11 +62,11 @@ test('the field lies on the picking plane and its plots line up with the picked 
   assert.equal(fieldTexel(0, HALF, texturePx), null);
 });
 
-test('the curb is 8 art pixels wide, mitred, and rings the field just above the plots', () => {
+test('the curb is 8 art pixels wide, mitred, and rings the field as a raised frame', () => {
   assert.equal(CURB.width, CURB_PX * PX_WORLD);
   assert.equal(CURB.inner, HALF);
-  assert.ok(CURB.top > FIELD.y && CURB.top < 0.1, 'a little above the plots');
-  assert.ok(CURB.top - CURB.faceHeight > CURB.ground, 'the wooden face ends above the meadow');
+  assert.equal(CURB.ground, FIELD.y, 'the meadow is flat and level with the plots');
+  assert.ok(CURB.top > CURB.ground, 'the wooden top stands above the meadow');
   const [innerStart, innerEnd, outerEnd, outerStart] = curbTopCorners();
   assert.deepEqual([innerStart.along, innerEnd.along], [-HALF, HALF]);
   assert.deepEqual([outerStart.along, outerEnd.along], [-(HALF + CURB.width), HALF + CURB.width]);
@@ -84,6 +81,35 @@ test('the curb is 8 art pixels wide, mitred, and rings the field just above the 
   }
   assert.equal(counts.size, 8);
   for (const count of counts.values()) assert.equal(count, 2);
+});
+
+test('the curb stands CURB_HEIGHT (6 art pixels) above the meadow; the plots stay at y = 0', () => {
+  assert.equal(CURB_HEIGHT_PX, 6);
+  assert.equal(CURB_HEIGHT, 6 / 32);
+  assert.equal(CURB_HEIGHT, CURB_HEIGHT_PX * PX_WORLD);
+  assert.equal(FIELD.y, 0);
+  assert.equal(CURB.ground, 0);
+  assert.equal(CURB.top, CURB_HEIGHT);
+  assert.equal(CURB_FACES.top, CURB_HEIGHT, 'the top face');
+  assert.deepEqual([...CURB_FACES.outer], [0, CURB_HEIGHT], 'the outer face, from the meadow to the top');
+  assert.deepEqual([...CURB_FACES.inner], [0, CURB_HEIGHT], 'the inner face, from the plots to the top');
+  // The front curb's outer face looks toward the camera and shows clearly,
+  // not the single art pixel of a curb sunk into the meadow: on a
+  // 1080-high screen at least 4 of the field's art pixels seen flat there
+  // (a 6 px face seen from 45 degrees up). Its top face shows too.
+  const front = HALF + CURB.width;
+  const toPx = (p) => (1 - projectToNdc(p, CAMERA).y) * 540;
+  const faceTop = toPx({ x: 0, y: CURB_HEIGHT, z: front });
+  const faceBottom = toPx({ x: 0, y: 0, z: front });
+  assert.ok(CAMERA.position.z > front, 'the camera is on the outer side of the front face');
+  const artPx = toPx({ x: 0, y: 0, z: front }) - toPx({ x: 0, y: 0, z: front - PX_WORLD });
+  assert.ok(faceBottom - faceTop >= 4 * artPx, `face ${faceBottom - faceTop} px, art pixel ${artPx} px`);
+  const topFace = toPx({ x: 0, y: CURB_HEIGHT, z: front }) - toPx({ x: 0, y: CURB_HEIGHT, z: HALF });
+  assert.ok(topFace > 0, 'the top face shows');
+  // The farm-field mesh is built from these heights.
+  const source = readFileSync(new URL('../src/render3d/farm-field.js', import.meta.url), 'utf8');
+  assert.match(source, /CURB_FACES\.outer/);
+  assert.match(source, /CURB_FACES\.inner/);
 });
 
 test('fence posts stand every 3 cells along the back, left and right, 1.5 cells outside the curb', () => {

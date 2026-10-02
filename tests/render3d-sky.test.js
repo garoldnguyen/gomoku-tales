@@ -7,7 +7,8 @@ import {
   WISP_HEIGHTS,
 } from '../src/config.js';
 import { ART, PLACEHOLDERS_3D } from '../src/render3d/art-assets.js';
-import { cameraPosition, cameraRay, projectToNdc } from '../src/render3d/camera.js';
+import { cameraRay, gameCamera, projectToNdc } from '../src/render3d/camera.js';
+import { FAR_EDGE_Z } from '../src/render3d/horizon.js';
 import { FAR_HILLS } from '../src/render3d/meadow.js';
 import { fieldFade, laneVelocity, LANE_NAMES, petalAt, petalPoint, planPetals, trailAt } from '../src/render3d/petals.js';
 import { QUALITY_LEVELS } from '../src/render3d/quality.js';
@@ -17,11 +18,10 @@ import {
   skyDrift, skyGradientStops, skyPixelDiscarded, sunRayAlpha, VIEW_ASPECT, viewHalfExtent, windOnScreen, wrapAround,
   wrapRange,
 } from '../src/render3d/sky.js';
-import { terrainHeight } from '../src/render3d/terrain.js';
 import { WIND_GROUND } from '../src/render3d/wind.js';
 
-const camera = cameraPosition(CAMERA_PITCH_DEG, CAMERA_DISTANCE);
-const setup = { position: camera, target: { x: 0, y: 0, z: 0 }, fovDeg: CAMERA_FOV, aspect: VIEW_ASPECT };
+const setup = gameCamera(VIEW_ASPECT);
+const camera = setup.position;
 const close = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 const along = (p) => p.x * WIND_GROUND.x + p.z * WIND_GROUND.z;
 
@@ -33,21 +33,15 @@ test('sky: the gradient of section 7 from the top of the view down to the horizo
   assert.deepEqual(skyGradientStops(1).map(([at]) => at), [0, 0.45, 0.8, 1]);
 });
 
-test('sky: the horizon is where the meadow crest meets the sky in the middle of the view', () => {
-  // March down the centre column of the view until a ray hits the ground.
-  let crest = null;
-  for (let ndcY = 1; ndcY > -1 && crest === null; ndcY -= 0.002) {
+test('sky: the horizon is the far edge of the meadow in the middle of the view', () => {
+  // March down the centre column of the view until a ray meets the flat
+  // ground in front of its far edge (horizon.js farEdgeZ).
+  let edge = null;
+  for (let ndcY = 1; ndcY > -1 && edge === null; ndcY -= 0.002) {
     const { origin, direction } = cameraRay(0, ndcY, setup);
-    for (let s = 0; s < 200; s += 0.25) {
-      const z = origin.z + direction.z * s;
-      if (z < -36) break;
-      if (origin.y + direction.y * s < terrainHeight(origin.x + direction.x * s, z)) {
-        crest = (1 - ndcY) / 2;
-        break;
-      }
-    }
+    if (direction.y < 0 && origin.z + (direction.z * -origin.y) / direction.y >= FAR_EDGE_Z) edge = (1 - ndcY) / 2;
   }
-  assert.ok(Math.abs(crest - SKY_HORIZON_FRACTION) < 0.01, `crest at ${crest}`);
+  assert.ok(Math.abs(edge - SKY_HORIZON_FRACTION) < 0.002, `far edge at ${edge}`);
 });
 
 test('quality: Low has the plain gradient only, Medium still clouds, High drifting clouds and wind', () => {
@@ -110,6 +104,7 @@ test('clouds stand in front of the far hills', () => {
   const dy = dz * Math.tan((hill.depressionDeg * Math.PI) / 180);
   const pitch = (CAMERA_PITCH_DEG * Math.PI) / 180;
   const hillDepth = dy * Math.sin(pitch) + dz * Math.cos(pitch);
+  assert.ok(Math.abs(Math.atan2(camera.y - setup.target.y, camera.z - setup.target.z) - pitch) < 1e-9);
   for (const layer of Object.values(CLOUD_LAYERS)) assert.ok(layer.depth < hillDepth, `${layer.depth} < ${hillDepth}`);
 });
 
@@ -117,10 +112,12 @@ test('the one wind looks right and a little down on screen, as the ground wind l
   assert.ok(close(Math.hypot(SCREEN_WIND.x, SCREEN_WIND.y), 1));
   assert.ok(SCREEN_WIND.x > 0 && SCREEN_WIND.y < 0, 'from the upper left toward the lower right');
   assert.deepEqual(windOnScreen(), SCREEN_WIND);
-  // A small step along WIND_GROUND at the board centre, seen through the real camera.
+  // A small step along WIND_GROUND at the middle of the view (the point the
+  // camera looks at), seen through the real camera.
   const step = 1e-4;
-  const a = projectToNdc({ x: 0, y: 0, z: 0 }, setup);
-  const b = projectToNdc({ x: WIND_GROUND.x * step, y: 0, z: WIND_GROUND.z * step }, setup);
+  const t = setup.target;
+  const a = projectToNdc(t, setup);
+  const b = projectToNdc({ x: t.x + WIND_GROUND.x * step, y: 0, z: t.z + WIND_GROUND.z * step }, setup);
   const { halfW, halfH } = viewHalfExtent(1);
   const dx = (b.x - a.x) * halfW;
   const dy = (b.y - a.y) * halfH;

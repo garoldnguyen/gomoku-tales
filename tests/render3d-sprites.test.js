@@ -107,7 +107,8 @@ test('pieces, flowers and clouds are generated at their sizes', () => {
   assert.deepEqual(cloudGrid(3).pixels, cloudGrid(3).pixels, 'clouds are the same on every load');
 });
 
-test('the hill is flat under the board and where the characters stand', () => {
+test('the meadow is flat: the board and both characters stand on the ground plane', () => {
+  assert.equal(GROUND_Y, 0);
   const half = (BOARD_SIZE * CELL_SIZE) / 2;
   for (let x = -half; x <= half; x += 0.5) {
     for (let z = -half; z <= half; z += 0.5) assert.equal(terrainHeight(x, z), GROUND_Y);
@@ -117,12 +118,9 @@ test('the hill is flat under the board and where the characters stand', () => {
       assert.equal(terrainHeight(x + dx, dz), GROUND_Y);
     }
   }
-});
-
-test('the hill falls away behind the board and never rises above the board top nearby', () => {
-  assert.ok(terrainHeight(0, -20) < GROUND_Y - 5);
-  for (let x = -20; x <= 20; x += 1) {
-    for (let z = -14; z <= 14; z += 1) assert.ok(terrainHeight(x, z) < 0.5);
+  // No hill falls away behind the board any more, and nothing rises.
+  for (let x = -30; x <= 30; x += 1) {
+    for (let z = -11; z <= 14; z += 1) assert.equal(terrainHeight(x, z), 0);
   }
 });
 

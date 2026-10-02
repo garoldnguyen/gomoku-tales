@@ -13,8 +13,8 @@
 // it instead (rail). Only if neither fits do the bottom bars lie over the
 // board, so the touch targets never drop under 44 px.
 
-import { BOARD_SIZE, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE } from '../config.js';
-import { cameraPosition, projectToNdc } from '../render3d/camera.js';
+import { BOARD_SIZE, CELL_SIZE } from '../config.js';
+import { gameCamera, projectToNdc } from '../render3d/camera.js';
 
 const STAGE_ASPECT = 16 / 9;
 
@@ -45,13 +45,7 @@ const RAIL_WIDTH_MAX = 180;
 // The board's outer plot corners on the 16:9 stage, as shares of its width
 // and height (the camera is fixed, so this is worked out once).
 const BOARD_SHARE = (() => {
-  const target = { x: 0, y: 0, z: 0 };
-  const setup = {
-    position: cameraPosition(CAMERA_PITCH_DEG, CAMERA_DISTANCE, target),
-    target,
-    fovDeg: CAMERA_FOV,
-    aspect: STAGE_ASPECT,
-  };
+  const setup = gameCamera(STAGE_ASPECT);
   const half = (BOARD_SIZE * CELL_SIZE) / 2;
   let left = 1;
   let right = 0;

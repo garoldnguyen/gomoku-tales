@@ -8,14 +8,18 @@
 // toward the camera, so the back of the meadow is -z.
 
 import {
-  CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CHARACTER_X, HUD_CARD_HEIGHT_PX, HUD_CARD_SIDE_PX,
+  CHARACTER_X, HUD_CARD_HEIGHT_PX, HUD_CARD_SIDE_PX,
   HUD_CARD_TOP_PX, HUD_CARD_WIDTH_PX, HUD_SCREEN_PX, MEADOW_BALES, MEADOW_BUSHES, MEADOW_MARGIN,
-  MEADOW_PATCH_PLANTS, MEADOW_PATCHES, MEADOW_SPACING, MEADOW_TREE_BRIGHTNESS, MEADOW_TREE_SCALE, MEADOW_TREES_BACK,
+  MEADOW_PATCH_PLANTS, MEADOW_PATCHES, MEADOW_SPACING, MEADOW_TREE_BRIGHTNESS, MEADOW_TREE_SCALE,
   MEADOW_TREES_SIDE, MEADOW_TUFTS, PX_WORLD, SPRITE_STRETCH_Y,
 } from '../config.js';
 import { placeholderShape } from './art-assets.js';
-import { cameraPosition, projectToNdc } from './camera.js';
+import { gameCamera, projectToNdc } from './camera.js';
 import { CURB, fenceRails, PATH } from './farm-layout.js';
+import {
+  depressionAtScreenY, MEADOW_PLANT_BOUNDS, SIDE_TREE_MAX_Z, screenEdgeX, TREE_ROW_HALF_WIDTH,
+  TREE_ROW_SPACING, TREE_ROW_Z,
+} from './horizon.js';
 import { seededRandom } from './seeded-random.js';
 import { terrainHeight } from './terrain.js';
 
@@ -46,9 +50,10 @@ export const BUSH_LOOKS = 3; // plain, flowering, small
 export const BUSH_FLOWERING = 1;
 export const TUFT_LOOKS = 3;
 
-// Where the meadow is planted. The camera sees x from about -15 to 15; the
-// hill falls away behind z = -11, where the trees stand against the hills.
-export const MEADOW_BOUNDS = Object.freeze({ minX: -16.5, maxX: 16.5, minZ: -12.6, maxZ: 10.2 });
+// Where the meadow is planted: the flat ground the camera sees, from the
+// far edge (the horizon, about z = -11) to just past the bottom of the
+// screen, as wide as the back row of trees (horizon.js).
+export const MEADOW_BOUNDS = MEADOW_PLANT_BOUNDS;
 
 // Tall flowers stay behind this z, so they never stand in front of the
 // field (the front of the meadow is for low ones).
@@ -56,9 +61,8 @@ export const TALL_MAX_Z = 5.5;
 // Low flower patches grow only in front of this z (the front half of the
 // meadow), where they never hide the field.
 export const LOW_FRONT_Z = 1;
-// Further back than this z only trees and tall flowers show above the
-// crest of the hill, so only tall patches are planted there.
-const PATCH_MIN_Z = -11.2;
+// No patch grows behind the back row of trees, at the very far edge.
+const PATCH_MIN_Z = TREE_ROW_Z[1];
 const PATCH_GAP = 2.1; // between patch centres
 // Clover and edge tufts stand this far (min, max) outside a patch's radius.
 export const EDGE_GAP = [0.1, 1.0];
@@ -125,12 +129,7 @@ export function meadowKeepOut(margin = MEADOW_MARGIN) {
   }
   rects.push(grow(PATH.x - PATH.width / 2, PATH.x + PATH.width / 2, PATH.startZ, PATH.endZ));
   const circles = [-CHARACTER_X, CHARACTER_X].map((x) => ({ x, z: 0, r: 1.5 + margin / 2 }));
-  const camera = {
-    position: cameraPosition(CAMERA_PITCH_DEG, CAMERA_DISTANCE),
-    target: { x: 0, y: 0, z: 0 },
-    fovDeg: CAMERA_FOV,
-    aspect: HUD_SCREEN_PX[0] / HUD_SCREEN_PX[1],
-  };
+  const camera = gameCamera(HUD_SCREEN_PX[0] / HUD_SCREEN_PX[1]);
   return { rects, circles, calm: { camera, screens: hudCardScreens(), groundAt: terrainHeight } };
 }
 
@@ -163,6 +162,11 @@ export function showsBehindCalm(keepOut, x, z, height) {
   return false;
 }
 
+// Where the right edge of the 16:9 screen meets the ground line at depth z.
+function sideEdge(z) {
+  return screenEdgeX(gameCamera(), HUD_SCREEN_PX[0] / HUD_SCREEN_PX[1], z, 1);
+}
+
 // Plans the meadow. Pure: the same arguments always give the same plan.
 //   seed     the seeded generator's seed (the game uses MEADOW_SEED)
 //   bounds   { minX, maxX, minZ, maxZ }: everything stands inside it
@@ -179,8 +183,9 @@ export function showsBehindCalm(keepOut, x, z, height) {
 //            where there is room
 //   clover:  [{ x, z, look }]  edge fill of the patches
 //   tufts:   [{ x, z, look }]  grass tufts, at patch edges and scattered
-//   trees:   [{ x, z, look, scale, mirror, brightness }]  along the far
-//            edge, and the sides; scale is always 1, mirror a boolean,
+//   trees:   [{ x, z, look, scale, mirror, brightness }]  the back row
+//            along the far edge, then 4 to 6 at the sides in the back
+//            third of the visible ground; scale is always 1, mirror a boolean,
 //            brightness 1 plus or minus MEADOW_TREE_BRIGHTNESS
 //   bushes:  [{ x, z, look }]  near trees, the fence and patches
 //   bales:   [{ x, z }]  two near the fence, one beside a patch
@@ -209,31 +214,46 @@ export function planMeadow(seed, bounds = MEADOW_BOUNDS, keepOut = meadowKeepOut
     && isFree(x, z, space) && !(height > 0 && showsBehindCalm(keepOut, x, z, height));
   const take = (x, z, space) => taken.push({ x, z, space });
 
-  // Trees along the far edge, where the meadow meets the hills, at
-  // irregular spacing, then a few along the left and right edges.
+  // The back row of trees stands just in front of the far edge, where the
+  // meadow meets the hills: TREE_ROW_SPACING apart on average at irregular
+  // spacing along the whole row (horizon.js, wider than the widest screen,
+  // so no gap ever shows), its trunk bases between TREE_ROW_Z[0] and [1].
+  // Being the horizon, it may stand behind the HUD cards. Then a few side
+  // trees on the left and right, only in the back third of the visible
+  // ground, so the sides and the front stay open.
   const trees = [];
-  const placeTree = (pickSpot, tries = 400) => {
-    const scale = MEADOW_TREE_SCALE;
-    for (let i = 0; i < tries; i++) {
-      const { x, z } = pickSpot();
+  const scale = MEADOW_TREE_SCALE;
+  const rowMinX = Math.max(bounds.minX, -TREE_ROW_HALF_WIDTH);
+  const rowMaxX = Math.min(bounds.maxX, TREE_ROW_HALF_WIDTH);
+  const rowMinZ = Math.max(bounds.minZ, TREE_ROW_Z[0]);
+  const rowMaxZ = Math.min(bounds.maxZ, TREE_ROW_Z[1]);
+  const rowCount = Math.round((rowMaxX - rowMinX) / TREE_ROW_SPACING);
+  for (let n = 0; n < rowCount && rowMaxZ >= rowMinZ; n++) {
+    const slot = (rowMaxX - rowMinX) / rowCount;
+    for (let i = 0; i < 40; i++) {
+      const x = rowMinX + slot * (n + 0.5 + (random() - 0.5) * 0.6);
+      const z = between(rowMinZ, rowMaxZ);
+      if (!inside(x, z) || isKeptOut(keepOut, x, z) || !isFree(x, z, SPACE.tree)) continue;
+      take(x, z, SPACE.tree);
+      trees.push({ x, z, look: intBetween(0, TREE_LOOKS - 1), scale });
+      break;
+    }
+  }
+  const sideTrees = intBetween(MEADOW_TREES_SIDE[0], MEADOW_TREES_SIDE[1]);
+  const sideMinZ = Math.max(bounds.minZ, TREE_ROW_Z[1] + 0.8);
+  const sideMaxZ = Math.min(bounds.maxZ, SIDE_TREE_MAX_Z);
+  for (let n = 0; n < sideTrees; n++) {
+    const sign = n % 2 ? 1 : -1;
+    for (let i = 0; i < 400; i++) {
+      const z = between(sideMinZ, sideMaxZ);
+      // Out to the edge of the 16:9 screen at this depth.
+      const edge = Math.min(bounds.maxX, sideEdge(z) - 0.5);
+      const x = sign * between(edge - 6, edge);
       if (!canStand(x, z, SPACE.tree, TREE_HEIGHT * scale)) continue;
       take(x, z, SPACE.tree);
       trees.push({ x, z, look: intBetween(0, TREE_LOOKS - 1), scale });
-      return true;
+      break;
     }
-    return false;
-  };
-  const backTrees = intBetween(MEADOW_TREES_BACK[0], MEADOW_TREES_BACK[1]);
-  for (let n = 0; n < backTrees; n++) {
-    placeTree(() => ({ x: between(bounds.minX, bounds.maxX), z: between(bounds.minZ, bounds.minZ + 1.6) }));
-  }
-  const sideTrees = intBetween(MEADOW_TREES_SIDE[0], MEADOW_TREES_SIDE[1]);
-  for (let n = 0; n < sideTrees; n++) {
-    const sign = n % 2 ? 1 : -1;
-    placeTree(() => ({
-      x: sign * between(bounds.maxX - 4.5, bounds.maxX - 1),
-      z: between(bounds.minZ + 2, bounds.maxZ - 2),
-    }));
   }
 
   // Trees vary by mirroring and brightness, never by scale. Their own
@@ -459,16 +479,21 @@ export function dandelionPuffs(plan) {
     .flatMap((p) => p.plants.filter((plant) => plant.look === DANDELION_PUFF_LOOK));
 }
 
-// The two far hill silhouettes behind the meadow, far then near. Each top
-// edge is a sum of sines (`waves`: [frequency per world unit, degrees,
-// phase]) added to the angle below the horizon it stands at, so it shows
-// in the band of sky above the crest (the top of the view is 37.5 degrees
-// down). `haze` is how much of the sky colour is mixed in; the far hill
-// is hazier. High adds HILL_FOOT_HAZE more toward their foot.
+// The two far hill silhouettes behind the far edge of the meadow, far then
+// near. Each top edge is a sum of sines (`waves`: [frequency per world unit,
+// degrees, phase]) added to the angle below the horizon it stands at,
+// `depressionDeg`: the screen row `crestY` percent down from the top
+// (depressionAtScreenY in horizon.js), so the crests stay between 15 and 19
+// percent down. Their feet reach far below the far edge, where the meadow
+// covers them, so no gap shows. `haze` is how much of the sky colour is
+// mixed in; the far hill is hazier. High adds HILL_FOOT_HAZE more toward
+// their foot.
 export const FAR_HILLS = Object.freeze([
-  { z: -80, depressionDeg: 38.35, color: '#8fcf8a', haze: 0.3, waves: [[0.045, 0.3, 0.4], [0.11, 0.12, 2.1], [0.023, 0.18, 4.0]] },
-  { z: -64, depressionDeg: 39.05, color: '#6fba6a', haze: 0.12, waves: [[0.06, 0.3, 1.3], [0.14, 0.12, 0.2], [0.03, 0.18, 5.2]] },
-].map(Object.freeze));
+  { z: -80, crestY: 16.4, color: '#8fcf8a', haze: 0.3, waves: [[0.045, 0.1, 0.4], [0.11, 0.04, 2.1], [0.023, 0.06, 4.0]] },
+  { z: -64, crestY: 17.6, color: '#6fba6a', haze: 0.12, waves: [[0.06, 0.1, 1.3], [0.14, 0.04, 0.2], [0.03, 0.06, 5.2]] },
+].map((hill) => Object.freeze({ ...hill, depressionDeg: depressionAtScreenY(hill.crestY) })));
+// World units each hill silhouette reaches down below its top.
+export const HILL_DEPTH = 40;
 export const HILL_FOOT_HAZE = 0.6;
 
 // Degrees the top of `hill` rises at world x: its sum of sines.

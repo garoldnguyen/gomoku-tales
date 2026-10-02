@@ -4,23 +4,20 @@
 // is in farm-layout.js. Wood appears only on the curb and the fence.
 
 import * as THREE from 'three';
-import { CURB_FACE_PX, CURB_LIFT_PX, CURB_PX, PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
+import { CURB_HEIGHT_PX, CURB_PX, PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
 import { artSource } from './art.js';
 import { ART } from './art-assets.js';
-import { CURB, CURB_SIDES, curbTopCorners, FENCE_RAIL_HEIGHTS, fencePosts, fenceRails, FIELD, PATH, pathStones } from './farm-layout.js';
+import { CURB, CURB_FACES, CURB_SIDES, curbTopCorners, FENCE_RAIL_HEIGHTS, fencePosts, fenceRails, FIELD, PATH, pathStones } from './farm-layout.js';
 import { PixelSprite, pixelTexture } from './sprites.js';
-import { terrainHeight } from './terrain.js';
 
 const CURB_TILE = 32 * PX_WORLD; // curb-wood is 32 px long
 const RAIL_TILE = 16 * PX_WORLD; // fence-rail is 16 px long
 const RAIL_THICKNESS_PX = 6;
 const PATH_TILE = 32 * PX_WORLD; // path-tile repeats every 32 px in y
 const PATH_LIFT = 0.006; // keeps the path just above the meadow
-const PATH_SEGMENTS = 10; // the path follows the ground along its length
 const COLORS = {
   curbFace: 0xa8a8a8, // the front face is the curb wood, darker
   curbInner: 0xc0c0c0,
-  soilBank: 0x6b4430, // the bank under the curb face down to the meadow
 };
 
 // Builds the farm into `scene`; posts and stepping stones are upright
@@ -59,8 +56,7 @@ export function createFarmField(scene, addSprite) {
   extras.add(createPath());
   const stoneSheet = artSource(ART.v3.pebble);
   for (const stone of pathStones()) {
-    const y = Math.max(terrainHeight(stone.x, stone.z), CURB.ground);
-    extraSprites.push(addSprite(new PixelSprite({ sheet: stoneSheet }).placeAt(stone.x, y, stone.z)));
+    extraSprites.push(addSprite(new PixelSprite({ sheet: stoneSheet }).placeAt(stone.x, CURB.ground, stone.z)));
   }
   scene.add(extras);
 
@@ -77,15 +73,16 @@ export function createFarmField(scene, addSprite) {
   };
 }
 
-// The curb: a mitred wooden top just above the plots, a darker wooden face
-// CURB.faceHeight tall on the outside and a soil bank under it down to the
-// meadow, plus a thin inner face up from the plots. Material groups: 0 top,
-// 1 face, 2 inner face, 3 soil bank.
+// The curb: a raised wooden frame CURB.top above the flat meadow, with a
+// mitred wooden top, a darker wooden outer face from the meadow up to the
+// top (the camera-side face shows about CURB_HEIGHT_PX art pixels) and a
+// lighter inner face from the plots up to the top. Material groups: 0 top,
+// 1 outer face, 2 inner face.
 function createCurb() {
   const positions = [];
   const normals = [];
   const uvs = [];
-  const groups = [[], [], [], []]; // vertex indices per group
+  const groups = [[], [], []]; // vertex indices per group
   let vertexCount = 0;
 
   // A quad from four [x, y, z] corners and their [u, v], wound so it faces
@@ -106,10 +103,10 @@ function createCurb() {
     vertexCount += 4;
   };
 
-  const top = CURB.top;
-  const faceRows = CURB_FACE_PX / CURB_PX; // of the 8 rows of curb-wood
-  const innerRows = CURB_LIFT_PX / CURB_PX;
-  const faceBottom = top - CURB.faceHeight;
+  const top = CURB_FACES.top;
+  const [outerBottom] = CURB_FACES.outer;
+  const [innerBottom] = CURB_FACES.inner;
+  const faceRows = CURB_HEIGHT_PX / CURB_PX; // of the 8 rows of curb-wood
   const corners = curbTopCorners();
   const outer = corners[2].along;
   for (const side of CURB_SIDES) {
@@ -122,17 +119,13 @@ function createCurb() {
     // from the field edge (0) to the outer edge (1).
     quad(0, corners.map((c) => at(c.along, c.across, top)),
       corners.map((c) => [c.along / CURB_TILE, c.across / CURB.width]), [0, 1, 0]);
-    // Outer face: the top CURB_FACE_PX rows of wood, darker.
-    quad(1, [at(-outer, CURB.width, top), at(outer, CURB.width, top), at(outer, CURB.width, faceBottom), at(-outer, CURB.width, faceBottom)],
+    // Outer face from the meadow up to the top: CURB_HEIGHT_PX rows of wood, darker.
+    quad(1, [at(-outer, CURB.width, top), at(outer, CURB.width, top), at(outer, CURB.width, outerBottom), at(-outer, CURB.width, outerBottom)],
       [[-outer / CURB_TILE, 1], [outer / CURB_TILE, 1], [outer / CURB_TILE, 1 - faceRows], [-outer / CURB_TILE, 1 - faceRows]], out);
     // Inner face from the plots up to the curb top.
     const inward = [-out[0], 0, -out[2]];
-    quad(2, [at(-CURB.inner, 0, top), at(CURB.inner, 0, top), at(CURB.inner, 0, FIELD.y), at(-CURB.inner, 0, FIELD.y)],
-      [[-CURB.inner / CURB_TILE, innerRows], [CURB.inner / CURB_TILE, innerRows], [CURB.inner / CURB_TILE, 0], [-CURB.inner / CURB_TILE, 0]], inward);
-    // Soil bank below the face, a little into the ground.
-    const bankBottom = CURB.ground - 0.05;
-    quad(3, [at(-outer, CURB.width, faceBottom), at(outer, CURB.width, faceBottom), at(outer, CURB.width, bankBottom), at(-outer, CURB.width, bankBottom)],
-      [[0, 1], [1, 1], [1, 0], [0, 0]], out);
+    quad(2, [at(-CURB.inner, 0, top), at(CURB.inner, 0, top), at(CURB.inner, 0, innerBottom), at(-CURB.inner, 0, innerBottom)],
+      [[-CURB.inner / CURB_TILE, faceRows], [CURB.inner / CURB_TILE, faceRows], [CURB.inner / CURB_TILE, 0], [-CURB.inner / CURB_TILE, 0]], inward);
   }
 
   const geometry = new THREE.BufferGeometry();
@@ -151,7 +144,6 @@ function createCurb() {
     new THREE.MeshLambertMaterial({ map: wood }),
     new THREE.MeshLambertMaterial({ map: wood, color: COLORS.curbFace }),
     new THREE.MeshLambertMaterial({ map: wood, color: COLORS.curbInner }),
-    new THREE.MeshLambertMaterial({ color: COLORS.soilBank }),
   ]);
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -186,17 +178,11 @@ function createRail(run, height) {
   return rail;
 }
 
-// The dirt path: path-tile repeated along z, following the ground.
+// The dirt path: path-tile repeated along z, lying flat on the meadow.
 function createPath() {
   const length = PATH.endZ - PATH.startZ;
-  const geometry = new THREE.PlaneGeometry(PATH.width, length, 1, PATH_SEGMENTS).rotateX(-Math.PI / 2);
-  geometry.translate(PATH.x, 0, (PATH.startZ + PATH.endZ) / 2);
-  const position = geometry.attributes.position;
-  for (let i = 0; i < position.count; i++) {
-    const height = Math.max(terrainHeight(position.getX(i), position.getZ(i)), CURB.ground);
-    position.setY(i, height + PATH_LIFT);
-  }
-  geometry.computeVertexNormals();
+  const geometry = new THREE.PlaneGeometry(PATH.width, length).rotateX(-Math.PI / 2);
+  geometry.translate(PATH.x, CURB.ground + PATH_LIFT, (PATH.startZ + PATH.endZ) / 2);
   const texture = repeatingTexture(artSource(ART.v3.path));
   texture.repeat.set(1, length / PATH_TILE);
   const path = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ map: texture, alphaTest: 0.5 }));

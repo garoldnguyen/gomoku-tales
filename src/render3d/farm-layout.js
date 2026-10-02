@@ -6,9 +6,10 @@
 // so it runs under node --test.
 
 import {
-  BOARD_SIZE, BOARD_THICKNESS, CELL_SIZE, CURB_FACE_PX, CURB_LIFT_PX, CURB_PX, FENCE_OFFSET_CELLS,
+  BOARD_SIZE, CELL_SIZE, CURB_HEIGHT, CURB_PX, FENCE_OFFSET_CELLS,
   FENCE_POST_EVERY, FENCE_RAIL_PX, PATH_LENGTH_CELLS, PATH_STONES, PATH_WIDTH_CELLS, PX_WORLD, SPRITE_STRETCH_Y,
 } from '../config.js';
+import { GROUND_Y } from './terrain.js';
 
 const HALF = (BOARD_SIZE * CELL_SIZE) / 2;
 const CURB_WIDTH = CURB_PX * PX_WORLD;
@@ -19,15 +20,26 @@ const PATH_START = HALF + CURB_WIDTH;
 // `size` world units square. Its texture's top row lies at -z, row 0.
 export const FIELD = { size: BOARD_SIZE * CELL_SIZE, y: 0 };
 
-// The curb around the field. Heights are world y; vertical sizes use the
-// sprite stretch so its art pixels look square like everything else.
+// The curb around the field: a raised wooden frame CURB_HEIGHT tall
+// standing on the flat meadow, its top face and its outer face (the darker
+// camera-side face) running from the ground up to the top. The plots inside
+// stay at y = 0. Heights are world y.
 export const CURB = {
   inner: HALF, // distance from the centre to the field edge
   width: CURB_WIDTH,
-  top: CURB_LIFT_PX * PX_WORLD * SPRITE_STRETCH_Y,
-  faceHeight: CURB_FACE_PX * PX_WORLD * SPRITE_STRETCH_Y,
-  ground: -BOARD_THICKNESS, // the meadow the soil bank stands on
+  top: GROUND_Y + CURB_HEIGHT,
+  faceHeight: CURB_HEIGHT, // the outer face, from the ground to the top
+  ground: GROUND_Y, // the flat meadow, level with the plots
 };
+
+// The heights farm-field.js builds the curb's faces with, as [bottom, top]
+// world y: its top face, its outer (camera-side) face standing on the
+// meadow and its inner face standing on the plots.
+export const CURB_FACES = Object.freeze({
+  top: CURB.top,
+  outer: Object.freeze([CURB.ground, CURB.top]),
+  inner: Object.freeze([FIELD.y, CURB.top]),
+});
 
 // Texel { u, v } (in pixels, from the top left) of a field texture
 // `texturePx` wide under world point (wx, wz), or null off the field.

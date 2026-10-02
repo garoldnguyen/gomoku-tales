@@ -68,7 +68,7 @@ Geometry. The board is a flat plane of 15 by 15 world units (one cell = one unit
 
 Plots. Each cell shows one 30 px soil plot with a 1 px grass gutter on every side, so neighbouring plots are 2 px apart. The plot is crumbly turned earth with dashed furrows, lit crests, clods and, on Medium and High, the odd pebble.
 
-Edge. A wooden curb 8 art pixels wide runs around the whole field using `curb-wood` on its top surface, with a slightly darker front face about 6 art pixels tall on the camera side. Corners are mitred.
+Edge. A wooden curb 8 art pixels wide runs around the whole field using `curb-wood` on its top surface, with a slightly darker front face about 6 art pixels tall on the camera side. Corners are mitred. The curb is a raised frame `CURB_HEIGHT` (6 art pixels, 6/32 world units) tall standing on the flat meadow, so its top face and its camera-side face both show, while the soil plots and everything on them stay at y = 0.
 
 Fence (Medium and High). Posts every 3 cells along the back, left and right sides, about 1.5 cells outside the curb, two rails at 10 and 18 art pixels high. The front side is open, with the path.
 
@@ -140,6 +140,8 @@ Unknown level values fall back to `medium`.
 
 ## 6. Meadow, flowers and scenery
 
+The ground is perfectly flat (height 0 everywhere, one rectangle that reaches past the left, right and bottom of the screen): there is no dome and no rim, and the horizon is the meadow's far edge, placed by `farEdgeZ` in `src/render3d/horizon.js` 21 percent down the screen, with the far hills, the back row of trees and the sky behind it.
+
 13 kinds, 31 looks (one frame per look in `flower-NAME.png`): daisy 3, tulip 3, bluebell 3, poppy 3, sunflower 1, lavender 2, cosmos 3, forget-me-not 2, marigold 2, hollyhock 3, mushroom 3, dandelion 2 (bloom, seed puff), clover 1.
 
 Planting rules:
@@ -163,6 +165,8 @@ Scenery (Medium and High):
 
 ## 7. Sky, clouds and wind
 
+The ground is flat with no dome or rim, so the horizon is the meadow's far edge that `farEdgeZ` places 21 percent down the screen: the sky gradient runs from the top of the screen down to it, the two hill silhouettes cover its lower part (crests 15 to 19 percent down) on Medium and High, and every cloud stays whole in the strip above the crests.
+
 Sky gradient from top to horizon: `#4a90e2`, `#7fbdf0` at 45 percent, `#cfe8f8` at 80 percent, `#f4f0d8` at the horizon. It is a plain gradient, no dithering.
 
 Clouds use `clouds.png`: six painted shapes with flat bottoms, a warm cream rim on the sun side and a blue-grey underside. No outlines, because real clouds have none. Never draw the old sprite clouds or any straight line effect.
@@ -174,6 +178,17 @@ Clouds use `clouds.png`: six painted shapes with flat bottoms, a warm cream rim 
 Wind petals (High): the wind carries `wind-bits`: pink, white, yellow and lilac petals, a green leaf and a seed fleck. Three lanes at different distances: far (scale 0.6, 0.6 units per second, slightly blurred), mid (scale 1.0, 1.0), near (scale 1.6, 1.5). About 40 in view in total. Each petal has a soft trail made of 3 ghost copies at 60, 120 and 180 ms behind with alpha 0.5, 0.3, 0.15. There are NO streak lines anywhere. Petals pass above the field but never hide a plot for more than a moment: near-lane petals fade out while over the field.
 
 Old sky and wind code (straight wind streak lines, the old sprite clouds) is deleted in the final task.
+
+### Framing numbers
+
+Measured on `docs/reference/v3/scene-*.jpg` (1920 x 1080) and kept in ONE place, `CAMERA_POSE` and `FRAMING` in `src/render3d/framing.js`, which both the renderer and the HUD layout (`src/ui/hud-layout.js`) read; the tests check them by projecting points through the real camera at 16:9 (percentages of the screen height from the top, widths as percentages of the screen width):
+
+- Camera: pitch 45 degrees, vertical field of view 17 degrees, distance 65.5 world units from the aim point, which lies 2.2 world units behind the board centre on its centre line (no sideways offset), so the board centre shows at about 58 percent and the far edge lands at z of about -11.
+- Far edge (horizon): 21 percent (accepted 19 to 23; the same at 4:3, 16:10 and 21:9; 10 to 30 at 9:16 portrait), placed by `farEdgeZ` through NDC y = 0.58.
+- Far hill crests: 15 to 19 percent, their feet hidden below the far edge.
+- Back-row tree trunk bases: 22 to 25 percent, crown tops 11 to 17 percent at scale 1 (never rescaled), the row wider than 21:9 plus 2 world units each side (12 to 14 trees on screen at 16:9, at most 18 in all); side trees only in the back third of the visible ground.
+- Field, outer curb corners: back edge 31 percent (28 to 34), front edge 90 percent (87 to 93), back width 42 percent (39 to 45), front width 50 percent (47 to 53), horizontal centre 50 percent (48.5 to 51.5).
+- Low: the far edge is a gentle wavy line at most 1 percent of the screen tall.
 
 ## 8. HUD: quiet glass
 

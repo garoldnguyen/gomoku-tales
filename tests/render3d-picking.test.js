@@ -1,15 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { BOARD_SIZE, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE } from '../src/config.js';
-import { cameraPosition, cameraRay } from '../src/render3d/camera.js';
+import { BOARD_SIZE, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CAMERA_TARGET_Z, CELL_SIZE } from '../src/config.js';
+import { CAMERA_TARGET, cameraPosition, cameraRay, gameCamera, projectToNdc } from '../src/render3d/camera.js';
 import { cellToWorld, intersectHorizontalPlane, pickCell, pointerToNdc, worldToCell } from '../src/render3d/picking.js';
 import { createFpsMeter } from '../src/render3d/fps.js';
 
-const TARGET = { x: 0, y: 0, z: 0 };
+const TARGET = CAMERA_TARGET;
 const ASPECT = 16 / 9;
-const POSITION = cameraPosition(CAMERA_PITCH_DEG, CAMERA_DISTANCE, TARGET);
-const CAMERA = { position: POSITION, target: TARGET, fovDeg: CAMERA_FOV, aspect: ASPECT };
+const CAMERA = gameCamera(ASPECT);
+const POSITION = CAMERA.position;
 
 function close(actual, expected, message, epsilon = 1e-9) {
   assert.ok(Math.abs(actual - expected) < epsilon, `${message}: ${actual} != ${expected}`);
@@ -41,18 +41,22 @@ function pickAtNdc(x, y) {
   return pickCell(ray.origin, ray.direction);
 }
 
-test('config holds the HD-2D camera values from the art direction', () => {
-  assert.ok(CAMERA_FOV >= 30 && CAMERA_FOV <= 40);
-  assert.ok(CAMERA_PITCH_DEG >= 50 && CAMERA_PITCH_DEG <= 60);
-  assert.ok(CAMERA_DISTANCE > 0);
+test('config holds the camera values that give the v3 framing numbers', () => {
+  // docs/art-direction-v3.md "Framing numbers", checked in render3d-horizon.test.js.
+  assert.equal(CAMERA_FOV, 17);
+  assert.equal(CAMERA_PITCH_DEG, 45);
+  assert.equal(CAMERA_DISTANCE, 65.5);
+  assert.equal(CAMERA_TARGET_Z, -2.2);
+  assert.deepEqual(CAMERA_TARGET, { x: 0, y: 0, z: CAMERA_TARGET_Z });
   assert.ok(CELL_SIZE > 0);
 });
 
 test('the camera sits CAMERA_DISTANCE away, looking down by the pitch from the +z side', () => {
-  close(Math.hypot(POSITION.x, POSITION.y, POSITION.z), CAMERA_DISTANCE, 'distance');
+  const offset = sub(POSITION, TARGET);
+  close(norm(offset), CAMERA_DISTANCE, 'distance');
   close(POSITION.x, 0, 'x');
   assert.ok(POSITION.y > 0 && POSITION.z > 0);
-  close(Math.atan2(POSITION.y, POSITION.z) * 180 / Math.PI, CAMERA_PITCH_DEG, 'pitch');
+  close(Math.atan2(offset.y, offset.z) * 180 / Math.PI, CAMERA_PITCH_DEG, 'pitch');
   const raised = cameraPosition(90, 10, { x: 2, y: 1, z: -3 });
   close(raised.x, 2, 'top-down x');
   close(raised.y, 11, 'top-down y');
@@ -61,7 +65,7 @@ test('the camera sits CAMERA_DISTANCE away, looking down by the pitch from the +
 
 test('the centre ray points at the target and the edge rays match the field of view', () => {
   const centre = cameraRay(0, 0, CAMERA);
-  const toTarget = { x: -POSITION.x, y: -POSITION.y, z: -POSITION.z };
+  const toTarget = sub(TARGET, POSITION);
   close(angleBetween(centre.direction, toTarget), 0, 'centre', 1e-6);
   const halfFov = (CAMERA_FOV / 2) * Math.PI / 180;
   close(angleBetween(cameraRay(0, 1, CAMERA).direction, centre.direction), halfFov, 'top edge', 1e-6);
@@ -122,18 +126,23 @@ test('a ray from the camera to any cell centre picks that cell', () => {
 
 test('picking through the screen finds the centre cell, the far rows up the screen, and misses off the board', () => {
   const mid = (BOARD_SIZE - 1) / 2;
-  assert.deepEqual(pickAtNdc(0, 0), { x: mid, y: mid });
-  const up = pickAtNdc(0, 0.3);
+  // The camera looks a little behind the board centre, so the centre cell
+  // shows just below the middle of the screen.
+  const centre = projectToNdc({ x: 0, y: 0, z: 0 }, CAMERA);
+  assert.ok(centre.x === 0 && centre.y < 0 && centre.y > -0.4);
+  assert.deepEqual(pickAtNdc(centre.x, centre.y), { x: mid, y: mid });
+  const up = pickAtNdc(0, centre.y + 0.3);
   assert.ok(up && up.y < mid, 'higher on screen is a lower row number');
-  const right = pickAtNdc(0.3, 0);
+  const right = pickAtNdc(0.3, centre.y);
   assert.ok(right && right.x > mid, 'right on screen is a higher column number');
   assert.equal(pickAtNdc(-1, 0), null, 'left edge of the screen is beside the board');
   assert.equal(pickAtNdc(0, 1), null, 'top edge of the screen is past the board');
 });
 
 test('the whole board is inside the camera view', () => {
-  // The camera looks along -POSITION with +x to its right (it sits at x = 0).
-  const forward = scale(POSITION, -1 / norm(POSITION));
+  // The camera looks from POSITION at TARGET with +x to its right (it sits at x = 0).
+  const toTarget = sub(TARGET, POSITION);
+  const forward = scale(toTarget, 1 / norm(toTarget));
   const right = { x: 1, y: 0, z: 0 };
   const up = { x: right.y * forward.z - right.z * forward.y, y: right.z * forward.x - right.x * forward.z, z: right.x * forward.y - right.y * forward.x };
   const tanHalf = Math.tan((CAMERA_FOV / 2) * Math.PI / 180);

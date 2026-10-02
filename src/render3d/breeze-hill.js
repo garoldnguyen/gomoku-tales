@@ -4,8 +4,10 @@
 // bushes, hay bales, grass tufts and flowers), the sky, clouds and wind
 // petals (sky-scene.js, section 7) and light fog.
 //
-// The camera looks steeply down, so the hill falls away behind the board
-// and the sky shows only in a band at the top of the view, above the crest.
+// The meadow is flat. The camera looks steeply down, so the ground ends at a
+// far edge placed on purpose 21 percent down the view (horizon.js
+// farEdgeZ), the horizon; the far hills, the trees and the sky stand
+// behind it.
 
 import * as THREE from 'three';
 import { FOG_FAR, FOG_NEAR } from '../config.js';

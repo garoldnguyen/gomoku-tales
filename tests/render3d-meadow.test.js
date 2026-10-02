@@ -3,18 +3,19 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   DANDELION_RELEASE_MS, GUST_EVERY_MS, GUST_MS, MEADOW_BALES, MEADOW_BUSHES, MEADOW_PATCH_PLANTS, MEADOW_SEED,
-  MEADOW_PATCHES, MEADOW_SHADOW_LIFT, MEADOW_SHADOW_STEP, MEADOW_SPACING, MEADOW_TREES_BACK, MEADOW_TREES_SIDE,
-  MEADOW_TUFTS, PX_WORLD,
+  MEADOW_PATCHES, MEADOW_SHADOW_LIFT, MEADOW_SPACING, MEADOW_TREES_BACK, MEADOW_TREES_BACK_MAX, MEADOW_TREES_SIDE,
+  MEADOW_TUFTS, PX_WORLD, SPRITE_STRETCH_Y,
 } from '../src/config.js';
 import { placeholderShape } from '../src/render3d/art-assets.js';
-import { cameraPosition, cameraRay, projectToNdc } from '../src/render3d/camera.js';
+import { cameraPosition, cameraRay, gameCamera, projectToNdc } from '../src/render3d/camera.js';
+import { TREE_ROW_Z } from '../src/render3d/horizon.js';
 import { CURB, fencePosts, PATH, pathStones } from '../src/render3d/farm-layout.js';
 import {
   BUSH_FLOWERING, BUSH_LOOKS, flowerSpecies, FLOWER_SPECIES, hudCardScreens, isKeptOut, MEADOW_BOUNDS, meadowItems,
   meadowKeepOut, meadowShadowSpots, patchQuota, planMeadow, showsBehindCalm, TREE_LOOKS, TUFT_LOOKS,
 } from '../src/render3d/meadow.js';
 import { seededRandom } from '../src/render3d/seeded-random.js';
-import { drapedGrid, groundMeshHeight, TERRAIN_GRID, terrainHeight } from '../src/render3d/terrain.js';
+import { groundMeshHeight, TERRAIN_GRID } from '../src/render3d/terrain.js';
 import {
   createGustClock, gustEnvelope, nextReleaseMs, swayAmplitudePx, swayLeanPx, swayLeanSide, swayPhase, swayRowFraction, WIND_GROUND,
 } from '../src/render3d/wind.js';
@@ -214,10 +215,12 @@ test('no tall flower or tree shows behind the two HUD cards', () => {
     const p = planMeadow(seed);
     for (const patch of p.patches) {
       if (flowerSpecies(patch.species).height !== 'tall') continue;
-      const height = placeholderShape(`flower-${patch.species}`).height / 32 / Math.cos((55 * Math.PI) / 180);
+      const height = placeholderShape(`flower-${patch.species}`).height * PX_WORLD * SPRITE_STRETCH_Y;
       for (const plant of patch.plants) assert.ok(!showsBehindCalm(keepOut, plant.x, plant.z, height));
     }
-    for (const tree of p.trees) assert.ok(!showsBehindCalm(keepOut, tree.x, tree.z, 2.6 * tree.scale));
+    // The side trees; the back row is the horizon itself and runs on behind
+    // the glass cards so it never shows a gap.
+    for (const tree of p.trees.filter((t) => t.z > TREE_ROW_Z[1])) assert.ok(!showsBehindCalm(keepOut, tree.x, tree.z, 2.6 * tree.scale));
   }
   // and the calm test does see things behind a card
   assert.ok(showsBehindCalm(keepOut, -13, -4, 2.5));
@@ -226,9 +229,13 @@ test('no tall flower or tree shows behind the two HUD cards', () => {
 });
 
 test('the scenery counts follow section 6', () => {
-  const back = plan.trees.filter((t) => t.z < -10.25);
-  const side = plan.trees.filter((t) => t.z >= -10.25);
-  assert.ok(back.length >= MEADOW_TREES_BACK[0] && back.length <= MEADOW_TREES_BACK[1], `${back.length} back trees`);
+  const back = plan.trees.filter((t) => t.z <= TREE_ROW_Z[1]);
+  const side = plan.trees.filter((t) => t.z > TREE_ROW_Z[1]);
+  // 12 to 14 of the back row on the 16:9 screen; the row runs on past both edges.
+  const camera = gameCamera(16 / 9);
+  const onScreen = back.filter((t) => Math.abs(projectToNdc({ x: t.x, y: 0, z: t.z }, camera).x) <= 1);
+  assert.ok(onScreen.length >= MEADOW_TREES_BACK[0] && onScreen.length <= MEADOW_TREES_BACK[1], `${onScreen.length} back trees on screen`);
+  assert.ok(back.length <= MEADOW_TREES_BACK_MAX, `${back.length} back trees in all`);
   assert.ok(side.length >= MEADOW_TREES_SIDE[0] && side.length <= MEADOW_TREES_SIDE[1], `${side.length} side trees`);
   assert.ok(side.some((t) => t.x < 0) && side.some((t) => t.x > 0));
   // always scale 1 (sections 1 and 6: never a non-integer scale)
@@ -340,57 +347,16 @@ test('dandelion puffs let a seed fleck go every 6 to 10 seconds', () => {
   assert.ok(plan.patches.some((p) => p.species === 'dandelion' && p.plants.some((plant) => plant.look === 1)));
 });
 
-test('the drawn ground matches the height field at its vertices and is flat between them', () => {
-  const { minX, minZ, cell } = TERRAIN_GRID;
-  for (const [i, j] of [[0, 0], [10, 7], [40, 20], [96, 62], [55, 3]]) {
-    const x = minX + i * cell;
-    const z = minZ + j * cell;
-    assert.ok(Math.abs(groundMeshHeight(x, z) - terrainHeight(x, z)) < 1e-9);
+test('every meadow root and shadow sits on the flat ground', () => {
+  const { minX, maxX, minZ, maxZ } = TERRAIN_GRID;
+  for (const item of meadowItems(plan)) {
+    assert.equal(groundMeshHeight(item.x, item.z), 0);
+    assert.ok(item.x > minX && item.x < maxX && item.z >= minZ && item.z < maxZ, 'on the drawn ground');
   }
-  // linear inside one triangle of a square
-  const x0 = minX + 30 * cell;
-  const z0 = minZ + 20 * cell;
-  const h = (fx, fz) => groundMeshHeight(x0 + fx * cell, z0 + fz * cell);
-  assert.ok(Math.abs(h(0.2, 0.3) - (h(0, 0) + 0.2 * (h(1, 0) - h(0, 0)) + 0.3 * (h(0, 1) - h(0, 0)))) < 1e-9);
-  assert.ok(Math.abs(h(0.5, 0.5) - (h(1, 0) + h(0, 1)) / 2) < 1e-9); // the split diagonal
-});
-
-test('every meadow root and shadow sits on the drawn ground, also on the slopes', () => {
-  // The scene stands everything on groundMeshHeight; the true height field
-  // differs from the drawn mesh there, so standing on it would float or sink.
-  const sloped = meadowItems(plan).filter((item) => Math.abs(terrainHeight(item.x, item.z) - groundMeshHeight(item.x, item.z)) > PX_WORLD);
-  assert.ok(sloped.length > 0, 'the plan reaches the slopes, where this matters');
   const spots = meadowShadowSpots(plan);
   assert.equal(spots.scenery.length, plan.trees.length + plan.bushes.length + plan.bales.length);
   assert.equal(spots.patches.length, plan.patches.length);
-  assert.ok(MEADOW_SHADOW_LIFT < 2 * PX_WORLD);
-  for (const spot of [...spots.scenery, ...spots.patches]) {
-    const grid = drapedGrid(spot.x, spot.z, spot.r, spot.r * 0.8, MEADOW_SHADOW_STEP, groundMeshHeight, MEADOW_SHADOW_LIFT);
-    const p = grid.positions;
-    for (let v = 0; v < p.length; v += 3) {
-      assert.ok(Math.abs(p[v + 1] - groundMeshHeight(p[v], p[v + 2]) - MEADOW_SHADOW_LIFT) < 1e-9);
-    }
-    // between its vertices no part of the shadow dips into the ground mesh
-    for (let k = 0; k < grid.indices.length; k += 3) {
-      const [a, b, c] = grid.indices.slice(k, k + 3).map((i) => i * 3);
-      for (const [wa, wb, wc] of [[1 / 3, 1 / 3, 1 / 3], [0.5, 0.5, 0], [0, 0.5, 0.5], [0.5, 0, 0.5]]) {
-        const at = (o) => p[a + o] * wa + p[b + o] * wb + p[c + o] * wc;
-        assert.ok(at(1) > groundMeshHeight(at(0), at(2)), `shadow at ${spot.x}, ${spot.z} sinks in`);
-      }
-    }
-  }
-});
-
-test('a draped grid faces up and covers its rectangle with uv 0 to 1', () => {
-  const grid = drapedGrid(2, -3, 1, 0.5, 0.25, () => 0, 0);
-  assert.equal(grid.positions.length / 3, 9 * 5);
-  assert.equal(grid.uvs.length / 2, 9 * 5);
-  assert.deepEqual(grid.positions.slice(0, 3), [1, 0, -3.5]);
-  assert.deepEqual(grid.positions.slice(-3), [3, 0, -2.5]);
-  const [a, b, c] = grid.indices.slice(0, 3).map((i) => grid.positions.slice(i * 3, i * 3 + 3));
-  const e1 = [b[0] - a[0], b[2] - a[2]];
-  const e2 = [c[0] - a[0], c[2] - a[2]];
-  assert.ok(e1[1] * e2[0] - e1[0] * e2[1] > 0, 'normal points up');
+  assert.ok(MEADOW_SHADOW_LIFT > 0 && MEADOW_SHADOW_LIFT < PX_WORLD, 'flat shadows lie just above the ground');
 });
 
 test('the sway lean is whole art pixels, downwind along the plane', () => {

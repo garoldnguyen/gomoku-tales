@@ -1,5 +1,7 @@
 // Tunable values from docs/design.md section 10.
 
+import { CAMERA_POSE } from './render3d/framing.js';
+
 export const BOARD_SIZE = 15;
 export const WIN_LENGTH = 5; // five or more in a row wins
 export const COOLDOWN_SHORT = 3;
@@ -45,18 +47,26 @@ export const WIND_STREAK_SPEED = 60; // px per second, left to right
 
 // HD-2D 3D scene from docs/art-direction-hd2d.md sections B and C. World
 // units: one board cell is CELL_SIZE wide.
-export const CAMERA_FOV = 35; // vertical field of view in degrees
-export const CAMERA_PITCH_DEG = 55; // how far the camera looks down, 90 is straight down
-export const CAMERA_DISTANCE = 30; // from the board centre, in world units
+// The camera pose lives in ONE place, CAMERA_POSE in src/render3d/framing.js
+// (docs/art-direction-v3.md "Framing numbers"), shared by the renderer and
+// the HUD layout. These names read it: the camera looks at CAMERA_TARGET_Z
+// on the board's centre line, a little behind the centre, so the field
+// sits low on the screen with the meadow, the far edge and the sky above it.
+export const CAMERA_FOV = CAMERA_POSE.fovDeg; // vertical field of view in degrees
+export const CAMERA_PITCH_DEG = CAMERA_POSE.pitchDeg; // how far the camera looks down, 90 is straight down
+export const CAMERA_DISTANCE = CAMERA_POSE.distance; // from the point it looks at, in world units
+export const CAMERA_TARGET_Z = -CAMERA_POSE.aimBehind; // the point it looks at: (0, 0, CAMERA_TARGET_Z)
 export const CELL_SIZE = 1;
 export const FPS_SAMPLE_MS = 500; // the on-screen FPS counter averages over this
-export const BOARD_THICKNESS = 0.4; // the raised field: its top is y = 0, the meadow lies this far below
 
 // The farmland board from docs/art-direction-v3.md section 3, in art pixels
 // (PX_WORLD world units each) or cells.
 export const CURB_PX = 8; // width of the wooden curb around the field
-export const CURB_LIFT_PX = 1; // the curb top sits this far above the plots
-export const CURB_FACE_PX = 6; // height of the darker wooden front face; soil below it
+// The curb is a raised wooden frame standing this many art pixels above the
+// flat meadow and the plots (both at y = 0), so its top and its darker
+// camera-side face both show.
+export const CURB_HEIGHT_PX = 6;
+export const CURB_HEIGHT = CURB_HEIGHT_PX / 32; // in world units (PX_WORLD each)
 export const FENCE_OFFSET_CELLS = 1.5; // the fence line lies this far outside the curb
 export const FENCE_POST_EVERY = 3; // cells between fence posts
 export const FENCE_RAIL_PX = [10, 18]; // rail heights above the ground
@@ -106,8 +116,10 @@ export const CLOUD_SPEED = 0.6; // world units per second, drifting towards +x
 export const CLOUD_PX_WORLD = 1 / 8; // clouds are far away, so their art pixels are bigger
 export const WIND3D_STREAK_COUNT = 10;
 export const WIND3D_STREAK_SPEED = 5; // world units per second, towards +x
-export const FOG_NEAR = 45; // light fog for depth, in world units from the camera
-export const FOG_FAR = 140;
+// Light fog for depth, in world units from the camera, starting a little
+// behind the board.
+export const FOG_NEAR = CAMERA_DISTANCE + 15;
+export const FOG_FAR = CAMERA_DISTANCE + 110;
 
 // The meadow around the field (docs/art-direction-v3.md section 6). Plan
 // distances are in cells (world units).
@@ -116,7 +128,8 @@ export const MEADOW_PATCHES = 36; // flower patches, about
 export const MEADOW_PATCH_PLANTS = [5, 14]; // plants in one patch, min and max
 export const MEADOW_SPACING = 0.7; // Poisson-disc minimum between two meadow plants
 export const MEADOW_MARGIN = 1; // keep-out margin around the field, curb, fence, path and characters
-export const MEADOW_TREES_BACK = [12, 14]; // trees along the far edge, min and max
+export const MEADOW_TREES_BACK = [12, 14]; // back-row trees on screen at 16:9, min and max (the row runs wider, at most 18)
+export const MEADOW_TREES_BACK_MAX = 18; // back-row trees in all, covering 21:9 plus 2 world units each side
 export const MEADOW_TREES_SIDE = [4, 6]; // trees along the left and right edges together
 // Trees are always scale 1 (section 1: never a non-integer scale at
 // rest); they vary by random mirroring and a brightness shift of up to
@@ -127,11 +140,8 @@ export const MEADOW_BUSHES = [8, 10];
 export const MEADOW_BALES = 3;
 export const MEADOW_TUFTS = [120, 160]; // grass tufts in all, edges of patches included
 export const GROUND_STRIPE_CELLS = 3; // Low: mown stripes this many cells wide
-// Blob shadows in the meadow are draped over the ground mesh: vertices
-// this far apart, lifted this much above it (more than the most a draped
-// triangle dips below the mesh where it crosses one of its creases).
-export const MEADOW_SHADOW_STEP = 0.2;
-export const MEADOW_SHADOW_LIFT = 0.06;
+// Blob shadows in the meadow lie flat this far above the flat ground.
+export const MEADOW_SHADOW_LIFT = 0.01;
 // The two HUD glass cards (docs/art-direction-v3.md section 8) at 1920 x
 // 1080: no tall flowers or trees may show behind them. The height is the
 // card with both skill rows.
@@ -157,36 +167,38 @@ export const DANDELION_FLECK_POOL = 24; // most seed flecks in the air at once
 // Sky, clouds and wind petals (docs/art-direction-v3.md section 7). Screen
 // spots are fractions of the view: x from the left, y from the top.
 // The sky gradient from the top of the view down to the horizon, which is
-// where the meadow's crest meets the sky in the middle of the view
-// (SKY_HORIZON_FRACTION of the height down; the far hills cover the lower
-// part of it on Medium and High).
+// the meadow's far edge (src/render3d/horizon.js farEdgeZ), 21 percent of
+// the height down (SKY_HORIZON_FRACTION); the far hills cover the lower
+// part of it on Medium and High, their crests 15 to 19 percent down.
 export const SKY_STOPS = [[0, '#4a90e2'], [0.45, '#7fbdf0'], [0.8, '#cfe8f8'], [1, '#f4f0d8']];
-export const SKY_HORIZON_FRACTION = 0.125;
+export const SKY_HORIZON_FRACTION = 0.21;
+// The lowest the far hills' crests reach on screen: every cloud stays above it.
+export const SKY_STRIP_FRACTION = 0.15;
 // Cloud layers from clouds.png. A cloud stands `depth` world units in front
 // of the camera: in front of the far hills, behind the trees and the
-// meadow's crest. At scale 1 its art pixels look as big as the board's.
+// meadow's far edge. At scale 1 its art pixels look as big as the board's.
 // speed is world units per second straight to the right on screen (High
 // only): clouds are high above the ground, so they drift horizontally.
 export const CLOUD_LAYERS = {
-  far: { scale: 0.6, speed: 0.35, depth: 75 },
-  near: { scale: 1.0, speed: 0.6, depth: 60 },
+  far: { scale: 0.6, speed: 0.35, depth: 110 },
+  near: { scale: 1.0, speed: 0.6, depth: 90 },
 };
 // Medium: 4 still clouds. x is the cloud's centre, y its flat bottom. The
-// bottoms stay above the meadow's crest so the meadow never cuts them.
+// bottoms stay above the hill crests (SKY_STRIP_FRACTION) so nothing cuts them.
 export const STILL_CLOUDS = [
-  { x: 0.14, y: 0.115, frame: 0, layer: 'near' },
-  { x: 0.5, y: 0.1, frame: 2, layer: 'near' },
-  { x: 0.78, y: 0.085, frame: 3, layer: 'far' },
-  { x: 0.9, y: 0.12, frame: 4, layer: 'near' },
+  { x: 0.14, y: 0.13, frame: 0, layer: 'near' },
+  { x: 0.5, y: 0.115, frame: 2, layer: 'near' },
+  { x: 0.78, y: 0.095, frame: 3, layer: 'far' },
+  { x: 0.9, y: 0.135, frame: 4, layer: 'near' },
 ];
 // High: 4 clouds in each layer drift to the right and wrap around
 // sideways, out of sight. Each keeps its flat bottom at one of these
 // heights (fractions of the view down) so it shows whole inside the sky
-// strip above the meadow's crest: a near cloud is about 0.093 of the view
-// tall, a far one about 0.056.
+// strip above the hill crests (SKY_STRIP_FRACTION): a near cloud is about
+// 0.09 of the view tall, a far one about 0.054.
 export const DRIFT_CLOUD_BOTTOMS = {
-  far: [0.075, 0.09, 0.07, 0.085],
-  near: [0.11, 0.118, 0.105, 0.114],
+  far: [0.085, 0.1, 0.08, 0.095],
+  near: [0.125, 0.135, 0.12, 0.13],
 };
 export const WISP_COUNT = 6; // thin soft streaks drifting with the far layer
 export const WISP_ALPHA = 0.25;
