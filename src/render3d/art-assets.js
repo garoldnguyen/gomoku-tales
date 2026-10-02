@@ -154,7 +154,7 @@ function v3Placeholder(name) {
     paint = stripPainter({ width, height, color: V3_STRIPS[name][0], band: V3_STRIPS[name][1] });
   } else {
     const colors = V3_COLORS[name] ?? V3_COLORS.flower;
-    paint = blockSheetPainter({ width, height, frames, colors });
+    paint = blockSheetPainter({ width, height, frames, colors, outline: name !== ART.v3.clouds });
   }
   return { width, height, frames, paint };
 }

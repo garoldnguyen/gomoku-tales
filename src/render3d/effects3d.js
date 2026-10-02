@@ -19,8 +19,7 @@
 //   Stone Conversion  the stone glows, lifts, flips and lands as the other
 //                     colour
 //   skill banners     HUD text on the 2D canvas over the world
-// The always-on drifting wind streaks belong to the scenery
-// (breeze-hill.js).
+// The always-on wind petals belong to the scenery (sky-scene.js).
 //
 // Kept cheap: all particles share one fixed-size pool (particle-pool.js)
 // drawn as one Points draw call, flying pieces are pooled sprites and the

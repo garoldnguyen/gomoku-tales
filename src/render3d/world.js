@@ -97,7 +97,7 @@ export function createWorld(canvas, {
   scene.add(new THREE.HemisphereLight(COLORS.hemiSky, COLORS.hemiGround, 1.2));
 
   // Windy Spring Breeze Hill around the board (section C).
-  const scenery = buildBreezeHill(scene, cameraPos);
+  const scenery = buildBreezeHill(scene, cameraPos, camera);
 
   // Hover highlight: the gold decal on the plot under the pointer, always
   // fully visible (docs/art-direction-v3.md section 3).

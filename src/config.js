@@ -154,6 +154,71 @@ export const DANDELION_FLECK_MS = 4500; // a seed fleck drifts this long before 
 export const DANDELION_FLECK_SPEED = 0.7; // world units per second along the wind, tripled in a gust
 export const DANDELION_FLECK_POOL = 24; // most seed flecks in the air at once
 
+// Sky, clouds and wind petals (docs/art-direction-v3.md section 7). Screen
+// spots are fractions of the view: x from the left, y from the top.
+// The sky gradient from the top of the view down to the horizon, which is
+// where the meadow's crest meets the sky in the middle of the view
+// (SKY_HORIZON_FRACTION of the height down; the far hills cover the lower
+// part of it on Medium and High).
+export const SKY_STOPS = [[0, '#4a90e2'], [0.45, '#7fbdf0'], [0.8, '#cfe8f8'], [1, '#f4f0d8']];
+export const SKY_HORIZON_FRACTION = 0.125;
+// Cloud layers from clouds.png. A cloud stands `depth` world units in front
+// of the camera: in front of the far hills, behind the trees and the
+// meadow's crest. At scale 1 its art pixels look as big as the board's.
+// speed is world units per second straight to the right on screen (High
+// only): clouds are high above the ground, so they drift horizontally.
+export const CLOUD_LAYERS = {
+  far: { scale: 0.6, speed: 0.35, depth: 75 },
+  near: { scale: 1.0, speed: 0.6, depth: 60 },
+};
+// Medium: 4 still clouds. x is the cloud's centre, y its flat bottom. The
+// bottoms stay above the meadow's crest so the meadow never cuts them.
+export const STILL_CLOUDS = [
+  { x: 0.14, y: 0.115, frame: 0, layer: 'near' },
+  { x: 0.5, y: 0.1, frame: 2, layer: 'near' },
+  { x: 0.78, y: 0.085, frame: 3, layer: 'far' },
+  { x: 0.9, y: 0.12, frame: 4, layer: 'near' },
+];
+// High: 4 clouds in each layer drift to the right and wrap around
+// sideways, out of sight. Each keeps its flat bottom at one of these
+// heights (fractions of the view down) so it shows whole inside the sky
+// strip above the meadow's crest: a near cloud is about 0.093 of the view
+// tall, a far one about 0.056.
+export const DRIFT_CLOUD_BOTTOMS = {
+  far: [0.075, 0.09, 0.07, 0.085],
+  near: [0.11, 0.118, 0.105, 0.114],
+};
+export const WISP_COUNT = 6; // thin soft streaks drifting with the far layer
+export const WISP_ALPHA = 0.25;
+export const WISP_PX = [160, 6]; // art pixels at the far layer's pixel size
+export const WISP_HEIGHTS = [0.03, 0.055, 0.04, 0.07, 0.025, 0.06]; // wisp centres, fractions of the view down
+export const SUN_RAY_COUNT = 3; // soft additive wedges from the upper left
+export const SUN_RAY_ALPHA = 0.1; // at the top of a breath
+export const SUN_RAY_LOW = 0.45; // share of SUN_RAY_ALPHA at the bottom of a breath
+export const SUN_RAY_PERIOD_MS = 14000; // one slow breath
+export const SUN_RAY_ANGLES_DEG = [-24, -37, -50]; // below the screen's horizontal, toward the lower right
+export const SUN_RAY_LENGTH = 0.85; // in view widths
+// Wind petals from wind-bits (High only), in three lanes. Each lane is a
+// band along the wind: `centre` on the ground, `length` along the wind,
+// `width` across it, petals `height` world units up. Petals wrap around
+// from its downwind end to its upwind end, fading in and out at the ends
+// (PETAL_END_FADE of the length). About 40 show in view at a time.
+export const WIND_LANES = {
+  far: { scale: 0.6, speed: 0.6, count: 13, centre: [0, -9], length: 30, width: 3, height: [0.3, 2.2] },
+  mid: { scale: 1.0, speed: 1.0, count: 20, centre: [0, 0.5], length: 34, width: 12, height: [0.6, 2.0] },
+  // Near-lane petals hide while in front of the field, about half of them.
+  near: { scale: 1.6, speed: 1.5, count: 22, centre: [0, 6], length: 28, width: 8, height: [5.5, 8.5] },
+};
+export const PETAL_END_FADE = 0.08;
+export const PETAL_TRAIL_MS = [60, 120, 180]; // ghost copies this far behind a petal
+export const PETAL_TRAIL_ALPHA = [0.5, 0.3, 0.15];
+export const PETAL_BOB = 0.15; // world units up and down
+export const PETAL_BOB_MS = 1600;
+export const PETAL_FLUTTER = 0.12; // world units from side to side, across the wind
+export const PETAL_FLUTTER_MS = 2300;
+export const PETAL_TUMBLE_MS = 700; // a petal flips over this often
+export const PETAL_FIELD_FADE = 1; // cells: near-lane petals fade out over this distance onto the field
+
 // Post-processing and quality levels. The levels themselves (pixel ratio
 // cap, particle caps and every other switch) live in ONE table in
 // src/render3d/quality.js (docs/art-direction-v3.md section 5).

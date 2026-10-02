@@ -30,15 +30,18 @@ export function farmBoardPainter({ size, cell, plot, low = false }) {
 
 // Upright sprites: per frame an outlined block standing on the bottom
 // centre, `colors[f]` (cycled) inside, so frames and looks tell apart.
-export function blockSheetPainter({ width, height, frames, colors }) {
+// outline false leaves the plum outline off (clouds have none).
+export function blockSheetPainter({ width, height, frames, colors, outline = true }) {
   return (ctx) => {
     for (let f = 0; f < frames; f++) {
       const w = Math.max(3, Math.round(width * 0.6));
       const h = Math.max(3, Math.round(height * (0.5 + (0.5 * (f + 1)) / frames)));
       const x = f * width + Math.floor((width - w) / 2);
       const y = height - h;
-      ctx.fillStyle = PLUM;
-      ctx.fillRect(x, y, w, h);
+      if (outline) {
+        ctx.fillStyle = PLUM;
+        ctx.fillRect(x, y, w, h);
+      }
       ctx.fillStyle = colors[f % colors.length];
       ctx.fillRect(x + 1, y + 1, w - 2, h - 2);
     }
