@@ -13,8 +13,8 @@ import {
   FPS_SAMPLE_MS, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS, TARGET_FRAME_MS,
 } from '../config.js';
 import { createAssetStore } from '../render/assets.js';
-import { artSource, setArtAssets } from './art.js';
-import { ART } from './art-assets.js';
+import { artMeta, artSource, setArtAssets } from './art.js';
+import { ART, placeholderShape } from './art-assets.js';
 import { buildBreezeHill } from './breeze-hill.js';
 import { cameraPosition, cameraRay } from './camera.js';
 import { createCharacters } from './characters3d.js';
@@ -22,6 +22,7 @@ import { createFarmField } from './farm-field.js';
 import { zonePieceUv } from './farm-layout.js';
 import { snapToStep, worldUnitsPerPixel } from './effect-plans.js';
 import { createFpsMeter } from './fps.js';
+import { STAGE_REST } from './growth.js';
 import { cellToWorld, pickCell } from './picking.js';
 import { createPostProcessing } from './post-processing.js';
 import {
@@ -29,6 +30,7 @@ import {
   normalizeQuality, QUALITY_FALLBACK, QUALITY_LEVELS, saveQuality,
 } from './quality.js';
 import { PixelSprite, pixelTexture } from './sprites.js';
+import { metaAnchor } from './v3-meta.js';
 import { sameViewSize, viewSize } from './view-size.js';
 
 export const WORLD_ASPECT = 16 / 9;
@@ -281,13 +283,25 @@ export function createWorld(canvas, {
   };
 }
 
-// A board piece sprite: 'X' (a sprout) or 'O' (a flower bud) for a stone,
-// 'rock' for a rock. Sprites of a kind share one texture.
+// A board piece sprite (docs/art-direction-v3.md section 4): 'X' or 'O'
+// is the plant (plant-x, a blue cross bloom, or plant-o, a red round
+// bloom) with its anchor pixel on the plot centre, showing the Rest stage
+// until its owner steps the growth with setFrame; 'rock' is the mossy
+// rock-v3 boulder on its bottom centre (the manifest key "rock" is the 2D
+// sprite). Sprites of a kind share one texture.
 export function createPieceSprite(kind) {
-  return new PixelSprite({
-    sheet: artSource(ART.piece[kind]),
-    shadowRadius: kind === 'rock' ? ROCK_SHADOW_RADIUS : PIECE_SHADOW_RADIUS,
+  if (kind === 'rock') {
+    return new PixelSprite({ sheet: artSource(ART.v3.rock), shadowRadius: ROCK_SHADOW_RADIUS });
+  }
+  const name = ART.v3.plant[kind];
+  const sprite = new PixelSprite({
+    sheet: artSource(name),
+    frameCount: placeholderShape(name).frames,
+    shadowRadius: PIECE_SHADOW_RADIUS,
+    anchor: metaAnchor(artMeta(), name),
   });
+  sprite.setFrame(STAGE_REST);
+  return sprite;
 }
 
 // Puts a sprite or decal on the centre of board cell (x, y), keeping its height.

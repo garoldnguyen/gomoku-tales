@@ -51,10 +51,17 @@ function deepFreeze(value) {
 
 // --- Event to visual mapping ---
 
-test('a placed stone shows sparkles, dust and a light shake on its cell', () => {
+test('a planted seed is a place visual on its cell and never shakes the camera', () => {
   const [placed] = play([[3, 4]]);
   assert.deepEqual(visualsForEvents(placed.events), [{ kind: 'place', x: 3, y: 4, player: X }]);
-  assert.equal(shakeStrength({ kind: 'place' }), SHAKE3D_LIGHT);
+  assert.equal(shakeStrength({ kind: 'place' }), 0);
+});
+
+test('only a rock landing shakes the camera, and only lightly', () => {
+  for (const kind of ['place', 'dashStreak', 'throw', 'convert', 'rockCrumble', 'dashMark', 'banner']) {
+    assert.equal(shakeStrength({ kind }), 0, kind);
+  }
+  assert.equal(shakeStrength({ kind: 'rockFall' }), SHAKE3D_LIGHT);
 });
 
 test('Wind Dash: the announcement marks source and target, then the stone streaks across', () => {
@@ -100,10 +107,10 @@ test('Tornado Zone: the column shows over the zone and a thrown stone flies in a
   assert.deepEqual(kinds(thrown), ['place', 'throw', 'tornadoEnd', 'banner']);
   assert.deepEqual(thrown[1], { kind: 'throw', from: { x: 7, y: 7 }, to: { x: 6, y: 6 }, player: O });
   assert.deepEqual(heldCell(thrown[1]), { x: 6, y: 6, ms: THROW_DELAY_MS + THROW_MS });
-  assert.equal(shakeStrength(thrown[1]), SHAKE3D_LIGHT);
+  assert.equal(shakeStrength(thrown[1]), 0);
 });
 
-test('Terrain Creation: the rock falls with a heavy shake and crumbles when it breaks', () => {
+test('Terrain Creation: the rock falls with a light shake and crumbles when it breaks', () => {
   const results = play([
     [0, 0],
     { skill: TERRAIN_CREATION, target: { x: 7, y: 7 } },
@@ -112,8 +119,7 @@ test('Terrain Creation: the rock falls with a heavy shake and crumbles when it b
   const fell = visualsForEvents(results[1].events);
   assert.deepEqual(kinds(fell), ['rockFall', 'banner']);
   assert.deepEqual(heldCell(fell[0]), { x: 7, y: 7, ms: ROCK_FALL_MS + ROCK_SETTLE_MS });
-  assert.equal(shakeStrength(fell[0]), SHAKE3D_HEAVY);
-  assert.ok(SHAKE3D_HEAVY > SHAKE3D_LIGHT);
+  assert.equal(shakeStrength(fell[0]), SHAKE3D_LIGHT);
 
   for (const result of results.slice(2, 5)) assert.ok(!kinds(visualsForEvents(result.events)).includes('rockCrumble'));
   const broke = visualsForEvents(results[5].events);

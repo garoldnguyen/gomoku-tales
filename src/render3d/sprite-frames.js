@@ -24,6 +24,37 @@ export function frameAt(timeMs, frameCount, frameMs, { loop = true } = {}) {
   return loop ? step % frameCount : Math.min(step, frameCount - 1);
 }
 
+// Where art pixel `anchor` { x, y } of an upright sprite's frame (widthPx
+// x heightPx, each pixel pxWorld wide and pxWorld * stretchY tall) sits on
+// the plane: { side, lift } in world units. side moves the plane along its
+// own width so the anchor is above the ground point; lift is the anchor's
+// height above the plane's foot (see anchorForward for how far the plane
+// then stands towards the camera). With no anchor the sprite stands on its
+// bottom centre: { side: 0, lift: 0 }. As in v3-meta.json (a 24 x 16
+// bottom-centre sprite has anchor (12, 15)), the anchor pixel's bottom left
+// corner is the point on the ground, so only the rows below the anchor row
+// count.
+export function anchorShift(widthPx, heightPx, anchor, pxWorld, stretchY) {
+  if (!anchor) return { side: 0, lift: 0 };
+  return {
+    side: (widthPx / 2 - anchor.x) * pxWorld,
+    lift: (heightPx - 1 - anchor.y) * pxWorld * stretchY,
+  };
+}
+
+// How far towards the camera (on the ground) to stand an upright plane on
+// `ground` { x, y, z } so that a point `lift` above its foot lies on the
+// camera ray through `ground`, as seen from the perspective camera at
+// `camera` { x, y, z }. The rows below the anchor are drawn by standing the
+// plane nearer the camera rather than sinking it into the ground, so they
+// are never cut off by the board. The ray to each plot has its own slope,
+// so this is worked out per sprite rather than from the camera pitch.
+export function anchorForward(lift, ground, camera) {
+  const height = camera.y - ground.y;
+  if (lift === 0 || !(height > 0)) return 0;
+  return (lift * Math.hypot(camera.x - ground.x, camera.z - ground.z)) / height;
+}
+
 // Rotation around +y (radians) that turns a plane facing +z at `from` so it
 // faces `to` on the horizontal plane. Height differences are ignored, so the
 // sprite stays upright and never tilts.

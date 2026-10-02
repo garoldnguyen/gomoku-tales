@@ -10,13 +10,13 @@
 
 import {
   CONVERT_LIFT, CONVERT_MS, DASH_STREAK_MS, ROCK_CRUMBLE_MS, ROCK_FALL_HEIGHT, ROCK_FALL_MS,
-  ROCK_SETTLE_MS, SHAKE3D_HEAVY, SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS,
+  ROCK_SETTLE_MS, SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS,
 } from '../config.js';
 import { bannerTexts } from '../render/effects.js';
 import { popInScaleInto } from './character-poses.js';
 
 // Visual specs for the events of one action, in order:
-//   { kind: 'place', x, y, player }       sparkles, a dust puff, a light shake
+//   { kind: 'place', x, y, player }       a seed planted (its growth cues are the piece layer's)
 //   { kind: 'dashMark', from, to, player } swirl on the source, red frame on the target, until the dash ends
 //   { kind: 'dashStreak', from, to, player } the stone streaks to the target with a trail
 //   { kind: 'dashFizzle', from, to }      a failed dash: the mark ends with a puff
@@ -24,7 +24,7 @@ import { popInScaleInto } from './character-poses.js';
 //   { kind: 'tornadoEnd' }
 //   { kind: 'throw', from, to, player }   a stone thrown in an arc, landing with a dust puff
 //   { kind: 'throwBlocked', x, y }        a gust around a stone with nowhere to go
-//   { kind: 'rockFall', x, y }            a rock falls with a growing shadow, dust and a shake
+//   { kind: 'rockFall', x, y }            a rock falls with a growing shadow, dust and a light shake
 //   { kind: 'rockCrumble', x, y }         a rock breaks into rubble and dust
 //   { kind: 'convert', x, y, from, to }   the stone glows, lifts, flips and lands as `to`
 //   { kind: 'endLingering' }              the game is over: marks and columns end
@@ -131,20 +131,10 @@ export function heldCell(spec) {
   }
 }
 
-// Shake strength in world units for a spec, 0 for none: light for
-// placements and landings, heavy for a falling rock.
+// Shake strength in world units for a spec, 0 for none: only a rock
+// landing shakes, lightly (docs/art-direction-v3.md section 5, High only).
 export function shakeStrength(spec) {
-  switch (spec.kind) {
-    case 'place':
-    case 'dashStreak':
-    case 'throw':
-    case 'convert':
-      return SHAKE3D_LIGHT;
-    case 'rockFall':
-      return SHAKE3D_HEAVY;
-    default:
-      return 0;
-  }
+  return spec.kind === 'rockFall' ? SHAKE3D_LIGHT : 0;
 }
 
 const clamp01 = (t) => Math.min(1, Math.max(0, t));

@@ -84,6 +84,16 @@ export const CHARACTER_X = 9.75; // characters stand this far left and right of 
 // Living pieces and characters (sections D and G). They only animate; they
 // never change the game state.
 export const PIECE_POP_IN_MS = 320; // a placed stone or rock grows in with a small bounce
+// Seeds and plants (docs/art-direction-v3.md section 4). The stage start
+// times are in assets/v3-meta.json.
+export const PLANT_DROP_PX = 10; // the seed slides down this many art pixels onto the plot
+export const PLANT_DROP_MS = 150; // over this long, ease in
+export const PLANT_OPEN_POP_MS = 120; // the Open stage pops 1.0, 1.12, 1.0 over this long
+export const PLANT_OPEN_POP_SCALE = 1.12;
+export const PLANT_OPEN_SPARKLES = 4; // gold (X) or pink (O) sparkles when the bloom opens
+export const SOIL_PUFF_MIN = 6; // soil pixels flying out when a seed lands
+export const SOIL_PUFF_MAX = 8;
+export const SOIL_PUFF_MS = 300;
 export const CHARACTER_CAST_FRAME_MS = 140; // time per frame of the 4 frame cast animation
 export const CHARACTER_CAST_MS = 1000; // a cast shows this long (it holds its last frame), then idle again
 export const CHARACTER_POSE_FRAME_MS = 300; // time per frame of the 2 frame win and lose poses
@@ -142,6 +152,6 @@ export const CONVERT_MS = 900; // Stone Conversion: glow, lift, flip and land
 export const CONVERT_LIFT = 0.7; // world units the converted stone rises
 export const CONVERT_SPARKLE_RATE = 36; // rising sparkles per second while it glows
 export const SHAKE3D_MS = 240; // camera shake length
-export const SHAKE3D_LIGHT = 0.04; // world units at the start of a light shake (placements, landings)
-export const SHAKE3D_HEAVY = 0.13; // a falling rock
+export const SHAKE3D_LIGHT = 0.04; // world units at the start of a light shake (a rock landing, the only shake)
+export const SHAKE3D_HEAVY = 0.13; // a strong shake (unused by the farm visuals)
 export const BANNER_3D_Y = 84; // top of the skill banner on the 3D HUD, under the title and hint

@@ -2,8 +2,9 @@
 // (docs/art-direction-hd2d.md section G). Everything is started by the
 // events returned by src/logic (see effect-plans.js visualsForEvents) and
 // never changes the rules:
-//   placed stone      sparkles, a dust puff and a light camera shake (the
-//                     pop-in bounce is the piece layer's, world-renderer.js)
+//   planted seed      nothing at once: the piece layer (world-renderer.js)
+//                     grows the plant and calls soilPuff on Land (High)
+//                     and openSparkles on Open (Medium and High)
 //   Wind Dash         a pale blue swirl around the source stone and a red
 //                     translucent frame decal on the target until the dash
 //                     ends; when it resolves the stone streaks across with
@@ -12,7 +13,8 @@
 //                     zone; a thrown stone flies in an arc and lands with a
 //                     dust puff
 //   Terrain Creation  the rock falls from above with a growing shadow,
-//                     impact dust and a camera shake; it crumbles with dust
+//                     impact dust and a light camera shake (High only,
+//                     the only shake); it crumbles with dust
 //                     when it breaks
 //   Stone Conversion  the stone glows, lifts, flips and lands as the other
 //                     colour
@@ -37,7 +39,8 @@
 import * as THREE from 'three';
 import {
   BANNER_3D_Y, BOARD_SIZE, CAMERA_FOV, CONVERT_SPARKLE_RATE, DASH_SWIRL_RATE, DASH_TRAIL_RATE,
-  MARK_FADE_MS, PLACE_DUST_COUNT, PLACE_SPARKLE_COUNT, PX_WORLD, THROW_ARC_HEIGHT,
+  MARK_FADE_MS, PLACE_DUST_COUNT, PLACE_SPARKLE_COUNT, PLANT_OPEN_SPARKLES, PX_WORLD,
+  SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, THROW_ARC_HEIGHT,
   TORNADO_PARTICLE_RATE, TORNADO_SIZE,
 } from '../config.js';
 import { X } from '../logic/board.js';
@@ -60,6 +63,10 @@ const COLORS = {
   sparkle: 0xfffbe0,
   sparkleX: 0xbfe0ff,
   sparkleO: 0xffc8cf,
+  bloomGoldX: 0xffd84a, // Open sparkles of an X bloom
+  bloomPinkO: 0xff9cc8, // and of an O bloom
+  soil: 0x8a5a3c,
+  soilDark: 0x5e3a24,
   dust: 0xc8a878,
   dustDark: 0x8a6a44,
   wind: 0xffffff,
@@ -77,6 +84,7 @@ const CONVERT_GLOW = 0.9; // emissive intensity of a converting stone at full gl
 const TIMELINE_SLOTS = 16; // skill animations running at once before more records are made
 const MAX_STEP_MS = 100; // a hidden tab does not make the effects jump on return
 const TWO_PI = Math.PI * 2;
+const BLOOM_ROW_PX = 12; // art pixel row of a plant frame where the bloom opens
 
 // Builds the effects on `world` (world.js). Call trigger() with the events
 // of each applied action (catchUp() for events that piled up while the
@@ -139,6 +147,61 @@ export function createEffects3d(world) {
       sp.color = i % 2 ? tint : COLORS.sparkle;
       sp.alpha = 1;
       sp.shape = SHAPE_PLUS;
+      pool.spawnFall(sp);
+    }
+  }
+
+  // PLANT_OPEN_SPARKLES gold (X) or pink (O) twinkles around an opening
+  // bloom whose frame stands `bloomY` world units up at (wx, wz). Not
+  // scaled by the level; the particle cap still applies.
+  function bloomSparkles(wx, wz, bloomY, player) {
+    const tint = player === X ? COLORS.bloomGoldX : COLORS.bloomPinkO;
+    for (let i = 0; i < PLANT_OPEN_SPARKLES; i++) {
+      random.fill(u);
+      const angle = ((i + 0.5) / PLANT_OPEN_SPARKLES) * TWO_PI + u[0] * 0.4;
+      const speed = 0.35 + u[1] * 0.25;
+      sp.x = wx + Math.cos(angle) * 0.15;
+      sp.y = bloomY + u[2] * 0.1;
+      sp.z = wz + Math.sin(angle) * 0.15;
+      sp.vx = Math.cos(angle) * speed;
+      sp.vy = 0.5 + u[3] * 0.4;
+      sp.vz = Math.sin(angle) * speed;
+      sp.gravity = 1.2;
+      sp.drag = 2;
+      sp.life = 0.45 + u[4] * 0.15;
+      sp.size = 3 * PX;
+      sp.grow = 0;
+      sp.color = tint;
+      sp.alpha = 1;
+      sp.shape = SHAPE_PLUS;
+      pool.spawnFall(sp);
+    }
+  }
+
+  // SOIL_PUFF_MIN to SOIL_PUFF_MAX soil pixels flying outward from a
+  // landing seed and falling back within SOIL_PUFF_MS.
+  function soilPixels(wx, wz) {
+    random.fill(u);
+    const count = SOIL_PUFF_MIN + Math.floor(u[0] * (SOIL_PUFF_MAX - SOIL_PUFF_MIN + 1));
+    const lifeS = SOIL_PUFF_MS / 1000;
+    for (let i = 0; i < count; i++) {
+      random.fill(u);
+      const angle = (i / count) * TWO_PI + u[0] * 0.6;
+      const speed = 0.5 + u[1] * 0.4;
+      sp.x = wx;
+      sp.y = 0.04;
+      sp.z = wz;
+      sp.vx = Math.cos(angle) * speed;
+      sp.vy = 0.9 + u[2] * 0.5;
+      sp.vz = Math.sin(angle) * speed;
+      sp.gravity = 8;
+      sp.drag = 0.5;
+      sp.life = lifeS * (0.8 + u[3] * 0.2);
+      sp.size = 2 * PX;
+      sp.grow = 0;
+      sp.color = i % 2 ? COLORS.soil : COLORS.soilDark;
+      sp.alpha = 1;
+      sp.shape = SHAPE_SQUARE;
       pool.spawnFall(sp);
     }
   }
@@ -380,14 +443,7 @@ export function createEffects3d(world) {
   function start(spec) {
     hold(spec);
     switch (spec.kind) {
-      case 'place': {
-        const { x, z } = cellToWorld(spec.x, spec.y);
-        const extras = world.features.growthExtras;
-        if (extras.openSparkles) sparkles(x, z, spec.player, PLACE_SPARKLE_COUNT);
-        if (extras.soilPuff) dustPuff(x, z, PLACE_DUST_COUNT, 1);
-        startShake(shakeStrength(spec));
-        break;
-      }
+      // 'place': the plant grows in the piece layer, which calls the cues below.
       case 'dashMark':
         dashMark.show(spec.from, spec.to);
         break;
@@ -474,6 +530,26 @@ export function createEffects3d(world) {
     catchUp(events, time) {
       frame.time = time;
       for (const spec of catchUpVisuals(events)) start(spec);
+    },
+
+    // The Open sparkles of the plant of `player` on cell (x, y), on levels
+    // with the openSparkles growth extra. anchorY is the art pixel row of
+    // the plant frame that stands on the plot centre; the bloom row is that
+    // many pixels higher seen from the camera.
+    openSparkles(x, y, player, anchorY) {
+      if (!world.features.growthExtras.openSparkles) return;
+      pool.limit = Math.min(pool.capacity, world.features.particleCap);
+      const { x: wx, z: wz } = cellToWorld(x, y);
+      bloomSparkles(wx, wz, (anchorY - BLOOM_ROW_PX) * PX * SPRITE_STRETCH_Y, player);
+    },
+
+    // The Land soil puff of a seed on cell (x, y), on levels with the
+    // soilPuff growth extra.
+    soilPuff(x, y) {
+      if (!world.features.growthExtras.soilPuff) return;
+      pool.limit = Math.min(pool.capacity, world.features.particleCap);
+      const { x: wx, z: wz } = cellToWorld(x, y);
+      soilPixels(wx, wz);
     },
 
     // True while the piece on cell index `i` (y * BOARD_SIZE + x) is shown

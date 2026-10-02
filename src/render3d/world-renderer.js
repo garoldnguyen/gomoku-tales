@@ -15,17 +15,17 @@
 // setQuality(cycleQuality(quality)) through cycleQuality().
 //
 // The world also comes alive from the logic events (sections D and G):
-//   trigger(events, time)  placed pieces pop in, a character casts when its
+//   trigger(events, time)  planted seeds grow into plants (growth.js), a character casts when its
 //                          player uses a skill, win and lose poses at the
 //                          end, and the skill visuals, sparkles, dust,
 //                          camera shake and HUD banners (effects3d.js)
 //   catchUp(events, time)  events that piled up while the page was
 //                          hidden: the poses and lingering skill marks are
 //                          brought up to date without replaying the rest
-//   reset()                a new game: no pops or effects, both characters idle
+//   reset()                a new game: no growth or effects, both characters idle
 // The player to move has a gentle glow. None of this changes the rules.
 
-import { BOARD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH } from '../config.js';
+import { BOARD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
 import { createInitialState, isGameOver } from '../logic/game.js';
 import { drawGameHud, drawText } from '../render/game-renderer.js';
@@ -33,11 +33,11 @@ import { HUD_3D } from '../render/layout.js';
 import { artMeta, artSource } from './art.js';
 import { ART } from './art-assets.js';
 import { boardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
-import { popCellsForEvents, popInScale } from './character-poses.js';
 import { createEffects3d } from './effects3d.js';
+import { enteredStage, plantedCells, plantPoseInto, STAGE_LAND, STAGE_OPEN, STAGE_REST } from './growth.js';
 import { createWorldHitTest } from './hit-test.js';
 import { fadedAlphaTest } from './sprite-frames.js';
-import { stageStartMs } from './v3-meta.js';
+import { metaAnchor, stageStartMs } from './v3-meta.js';
 import { createCellDecal, createPieceSprite, createWorld, decalMaterial, placeOnCell, zonePieceGeometry } from './world.js';
 
 const GHOST_OPACITY = 0.45; // see-through stone or rock where it would go
@@ -118,7 +118,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
 
     trigger(events, time) {
       if (events.length === 0) return;
-      pieces.pop(popCellsForEvents(events), time);
+      pieces.grow(plantedCells(events), time);
       lastMove.trigger(events, time);
       world.characters.trigger(events, time);
       effects.trigger(events, time);
@@ -132,7 +132,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
     },
 
     reset() {
-      pieces.clearPops();
+      pieces.settleAll();
       lastMove.reset();
       world.characters.reset();
       effects.reset();
@@ -146,24 +146,65 @@ function pieceKind(cell) {
   return null;
 }
 
-// Stone and rock sprites that follow the board. Sprites are reused: a
-// removed piece goes back to its kind's pool, hidden. A piece on a cell
-// given to pop() grows in with a small bounce. A piece stays hidden while
-// the effects show a flying copy arriving on its cell.
+const UNPLANTED = -1; // growth stage of a cell before its seed drops
+
+// Plant and rock sprites that follow the board (docs/art-direction-v3.md
+// section 4). Sprites are reused: a removed piece goes back to its kind's
+// pool, hidden. A plant whose seed was planted by an event given to grow()
+// grows through Drop, Land, Sprout, Open and Rest at the stage start times
+// of v3-meta.json, with the Land soil puff and the Open sparkles of the
+// effects (shown on the levels that have them). Every other plant, one
+// that already stood there when the game started or loaded, or one a skill
+// moved, shows Rest at once. Growth only animates: the board is always the
+// logic's. A piece stays hidden while the effects show a flying copy
+// arriving on its cell.
 function createPieceLayer(world) {
+  const cellCount = BOARD_SIZE * BOARD_SIZE;
   const shownKind = []; // per cell index: 'X', 'O', 'rock' or null
   const shownSprite = [];
   const free = { [X]: [], [O]: [], rock: [] };
-  const pops = new Map(); // cell index -> pop start time
+  const growStart = new Float64Array(cellCount).fill(NaN); // when the seed was planted, NaN: not growing
+  const growKind = []; // the player whose seed it is
+  const lastStage = new Int8Array(cellCount).fill(UNPLANTED);
+  const pose = { frame: 0, progress: 0, dropPx: 0, scale: 1 }; // written by plantPoseInto
+  const looks = {}; // per player: { stages, anchorY }
+  const look = (player) => {
+    if (!looks[player]) {
+      const name = ART.v3.plant[player];
+      const meta = artMeta();
+      looks[player] = { stages: stageStartMs(meta, name), anchorY: metaAnchor(meta, name)?.y ?? 0 };
+    }
+    return looks[player];
+  };
+
+  const rest = (sprite, kind) => {
+    if (kind === 'rock') return;
+    sprite.setFrame(STAGE_REST);
+    sprite.plane.position.y = 0;
+    sprite.object.scale.set(1, 1, 1);
+  };
+
+  // The plant on cell i stops growing and shows Rest.
+  const settle = (i) => {
+    growStart[i] = NaN;
+    lastStage[i] = UNPLANTED;
+    if (shownSprite[i]) rest(shownSprite[i], shownKind[i]);
+  };
+
   return {
-    // Cells { x, y } whose piece pops in from `time` on.
-    pop(cells, time) {
-      for (const { x, y } of cells) pops.set(y * BOARD_SIZE + x, time);
+    // Cells { x, y, player } whose seed was planted at `time`.
+    grow(cells, time) {
+      for (const { x, y, player } of cells) {
+        const i = y * BOARD_SIZE + x;
+        growStart[i] = time;
+        growKind[i] = player;
+        lastStage[i] = UNPLANTED;
+      }
     },
 
-    clearPops() {
-      for (const i of pops.keys()) shownSprite[i]?.object.scale.set(1, 1, 1);
-      pops.clear();
+    // Every plant shows Rest (a new game).
+    settleAll() {
+      for (let i = 0; i < cellCount; i++) if (!Number.isNaN(growStart[i])) settle(i);
     },
 
     sync(board, time, effects) {
@@ -175,27 +216,44 @@ function createPieceLayer(world) {
           const current = shownKind[i] ?? null;
           if (current === kind) continue;
           if (current) {
-            shownSprite[i].object.visible = false;
-            free[current].push(shownSprite[i]);
+            const old = shownSprite[i];
+            rest(old, current);
+            old.object.visible = false;
+            free[current].push(old);
           }
           shownKind[i] = kind;
           shownSprite[i] = null;
           if (kind) {
             const sprite = free[kind].pop() ?? world.addSprite(createPieceSprite(kind));
-            sprite.object.scale.set(1, 1, 1);
+            sprite.object.visible = true;
             placeOnCell(sprite, x, y);
             shownSprite[i] = sprite;
+            // Only a seed planted by an event grows; anything else rests.
+            if (growKind[i] !== kind) growStart[i] = NaN;
+            if (Number.isNaN(growStart[i])) settle(i);
           }
         }
       }
-      for (let i = 0; i < shownSprite.length; i++) {
-        if (shownSprite[i]) shownSprite[i].object.visible = !effects.holds(i, time);
-      }
-      for (const [i, start] of pops) {
+      for (let i = 0; i < cellCount; i++) {
         const sprite = shownSprite[i];
-        const scale = popInScale(time - start);
-        sprite?.object.scale.set(scale.x, scale.y, scale.x);
-        if (!sprite || (scale.x === 1 && scale.y === 1)) pops.delete(i);
+        if (!sprite) {
+          growStart[i] = NaN; // the seed's cell is empty again (a skill took it)
+          continue;
+        }
+        sprite.object.visible = !effects.holds(i, time);
+        if (Number.isNaN(growStart[i])) continue;
+        const player = shownKind[i];
+        const { stages, anchorY } = look(player);
+        plantPoseInto(time - growStart[i], stages, pose);
+        sprite.setFrame(pose.frame);
+        sprite.plane.position.y = pose.dropPx * PX_WORLD * SPRITE_STRETCH_Y;
+        sprite.object.scale.set(pose.scale, pose.scale, pose.scale);
+        const x = i % BOARD_SIZE;
+        const y = (i - x) / BOARD_SIZE;
+        if (enteredStage(lastStage[i], pose.frame, STAGE_LAND)) effects.soilPuff(x, y);
+        if (enteredStage(lastStage[i], pose.frame, STAGE_OPEN)) effects.openSparkles(x, y, player, anchorY);
+        lastStage[i] = pose.frame;
+        if (pose.frame === STAGE_REST && pose.scale === 1) settle(i);
       }
     },
   };

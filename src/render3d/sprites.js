@@ -9,7 +9,7 @@
 
 import * as THREE from 'three';
 import { PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
-import { faceYaw, frameAt, SPRITE_ALPHA_TEST } from './sprite-frames.js';
+import { anchorForward, anchorShift, faceYaw, frameAt, SPRITE_ALPHA_TEST } from './sprite-frames.js';
 
 const SHADOW_LIFT = 0.005; // keeps the blob shadow just above the ground
 const SHADOW_OPACITY = 0.35;
@@ -134,13 +134,16 @@ function sharedGeometry(widthPx, heightPx) {
 // One pixel sprite standing on the ground.
 //   sheet       canvas with all frames in one row (see sheetCanvas)
 //   frameCount  number of frames in the sheet
-//   frameMs     time per frame; 0 or 1 frame means a still sprite
+//   frameMs     time per frame; 0 means the frame only changes through
+//               setFrame (a still sprite, or one its owner steps)
 //   shadowRadius  blob shadow radius in world units
 //   phaseMs     offsets the animation so neighbours do not move in step
 //   frameFor    optional (timeMs) => frame index; replaces the looping
 //               animation, for sheets that hold several animations
+//   anchor      optional art pixel { x, y } of a frame that stands on the
+//               ground point (default: the bottom centre)
 export class PixelSprite {
-  constructor({ sheet, frameCount = 1, frameMs = 0, shadowRadius, phaseMs = 0, frameFor = null }) {
+  constructor({ sheet, frameCount = 1, frameMs = 0, shadowRadius, phaseMs = 0, frameFor = null, anchor = null }) {
     this.frameCount = frameCount;
     this.frameMs = frameMs;
     this.phaseMs = phaseMs;
@@ -155,6 +158,7 @@ export class PixelSprite {
     this.texture.repeat.set(1 / frameCount, 1);
 
     this.plane = new THREE.Mesh(sharedGeometry(frameWidth, sheet.height), spriteMaterial(this.texture));
+    this.anchor = anchorShift(frameWidth, sheet.height, anchor, PX_WORLD, SPRITE_STRETCH_Y);
     this.shadow = createBlobShadow(shadowRadius ?? (frameWidth * PX_WORLD) / 3);
 
     this.object = new THREE.Group();
@@ -174,10 +178,23 @@ export class PixelSprite {
     this.texture.offset.x = frame / this.frameCount;
   }
 
-  // Advances the animation and turns the sprite towards the camera.
+  // Advances the animation and turns the sprite towards the camera. An
+  // anchored plane is moved along its own width and towards the camera so
+  // the anchor pixel stays on the ground point, along this sprite's own
+  // camera ray (the perspective camera sees each plot from its own angle).
   update(timeMs, cameraPosition) {
-    this.setFrame(this.frameFor ? this.frameFor(timeMs) : frameAt(timeMs + this.phaseMs, this.frameCount, this.frameMs));
-    this.plane.rotation.y = faceYaw(this.object.position, cameraPosition);
+    if (this.frameFor) this.setFrame(this.frameFor(timeMs));
+    else if (this.frameMs > 0) this.setFrame(frameAt(timeMs + this.phaseMs, this.frameCount, this.frameMs));
+    const yaw = faceYaw(this.object.position, cameraPosition);
+    this.plane.rotation.y = yaw;
+    const { side, lift } = this.anchor;
+    if (side !== 0 || lift !== 0) {
+      const forward = anchorForward(lift, this.object.position, cameraPosition);
+      const cos = Math.cos(yaw);
+      const sin = Math.sin(yaw);
+      this.plane.position.x = side * cos + forward * sin;
+      this.plane.position.z = forward * cos - side * sin;
+    }
   }
 }
 
