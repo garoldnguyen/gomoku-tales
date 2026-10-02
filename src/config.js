@@ -50,7 +50,19 @@ export const CAMERA_PITCH_DEG = 55; // how far the camera looks down, 90 is stra
 export const CAMERA_DISTANCE = 30; // from the board centre, in world units
 export const CELL_SIZE = 1;
 export const FPS_SAMPLE_MS = 500; // the on-screen FPS counter averages over this
-export const BOARD_THICKNESS = 0.4; // the wooden slab; its top face is y = 0
+export const BOARD_THICKNESS = 0.4; // the raised field: its top is y = 0, the meadow lies this far below
+
+// The farmland board from docs/art-direction-v3.md section 3, in art pixels
+// (PX_WORLD world units each) or cells.
+export const CURB_PX = 8; // width of the wooden curb around the field
+export const CURB_LIFT_PX = 1; // the curb top sits this far above the plots
+export const CURB_FACE_PX = 6; // height of the darker wooden front face; soil below it
+export const FENCE_OFFSET_CELLS = 1.5; // the fence line lies this far outside the curb
+export const FENCE_POST_EVERY = 3; // cells between fence posts
+export const FENCE_RAIL_PX = [10, 18]; // rail heights above the ground
+export const PATH_WIDTH_CELLS = 1.25;
+export const PATH_LENGTH_CELLS = 2.5; // from the curb toward the camera
+export const PATH_STONES = [0.7, 1.7]; // stepping stones, cells from the curb
 
 // HD-2D sprites from docs/art-direction-hd2d.md section D. One art pixel is
 // PX_WORLD world units for every sprite, so all sprite pixels look the same

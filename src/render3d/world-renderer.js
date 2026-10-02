@@ -6,8 +6,9 @@
 //                              DOM lobby and room screens, and the title
 //   hitTest(px, py)            what is under an internal HUD point
 // The WebGL canvas shows the world (src/render3d/world.js) with the board's
-// stones and rocks as sprites and flat decals for hover, skill targeting,
-// announced skills and the winning line. ctx is the transparent 2D canvas
+// stones and rocks as sprites on the farmland board, and the v3 flat
+// decals (docs/art-direction-v3.md section 3) for hover, skill targeting,
+// announced skills, the last move and the winning line. ctx is the transparent 2D canvas
 // stacked above it, where the existing 2D HUD code draws the player panels,
 // skill buttons, cooldowns, status line and winner text. Board picking is a
 // ray from the camera (src/render3d/hit-test.js). The Q key calls
@@ -29,14 +30,15 @@ import { O, ROCK, X } from '../logic/board.js';
 import { createInitialState, isGameOver } from '../logic/game.js';
 import { drawGameHud, drawText } from '../render/game-renderer.js';
 import { HUD_3D } from '../render/layout.js';
-import { artSource } from './art.js';
+import { artMeta, artSource } from './art.js';
 import { ART } from './art-assets.js';
-import { boardMarks } from './board-marks.js';
+import { boardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
 import { popCellsForEvents, popInScale } from './character-poses.js';
 import { createEffects3d } from './effects3d.js';
 import { createWorldHitTest } from './hit-test.js';
 import { fadedAlphaTest } from './sprite-frames.js';
-import { createCellDecal, createPieceSprite, createWorld, decalMaterial, placeOnCell } from './world.js';
+import { stageStartMs } from './v3-meta.js';
+import { createCellDecal, createPieceSprite, createWorld, decalMaterial, placeOnCell, zonePieceGeometry } from './world.js';
 
 const GHOST_OPACITY = 0.45; // see-through stone or rock where it would go
 const EMPTY_BOARD = createInitialState().board; // the menus show the board bare
@@ -49,6 +51,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
   const pieces = createPieceLayer(world);
   const decals = createDecalLayer(world);
   const ghosts = createGhosts(world);
+  const lastMove = createLastMoveMark(world);
   const effects = createEffects3d(world);
 
   // The level and FPS of this window, top left on the HUD.
@@ -63,7 +66,8 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       pieces.sync(view.state.board, time, effects);
       world.characters.setActive(isGameOver(view.state) ? null : view.state.currentPlayer);
       const marks = boardMarks(view);
-      decals.show(marks.decals);
+      decals.show(marks.decals, time);
+      lastMove.show(view.state.board, time);
       ghosts.show(marks.ghost);
       world.setHoveredCell(view.hover ?? null);
       effects.update(time);
@@ -78,7 +82,8 @@ export function createWorldRenderer(worldCanvas, options = {}) {
     drawMenuScreen(ctx, time = performance.now()) {
       pieces.sync(EMPTY_BOARD, time, effects);
       world.characters.setActive(null);
-      decals.show(NO_DECALS);
+      decals.show(NO_DECALS, time);
+      lastMove.hide();
       ghosts.show(null);
       world.setHoveredCell(null);
       effects.update(time);
@@ -114,18 +119,21 @@ export function createWorldRenderer(worldCanvas, options = {}) {
     trigger(events, time) {
       if (events.length === 0) return;
       pieces.pop(popCellsForEvents(events), time);
+      lastMove.trigger(events, time);
       world.characters.trigger(events, time);
       effects.trigger(events, time);
     },
 
     catchUp(events, time) {
       if (events.length === 0) return;
+      lastMove.catchUp(events);
       world.characters.trigger(events, time);
       effects.catchUp(events, time);
     },
 
     reset() {
       pieces.clearPops();
+      lastMove.reset();
       world.characters.reset();
       effects.reset();
     },
@@ -193,31 +201,31 @@ function createPieceLayer(world) {
   };
 }
 
-// Decal looks per kind (see board-marks.js): 16x16 pixel textures from
-// assets/manifest.json, or placeholders like the 2D ones (art.js).
-// renderOrder keeps overlapping decals in a fixed order.
+// Decal art per kind (see board-marks.js): the v3 decals from
+// assets/manifest.json, or placeholders (art.js). All show at full
+// opacity; the winner marks pulse. renderOrder keeps overlapping decals in
+// a fixed order (the last-move mark is 3, see createLastMoveMark).
 const DECALS = {
-  zonePreview: { order: 1, opacity: 0.6, art: ART.decal.zone },
-  win: { order: 2, opacity: 1, art: ART.decal.win },
-  dashTarget: { order: 3, opacity: 1, art: ART.decal.dashTarget },
-  select: { order: 4, opacity: 1, art: ART.decal.select },
-  whirl: { order: 5, opacity: 1, art: ART.decal.whirl },
+  zonePreview: { order: 1, art: ART.v3.decal.zone },
+  win: { order: 2, art: ART.v3.decal.win },
+  dashTarget: { order: 4, art: ART.v3.decal.dashTarget },
+  select: { order: 5, art: ART.v3.decal.select },
 };
 
 // Pools of flat cell decals; show() places this frame's decals and hides
-// the rest.
+// the rest. A zone decal shows its own part of the 3x3 zone art.
 function createDecalLayer(world) {
   const pools = {};
   for (const [kind, look] of Object.entries(DECALS)) {
     const material = decalMaterial(artSource(look.art));
-    material.opacity = look.opacity;
     pools[kind] = { material, order: look.order, meshes: [], used: 0 };
   }
   return {
-    show(decals) {
+    show(decals, time) {
+      pools.win.material.opacity = winPulseOpacity(time);
       for (const pool of Object.values(pools)) pool.used = 0;
-      for (const { kind, x, y } of decals) {
-        const pool = pools[kind];
+      for (const decal of decals) {
+        const pool = pools[decal.kind];
         if (!pool) continue;
         let mesh = pool.meshes[pool.used];
         if (!mesh) {
@@ -227,12 +235,62 @@ function createDecalLayer(world) {
           pool.meshes.push(mesh);
         }
         pool.used++;
+        if (decal.kind === 'zonePreview') mesh.geometry = zonePieceGeometry(decal.dx, decal.dy);
         mesh.visible = true;
-        placeOnCell(mesh, x, y);
+        placeOnCell(mesh, decal.x, decal.y);
       }
       for (const pool of Object.values(pools)) {
         for (let i = pool.used; i < pool.meshes.length; i++) pool.meshes[i].visible = false;
       }
+    },
+  };
+}
+
+// The last-move mark: decal-last-x or decal-last-o on the newest plant,
+// fading in with its Open stage and staying until the next move. It hides
+// once that plant is gone from its plot (thrown, converted, a new game).
+function createLastMoveMark(world) {
+  const marks = {};
+  for (const [player, art] of [[X, ART.v3.decal.lastX], [O, ART.v3.decal.lastO]]) {
+    const mesh = createCellDecal(decalMaterial(artSource(art)));
+    mesh.renderOrder = 3;
+    world.scene.add(mesh);
+    marks[player] = mesh;
+  }
+  let last = null; // { x, y, player }
+  let start = -Infinity; // when its seed was planted
+  const hide = () => {
+    marks[X].visible = false;
+    marks[O].visible = false;
+  };
+  return {
+    trigger(events, time) {
+      const next = lastPlanted(events, last);
+      if (next === last) return;
+      last = next;
+      start = time;
+    },
+
+    // Events that piled up while hidden: the mark shows at once.
+    catchUp(events) {
+      last = lastPlanted(events, last);
+      start = -Infinity;
+    },
+
+    reset() {
+      last = null;
+    },
+
+    hide,
+
+    show(board, time) {
+      hide();
+      if (!last || board[last.y]?.[last.x] !== last.player) return;
+      const mesh = marks[last.player];
+      const plant = last.player === X ? ART.v3.plant.X : ART.v3.plant.O;
+      mesh.material.opacity = lastMoveOpacity(time - start, stageStartMs(artMeta(), plant));
+      mesh.visible = true;
+      placeOnCell(mesh, last.x, last.y);
     },
   };
 }

@@ -152,7 +152,7 @@ test('hovering an empty cell shows a ghost stone of the player to move', () => {
   assert.deepEqual(boardMarks(game.getView()).ghost, { kind: O, x: 8, y: 8 });
 });
 
-test('the Wind Dash flow shows the select ring, whirl and target frame while choosing', () => {
+test('the Wind Dash flow shows the select mark and target mark while choosing', () => {
   const game = createLocalGame();
   game.click({ x: 7, y: 7 });
   game.click({ x: 0, y: 0 });
@@ -162,7 +162,7 @@ test('the Wind Dash flow shows the select ring, whirl and target frame while cho
   assert.equal(boardMarks(game.getView()).ghost, null);
   game.click({ x: 7, y: 7 });
   game.setHover({ x: 9, y: 9 });
-  assert.deepEqual(kinds(boardMarks(game.getView())), ['dashTarget@9,9', 'select@7,7', 'whirl@7,7']);
+  assert.deepEqual(kinds(boardMarks(game.getView())), ['dashTarget@9,9', 'select@7,7']);
   game.click({ x: 9, y: 9 });
   game.setHover(null);
   // The announced dash is shown by the skill visuals (effects3d.js) from its event.

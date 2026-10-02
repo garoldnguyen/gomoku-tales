@@ -1,6 +1,6 @@
 // HD-2D look lab (docs/art-direction-hd2d.md sections A to F): a test
 // scene for the 3D look, separate from the game. Open /hd2d-lab.html.
-// It shows the shared world (src/render3d/world.js: the wooden board on
+// It shows the shared world (src/render3d/world.js: the farmland board on
 // Windy Spring Breeze Hill under a fixed camera with a warm sun, soft
 // shadows, Wind Rabbit and Earth Bear, post-processing with quality levels)
 // with a few sample stones and a rock, an FPS counter and a hover highlight

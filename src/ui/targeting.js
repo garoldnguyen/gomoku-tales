@@ -68,7 +68,7 @@ export function targetClick(state, player, targeting, cell) {
 // (hover may be null). Returns null or one of:
 //   { type: 'select', x, y }       ring around a stone that can be picked
 //   { type: 'dash', from, to }     whirl on the source, red frame on `to` (or null)
-//   { type: 'zone', cells }        the Tornado Zone cells
+//   { type: 'zone', x, y, cells }  the Tornado Zone centred on (x, y) and its cells
 //   { type: 'rock', x, y }         a ghost rock
 export function targetPreview(state, player, targeting, hover) {
   const { board } = state;
@@ -83,7 +83,7 @@ export function targetPreview(state, player, targeting, hover) {
       return { type: 'dash', from, to };
     }
     case TORNADO_ZONE:
-      return cell ? { type: 'zone', cells: tornadoCells(board, cell.x, cell.y) } : null;
+      return cell ? { type: 'zone', x: cell.x, y: cell.y, cells: tornadoCells(board, cell.x, cell.y) } : null;
     case TERRAIN_CREATION:
       return cell && isEmptyCell(board, cell.x, cell.y) ? { type: 'rock', x: cell.x, y: cell.y } : null;
     case STONE_CONVERSION:

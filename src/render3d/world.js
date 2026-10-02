@@ -1,14 +1,15 @@
 // The HD-2D world (docs/art-direction-hd2d.md sections B to F), shared by
 // the game (src/render3d/world-renderer.js) and the look lab (lab.js): a
 // WebGL renderer, the fixed camera, a warm sun and a cool hemisphere fill,
-// Windy Spring Breeze Hill, the wooden board, Wind Rabbit and Earth Bear
-// beside it, a glowing hover decal, post-processing, the quality levels of
+// Windy Spring Breeze Hill, the farmland board (farm-field.js,
+// docs/art-direction-v3.md section 3), Wind Rabbit and Earth Bear beside
+// it, the gold hover decal, post-processing, the quality levels of
 // src/render3d/quality.js with automatic step down, and an FPS meter.
 // Pieces are added as sprites.
 
 import * as THREE from 'three';
 import {
-  BOARD_SIZE, BOARD_THICKNESS, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE,
+  CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CELL_SIZE,
   FPS_SAMPLE_MS, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS, TARGET_FRAME_MS,
 } from '../config.js';
 import { createAssetStore } from '../render/assets.js';
@@ -17,6 +18,8 @@ import { ART } from './art-assets.js';
 import { buildBreezeHill } from './breeze-hill.js';
 import { cameraPosition, cameraRay } from './camera.js';
 import { createCharacters } from './characters3d.js';
+import { createFarmField } from './farm-field.js';
+import { zonePieceUv } from './farm-layout.js';
 import { snapToStep, worldUnitsPerPixel } from './effect-plans.js';
 import { createFpsMeter } from './fps.js';
 import { cellToWorld, pickCell } from './picking.js';
@@ -36,9 +39,10 @@ const ROCK_SHADOW_RADIUS = PIECE_SHADOW_RADIUS * 1.2;
 
 // The switches the scenery around the board reads (breeze-hill.js).
 const SCENERY_FEATURES = new Set(['scenery', 'meadowFlowers', 'farHills', 'sky', 'wind', 'backgroundMotion']);
+// The switches the farmland board reads (farm-field.js).
+const FARM_FEATURES = new Set(['boardTexture', 'scenery']);
 
 const COLORS = {
-  boardSide: 0x8a5a2b,
   sun: 0xffe0b0,
   hemiSky: 0xcfe8ff,
   hemiGround: 0x6f8f4a,
@@ -91,10 +95,10 @@ export function createWorld(canvas, {
 
   // Windy Spring Breeze Hill around the board (section C).
   const scenery = buildBreezeHill(scene, cameraPos);
-  scene.add(createBoard());
 
-  // Hover highlight: a flat glowing decal on the cell under the pointer (section F).
-  const hoverMaterial = decalMaterial(artSource(ART.decal.hover));
+  // Hover highlight: the gold decal on the plot under the pointer, always
+  // fully visible (docs/art-direction-v3.md section 3).
+  const hoverMaterial = decalMaterial(artSource(ART.v3.decal.hover));
   const hover = createCellDecal(hoverMaterial);
   scene.add(hover);
   let hoveredCell = null;
@@ -115,6 +119,9 @@ export function createWorld(canvas, {
     return sprite;
   };
   const characters = createCharacters(addSprite);
+
+  // The farmland board: field, curb, and with scenery the fence and path.
+  const farm = createFarmField(scene, addSprite);
 
   // Post-processing focused on the board centre.
   const postProcessing = createPostProcessing(renderer, scene, camera, CAMERA_DISTANCE);
@@ -164,6 +171,7 @@ export function createWorld(canvas, {
     }
     if (changed.includes('postEffects')) postProcessing.setEffects(features.postEffects);
     if (changed.some((key) => SCENERY_FEATURES.has(key))) scenery.setFeatures(features);
+    if (changed.some((key) => FARM_FEATURES.has(key))) farm.setFeatures(features);
     if (changed.includes('pixelRatioCap')) {
       viewSizeNow = null;
       resize();
@@ -268,8 +276,6 @@ export function createWorld(canvas, {
       scenery.update(now, dtMs);
       characters.update(now, dtMs);
       for (const sprite of sprites) sprite.update(now, camera.position);
-      // A gentle glow pulse; only the opacity changes, so pixels never move.
-      hoverMaterial.opacity = 0.75 + 0.25 * Math.sin(now / 250);
       postProcessing.render(dtMs / 1000);
     },
   };
@@ -294,39 +300,40 @@ export function placeOnCell(object, x, y) {
 
 // Unlit see-through material for flat decals drawn from a canvas or image.
 // Tone mapped like everything else, so decals look the same without post
-// effects (tone mapped by the renderer) as with them (by OutputPass).
+// effects (tone mapped by the renderer) as with them (by OutputPass). Fog
+// and shadows never dim them.
 export function decalMaterial(source) {
   return new THREE.MeshBasicMaterial({
     map: pixelTexture(source),
     transparent: true,
     depthWrite: false,
+    fog: false,
   });
 }
 
-// A flat one-cell decal lying on the board, hidden until placed.
+// A flat one-cell decal lying just above the plot, hidden until placed.
+// `geometry` defaults to the whole texture on one cell.
 let cellDecalGeometry = null;
-export function createCellDecal(material) {
+export function createCellDecal(material, geometry = null) {
   cellDecalGeometry ??= new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE).rotateX(-Math.PI / 2);
-  const decal = new THREE.Mesh(cellDecalGeometry, material);
+  const decal = new THREE.Mesh(geometry ?? cellDecalGeometry, material);
   decal.position.y = DECAL_LIFT;
   decal.visible = false;
   return decal;
 }
 
-// The board: a wooden slab whose top face carries the grid texture. On a
-// BoxGeometry top face the texture's top row lies at -z, so row 0 is the far
-// edge, matching src/render3d/picking.js.
-function createBoard() {
-  const boardWidth = BOARD_SIZE * CELL_SIZE;
-  const sideMaterial = new THREE.MeshStandardMaterial({ color: COLORS.boardSide, roughness: 0.9 });
-  const topMaterial = new THREE.MeshStandardMaterial({ map: pixelTexture(artSource(ART.board)), roughness: 0.85 });
-  const board = new THREE.Mesh(
-    new THREE.BoxGeometry(boardWidth, BOARD_THICKNESS, boardWidth),
-    // Face order: +x, -x, +y (top), -y, +z, -z.
-    [sideMaterial, sideMaterial, topMaterial, sideMaterial, sideMaterial, sideMaterial],
-  );
-  board.position.y = -BOARD_THICKNESS / 2;
-  board.castShadow = true;
-  board.receiveShadow = true;
-  return board;
+// One-cell geometry showing the part of a 3x3-cell zone decal (decal-zone-v3)
+// that lies on the cell (dx, dy) from the zone centre, so a zone clipped at
+// the board edge shows only its part on the field.
+const zonePieces = new Map();
+export function zonePieceGeometry(dx, dy) {
+  const key = `${dx},${dy}`;
+  if (!zonePieces.has(key)) {
+    const { u0, u1, v0, v1 } = zonePieceUv(dx, dy);
+    const geometry = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
+    // PlaneGeometry corners: top left, top right, bottom left, bottom right.
+    geometry.attributes.uv.set([u0, v1, u1, v1, u0, v0, u1, v0]);
+    zonePieces.set(key, geometry.rotateX(-Math.PI / 2));
+  }
+  return zonePieces.get(key);
 }

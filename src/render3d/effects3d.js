@@ -54,7 +54,7 @@ import {
 import { cellToWorld } from './picking.js';
 import { MAX_PARTICLE_CAP, particleScale } from './quality.js';
 import { effectRandom } from './seeded-random.js';
-import { createCellDecal, createPieceSprite, decalMaterial, placeOnCell } from './world.js';
+import { createCellDecal, createPieceSprite, decalMaterial, placeOnCell, zonePieceGeometry } from './world.js';
 
 const COLORS = {
   sparkle: 0xfffbe0,
@@ -592,9 +592,9 @@ function markFade(mark, time) {
   return Number.isNaN(mark.endStart) ? 1 : 1 - (time - mark.endStart) / MARK_FADE_MS;
 }
 
-// The announced Wind Dash: a pale blue whirl decal and swirling particles
-// around the source stone, and a pulsing red translucent frame decal on the
-// target cell, from 'dashAnnounced' until the dash resolves, fails or the
+// The announced Wind Dash: the chosen-source decal (decal-select-v3) and
+// swirling particles around the source stone, and the pulsing target decal
+// (decal-dash-target-v3) on the target cell, from 'dashAnnounced' until the dash resolves, fails or the
 // game ends.
 function createDashMark({ world, pool, sp, random, u, frame }) {
   const make = (art, order) => {
@@ -603,8 +603,8 @@ function createDashMark({ world, pool, sp, random, u, frame }) {
     world.scene.add(mesh);
     return mesh;
   };
-  const target = make(ART.decal.dashTarget, 3);
-  const whirl = make(ART.decal.whirl, 5);
+  const target = make(ART.v3.decal.dashTarget, 4);
+  const source = make(ART.v3.decal.select, 5);
   // endStart is NaN while the mark shows; carry is the emission remainder.
   const mark = { active: false, endStart: NaN, x: 0.5, z: 0.5, carry: 0.5 };
 
@@ -612,18 +612,18 @@ function createDashMark({ world, pool, sp, random, u, frame }) {
     mark.active = false;
     mark.endStart = NaN;
     target.visible = false;
-    whirl.visible = false;
+    source.visible = false;
   };
 
   return {
     show(from, to) {
       placeOnCell(target, to.x, to.y);
-      placeOnCell(whirl, from.x, from.y);
-      mark.x = whirl.position.x;
-      mark.z = whirl.position.z;
+      placeOnCell(source, from.x, from.y);
+      mark.x = source.position.x;
+      mark.z = source.position.z;
       mark.carry = 0;
       target.visible = true;
-      whirl.visible = true;
+      source.visible = true;
       mark.active = true;
       mark.endStart = NaN;
     },
@@ -640,7 +640,7 @@ function createDashMark({ world, pool, sp, random, u, frame }) {
         return;
       }
       target.material.opacity = fade * (0.75 + 0.25 * Math.sin(frame.time / 180));
-      whirl.material.opacity = fade;
+      source.material.opacity = fade;
       if (fade < 1) return; // ending: no new swirl
       const count = emit(mark, DASH_SWIRL_RATE * frame.scale, frame.dtS);
       for (let i = 0; i < count; i++) {
@@ -667,11 +667,11 @@ function createDashMark({ world, pool, sp, random, u, frame }) {
   };
 }
 
-// The announced Tornado Zone: translucent wind decals on the zone cells
-// (clipped at the board edges) and a column of particles swirling up over
+// The announced Tornado Zone: decal-zone-v3 centred on the zone, one piece
+// per zone cell so it is clipped at the board edges, and a column of particles swirling up over
 // the zone centre, from 'tornadoAnnounced' until it ends.
 function createTornadoColumn({ world, pool, sp, random, u, frame }) {
-  const material = decalMaterial(artSource(ART.decal.zone));
+  const material = decalMaterial(artSource(ART.v3.decal.zone));
   const decals = [];
   for (let i = 0; i < TORNADO_SIZE * TORNADO_SIZE; i++) {
     const mesh = createCellDecal(material);
@@ -692,7 +692,9 @@ function createTornadoColumn({ world, pool, sp, random, u, frame }) {
       for (let i = 0; i < decals.length; i++) {
         const cell = cells[i];
         decals[i].visible = Boolean(cell);
-        if (cell) placeOnCell(decals[i], cell.x, cell.y);
+        if (!cell) continue;
+        decals[i].geometry = zonePieceGeometry(cell.x - x, cell.y - y);
+        placeOnCell(decals[i], cell.x, cell.y);
       }
       const centre = cellToWorld(x, y);
       mark.x = centre.x;
