@@ -67,8 +67,10 @@ function lowestText(fps) {
 // `options.showFps` adds the lowest FPS reading of the current level under
 // the FPS line (default: ?fps=1 in the page's URL), on every level, for the
 // owner's FPS measurement (docs/art-direction-v3.md, Performance results).
+// `options.showQualityLine` false hides the quality and FPS line (shot
+// mode, docs/shots.md section 4).
 export function createWorldRenderer(worldCanvas, options = {}) {
-  const { showFps = parseFpsSwitch(globalThis.location?.search ?? '') } = options;
+  const { showFps = parseFpsSwitch(globalThis.location?.search ?? ''), showQualityLine = true } = options;
   const world = createWorld(worldCanvas, options);
   const pieces = createPieceLayer(world);
   const decals = createDecalLayer(world);
@@ -88,6 +90,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
   for (let i = 0; i < QUALITY_ORDER.length * 2; i++) qualityLines.push([]);
   const lowestLines = [];
   const drawQuality = (ctx) => {
+    if (!showQualityLine) return;
     const fps = Math.min(Math.max(Math.round(world.fps), 0), FPS_TEXT_MAX);
     const level = Math.max(0, QUALITY_ORDER.indexOf(world.quality));
     const lines = qualityLines[level * 2 + (world.autoStepped ? 1 : 0)];

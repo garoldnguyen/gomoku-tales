@@ -314,3 +314,13 @@ export const SHAKE3D_MS = 240; // camera shake length
 export const SHAKE3D_LIGHT = 0.04; // world units at the start of a light shake (a rock landing, the only shake)
 export const SHAKE3D_HEAVY = 0.13; // a strong shake (unused by the farm visuals)
 export const BANNER_3D_Y = 84; // top of the skill banner on the 3D HUD, under the title and hint
+
+// Shot mode (?shot=<scene>, docs/shots.md section 4): the screenshot
+// self-check freezes every time driven thing at this time and seeds the
+// game's random source (the Tornado Zone throw) with this number.
+export const SHOT_TIME_MS = 12000;
+export const SHOT_SEED = 20261003;
+// Seed of the 2D renderer's sparkles and dust in shot mode (?render=2d).
+export const SHOT_EFFECTS_SEED = 0x51f15e;
+// The ready flag waits for this many frames drawn at the final window size.
+export const SHOT_READY_FRAMES = 3;

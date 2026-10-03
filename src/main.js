@@ -1,4 +1,5 @@
-import { INTERNAL_WIDTH, INTERNAL_HEIGHT, RESUME_GAP_MS } from './config.js';
+import { INTERNAL_WIDTH, INTERNAL_HEIGHT, RESUME_GAP_MS, SHOT_EFFECTS_SEED, SHOT_READY_FRAMES, SHOT_SEED, SHOT_TIME_MS } from './config.js';
+import { O, X } from './logic/board.js';
 import { CHARACTERS } from './logic/characters.js';
 import { createBroadcastTransport } from './net/transport.js';
 import { loadAssets, USES_3D } from './render/assets.js';
@@ -6,6 +7,7 @@ import { createEffects } from './render/effects.js';
 import { drawGameScreen, drawMenuScreen, setAssets } from './render/game-renderer.js';
 import { createResumeWatch } from './render3d/frame-gap.js';
 import { blursMenus, browserStorage, cycleQuality, startQuality } from './render3d/quality.js';
+import { seededRandom } from './render3d/seeded-random.js';
 import { loadV3Meta } from './render3d/v3-meta.js';
 import { GAME, GAME_OVER, createApp } from './ui/app.js';
 import { createHud } from './ui/hud.js';
@@ -13,6 +15,7 @@ import { hudViewModel } from './ui/hud-view.js';
 import { attachGameInput, hitTest, isQualityKey } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
 import { attachScreens } from './ui/screens.js';
+import { parseShotParams, setUpShotScene } from './ui/shot-mode.js';
 
 const canvas = document.getElementById('game');
 canvas.width = INTERNAL_WIDTH;
@@ -23,6 +26,15 @@ ctx.imageSmoothingEnabled = false;
 
 const params = new URLSearchParams(window.location.search);
 const wants2d = params.get('render') === '2d';
+
+// Shot mode (?shot=<scene>&quality=<level>, docs/shots.md section 4) is
+// for the screenshot self-check (tools/shots.sh): a fixed scene of a local
+// game, frozen at SHOT_TIME_MS, with no input, storage, network or FPS
+// line. Without the shot parameter it is null and none of it runs.
+const shot = parseShotParams(params);
+if (shot) {
+  window.__SHOT__ = { scene: shot.scene, quality: shot.quality, renderer: wants2d ? '2d' : '3d', ready: false, info: {} };
+}
 
 // The 2D renderer and HUD draw placeholders until the art from
 // assets/manifest.json has loaded, and for good for any file that is
@@ -52,9 +64,11 @@ document.addEventListener('visibilitychange', () => {
 // changes only the window it is pressed in. ?quality=low|medium|high picks
 // the level (unknown values are medium) and saves it; otherwise the saved
 // choice is used, else medium. The game works without storage.
-const storage = browserStorage();
-const quality = startQuality(params.get('quality'), storage);
+// Shot mode neither reads nor saves the stored choice.
+const storage = shot ? null : browserStorage();
+const quality = startQuality(shot ? shot.quality : params.get('quality'), storage);
 const renderer = wants2d ? RENDERER_2D : await load3dRenderer();
+if (shot) window.__SHOT__.renderer = renderer === RENDERER_2D ? '2d' : '3d';
 
 // The 3D game's HUD is the DOM glass overlay (src/ui/hud.js); the 2D
 // renderer draws its own panels on the canvas. The game modes set the
@@ -67,7 +81,9 @@ const hud = renderer === RENDERER_2D ? null : createHud(document.getElementById(
 });
 assetsLoaded.then((store) => hud?.setAssets(store));
 
-if (params.get('local') === '1') {
+if (shot) {
+  startShotMode(shot);
+} else if (params.get('local') === '1') {
   startLocalMode();
 } else {
   startOnlineMode();
@@ -81,7 +97,7 @@ async function load3dRenderer() {
     const [{ createWorldRenderer }, assets, meta] = await Promise.all([
       import('./render3d/world-renderer.js'), assetsLoaded, metaLoaded,
     ]);
-    const world = createWorldRenderer(worldCanvas, { assets, meta, warn, storage, quality: quality.level });
+    const world = createWorldRenderer(worldCanvas, { assets, meta, warn, storage, quality: quality.level, showQualityLine: !shot });
     if (quality.fromUrl) world.setQuality(quality.level);
     return world;
   } catch (err) {
@@ -301,6 +317,50 @@ function startLocalMode() {
     canvas.style.cursor = view.pointer ? 'pointer' : 'default';
     renderer.drawGameScreen(ctx, frameViewOf(view, time, effects, hint));
     if (hud) showHud(game, view, null, null, hint);
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+
+// Shot mode (docs/shots.md section 4): the scene is played on a local game
+// with a seeded random source (the 2D sparkles and dust are seeded too),
+// the growing plants and the last move are staged as planted at fixed
+// times before SHOT_TIME_MS, and every frame is drawn at SHOT_TIME_MS, so
+// two pictures are the same. No input is attached, so there is no hover.
+// window.__SHOT__.ready turns true once the art and the HUD images are
+// loaded and SHOT_READY_FRAMES frames were drawn at the current window size.
+async function startShotMode({ scene }) {
+  const game = createLocalGame({ random: seededRandom(SHOT_SEED) });
+  const staged = setUpShotScene(game, scene);
+  const effects = renderer === RENDERER_2D ? createEffects({ random: seededRandom(SHOT_EFFECTS_SEED) }) : null;
+  const planted = ({ x, y, player }) => [{ type: 'stonePlaced', player, x, y }];
+  for (const plant of staged.growing) showEvents(planted(plant), effects, SHOT_TIME_MS - plant.ageMs, false);
+  if (staged.last) showEvents(planted(staged.last), effects, SHOT_TIME_MS - staged.last.ageMs, false);
+  hud?.show(true);
+
+  await assetsLoaded;
+  await Promise.all(Array.from(document.images, (img) => (img.src ? img.decode().catch(() => {}) : null)));
+
+  const state = window.__SHOT__;
+  const { board, rocks, turn } = game.getState();
+  state.info.stones = board.flat().filter((cell) => cell === X || cell === O).length;
+  state.info.rocks = rocks.length;
+  state.info.turn = turn;
+  state.info.timeMs = SHOT_TIME_MS;
+  let width = -1;
+  let height = -1;
+  let drawn = 0;
+  const frame = () => {
+    if (window.innerWidth !== width || window.innerHeight !== height) {
+      width = window.innerWidth;
+      height = window.innerHeight;
+      drawn = 0;
+    }
+    const view = game.getView();
+    renderer.drawGameScreen(ctx, frameViewOf(view, SHOT_TIME_MS, effects, null));
+    if (hud) showHud(game, view, null, null, null);
+    drawn++;
+    state.ready = drawn >= SHOT_READY_FRAMES;
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

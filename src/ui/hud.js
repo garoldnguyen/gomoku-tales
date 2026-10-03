@@ -30,6 +30,9 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
   // Top bar: the turn pill.
   const topbar = el('div', 'topbar', root);
   const turn = el('div', 'turn glass', topbar);
+  // data-hud-box names every element that takes screen space, for the
+  // overlap check of the screenshot self-check (docs/shots.md section 4).
+  turn.dataset.hudBox = 'turn';
   turn.setAttribute('role', 'status');
   turn.setAttribute('aria-live', 'polite');
   el('span', 'dot', turn);
@@ -40,11 +43,13 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
   const quality = el('div', 'quality glass', root);
   quality.setAttribute('role', 'group');
   quality.setAttribute('aria-label', 'Quality');
+  quality.dataset.hudBox = 'quality';
   const qualityButtons = QUALITY_CHOICES.map(({ level, label }) => {
     const button = el('button', null, quality);
     button.type = 'button';
     button.textContent = label;
     button.setAttribute('aria-pressed', 'false');
+    button.dataset.hudBox = `quality-${level}`;
     button.addEventListener('click', () => onQuality(level));
     return button;
   });
@@ -71,6 +76,7 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
     const character = characterForStone(player);
     const card = el('section', `card ${player === X ? 'left' : 'right'} glass`, root);
     card.setAttribute('aria-label', character.name);
+    card.dataset.hudBox = `card-${player.toLowerCase()}`;
     const whoRow = el('div', 'who-row', card);
     artImage(el('div', 'tile', whoRow), PORTRAIT_ART[player], character.name[0]);
     const text = el('div', null, whoRow);
@@ -83,6 +89,7 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
     const skills = character.skills.map((skillId) => {
       const button = el('button', 'skill', list);
       button.type = 'button';
+      button.dataset.hudBox = `skill-${skillId}`;
       const ico = el('span', 'ico', button);
       artImage(ico, SKILL_ICON_ART[skillId], getSkill(skillId).name.split(' ').map((word) => word[0]).join(''));
       const ring = el('span', 'ring', ico);
@@ -99,6 +106,7 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
   const toast = el('div', 'toast glass', root);
   toast.setAttribute('role', 'status');
   toast.setAttribute('aria-live', 'polite');
+  toast.dataset.hudBox = 'toast';
   toast.hidden = true;
 
   root.addEventListener('contextmenu', (event) => {
