@@ -57,12 +57,15 @@ Entry points: `index.html` (the game, import map for `vendor/three`) loads `src/
 - `tests/*.test.js`: `node --test`. `docs/`: design, art direction (`art-direction-v3.md` is current), art spec, testing, lab, and `visual-qa.md` (the owner's checklist).
 
 <!-- GOMOKU-V31-FOREST -->
-## FOREST, HORIZON, FULL WINDOW AND COLLAPSIBLE HUD (v3.1), adds to the farmland art rules
+## FOREST, HORIZON, FULL WINDOW, COLLAPSIBLE HUD AND SCREENSHOT SELF-CHECK (v3.1), adds to the farmland art rules
 
 Read `docs/art-direction-v3-1.md` before any work in `src/render3d` or `src/ui`. It changes only what it lists from `docs/art-direction-v3.md`; where the two differ, v3.1 wins. Game rules, networking and cell numbering do not change.
 
-1. The canvas fills the whole window. Only `fitView(aspect)` in `framing.js` changes the field of view, and only for windows narrower than 16:9.
+1. The canvas fills the whole window. Only `fitView(aspect)` in `framing.js` changes the field of view, and only for windows narrower than 16:9. A Fullscreen button (browser Fullscreen API, key F) is the only extra window control: there is no aspect ratio setting.
 2. Far things fade into `HAZE_COLOR` through the functions in `haze.js`. Haze never uses blur. The sky is a plain gradient with no dithering.
 3. The forest (`planForest`) exists on Medium and High only. Trees and wall strips are always scale 1. Low stays plain: only the sky gradient and the soft ground edge.
 4. HUD cards are collapsible. Skill text comes only from the `SKILL_INFO` table, and numbers in it come from the game config constants.
 5. Every number of the doc that code uses lives in one named constant, shared by code and tests. Pure helpers get unit tests. No per frame allocation. All existing tests keep passing.
+6. The builder can see the game. Read `docs/shots.md`. After a change that affects what is drawn, run `bash tools/shots.sh --set <name>` as the task says, read `shots/report.json` first and fix every problem it lists, then open at most 3 of the PNG files with the image reading tool and compare them with the picture the task names. Write a paragraph that starts with `Seen:` in the final summary: what the pictures show in plain words, with the key numbers from the report. Write only what you saw. At most 3 rounds of fix and shoot, then stop and say what is still wrong. If the tool cannot run, say so and do not claim a visual check.
+7. The pictures come from software rendering. They show layout, colour, shapes, density and overlaps, not frame rate. Never state an FPS number: the owner measures it. The reviewer may not see pictures, so quote the report numbers in the summary.
+<!-- /GOMOKU-V31-FOREST -->

@@ -1,0 +1,8 @@
+{
+  "_note": "Game specific settings for tools/shots.py. Keys that are not listed use the defaults in shots.py. See docs/shots.md.",
+  "serve": ["{python}", "-m", "http.server", "{port}", "--bind", "127.0.0.1"],
+  "cwd": ".",
+  "entry": "/index.html",
+  "ready_timeout_s": 120,
+  "strict_window": false
+}

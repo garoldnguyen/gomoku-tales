@@ -7,6 +7,7 @@ Forest, horizon haze, full window view and collapsible HUD cards. Written after 
 | owner feedback | what we build | section |
 |---|---|---|
 | The view is not full screen, black empty bars on the left and right. | The canvas fills the whole window at any shape. The camera widens only when the window is narrower than 16:9. | 3 |
+| Easy to play: a way to go fullscreen. | A Fullscreen button in the top bar and the key F (section 3.5). | 3 |
 | Make the Card Character HUD collapsible. Collapsed, the skills must still be one click away. Let players read what a skill does. | Each card folds into a slim pill (portrait, two skill buttons, chevron). Every skill has a short description in the expanded card and in a tooltip. | 4 |
 | The green trees at the back do not look cool. Make it look like a forest. | A real forest: far canopy wall, tree rows, undergrowth, new tree sprites. | 6 |
 | The blend between the green hill, the horizon and the sky is not smooth. | One haze system: distance fades colour into the sky colour, ridges have soft crests, the grass edge fades. | 5 |
@@ -17,6 +18,7 @@ Decisions the owner already made (do not reopen them):
 2. HUD cards start expanded, then remember the player's choice on this device.
 3. The four skill descriptions in section 4 are accepted as written (the builder still checks every number against the code).
 4. Low stays plain: only a soft sky-to-horizon gradient and the soft ground edge from section 5. No forest, no hills.
+5. Window: the view always fills the window and adapts to its shape (Auto). A Fullscreen button is added. There is no setting to pick a fixed aspect ratio, so black bars never come back.
 
 ### Differences from `art-direction-v3.md`
 
@@ -50,7 +52,7 @@ All in `docs/reference/v3-1/`. They are made from the real sprites by a script, 
 
 1. The canvas is exactly the size of the browser window (width and height of the viewport, no margin, no scroll bars, no black stage, no fixed 16:9 box). The page background behind it is irrelevant because the canvas covers it.
 2. On window resize and on orientation change the renderer size, the camera aspect, the pixel ratio (capped by `quality.js`: 1, 1.5, 2) and the HUD layout are updated in the same tick. Nothing is allocated per frame because of this.
-3. The HUD floats over the picture exactly as today, positioned against the full window. F11 gives a true full screen; no code is needed for it.
+3. The HUD floats over the picture exactly as today, positioned against the full window. A Fullscreen button and a key give a true full screen (section 3.5). There is no aspect ratio setting: the view is always Auto.
 4. Mouse and touch picking use the canvas rectangle and the same camera, so a click lands on the cell under the pointer at every window shape.
 5. Supported window shapes: 9:21 (tall phone) to 32:9 (super ultrawide). Outside that range nothing breaks, but it is not tuned.
 6. The 2D fallback renderer (`?render=2d`) is not touched.
@@ -84,6 +86,16 @@ Expected values from the author's own model of the camera (aim 2.2 units behind 
 - The far canopy wall and the forest span x from -44 to 44 (section 6).
 
 Not part of this: no change to the board size, the plot size, the pixel scale of plants or the look of the field.
+
+### 3.5 Fullscreen button
+
+- A real `button`, 44 by 44 px, in the top bar next to the quality switch, same glass tokens. Inline SVG icon (expand corners, and a collapse version while active), no new image assets. `aria-label` is `Enter full screen` or `Exit full screen`, and it has `aria-pressed`. In the slim layout below 700 px it stays in the compact top bar.
+- It uses the browser Fullscreen API on the whole page (`document.documentElement.requestFullscreen()` and `document.exitFullscreen()`, with the `webkit` prefixed versions as a fallback if the page already supports them). The call is made directly from the click or key handler, because browsers only allow it from a user action; a failed promise is caught and ignored.
+- Key `F` toggles it. First check the existing shortcuts in `src/ui/app.js` and the help text; if `F` is taken use `Z`. Ignore the key when a modifier key is held, when focus is in a text field, select or contenteditable element, and on key repeat. The browser's own Escape and F11 keep working. Write the final key in `docs/design.md`.
+- The button label follows the real state through the `fullscreenchange` event, so it is right when the player leaves with Escape or F11. If the browser has no Fullscreen API (`document.fullscreenEnabled` is false, as on iPhone Safari), the button is not shown at all.
+- Entering or leaving fullscreen needs no special scene code: the resize path of section 3.1 handles the new size.
+- The view stays Auto. Do not add a fixed aspect ratio setting.
+- Pure helper `fullscreenViewModel({ supported, active })` returns `{ visible, ariaLabel, pressed }`. Tests: unsupported hides the button, both labels and pressed states, the key helper (toggles, ignored with modifiers, in inputs and on repeat), and the `hud-layout` top bar rectangles with the button at 1920 by 1080, 1280 by 720, 800 by 600 and 390 by 844 with no overlaps and all inside the viewport.
 
 ### 3.4 Tests (all pure, no browser)
 
@@ -312,15 +324,15 @@ These rows join the one table in `src/render3d/quality.js`. Nothing else may tes
 - No per-frame allocation. The forest is static: it is built once per quality change, drawn with a handful of instanced meshes, and only the haze uniforms change when the window or the quality changes.
 - Switching quality at runtime rebuilds only the forest and the haze layers, disposes replaced geometries, textures and materials, and never resets the game.
 - Every number in this document that the code uses lives in one named constant, used by the code and by the tests.
-- Pure helpers with unit tests: `fitView`, `zoomK`, ground bounds, `groundZAtScreenY`, `hazeAmount`, `wallTopHaze`, `groundFogAmount`, `floorShadeAmount`, ridge crest, `planForest`, forest zone filter, `SKILL_INFO` view model, `tooltipPosition`, collapsed-state storage, key helper, `hud-layout` for collapsed and expanded.
+- Pure helpers with unit tests: `fitView`, `zoomK`, ground bounds, `groundZAtScreenY`, `hazeAmount`, `wallTopHaze`, `groundFogAmount`, `floorShadeAmount`, ridge crest, `planForest`, forest zone filter, `SKILL_INFO` view model, `tooltipPosition`, collapsed-state storage, key helpers, `fullscreenViewModel`, `hud-layout` for collapsed and expanded and for the top bar.
 - All existing tests must still pass. If a test fails because the new behaviour is intended, change only that expectation and say which one and why. Never delete or weaken a test to make it pass.
-- The builder has no browser or GPU: it must not invent frame rates or screenshots. FPS is measured by the owner (section 9).
+- The builder can take screenshots with `bash tools/shots.sh` (see `docs/shots.md`) and must look at them as the task says. Software rendering shows layout, colour, density and overlaps, not speed: the builder must not invent frame rates. FPS is measured by the owner (section 9).
 
 ## 9. Visual QA for the owner (after the last task)
 
 Hard refresh first (Ctrl+Shift+R). Use `?quality=low`, `?quality=medium`, `?quality=high` and `?fps=1`.
 
-1. Wide window: no black bars at any width. Drag the window narrower and taller: the whole field always stays visible, nothing cut off. Try F11.
+1. Wide window: no black bars at any width. Drag the window narrower and taller: the whole field always stays visible, nothing cut off. Try the Fullscreen button and the F key, and leave with Escape: the label follows.
 2. Phone shape (browser device mode, portrait): the field, the curb and a small margin are visible, the cards are slim bars.
 3. HUD: collapse each card with its chevron and with the shortcut key; reload the page and check it is remembered; click the skills while collapsed; hover (or Tab to) each skill and read its description; Escape closes the tooltip; the opponent's skills show Wait for your turn but still explain themselves.
 4. Forest on High: a real forest, uneven gaps, tall and short trees, ferns and shrubs at the feet; far trees pale, near trees crisp. Compare with `scene-forest-high.jpg`.
@@ -336,6 +348,7 @@ Hard refresh first (Ctrl+Shift+R). Use `?quality=low`, `?quality=medium`, `?qual
 - Do not scale pixel sprites by fractional factors at rest. Trees and wall strips are scale 1.
 - Do not blur anything on Medium or Low. Do not change the depth of field settings.
 - Do not dither the sky.
+- Do not add a setting for a fixed aspect ratio. The view is always Auto.
 - Do not put anything on a plot except a plant, a rock or a mark. Meadow items stay in front of the forest zone line.
 - Do not change game rules, networking or cell numbering.
 - Do not add libraries, fonts or network requests for art. Everything is vendored.
