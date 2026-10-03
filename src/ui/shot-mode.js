@@ -6,6 +6,7 @@
 // clicks.
 
 import { normalizeQuality } from '../render3d/quality.js';
+import { parseHudParam } from './hud-collapse.js';
 import { SHOT_FIELD } from './shot-position.js';
 
 export const SHOT_SCENES = Object.freeze(['field', 'empty']);
@@ -13,8 +14,9 @@ const DEFAULT_SCENE = 'field';
 
 // The shot and quality parameters of a URL search string (or
 // URLSearchParams): null without the shot parameter, else { scene,
-// quality }. An unknown or empty scene is `field`; quality is low, medium
-// or high (missing or unknown values are medium, as for ?quality=).
+// quality, hud }. An unknown or empty scene is `field`; quality is low, medium
+// or high (missing or unknown values are medium, as for ?quality=); hud is
+// 'expanded' or 'collapsed' (both HUD cards, over any stored choice) or null.
 export function parseShotParams(search) {
   const params = typeof search === 'string' || search == null ? new URLSearchParams(search ?? '') : search;
   const shot = params.get('shot');
@@ -23,6 +25,7 @@ export function parseShotParams(search) {
   return {
     scene: SHOT_SCENES.includes(name) ? name : DEFAULT_SCENE,
     quality: normalizeQuality(params.get('quality')),
+    hud: parseHudParam(params.get('hud')),
   };
 }
 

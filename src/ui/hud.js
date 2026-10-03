@@ -4,21 +4,33 @@
 // hud-view.js and touches the DOM only where a value changed. Every control
 // is a real button; the skill rows call onSkill like the old canvas
 // buttons did, so the target flows, Esc, right click, R and Q work as before.
+//
+// Each card folds into a pill (docs/art-direction-v3-1.md section 4): a
+// chevron button per card, the pill's own skill buttons calling the same
+// onSkill, and one shared tooltip with the skill's description, placed by
+// tooltipPosition(). The slim layouts of narrow windows never fold.
 
 import { X, O } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
 import { getSkill } from '../logic/skills.js';
-import { CARD_HEIGHT, hudLayout } from './hud-layout.js';
+import { CARD_HEIGHT, chevronSize, hudFoldLayout, pillScale } from './hud-layout.js';
 import { PORTRAIT_ART, QUALITY_CHOICES, SKILL_ICON_ART } from './hud-view.js';
+import { TOOLTIP_LONG_PRESS_MS, TOOLTIP_SHOW_MS, tooltipPosition } from './tooltip-position.js';
 
 const LOOK_CLASSES = { selected: 'is-selected', cooling: 'is-cooling', off: 'is-off', ready: null };
+const SVG = 'http://www.w3.org/2000/svg';
+// The pill's cooldown ring: viewBox 72, radius 33, stroke 4.
+const RING_RADIUS = 33;
+const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
+const TOOLTIP_ID = 'hud-tooltip';
 
 // root: the empty .hud element. handlers:
 //   onSkill(player, skillId)  a skill row was pressed
 //   onQuality(level)          a quality button was pressed
 //   onCancel()                a right click on the HUD
+//   onCollapse(player)        a card's chevron was pressed
 // assets: the asset store (render/assets.js) or null; setAssets() swaps it.
-export function createHud(root, { onSkill, onQuality, onCancel }, assets = null) {
+export function createHud(root, { onSkill, onQuality, onCancel, onCollapse }, assets = null) {
   root.classList.add('hud');
   const el = (tag, className, parent) => {
     const node = document.createElement(tag);
@@ -71,36 +83,108 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
     }
   };
 
-  // Player cards.
-  const cards = [X, O].map((player) => {
+  // The shared skill tooltip (filled and placed in showTip below).
+  const tip = el('div', 'tooltip', root);
+  tip.id = TOOLTIP_ID;
+  tip.setAttribute('role', 'tooltip');
+  tip.dataset.hudBox = 'tooltip';
+  tip.hidden = true;
+  const tipHead = el('div', 'tip-head', tip);
+  const tipTitle = el('div', 'tip-title', tipHead);
+  const tipState = el('div', 'tip-state', tipHead);
+  const tipText = el('div', 'tip-text', tip);
+  el('div', 'tip-rule', tip);
+  const tipHint = el('div', 'tip-hint', tip);
+
+  // A skill button: a row of the expanded card or a button of the pill.
+  // Both run onSkill, unless a long press just showed the tooltip.
+  let skipClick = null;
+  const skillButton = (className, parent, player, skillId, c, s) => {
+    const button = el('button', className, parent);
+    button.type = 'button';
+    button.addEventListener('click', () => {
+      if (skipClick === button) {
+        skipClick = null; // the click after a long press: the tooltip stays
+        return;
+      }
+      hideTip();
+      onSkill(player, skillId);
+    });
+    attachTip(button, c, s);
+    return button;
+  };
+
+  // Player cards. Each is one section that folds: the chevron stays, the
+  // card body hides and the pill's skill buttons show.
+  const cards = [X, O].map((player, c) => {
     const character = characterForStone(player);
+    const team = player.toLowerCase();
     const card = el('section', `card ${player === X ? 'left' : 'right'} glass`, root);
     card.setAttribute('aria-label', character.name);
-    card.dataset.hudBox = `card-${player.toLowerCase()}`;
+    card.dataset.hudBox = `card-${team}`;
     const whoRow = el('div', 'who-row', card);
-    artImage(el('div', 'tile', whoRow), PORTRAIT_ART[player], character.name[0]);
-    const text = el('div', null, whoRow);
+    const tile = el('div', 'tile', whoRow);
+    artImage(tile, PORTRAIT_ART[player], character.name[0]);
+    el('span', 'turn-dot', tile);
+    const text = el('div', 'who-text', whoRow);
     const name = el('div', 'name', text);
     const meta = el('div', 'meta', text);
-    const chip = el('div', 'chip', card);
-    el('div', 'rule', card);
-    el('div', 'label', card).textContent = 'SKILLS';
-    const list = el('div', 'skills', card);
-    const skills = character.skills.map((skillId) => {
-      const button = el('button', 'skill', list);
-      button.type = 'button';
+    const pillSkills = el('div', 'pill-skills', whoRow);
+    pillSkills.hidden = true;
+    const chevron = el('button', 'chevron', whoRow);
+    chevron.type = 'button';
+    chevron.dataset.hudBox = `chevron-${team}`;
+    chevron.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg>';
+    chevron.addEventListener('click', () => onCollapse?.(player));
+    const body = el('div', 'card-body', card);
+    body.id = `hud-card-${team}-body`;
+    chevron.setAttribute('aria-controls', body.id);
+    const chip = el('div', 'chip', body);
+    el('div', 'rule', body);
+    el('div', 'label', body).textContent = 'SKILLS';
+    const list = el('div', 'skills', body);
+    const skills = character.skills.map((skillId, s) => {
+      const letters = getSkill(skillId).name.split(' ').map((word) => word[0]).join('');
+      const button = skillButton('skill', list, player, skillId, c, s);
       button.dataset.hudBox = `skill-${skillId}`;
       const ico = el('span', 'ico', button);
-      artImage(ico, SKILL_ICON_ART[skillId], getSkill(skillId).name.split(' ').map((word) => word[0]).join(''));
+      artImage(ico, SKILL_ICON_ART[skillId], letters);
       const ring = el('span', 'ring', ico);
       const count = el('span', 'count', ico);
       const t = el('span', 't', button);
       const title = el('span', 'title', t);
       const state = el('span', 'state', t);
-      button.addEventListener('click', () => onSkill(player, skillId));
-      return { button, ico, ring, count, title, state, look: null, progress: null };
+      const desc = el('span', 'desc', button);
+
+      // The pill's button for the same skill.
+      const pill = skillButton('pskill', pillSkills, player, skillId, c, s);
+      pill.dataset.hudBox = `pill-skill-${skillId}`;
+      const pico = el('span', 'ico', pill);
+      artImage(pico, SKILL_ICON_ART[skillId], letters);
+      const svg = document.createElementNS(SVG, 'svg');
+      svg.setAttribute('class', 'pring');
+      svg.setAttribute('viewBox', '0 0 72 72');
+      svg.setAttribute('aria-hidden', 'true');
+      const track = document.createElementNS(SVG, 'circle');
+      const arc = document.createElementNS(SVG, 'circle');
+      for (const circle of [track, arc]) {
+        circle.setAttribute('cx', '36');
+        circle.setAttribute('cy', '36');
+        circle.setAttribute('r', String(RING_RADIUS));
+        svg.append(circle);
+      }
+      track.setAttribute('class', 'track');
+      arc.setAttribute('class', 'arc');
+      arc.setAttribute('transform', 'rotate(-90 36 36)');
+      pill.append(svg);
+      const pcount = el('span', 'count', pill);
+      el('span', 'ready-dot', pill);
+
+      return {
+        button, ico, ring, count, title, state, desc, pill, arc, pcount, look: null, progress: null, view: null,
+      };
     });
-    return { card, name, meta, chip, skills };
+    return { card, team, text, pillSkills, chevron, body, name, meta, chip, skills, folded: false, collapsed: false };
   });
 
   const toast = el('div', 'toast glass', root);
@@ -111,6 +195,8 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
 
   root.addEventListener('contextmenu', (event) => {
     event.preventDefault();
+    // A touch long press on a skill shows its tooltip, not a cancel.
+    if (pressed || skipClick) return;
     onCancel?.();
   });
 
@@ -126,22 +212,158 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
   // Shrinks the cards or turns them into slim bars (at the bottom or upright
   // beside the board) so they never lie over
   // the board (hud-layout.js), against the full window. Runs when the window
-  // size or the orientation changes, not per frame.
+  // size or the orientation changes, or a card folds, not per frame. The
+  // height that counts is the last measured height of the full card, or
+  // the pill's when both cards are folded (hudFoldLayout).
   let cardHeight = CARD_HEIGHT;
+  let compact = false;
+  let foldable = true;
   const layout = () => {
     if (root.hidden) return;
-    if (!root.classList.contains('is-compact')) cardHeight = Math.max(CARD_HEIGHT, cards[0].card.offsetHeight);
-    const { compact, rail, railWidth, stacked, scale } = hudLayout(window.innerWidth, window.innerHeight, cardHeight);
-    root.classList.toggle('is-compact', compact);
-    root.classList.toggle('is-rail', rail);
-    root.classList.toggle('is-stacked', stacked);
-    const value = String(scale);
+    if (!compact) {
+      for (const dom of cards) if (!dom.folded) cardHeight = Math.max(CARD_HEIGHT, dom.card.offsetHeight);
+    }
+    const collapsed = { [X]: cards[0].collapsed, [O]: cards[1].collapsed };
+    const { layout: next, foldable: fits } = hudFoldLayout(window.innerWidth, window.innerHeight, { collapsed, cardHeight });
+    compact = next.compact;
+    foldable = fits;
+    root.classList.toggle('is-compact', next.compact);
+    root.classList.toggle('is-rail', next.rail);
+    root.classList.toggle('is-stacked', next.stacked);
+    // Where no pill fits (the slim layouts, the smallest full cards) the
+    // chevrons hide and the cards stay full; the saved choice is kept.
+    root.classList.toggle('no-fold', !fits);
+    const value = String(next.scale);
     if (root.style.getPropertyValue('--card-scale') !== value) root.style.setProperty('--card-scale', value);
-    const width = `${railWidth}px`;
+    const pill = String(pillScale(next.scale));
+    if (root.style.getPropertyValue('--pill-scale') !== pill) root.style.setProperty('--pill-scale', pill);
+    // The chevrons stay 44 px on screen however small the card or pill is drawn.
+    const chevronCard = `${chevronSize(next.scale)}px`;
+    if (root.style.getPropertyValue('--chevron-card') !== chevronCard) root.style.setProperty('--chevron-card', chevronCard);
+    const chevronPill = `${chevronSize(pillScale(next.scale))}px`;
+    if (root.style.getPropertyValue('--chevron-pill') !== chevronPill) root.style.setProperty('--chevron-pill', chevronPill);
+    const width = `${next.railWidth}px`;
     if (root.style.getPropertyValue('--rail-width') !== width) root.style.setProperty('--rail-width', width);
+    if (fold()) layout();
+    else placeTip();
   };
   window.addEventListener('resize', layout);
   window.addEventListener('orientationchange', layout);
+  document.fonts?.ready.then(layout);
+
+  // Shows each card folded or not: folded when the view model says
+  // collapsed and a pill fits (not in the slim layouts; there the saved
+  // choice is ignored, not erased). Returns true if a card changed.
+  function fold() {
+    let changed = false;
+    for (const dom of cards) {
+      const folded = dom.collapsed && foldable;
+      if (dom.folded === folded) continue;
+      changed = true;
+      // Focus on a part that hides moves to the chevron, which stays.
+      const lost = dom.card.contains(document.activeElement) && document.activeElement !== dom.chevron;
+      if (lost || (tipOwner && dom.card.contains(tipOwner.button))) hideTip();
+      dom.folded = folded;
+      dom.card.classList.toggle('is-collapsed', folded);
+      dom.card.dataset.hudBox = `${folded ? 'pill' : 'card'}-${dom.team}`;
+      dom.body.hidden = folded;
+      dom.text.hidden = folded;
+      dom.pillSkills.hidden = !folded;
+      if (lost) dom.chevron.focus({ preventScroll: true });
+    }
+    return changed;
+  }
+
+  // The tooltip: one element, shown for one skill button at a time.
+  let tipOwner = null; // { button, c, s }
+  let hoverTimer = null;
+  let pressTimer = null;
+  let pressed = false;
+  function fillTip() {
+    const view = cards[tipOwner.c].skills[tipOwner.s].view;
+    if (!view) return;
+    setText(tipTitle, view.title);
+    setText(tipState, view.stateText);
+    setAttr(tipState, 'data-state', view.state);
+    setText(tipText, view.description);
+    setText(tipHint, view.hint);
+  }
+  function showTip(button, c, s) {
+    clearTimeout(hoverTimer);
+    if (tipOwner && tipOwner.button !== button) tipOwner.button.removeAttribute('aria-describedby');
+    tipOwner = { button, c, s };
+    button.setAttribute('aria-describedby', TOOLTIP_ID);
+    fillTip();
+    tip.hidden = false;
+    placeTip();
+  }
+  // Places the open tooltip next to its button. Runs when it opens, when
+  // its text changes and after every layout (resize, orientation, fold),
+  // so it never stays where the button was. A button that is no longer
+  // drawn closes it.
+  function placeTip() {
+    if (!tipOwner) return;
+    const rect = tipOwner.button.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) {
+      hideTip();
+      return;
+    }
+    const at = tooltipPosition(rect, { width: tip.offsetWidth, height: tip.offsetHeight },
+      { width: window.innerWidth, height: window.innerHeight });
+    tip.style.left = `${at.left}px`;
+    tip.style.top = `${at.top}px`;
+    tip.dataset.placement = at.placement;
+  }
+  function hideTip() {
+    clearTimeout(hoverTimer);
+    hoverTimer = null;
+    if (tipOwner) tipOwner.button.removeAttribute('aria-describedby');
+    tipOwner = null;
+    tip.hidden = true;
+  }
+  // Hover after TOOLTIP_SHOW_MS and keyboard focus at once, on the full
+  // cards and the pills; a long touch press everywhere, the slim bars too.
+  function attachTip(button, c, s) {
+    button.addEventListener('pointerenter', (event) => {
+      if (event.pointerType !== 'mouse' || compact) return;
+      clearTimeout(hoverTimer);
+      hoverTimer = setTimeout(() => showTip(button, c, s), TOOLTIP_SHOW_MS);
+    });
+    button.addEventListener('pointerleave', (event) => {
+      if (event.pointerType === 'mouse') hideTip();
+    });
+    button.addEventListener('focus', () => {
+      if (!compact && button.matches(':focus-visible')) showTip(button, c, s);
+    });
+    button.addEventListener('blur', hideTip);
+    button.addEventListener('pointerdown', (event) => {
+      if (event.pointerType !== 'touch') return;
+      clearTimeout(pressTimer);
+      pressed = true;
+      pressTimer = setTimeout(() => {
+        skipClick = button;
+        showTip(button, c, s);
+      }, TOOLTIP_LONG_PRESS_MS);
+    });
+    const release = () => {
+      clearTimeout(pressTimer);
+      pressed = false;
+    };
+    button.addEventListener('pointerup', release);
+    button.addEventListener('pointercancel', () => {
+      release();
+      skipClick = null;
+    });
+  }
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && tipOwner) hideTip();
+  });
+  // A long press that ends without a click (moved off) must not eat the
+  // next one, and a touch anywhere else closes its tooltip.
+  window.addEventListener('pointerdown', (event) => {
+    if (skipClick && !skipClick.contains(event.target)) skipClick = null;
+    if (tipOwner && event.pointerType === 'touch' && !tipOwner.button.contains(event.target)) hideTip();
+  }, true);
 
   const setQuality = (level) => {
     if (root.dataset.quality !== level) root.dataset.quality = level;
@@ -164,26 +386,48 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
         setText(dom.chip, card.chip);
         dom.card.classList.toggle('is-waiting', card.waiting);
         dom.card.classList.toggle('is-winner', card.winner);
+        dom.card.classList.toggle('is-active', card.active);
+        setAttr(dom.chevron, 'aria-label', card.chevronLabel);
+        setAttr(dom.chevron, 'aria-expanded', String(!card.collapsed));
+        if (dom.collapsed !== card.collapsed) {
+          dom.collapsed = card.collapsed;
+          if (fold()) layout();
+        }
         card.skills.forEach((skill, s) => {
           const row = dom.skills[s];
+          row.view = skill;
           if (row.look !== skill.look) {
-            if (row.look && LOOK_CLASSES[row.look]) row.button.classList.remove(LOOK_CLASSES[row.look]);
-            if (LOOK_CLASSES[skill.look]) row.button.classList.add(LOOK_CLASSES[skill.look]);
+            for (const button of [row.button, row.pill]) {
+              if (row.look && LOOK_CLASSES[row.look]) button.classList.remove(LOOK_CLASSES[row.look]);
+              if (LOOK_CLASSES[skill.look]) button.classList.add(LOOK_CLASSES[skill.look]);
+            }
             row.look = skill.look;
           }
+          setAttr(row.pill, 'data-state', skill.state);
           setText(row.title, skill.title);
-          setText(row.state, skill.state);
-          setText(row.count, skill.cooldown > 0 ? String(skill.cooldown) : '');
-          const percent = Math.round(skill.progress * 100);
+          setText(row.state, skill.stateText);
+          setText(row.desc, skill.description);
+          const count = skill.cooldownTurns > 0 ? String(skill.cooldownTurns) : '';
+          setText(row.count, count);
+          setText(row.pcount, count);
+          const percent = Math.round(skill.cooldownProgress * 100);
           if (row.progress !== percent) {
             row.ring.style.setProperty('--p', String(percent));
+            const dash = (RING_LENGTH * percent) / 100;
+            row.arc.setAttribute('stroke-dasharray', `${dash.toFixed(1)} ${RING_LENGTH.toFixed(1)}`);
             row.progress = percent;
           }
-          setAttr(row.button, 'aria-label', skill.label);
-          setAttr(row.button, 'aria-disabled', String(skill.disabled));
-          setAttr(row.button, 'aria-pressed', String(skill.selected));
+          for (const button of [row.button, row.pill]) {
+            setAttr(button, 'aria-label', skill.ariaLabel);
+            setAttr(button, 'aria-disabled', String(skill.disabled));
+            setAttr(button, 'aria-pressed', String(skill.selected));
+          }
         });
       });
+      if (tipOwner) {
+        fillTip();
+        placeTip();
+      }
 
       const message = vm.toast ?? '';
       setText(toast, message);
@@ -196,8 +440,16 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
     show(visible) {
       if (root.hidden === visible) {
         root.hidden = !visible;
+        if (!visible) hideTip();
         layout();
       }
+    },
+
+    // False while the HUD is hidden and where the cards never fold (the
+    // slim layouts and the windows too small for a pill): the C key then
+    // does nothing.
+    canCollapse() {
+      return !root.hidden && foldable;
     },
 
     // The loaded art; missing files keep their letters.

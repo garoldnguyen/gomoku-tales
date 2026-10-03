@@ -11,6 +11,7 @@ import { seededRandom } from './render3d/seeded-random.js';
 import { loadV3Meta } from './render3d/v3-meta.js';
 import { GAME, GAME_OVER, createApp } from './ui/app.js';
 import { createHud } from './ui/hud.js';
+import { isCollapseKey, startCollapsed, toggleAll, withCollapsed, writeCollapsed } from './ui/hud-collapse.js';
 import { hudViewModel } from './ui/hud-view.js';
 import { attachGameInput, hitTest, isQualityKey } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
@@ -81,8 +82,27 @@ const hud = renderer === RENDERER_2D ? null : createHud(document.getElementById(
   onSkill: (player, skillId) => hudHandlers.onSkill(player, skillId),
   onQuality: (level) => setQuality(level),
   onCancel: () => hudHandlers.onCancel(),
+  onCollapse: (player) => setCollapsed(withCollapsed(hudCollapsed, player, !hudCollapsed[player])),
 });
 assetsLoaded.then((store) => hud?.setAssets(store));
+
+// Which HUD cards are folded into pills (docs/art-direction-v3-1.md section
+// 4.1): saved per team, all expanded at first. Shot mode takes ?hud= and
+// neither reads nor saves the stored choice (storage is null there).
+let hudCollapsed = startCollapsed(storage, shot?.hud ?? null);
+function setCollapsed(next) {
+  for (const player of [X, O]) {
+    if (next[player] !== hudCollapsed[player]) writeCollapsed(storage, player, next[player]);
+  }
+  hudCollapsed = next;
+}
+// The C key folds or unfolds both cards; not in the slim layouts, where
+// the cards never fold, and not in shot mode (no input there).
+if (hud && !shot) {
+  window.addEventListener('keydown', (event) => {
+    if (isCollapseKey(event) && hud.canCollapse()) setCollapsed(toggleAll(hudCollapsed));
+  });
+}
 
 if (shot) {
   startShotMode(shot);
@@ -141,6 +161,7 @@ function attachQualityKey() {
 // makes nothing.
 const hudInputs = {
   state: null, targeting: null, status: null, message: null, peerCountdown: null, winner: null, quality: null, hint: null,
+  collapsed: null,
 };
 let hudPlayer = null;
 let hudShown = false;
@@ -150,7 +171,8 @@ function showHud(game, view, localPlayer, winner, hint) {
   const quality = renderer.quality;
   if (hudShown && hudInputs.state === view.state && hudInputs.targeting === targeting && hudInputs.status === view.status
     && hudInputs.message === view.message && hudInputs.peerCountdown === peerCountdown && hudInputs.winner === winner
-    && hudInputs.quality === quality && hudInputs.hint === hint && hudPlayer === localPlayer) return;
+    && hudInputs.quality === quality && hudInputs.hint === hint && hudInputs.collapsed === hudCollapsed
+    && hudPlayer === localPlayer) return;
   hudShown = true;
   hudPlayer = localPlayer;
   hudInputs.state = view.state;
@@ -161,6 +183,7 @@ function showHud(game, view, localPlayer, winner, hint) {
   hudInputs.winner = winner;
   hudInputs.quality = quality;
   hudInputs.hint = hint;
+  hudInputs.collapsed = hudCollapsed;
   hud.render(hudViewModel(view.state, hudInputs, localPlayer));
 }
 

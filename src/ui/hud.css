@@ -99,7 +99,7 @@
    it also covers windows where full cards would lie over the board. */
 .hud.is-compact .quality { right: 12px; top: 12px; padding: 4px; }
 .hud.is-compact .quality button { padding: 6px 8px; font-size: 13px; min-height: 40px; }
-.hud.is-compact .topbar { top: 12px; left: 12px; right: auto; justify-content: flex-start; max-width: calc(100% - 196px); }
+.hud.is-compact .topbar { top: 12px; left: 12px; right: auto; justify-content: flex-start; max-width: calc(100% - 216px); }
 .hud.is-compact .turn { padding: 8px 12px; gap: 8px; min-height: 48px; max-width: 100%; }
 .hud.is-compact .turn .who { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* the reference hides the hint here; the game keeps it on a second line, as
@@ -107,8 +107,8 @@
 .hud.is-compact .turn { flex-wrap: wrap; row-gap: 2px; border-radius: 22px; }
 .hud.is-compact .turn .who { max-width: calc(100% - 20px); }
 .hud.is-compact .turn .hint { flex-basis: 100%; padding-left: 20px; font-size: 13px; line-height: 1.25; }
-.hud.is-compact .card { top: auto; width: calc(100% - 24px); left: 12px !important; right: 12px !important; padding: 10px 12px; flex-direction: row; align-items: center; gap: 12px; border-radius: 22px; }
-.hud.is-compact .card.left { bottom: 80px; }
+.hud.is-compact .card { top: auto; width: calc(100% - 24px); left: 12px !important; right: 12px !important; padding: 9px 12px; flex-direction: row; align-items: center; gap: 12px; border-radius: 22px; }
+.hud.is-compact .card.left { bottom: 92px; }
 .hud.is-compact .card.right { bottom: 12px; }
 .hud.is-compact .tile { width: 52px; height: 52px; border-radius: 16px; }
 .hud.is-compact .tile img { width: 32px; height: 32px; }
@@ -139,7 +139,7 @@
 /* toast: the game's messages in the same glass */
 .hud .toast { position: absolute; left: 50%; bottom: 28px; transform: translateX(-50%); max-width: min(720px, calc(100% - 24px)); padding: 12px 22px; border-radius: 999px; font-size: 15px; font-weight: 600; text-align: center; pointer-events: none; }
 .hud.is-compact .quality button { min-height: 44px; min-width: 44px; }
-.hud.is-compact .toast { bottom: 156px; font-size: 13px; padding: 8px 14px; border-radius: 18px; }
+.hud.is-compact .toast { bottom: 176px; font-size: 13px; padding: 8px 14px; border-radius: 18px; }
 /* Where the space beside the board is narrow the cards shrink (--card-scale
    from hudLayout()) so they never lie over the plots and take their clicks. */
 .hud .card.left { left: calc(56px * var(--card-scale, 1)); transform: scale(var(--card-scale, 1)); transform-origin: top left; }
@@ -151,7 +151,7 @@
   .hud.is-compact:not(.is-rail) .card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-areas: "tile name skills" "tile chip skills"; column-gap: 10px; row-gap: 4px; align-items: center; }
   .hud.is-compact:not(.is-rail) .who-row { display: contents; }
   .hud.is-compact:not(.is-rail) .tile { grid-area: tile; }
-  .hud.is-compact:not(.is-rail) .who-row > div:last-child { grid-area: name; align-self: end; min-width: 0; }
+  .hud.is-compact:not(.is-rail) .who-text { grid-area: name; align-self: end; min-width: 0; }
   .hud.is-compact:not(.is-rail) .chip { grid-area: chip; align-self: start; justify-self: start; white-space: nowrap; }
   .hud.is-compact:not(.is-rail) .skills { grid-area: skills; }
   .hud.is-compact:not(.is-rail) .name { overflow-wrap: anywhere; }
@@ -163,7 +163,7 @@
 .hud.is-compact.is-rail .card.left { left: 12px !important; right: auto !important; }
 .hud.is-compact.is-rail .card.right { right: 12px !important; left: auto !important; }
 .hud.is-compact.is-rail .who-row { flex: none; flex-direction: column; gap: 6px; }
-.hud.is-compact.is-rail .who-row > div:last-child { max-width: 100%; min-width: 0; }
+.hud.is-compact.is-rail .who-text { max-width: 100%; min-width: 0; }
 .hud.is-compact.is-rail .tile { width: 40px; height: 40px; border-radius: 12px; }
 .hud.is-compact.is-rail .name { font-size: 13px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hud.is-compact.is-rail .chip { order: 0; align-self: center; white-space: nowrap; font-size: 12px; padding: 4px 8px; }
@@ -171,3 +171,78 @@
 .hud.is-compact.is-rail.is-stacked .skills { flex-direction: column; align-items: center; }
 /* the pill may reach over the far plots here; it only shows text, so clicks go through to the board */
 .hud.is-compact.is-rail .turn { pointer-events: none; }
+
+/* Farmland v3.1 (docs/art-direction-v3-1.md section 4): collapsible cards,
+   skill descriptions and the shared tooltip. Hidden parts are display none
+   whatever else sets their display, so they are neither seen, focused nor
+   read. */
+.hud [hidden] { display: none !important; }
+.hud { --blue-ring: color-mix(in srgb, var(--blue) 55%, transparent); --red-ring: color-mix(in srgb, var(--red) 55%, transparent); }
+.hud .card.left { --team-ring: var(--blue-ring); }
+.hud .card.right { --team-ring: var(--red-ring); }
+/* The card body sits in the card's own flex column (and in the slim bar's row). */
+.hud .card-body { display: contents; }
+.hud .who-text { flex: 1; min-width: 0; }
+/* The chevron: a real 44 px button in the card's top corner, at the end of the pill. */
+.hud .chevron { width: var(--chevron-card, 44px); height: var(--chevron-card, 44px); flex-shrink: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
+.hud .chevron svg { transition: transform 180ms ease-out; }
+.hud .card.is-collapsed .chevron svg { transform: rotate(180deg); }
+.hud.is-compact .chevron, .hud.no-fold .chevron { display: none; }
+/* The description under each skill row of the full card. */
+.hud .skill { flex-wrap: wrap; row-gap: 10px; }
+.hud .skill .desc { flex-basis: 100%; font-size: 13px; font-weight: 400; line-height: 1.45; color: var(--ink-2); }
+.hud .skill.is-cooling .desc, .hud .skill.is-off .desc { color: var(--ink-3); }
+.hud.is-compact .skill .desc { display: none; }
+.hud .card { gap: 16px; }
+/* Folding: about 180 ms (opacity and a small slide, apart from the --card-scale transform), instant under reduced motion. */
+@keyframes hud-fold-a { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0 0; } }
+@keyframes hud-fold-b { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0 0; } }
+.hud:not(.is-compact) .card { animation: hud-fold-b 180ms ease-out; }
+.hud:not(.is-compact) .card.is-collapsed { animation-name: hud-fold-a; }
+/* The collapsed pill: portrait tile, the two skill buttons, the chevron. */
+.hud .card.is-collapsed { width: auto; padding: 8px; gap: 8px; border-radius: 32px; flex-direction: row; align-items: center; }
+.hud .card.left.is-collapsed { transform: scale(var(--pill-scale, 1)); }
+.hud .card.right.is-collapsed { transform: scale(var(--pill-scale, 1)); }
+.hud .card.is-collapsed .who-row { gap: 8px; }
+.hud .card.is-collapsed .tile { position: relative; width: 72px; height: 72px; border-radius: 22px; }
+.hud .card.is-collapsed .chevron { margin-left: 4px; width: var(--chevron-pill, 44px); height: var(--chevron-pill, 44px); }
+.hud .turn-dot { display: none; position: absolute; right: -2px; top: -2px; width: 16px; height: 16px; border-radius: 50%; background: var(--team); border: 3px solid var(--card-solid); }
+.hud .card.is-collapsed.is-active .turn-dot { display: block; }
+.hud .card.is-collapsed.is-active { box-shadow: 0 18px 44px rgba(10, 20, 40, 0.3), 0 0 0 2px var(--team-ring); }
+.hud[data-quality="low"] .card.is-collapsed.is-active { box-shadow: 0 0 0 2px var(--team-ring); }
+.hud .card.is-collapsed.is-waiting { opacity: 0.55; }
+.hud .pill-skills { display: flex; gap: 8px; }
+.hud .pskill { position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
+.hud .pskill .ico { position: relative; width: 64px; height: 64px; }
+.hud .pskill .ico img { width: 64px; height: 64px; image-rendering: pixelated; border-radius: var(--r-icon); display: block; }
+.hud .pskill .ready-dot { display: none; position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: var(--ready); border: 3px solid var(--card-solid); }
+.hud .pskill[data-state="ready"] .ready-dot { display: block; }
+.hud .pskill.is-selected { border: 3px solid var(--team); background: color-mix(in srgb, var(--team) 28%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--team) 32%, transparent), 0 0 22px color-mix(in srgb, var(--team) 55%, transparent); }
+.hud .pskill.is-cooling, .hud .pskill.is-off { border-color: rgba(255, 255, 255, 0.12); background: var(--row-off); }
+.hud .pskill.is-off .ico img { opacity: 0.55; }
+.hud .pskill.is-cooling .ico img { opacity: 0.4; }
+.hud .pskill .pring { display: none; position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.hud .pskill.is-cooling .pring { display: block; }
+.hud .pskill .pring circle { fill: none; stroke-width: 4; }
+.hud .pskill .pring .track { stroke: rgba(255, 255, 255, 0.22); }
+.hud .pskill .pring .arc { stroke: var(--ready); stroke-linecap: round; }
+.hud .pskill .count { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 30px; font-weight: 700; color: var(--ink); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); }
+.hud .pskill.is-cooling .count { display: flex; }
+.hud .pskill[aria-disabled="true"] { cursor: not-allowed; }
+/* A long touch press shows the tooltip: no text selection or callout. */
+.hud .skill, .hud .pskill { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
+/* The shared skill tooltip (placed by tooltipPosition() in src/ui/tooltip-position.js). */
+.hud .tooltip { position: fixed; left: 0; top: 0; z-index: 2; width: 356px; max-width: calc(100vw - 24px); padding: 16px 18px; border-radius: 22px; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  background: rgba(14, 20, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.22); -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.34); }
+.hud[data-quality="low"] .tooltip { background: var(--card-solid); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+.hud .tip-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hud .tip-title { font-size: 17px; font-weight: 700; }
+.hud .tip-state { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; white-space: nowrap; background: rgba(255, 255, 255, 0.14); color: rgba(244, 247, 251, 0.86); }
+.hud .tip-state[data-state="ready"] { background: color-mix(in srgb, var(--ready) 18%, transparent); color: var(--ready); }
+.hud .tip-text { font-size: 14px; line-height: 1.45; color: rgba(244, 247, 251, 0.88); }
+.hud .tip-rule { height: 1px; background: var(--hair); }
+.hud .tip-hint { font-size: 12px; font-weight: 600; color: rgba(244, 247, 251, 0.7); }
+/* Full cards: the turn pill never reaches the quality switch (TURN_SIDE_ROOM in hud-layout.js). */
+.hud:not(.is-compact) .turn { max-width: calc(100vw - 608px); min-width: 0; }
+.hud:not(.is-compact) .turn .who { white-space: nowrap; }
+.hud:not(.is-compact) .turn .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

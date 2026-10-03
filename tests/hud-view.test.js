@@ -44,16 +44,16 @@ test('my turn: Your turn on my card, Ready skills, the pill says whose turn and 
   assert.equal(mine.portrait, 'portrait-wind-rabbit-v3');
   for (const id of [WIND_DASH, TORNADO_ZONE]) {
     const row = skill(vm, X, id);
-    assert.equal(row.state, 'Ready');
+    assert.equal(row.stateText, 'Ready');
     assert.equal(row.look, READY);
     assert.equal(row.selected, false);
     assert.equal(row.disabled, false);
-    assert.equal(row.cooldown, 0);
-    assert.equal(row.progress, 0);
+    assert.equal(row.cooldownTurns, 0);
+    assert.equal(row.cooldownProgress, 0);
   }
   assert.equal(skill(vm, X, WIND_DASH).title, 'Wind Dash');
   assert.equal(skill(vm, X, WIND_DASH).icon, 'icon-wind-dash');
-  assert.equal(skill(vm, X, WIND_DASH).label, 'Wind Dash: Ready');
+  assert.equal(skill(vm, X, WIND_DASH).ariaLabel, 'Wind Dash: Ready');
   const theirs = card(vm, O);
   assert.equal(theirs.side, 'right');
   assert.equal(theirs.meta, 'Plays O, 2 planted');
@@ -68,11 +68,11 @@ test('a skill is selected: Selected on its row and the targeting prompt in the p
   const targeting = startTargeting(WIND_DASH);
   const vm = hudViewModel(midGame(), { targeting }, X);
   const row = skill(vm, X, WIND_DASH);
-  assert.equal(row.state, 'Selected');
+  assert.equal(row.stateText, 'Selected');
   assert.equal(row.look, SELECTED);
   assert.equal(row.selected, true);
   assert.equal(card(vm, X).chip, 'Your turn');
-  assert.equal(skill(vm, X, TORNADO_ZONE).state, 'Ready');
+  assert.equal(skill(vm, X, TORNADO_ZONE).stateText, 'Ready');
   assert.equal(vm.turn.hint, 'Wind Dash: choose one of your stones');
   const next = hudViewModel(midGame(), { targeting: { skill: WIND_DASH, from: { x: 7, y: 7 } } }, X);
   assert.equal(next.turn.hint, 'Wind Dash: choose an empty target cell');
@@ -82,11 +82,11 @@ test('a skill cooling down with 1 turn left: singular turn, nearly full ring', (
   const state = withCooldown(midGame(), X, WIND_DASH, 1);
   const vm = hudViewModel(state, {}, X);
   const row = skill(vm, X, WIND_DASH);
-  assert.equal(row.state, 'Ready in 1 turn');
+  assert.equal(row.stateText, 'Ready in 1 turn');
   assert.equal(row.look, COOLING);
-  assert.equal(row.cooldown, 1);
+  assert.equal(row.cooldownTurns, 1);
   const total = cooldownTurns(WIND_DASH);
-  assert.equal(row.progress, (total - 1) / total);
+  assert.equal(row.cooldownProgress, (total - 1) / total);
   assert.equal(row.disabled, true);
   assert.equal(card(vm, X).chip, 'Your turn');
 });
@@ -95,17 +95,17 @@ test('a skill cooling down with 3 turns left: plural turns and the served share'
   const state = withCooldown(midGame(), X, TORNADO_ZONE, 3);
   const vm = hudViewModel(state, {}, X);
   const row = skill(vm, X, TORNADO_ZONE);
-  assert.equal(row.state, 'Ready in 3 turns');
+  assert.equal(row.stateText, 'Ready in 3 turns');
   assert.equal(row.look, COOLING);
-  assert.equal(row.cooldown, 3);
-  assert.equal(row.progress, (cooldownTurns(TORNADO_ZONE) - 3) / cooldownTurns(TORNADO_ZONE));
+  assert.equal(row.cooldownTurns, 3);
+  assert.equal(row.cooldownProgress, (cooldownTurns(TORNADO_ZONE) - 3) / cooldownTurns(TORNADO_ZONE));
   // A 3 turn cooldown that just started has served nothing yet.
   const fresh = skill(hudViewModel(withCooldown(midGame(), X, WIND_DASH, 3), {}, X), X, WIND_DASH);
-  assert.equal(fresh.state, 'Ready in 3 turns');
-  assert.equal(fresh.progress, 0);
+  assert.equal(fresh.stateText, 'Ready in 3 turns');
+  assert.equal(fresh.cooldownProgress, 0);
   // The reference picture: 2 of 3 turns left fills a third of the ring.
   const ref = skill(hudViewModel(withCooldown(midGame(), O, TERRAIN_CREATION, 2), {}, X), O, TERRAIN_CREATION);
-  assert.equal(Math.round(ref.progress * 100), 33);
+  assert.equal(Math.round(ref.cooldownProgress * 100), 33);
 });
 
 test("opponent's turn: Waiting and dimmed rows that say Wait for your turn", () => {
@@ -115,7 +115,7 @@ test("opponent's turn: Waiting and dimmed rows that say Wait for your turn", () 
   assert.equal(mine.chip, 'Waiting');
   assert.equal(mine.waiting, true);
   for (const row of mine.skills) {
-    assert.equal(row.state, 'Wait for your turn');
+    assert.equal(row.stateText, 'Wait for your turn');
     assert.equal(row.look, OFF);
     assert.equal(row.disabled, true);
   }
@@ -127,7 +127,7 @@ test("opponent's turn: Waiting and dimmed rows that say Wait for your turn", () 
   assert.equal(skill(vm, O, TERRAIN_CREATION).disabled, true);
   // A cooldown still shows while waiting (the reference card).
   const cooling = hudViewModel(withCooldown(state, X, WIND_DASH, 2), {}, X);
-  assert.equal(skill(cooling, X, WIND_DASH).state, 'Ready in 2 turns');
+  assert.equal(skill(cooling, X, WIND_DASH).stateText, 'Ready in 2 turns');
 });
 
 test('round won: Winner in gold on the winner, Round over on every skill row', () => {
@@ -145,7 +145,7 @@ test('round won: Winner in gold on the winner, Round over on every skill row', (
   assert.equal(card(vm, O).winner, false);
   for (const c of vm.cards) {
     for (const row of c.skills) {
-      assert.equal(row.state, 'Round over');
+      assert.equal(row.stateText, 'Round over');
       assert.equal(row.look, OFF);
       assert.equal(row.disabled, true);
     }
@@ -161,7 +161,7 @@ test('round over without a winner (a draw): Round over on both cards', () => {
   for (const c of vm.cards) {
     assert.equal(c.chip, 'Round over');
     assert.equal(c.winner, false);
-    for (const row of c.skills) assert.equal(row.state, 'Round over');
+    for (const row of c.skills) assert.equal(row.stateText, 'Round over');
   }
   assert.equal(vm.turn.who, 'Round over');
   assert.equal(vm.turn.hint, 'Draw!');
@@ -179,7 +179,7 @@ test('opponent left: the pill counts down from 10, then the win', () => {
   assert.equal(card(after, O).chip, 'Round over');
   assert.equal(after.turn.countdown, null);
   assert.equal(after.turn.hint, 'Opponent left, you win!');
-  for (const row of card(after, X).skills) assert.equal(row.state, 'Round over');
+  for (const row of card(after, X).skills) assert.equal(row.stateText, 'Round over');
 });
 
 test('local mode: the player to move is always you, and messages become the toast', () => {
@@ -190,12 +190,12 @@ test('local mode: the player to move is always you, and messages become the toas
   const vm = hudViewModel(view.state, { targeting: game.getTargeting(), status: view.status, message: view.message }, null);
   assert.equal(vm.toast, "It is Earth Bear's turn.");
   assert.equal(card(vm, O).chip, 'Your turn');
-  assert.equal(skill(vm, O, STONE_CONVERSION).state, 'Ready');
+  assert.equal(skill(vm, O, STONE_CONVERSION).stateText, 'Ready');
   assert.equal(skill(vm, O, STONE_CONVERSION).disabled, false);
   assert.equal(vm.turn.hint, 'Plant a seed');
   game.clickSkill(O, TERRAIN_CREATION);
   const picked = hudViewModel(game.getView().state, { targeting: game.getTargeting() }, null);
-  assert.equal(skill(picked, O, TERRAIN_CREATION).state, 'Selected');
+  assert.equal(skill(picked, O, TERRAIN_CREATION).stateText, 'Selected');
   assert.equal(picked.turn.hint, 'Terrain Creation: choose an empty cell');
 });
 

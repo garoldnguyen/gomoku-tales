@@ -7,6 +7,8 @@ import { X, O } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
 import { isGameOver, skillCooldown } from '../logic/game.js';
 import { cooldownTurns, getSkill } from '../logic/skills.js';
+import { ALL_EXPANDED } from './hud-collapse.js';
+import { skillInfo } from './skill-info.js';
 import { targetPrompt } from './targeting.js';
 
 export const QUALITY_CHOICES = Object.freeze([
@@ -31,6 +33,14 @@ export const SELECTED = 'selected';
 export const COOLING = 'cooling';
 export const OFF = 'off';
 
+// Skill states of docs/art-direction-v3-1.md section 4.2 (the collapsed
+// pill and the tooltip): `waiting` is every skill that cannot be used now
+// and is not cooling down.
+export const STATE_READY = 'ready';
+export const STATE_SELECTED = 'selected';
+export const STATE_COOLING = 'cooling';
+export const STATE_WAITING = 'waiting';
+
 export const PLANT_HINT = 'Plant a seed';
 
 // gameState: the rules state (src/logic/game.js).
@@ -43,6 +53,7 @@ export const PLANT_HINT = 'Plant a seed';
 //   winner         the winner when the room settled it (a leave), else the board's
 //   quality        'low', 'medium' or 'high'
 //   hint           the page hint (room code, keys), as a tooltip
+//   collapsed      { X, O }: which cards are folded into pills (hud-collapse.js)
 // localPlayer: this window's stone online, or null when one window plays
 // both sides (?local=1), where the player to move is always "you".
 //
@@ -51,6 +62,7 @@ export const PLANT_HINT = 'Plant a seed';
 export function hudViewModel(gameState, uiState = {}, localPlayer = null) {
   const {
     targeting = null, status = null, message = null, peerCountdown = null, quality = 'medium', hint = null,
+    collapsed = ALL_EXPANDED,
   } = uiState;
   const winner = uiState.winner !== undefined && uiState.winner !== null ? uiState.winner : gameState.winner;
   const over = Boolean(winner) || isGameOver(gameState);
@@ -58,7 +70,7 @@ export function hudViewModel(gameState, uiState = {}, localPlayer = null) {
   const leaving = !over && peerCountdown !== null && peerCountdown !== undefined;
 
   const cards = [X, O].map((player) => cardView(gameState, player, {
-    over, winner, toMove, localPlayer,
+    over, winner, toMove, localPlayer, collapsed: Boolean(collapsed?.[player]),
     targeting: player === toMove && (localPlayer === null || localPlayer === player) ? targeting : null,
   }));
 
@@ -100,7 +112,7 @@ function turnView(state, { over, winner, toMove, leaving, peerCountdown, targeti
   return { player: toMove, team: teamOf(toMove), who: `${nameOf(toMove)}'s turn`, hint, countdown: null };
 }
 
-function cardView(state, player, { over, winner, toMove, localPlayer, targeting }) {
+function cardView(state, player, { over, winner, toMove, localPlayer, targeting, collapsed }) {
   const character = characterForStone(player);
   const isWinner = winner === player;
   const active = player === toMove;
@@ -119,6 +131,10 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting 
     waiting: !isWinner && !active,
     winner: isWinner,
     you: localPlayer === player,
+    // The turn ring and dot of the collapsed pill.
+    active,
+    collapsed,
+    chevronLabel: `${collapsed ? 'Expand' : 'Collapse'} ${character.name} panel`,
     skills: character.skills.map((skillId) => skillView(state, player, skillId, { over, active, yours, targeting })),
   };
 }
@@ -127,25 +143,32 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting 
 // them focusable and clickable (aria-disabled) so a click still explains
 // why, with the game's existing messages.
 function skillView(state, player, skillId, { over, active, yours, targeting }) {
-  const title = getSkill(skillId).name;
+  const info = skillInfo(skillId);
+  const title = info?.title ?? getSkill(skillId).name;
   const total = cooldownTurns(skillId);
   const remaining = over ? 0 : skillCooldown(state, player, skillId);
   let look;
+  let skillState;
   let text;
   if (over) {
     look = OFF;
+    skillState = STATE_WAITING;
     text = 'Round over';
   } else if (remaining > 0) {
     look = COOLING;
+    skillState = STATE_COOLING;
     text = `Ready in ${remaining} ${remaining === 1 ? 'turn' : 'turns'}`;
   } else if (targeting?.skill === skillId) {
     look = SELECTED;
+    skillState = STATE_SELECTED;
     text = 'Selected';
   } else if (active) {
     look = READY;
+    skillState = STATE_READY;
     text = 'Ready';
   } else {
     look = OFF;
+    skillState = STATE_WAITING;
     text = 'Wait for your turn';
   }
   const progress = remaining > 0 && total > 0 ? Math.min(1, Math.max(0, (total - remaining) / total)) : 0;
@@ -154,13 +177,16 @@ function skillView(state, player, skillId, { over, active, yours, targeting }) {
     player,
     title,
     icon: SKILL_ICON_ART[skillId],
-    state: text,
+    state: skillState,
+    stateText: text,
     look,
-    cooldown: remaining,
-    progress,
+    cooldownTurns: remaining,
+    cooldownProgress: progress,
     selected: look === SELECTED,
     disabled: look === OFF || look === COOLING || !yours,
-    label: `${title}: ${text}`,
+    ariaLabel: `${title}: ${text}`,
+    description: info?.description ?? '',
+    hint: info?.hint ?? '',
   };
 }
 

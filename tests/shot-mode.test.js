@@ -74,14 +74,14 @@ test('parseShotParams: no shot parameter means normal play', () => {
 
 test('parseShotParams reads the scene and the quality', () => {
   assert.deepEqual(SHOT_SCENES, ['field', 'empty']);
-  assert.deepEqual(parseShotParams('?shot=field&quality=high'), { scene: 'field', quality: 'high' });
-  assert.deepEqual(parseShotParams('?shot=empty&quality=low'), { scene: 'empty', quality: 'low' });
-  assert.deepEqual(parseShotParams(new URLSearchParams('shot=EMPTY&quality=Medium')), { scene: 'empty', quality: 'medium' });
-  assert.deepEqual(parseShotParams('?shot=field&quality=%20high%20'), { scene: 'field', quality: 'high' });
+  assert.deepEqual(parseShotParams('?shot=field&quality=high'), { scene: 'field', quality: 'high', hud: null });
+  assert.deepEqual(parseShotParams('?shot=empty&quality=low'), { scene: 'empty', quality: 'low', hud: null });
+  assert.deepEqual(parseShotParams(new URLSearchParams('shot=EMPTY&quality=Medium')), { scene: 'empty', quality: 'medium', hud: null });
+  assert.deepEqual(parseShotParams('?shot=field&quality=%20high%20'), { scene: 'field', quality: 'high', hud: null });
 });
 
 test('parseShotParams falls back to the field scene and medium quality', () => {
-  assert.deepEqual(parseShotParams('?shot='), { scene: 'field', quality: 'medium' });
-  assert.deepEqual(parseShotParams('?shot=castle&quality=ultra'), { scene: 'field', quality: 'medium' });
-  assert.deepEqual(parseShotParams('?shot=field'), { scene: 'field', quality: 'medium' });
+  assert.deepEqual(parseShotParams('?shot='), { scene: 'field', quality: 'medium', hud: null });
+  assert.deepEqual(parseShotParams('?shot=castle&quality=ultra'), { scene: 'field', quality: 'medium', hud: null });
+  assert.deepEqual(parseShotParams('?shot=field'), { scene: 'field', quality: 'medium', hud: null });
 });
