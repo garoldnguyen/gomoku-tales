@@ -101,16 +101,19 @@ export const TREE_ROW_SPACING = 3; // average between back-row trunks
 // Side trees stay in the back third of the visible ground depth.
 export const SIDE_TREE_MAX_Z = FAR_EDGE_Z + (BOTTOM_Z - FAR_EDGE_Z) / 3;
 
-// The drawn ground: one flat rectangle at y = 0 from the far edge forward,
-// reaching GROUND_REACH world units past the left, right and bottom screen
-// edges at every supported aspect (the widest is 21:9 at the far edge).
-const GROUND_REACH = 6;
-const GROUND_HALF_X = Math.ceil(screenEdgeX(CAMERA, WIDEST_ASPECT, FAR_EDGE_Z, 1) + GROUND_REACH);
+// The drawn ground: one flat rectangle at y = 0 from the far edge forward
+// that covers every pixel below the far edge at every supported window
+// shape, 9:21 to 32:9 (docs/art-direction-v3-1.md section 3.3). The
+// ground bounds come from here only: GROUND_HALF_WIDTH to each side (32:9
+// needs about 39 at the far edge) and GROUND_NEAR_Z toward the camera (the
+// widened 9:21 view needs about z 22 at the bottom of the window).
+export const GROUND_HALF_WIDTH = 44;
+export const GROUND_NEAR_Z = 24;
 export const GROUND_RECT = Object.freeze({
-  minX: -GROUND_HALF_X,
-  maxX: GROUND_HALF_X,
+  minX: -GROUND_HALF_WIDTH,
+  maxX: GROUND_HALF_WIDTH,
   minZ: FAR_EDGE_Z,
-  maxZ: Math.ceil(BOTTOM_Z + GROUND_REACH),
+  maxZ: GROUND_NEAR_Z,
 });
 
 // Where the meadow is planted: the ground the camera sees, from the far

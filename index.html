@@ -44,6 +44,26 @@
       image-rendering: pixelated;
       image-rendering: crisp-edges;
     }
+    /* The 3D game (body.world-3d, set by src/main.js) fills the whole
+       window at any shape, with no 16:9 box, margin or bars
+       (docs/art-direction-v3-1.md section 3): the WebGL canvas (#world)
+       covers it and takes the pointer, and the camera adapts to its shape.
+       The 2D overlay canvas (#game: banners, quality line, menu title)
+       stays a 16:9 box in the middle that lets the pointer through. The
+       2D renderer (?render=2d) keeps the 16:9 stage above. */
+    body.world-3d #stage {
+      position: fixed;
+      inset: 0;
+      width: auto;
+      height: auto;
+    }
+    body.world-3d #game {
+      inset: 0;
+      margin: auto;
+      width: min(100vw, calc(100vh * 16 / 9));
+      height: min(100vh, calc(100vw * 9 / 16));
+      pointer-events: none;
+    }
     /* Behind the lobby and room screens the 3D world is blurred (not on
        LOW quality, see src/render3d/quality.js menuBlur). The slight zoom
        hides the dark fringe a blur leaves at the edges; #stage clips it. */

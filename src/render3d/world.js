@@ -9,7 +9,7 @@
 
 import * as THREE from 'three';
 import {
-  CAMERA_DISTANCE, CAMERA_FOV, CELL_SIZE,
+  CAMERA_DISTANCE, CELL_SIZE,
   FPS_SAMPLE_MS, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS, TARGET_FRAME_MS,
 } from '../config.js';
 import { createAssetStore } from '../render/assets.js';
@@ -32,8 +32,9 @@ import {
 } from './quality.js';
 import { ON_SURFACE, PixelSprite, pixelTexture } from './sprites.js';
 import { metaAnchor } from './v3-meta.js';
-import { sameViewSize, viewSizeInto } from './view-size.js';
+import { sameViewSize, windowViewInto } from './view-size.js';
 
+// The camera aspect until the first resize() measures the canvas.
 export const WORLD_ASPECT = 16 / 9;
 const PIECE_SHADOW_RADIUS = 0.36;
 const ROCK_SHADOW_RADIUS = PIECE_SHADOW_RADIUS * 1.2;
@@ -50,7 +51,9 @@ const COLORS = {
   hemiGround: 0x6f8f4a,
 };
 
-// Builds the world on `canvas` (it fills its CSS box at 16:9). Throws if
+// Builds the world on `canvas` (it fills the whole window at any shape,
+// docs/art-direction-v3-1.md section 3; the camera's aspect and field of
+// view follow the canvas, see resize below). Throws if
 // WebGL is not available. Returns the world; call render(now) every frame.
 // `assets` is the store from loadAssets (src/render/assets.js); textures
 // whose file is missing are generated placeholders (src/render3d/art.js).
@@ -79,7 +82,10 @@ export function createWorld(canvas, {
 
   const scene = new THREE.Scene();
 
-  // Fixed camera: no rotation or zoom (section B).
+  // Fixed camera: no rotation or zoom (section B). Its position and aim
+  // never change; resize() sets its aspect and its field of view
+  // (fitView, framing.js) from the canvas, in cameraSetup too, so picking
+  // always uses the camera that is drawn.
   const cameraSetup = gameCamera(WORLD_ASPECT);
   const cameraPos = cameraSetup.position;
   // Its near and far planes hug what it can show, for depth precision.
@@ -142,25 +148,43 @@ export function createWorld(canvas, {
   let autoStepped = false; // true after the last change was an automatic step down
 
   // The drawing buffer follows the canvas's CSS box and this window's
-  // devicePixelRatio (capped by the level's pixelRatioCap). It is checked
-  // every frame (see view-size.js): a window moved to another screen or
-  // zoomed does not always get a resize event, and a canvas laid out after
-  // the world was built has no size at first. clientWidth ignores CSS
-  // transforms, so the blurred backdrop behind the menus (index.html) does
-  // not resize it.
-  // Both sizes are made once and rewritten, so the check allocates nothing.
+  // devicePixelRatio (capped by the level's pixelRatioCap), and the camera
+  // its shape (windowView in view-size.js). It is checked every frame: a
+  // window moved to another screen or zoomed does not always get a resize
+  // event, a canvas laid out after the world was built has no size at
+  // first, and a resize or an orientation change lands in the next frame
+  // with the renderer size, the pixel ratio and the camera together.
+  // clientWidth ignores CSS transforms, so the blurred backdrop behind the
+  // menus (index.html) does not resize it.
+  // Both sizes are made once and rewritten, so the check allocates nothing
+  // unless the size really changed.
   const viewSizeNow = { width: 0, height: 0, pixelRatio: 0 };
-  const viewSizeNext = { width: 0, height: 0, pixelRatio: 0 };
+  const viewSizeNext = { width: 0, height: 0, pixelRatio: 0, aspect: 0, fovDeg: 0 };
   let sized = false; // false until viewSizeNow holds the buffer's size
   function resize() {
-    const next = viewSizeInto(canvas.clientWidth, canvas.clientHeight, globalThis.devicePixelRatio, features.pixelRatioCap, viewSizeNext);
-    if (next === null || (sized && sameViewSize(viewSizeNow, next))) return;
+    if (!(canvas.clientWidth > 0 && canvas.clientHeight > 0)) return; // hidden or not laid out yet: keep the last size
+    const next = windowViewInto(canvas.clientWidth, canvas.clientHeight, features, globalThis.devicePixelRatio, viewSizeNext);
+    if (sized && sameViewSize(viewSizeNow, next)) return;
+    applyViewSize(next);
+  }
+
+  // A new size: the renderer, the pixel ratio and the camera change
+  // together (only when the size changed, never on a steady frame).
+  function applyViewSize(next) {
     sized = true;
     viewSizeNow.width = next.width;
     viewSizeNow.height = next.height;
     viewSizeNow.pixelRatio = next.pixelRatio;
     renderer.setPixelRatio(next.pixelRatio);
     renderer.setSize(next.width, next.height, false);
+    cameraSetup.aspect = next.aspect;
+    cameraSetup.fovDeg = next.fovDeg;
+    const clip = clipPlanes(cameraSetup); // a wider view sees nearer ground
+    camera.aspect = next.aspect;
+    camera.fov = next.fovDeg;
+    camera.near = clip.near;
+    camera.far = clip.far;
+    camera.updateProjectionMatrix();
     postProcessing.resize();
   }
 
@@ -238,7 +262,7 @@ export function createWorld(canvas, {
     // screen pixels at the board so sprite pixels never shimmer. { x: 0,
     // y: 0 } puts it back. Picking keeps using the unshaken camera.
     setCameraShake(offset) {
-      const step = worldUnitsPerPixel(CAMERA_DISTANCE, CAMERA_FOV, canvas.height);
+      const step = worldUnitsPerPixel(CAMERA_DISTANCE, cameraSetup.fovDeg, canvas.height);
       camera.position.set(cameraPos.x, cameraPos.y, cameraPos.z)
         .addScaledVector(cameraRight, snapToStep(offset.x, step))
         .addScaledVector(cameraUp, snapToStep(offset.y, step));

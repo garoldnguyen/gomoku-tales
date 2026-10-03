@@ -17,7 +17,7 @@ import { placeholderShape } from './art-assets.js';
 import { gameCamera, projectToNdc } from './camera.js';
 import { CURB, fenceRails, PATH } from './farm-layout.js';
 import {
-  depressionAtScreenY, MEADOW_PLANT_BOUNDS, SIDE_TREE_MAX_Z, screenEdgeX, TREE_ROW_HALF_WIDTH,
+  depressionAtScreenY, GROUND_HALF_WIDTH, MEADOW_PLANT_BOUNDS, SIDE_TREE_MAX_Z, screenEdgeX, TREE_ROW_HALF_WIDTH,
   TREE_ROW_SPACING, TREE_ROW_Z,
 } from './horizon.js';
 import { seededRandom } from './seeded-random.js';
@@ -419,6 +419,34 @@ export function planMeadow(seed, bounds = MEADOW_BOUNDS, keepOut = meadowKeepOut
   }
 
   return { patches, clover, tufts, trees, bushes, bales };
+}
+
+// The two side strips of the meadow that a window wider than 21:9 shows
+// (docs/art-direction-v3-1.md section 3.3): from MEADOW_STRIP_INNER_X (or
+// the edge of MEADOW_BOUNDS, if that is further out, so the strips never
+// overlap the central meadow) out to the ground's GROUND_HALF_WIDTH on each
+// side, as deep as MEADOW_BOUNDS.
+export const MEADOW_STRIP_INNER_X = 27;
+const STRIP_INNER_X = Math.max(MEADOW_STRIP_INNER_X, MEADOW_BOUNDS.maxX);
+export const MEADOW_STRIPS = Object.freeze([
+  Object.freeze({ side: 'left', seedOffset: 1, bounds: Object.freeze({ ...MEADOW_BOUNDS, minX: -GROUND_HALF_WIDTH, maxX: -STRIP_INNER_X }) }),
+  Object.freeze({ side: 'right', seedOffset: 2, bounds: Object.freeze({ ...MEADOW_BOUNDS, minX: STRIP_INNER_X, maxX: GROUND_HALF_WIDTH }) }),
+]);
+
+// The side strips planned by planMeadow itself (unchanged, with the same
+// species and spacing rules), a second deterministic call per strip with a
+// derived seed: `seed` plus 1 for the left strip, plus 2 for the right one.
+// planMeadow(seed) still gives the central meadow exactly as before.
+// Returns one plan of the same shape as planMeadow's with both strips.
+export function planMeadowStrips(seed) {
+  return mergeMeadowPlans(...MEADOW_STRIPS.map((strip) => planMeadow(seed + strip.seedOffset, strip.bounds)));
+}
+
+// One plan with everything of `plans` (each shaped like planMeadow's), in order.
+export function mergeMeadowPlans(...plans) {
+  const merged = { patches: [], clover: [], tufts: [], trees: [], bushes: [], bales: [] };
+  for (const plan of plans) for (const key of Object.keys(merged)) merged[key].push(...plan[key]);
+  return merged;
 }
 
 // Everything in a plan that stands on the ground, as [{ kind, x, z }], for

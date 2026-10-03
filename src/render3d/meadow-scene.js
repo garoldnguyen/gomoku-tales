@@ -27,7 +27,8 @@ import { artMeta, artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
 import { heightAtDepression } from './camera.js';
 import {
-  dandelionPuffs, FAR_HILLS, hazeMix, HILL_DEPTH, HILL_FOOT_HAZE, hillLift, meadowInstanceGroups, meadowShadowSpots, planMeadow,
+  dandelionPuffs, FAR_HILLS, hazeMix, HILL_DEPTH, HILL_FOOT_HAZE, hillLift, meadowInstanceGroups, meadowShadowSpots, mergeMeadowPlans,
+  planMeadow, planMeadowStrips,
 } from './meadow.js';
 import { effectRandom, seededRandom } from './seeded-random.js';
 import { anchorForward, anchorShift, faceYaw, SPRITE_ALPHA_TEST } from './sprite-frames.js';
@@ -67,7 +68,11 @@ const PUFF_TOP = 0.8; // the seed head is this far up the dandelion
 // plants on the board (half the meadow's amplitude, same wind and gusts).
 // Returns { setFeatures(features), update(timeMs, dtMs) }.
 export function createMeadow(scene, cameraPosition, { haze }) {
-  const plan = planMeadow(MEADOW_SEED);
+  // The central meadow and the two side strips a window wider than 21:9
+  // shows (docs/art-direction-v3-1.md section 3.3). Every kind in it is
+  // hidden on Low by the switches below (flowers, scenery, tufts), so the
+  // strips show on Medium and High only.
+  const plan = mergeMeadowPlans(planMeadow(MEADOW_SEED), planMeadowStrips(MEADOW_SEED));
   const ground = createGround();
   scene.add(ground.mesh);
   const hills = createFarHills(cameraPosition, haze);

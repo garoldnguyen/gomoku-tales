@@ -125,7 +125,8 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
 
   // Shrinks the cards or turns them into slim bars (at the bottom or upright
   // beside the board) so they never lie over
-  // the board (hud-layout.js). Runs when the window size changes, not per frame.
+  // the board (hud-layout.js), against the full window. Runs when the window
+  // size or the orientation changes, not per frame.
   let cardHeight = CARD_HEIGHT;
   const layout = () => {
     if (root.hidden) return;
@@ -140,6 +141,7 @@ export function createHud(root, { onSkill, onQuality, onCancel }, assets = null)
     if (root.style.getPropertyValue('--rail-width') !== width) root.style.setProperty('--rail-width', width);
   };
   window.addEventListener('resize', layout);
+  window.addEventListener('orientationchange', layout);
 
   const setQuality = (level) => {
     if (root.dataset.quality !== level) root.dataset.quality = level;

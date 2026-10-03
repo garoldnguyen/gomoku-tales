@@ -407,7 +407,8 @@ const FRAME_PATH = {
   'render3d/petals.js': ['fieldFade', 'petalAt', 'smoothstep', 'trailAt'],
   'render3d/picking.js': ['cellToWorldInto'],
   'render3d/post-processing.js': ['render', 'resize'],
-  'render3d/quality.js': ['blursMenus', 'cappedPixelRatio', 'clear', 'dropOldest', 'lowerQuality', 'particleScale',
+  'render3d/quality.js': ['blursMenus', 'cappedPixelRatio', 'clear', 'dropOldest', 'lowerQuality', 'normalizeQuality', 'particleScale',
+    'qualityFeatures',
     'plainSlides', 'tick'],
   'render3d/seeded-random.js': ['fill', 'random', 'step'],
   'render3d/shadow-math.js': ['cloudShadowOffset'],
@@ -415,7 +416,8 @@ const FRAME_PATH = {
   'render3d/sky.js': ['skyDrift', 'sunRayAlpha', 'wrapAround'],
   'render3d/sprite-frames.js': ['anchorForward', 'faceYaw', 'frameAt'],
   'render3d/sprites.js': ['setBend', 'setFrame', 'setShadowScale', 'update'],
-  'render3d/view-size.js': ['sameViewSize', 'viewSizeInto'],
+  'render3d/view-size.js': ['sameViewSize', 'wholePixels', 'windowViewInto'],
+  'render3d/framing.js': ['fitView', 'tanHalfNeeded'],
   'render3d/wind.js': ['bendTowardPx', 'clear', 'fleckSpeed', 'gap', 'gustEnvelope', 'nextReleaseMs',
     'plantSwayAmplitudePx', 'step', 'strength', 'swayAmplitudePx', 'swayLeanSide', 'swayPhase'],
   'render3d/world-renderer.js': ['drawGameScreen', 'drawMenuScreen', 'drawQuality', 'features', 'hide', 'look',
@@ -432,6 +434,7 @@ const NOT_EACH_FRAME = {
   '* catchUp': 'only on the first frame after the page was hidden, with events',
   // Only when the level changes (the automatic step down after slow frames).
   'render3d/world.js applyQuality': 'only when the quality level changes',
+  'render3d/world.js applyViewSize': 'only when the window size or pixel ratio changes',
   // Pools and caches grow the first time they need more, then are reused.
   'render3d/board-marks.js newDecal': 'a decal record pool that grows on a miss (??)',
   'render3d/world-renderer.js plantLook': 'built once per player on a miss (??)',

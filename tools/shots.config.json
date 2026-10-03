@@ -4,5 +4,5 @@
   "cwd": ".",
   "entry": "/index.html",
   "ready_timeout_s": 120,
-  "strict_window": false
+  "strict_window": true
 }

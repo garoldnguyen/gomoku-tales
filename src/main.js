@@ -69,6 +69,9 @@ const storage = shot ? null : browserStorage();
 const quality = startQuality(shot ? shot.quality : params.get('quality'), storage);
 const renderer = wants2d ? RENDERER_2D : await load3dRenderer();
 if (shot) window.__SHOT__.renderer = renderer === RENDERER_2D ? '2d' : '3d';
+// The element that takes the pointer: the 2D canvas, or the full window
+// WebGL canvas, whose drawing buffer pixels renderer.hitTest reads.
+const pointerCanvas = renderer === RENDERER_2D ? canvas : worldCanvas;
 
 // The 3D game's HUD is the DOM glass overlay (src/ui/hud.js); the 2D
 // renderer draws its own panels on the canvas. The game modes set the
@@ -93,7 +96,10 @@ if (shot) {
 // Three.js loads only when the 3D renderer is used.
 async function load3dRenderer() {
   try {
-    worldCanvas.hidden = false; // it must be laid out before the renderer sizes it
+    // The 3D game fills the whole window (index.html body.world-3d). The
+    // canvas must be laid out before the renderer sizes it.
+    document.body.classList.add('world-3d');
+    worldCanvas.hidden = false;
     const [{ createWorldRenderer }, assets, meta] = await Promise.all([
       import('./render3d/world-renderer.js'), assetsLoaded, metaLoaded,
     ]);
@@ -103,6 +109,7 @@ async function load3dRenderer() {
   } catch (err) {
     console.warn('The 3D renderer is not available, using the 2D one.', err);
     worldCanvas.hidden = true;
+    document.body.classList.remove('world-3d'); // back to the 16:9 stage of the 2D renderer
     await assetsLoaded; // so the full store below is the one the 2D renderer keeps
     loadAssets({ warn }).then(setAssets);
     return RENDERER_2D;
@@ -201,7 +208,7 @@ function startOnlineMode() {
 
   const playing = () => (app.getScreen() === GAME ? app.getGame() : null);
 
-  attachGameInput(canvas, {
+  attachGameInput(pointerCanvas, {
     onHover: (point) => {
       const game = playing();
       if (!game) return;
@@ -247,7 +254,7 @@ function startOnlineMode() {
       }
       showEvents(game.takeEvents(), effects, time, resumed);
       const view = game.getView();
-      canvas.style.cursor = screen === GAME && view.pointer ? 'pointer' : 'default';
+      pointerCanvas.style.cursor = screen === GAME && view.pointer ? 'pointer' : 'default';
       if (view.code !== hintCode || view.you !== hintStone) {
         hintCode = view.code;
         hintStone = view.you;
@@ -263,7 +270,7 @@ function startOnlineMode() {
         forgetGame();
         shownGame = null;
       }
-      canvas.style.cursor = 'default';
+      pointerCanvas.style.cursor = 'default';
       renderer.drawMenuScreen(ctx, time);
       hud?.show(false);
     }
@@ -288,7 +295,7 @@ function startLocalMode() {
     ? 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts.'
     : 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts. Q quality.';
 
-  attachGameInput(canvas, {
+  attachGameInput(pointerCanvas, {
     onHover: (point) => {
       const hit = point ? renderer.hitTest(point.px, point.py) : null;
       game.setHover(hit?.cell ?? null);
@@ -314,7 +321,7 @@ function startLocalMode() {
   const frame = (time) => {
     showEvents(game.takeEvents(), effects, time, resumeWatch.tick(time));
     const view = game.getView();
-    canvas.style.cursor = view.pointer ? 'pointer' : 'default';
+    pointerCanvas.style.cursor = view.pointer ? 'pointer' : 'default';
     renderer.drawGameScreen(ctx, frameViewOf(view, time, effects, hint));
     if (hud) showHud(game, view, null, null, hint);
     requestAnimationFrame(frame);

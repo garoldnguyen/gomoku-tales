@@ -11,7 +11,7 @@ import {
 } from '../src/config.js';
 import { CAMERA_TARGET, createGameCamera, gameCamera, heightAtDepression } from '../src/render3d/camera.js';
 import { CURB, FIELD } from '../src/render3d/farm-layout.js';
-import { ASPECTS, CAMERA_POSE, FAR_EDGE_NDC_Y, FRAMING } from '../src/render3d/framing.js';
+import { ASPECTS, CAMERA_POSE, FAR_EDGE_NDC_Y, fitView, FRAMING } from '../src/render3d/framing.js';
 import {
   FAR_EDGE_Z, farEdgeWave, farEdgeZ, GROUND_RECT, groundUnderNdc, screenEdgeX, SIDE_TREE_MAX_Z, TREE_ROW_HALF_WIDTH,
 } from '../src/render3d/horizon.js';
@@ -241,13 +241,10 @@ test('(5) the camera pose lives in framing.js: pitch, field of view, distance an
 
 test('(5) the HUD layout board rectangle matches the real PerspectiveCamera within 1 pixel', () => {
   const half = (BOARD_SIZE * CELL_SIZE) / 2;
-  for (const [w, h] of [[1920, 1080], [1280, 720], [800, 600]]) {
-    // The 16:9 stage, as large as fits and centred in the window.
-    const stageW = Math.min(w, h * ASPECT_16_9);
-    const stageH = Math.min(h, w / ASPECT_16_9);
-    const stageX = (w - stageW) / 2;
-    const stageY = (h - stageH) / 2;
-    const camera = new THREE.PerspectiveCamera(CAMERA_POSE.fovDeg, stageW / stageH, 0.5, 260);
+  for (const [w, h] of [[1920, 1080], [1280, 720], [800, 600], [1680, 720], [720, 1280], [390, 844]]) {
+    // The view fills the whole window, its field of view from fitView
+    // (docs/art-direction-v3-1.md section 3).
+    const camera = new THREE.PerspectiveCamera(fitView(w / h), w / h, 0.5, 260);
     const target = new THREE.Vector3(0, 0, -CAMERA_POSE.aimBehind);
     const pitch = (CAMERA_POSE.pitchDeg * Math.PI) / 180;
     camera.position.set(0, Math.sin(pitch) * CAMERA_POSE.distance, target.z + Math.cos(pitch) * CAMERA_POSE.distance);
@@ -257,8 +254,8 @@ test('(5) the HUD layout board rectangle matches the real PerspectiveCamera with
     for (const x of [-half, half]) {
       for (const z of [-half, half]) {
         const v = new THREE.Vector3(x, 0, z).project(camera);
-        const px = stageX + ((v.x + 1) / 2) * stageW;
-        const py = stageY + ((1 - v.y) / 2) * stageH;
+        const px = ((v.x + 1) / 2) * w;
+        const py = ((1 - v.y) / 2) * h;
         real.left = Math.min(real.left, px);
         real.right = Math.max(real.right, px);
         real.top = Math.min(real.top, py);

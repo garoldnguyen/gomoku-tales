@@ -2,7 +2,7 @@
 // section B). No Three.js imports, so it runs under node --test.
 // Vectors are plain { x, y, z } objects; the world is y-up.
 
-import { CAMERA_POSE } from './framing.js';
+import { CAMERA_POSE, fitView } from './framing.js';
 
 const DEG = Math.PI / 180;
 
@@ -12,14 +12,15 @@ export const CAMERA_TARGET = Object.freeze({ x: 0, y: 0, z: -CAMERA_POSE.aimBehi
 
 // The game's fixed camera as { position, target, fovDeg, aspect }, from
 // CAMERA_POSE (framing.js): it looks down pitchDeg at CAMERA_TARGET from
-// distance away. world.js
+// distance away, with the vertical field of view fitView(aspect) (the
+// reference one at 16:9 and wider, wider for narrower windows). world.js
 // builds the Three.js camera from it; everything that projects through the
 // camera (picking, the HUD layout, the meadow plan, the framing) uses it.
 export function gameCamera(aspect = 16 / 9) {
   return {
     position: cameraPosition(CAMERA_POSE.pitchDeg, CAMERA_POSE.distance, CAMERA_TARGET),
     target: { ...CAMERA_TARGET },
-    fovDeg: CAMERA_POSE.fovDeg,
+    fovDeg: fitView(aspect),
     aspect,
   };
 }

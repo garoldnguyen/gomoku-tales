@@ -26,12 +26,13 @@ function cardBoxes(w, h, { compact, rail, railWidth, stacked, scale }) {
 
 const overlaps = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
 
-test('boardScreenRect: the plots sit in the middle of the 16:9 stage', () => {
+test('boardScreenRect: the plots sit in the middle of the full window', () => {
   const board = boardScreenRect(1920, 1080);
   assert.ok(board.left > 400 && board.left < 520, `left ${board.left}`);
   assert.ok(Math.abs(board.left + board.right - 1920) < 1e-6, 'centred');
   assert.ok(board.top > 150 && board.bottom < 1000);
-  // A wider window adds the letterbox bars to the left edge.
+  // A wider window shows more meadow at the sides: the board keeps its
+  // size and stays centred (docs/art-direction-v3-1.md section 3.2).
   assert.ok(Math.abs(boardScreenRect(2520, 1080).left - (board.left + 300)) < 1e-6);
 });
 
@@ -40,7 +41,7 @@ test('hudLayout: full size cards at 1920x1080', () => {
 });
 
 test('hudLayout: smaller desktop windows shrink the cards beside the board', () => {
-  for (const [w, h] of [[1280, 720], [1366, 768], [1440, 900], [1024, 768]]) {
+  for (const [w, h] of [[1280, 720], [1366, 768], [1440, 900]]) {
     const layout = hudLayout(w, h);
     assert.equal(layout.compact, false, `${w}x${h}`);
     assert.ok(layout.scale < 1 && layout.scale >= MIN_CARD_SCALE, `${w}x${h} scale ${layout.scale}`);
@@ -91,7 +92,9 @@ test('hudLayout: full cards never shrink below the 44 px touch height', () => {
 });
 
 test('hudLayout: small landscape windows stand the bars beside the board', () => {
-  for (const [w, h] of [[667, 375], [640, 360], [800, 600]]) {
+  // The view fills the whole window, so at 4:3 the board is as tall as the
+  // window allows and the cards stand upright beside it.
+  for (const [w, h] of [[667, 375], [640, 360], [1024, 768]]) {
     const layout = hudLayout(w, h);
     assert.equal(layout.compact, true, `${w}x${h}`);
     assert.equal(layout.rail, true, `${w}x${h}`);
@@ -99,7 +102,10 @@ test('hudLayout: small landscape windows stand the bars beside the board', () =>
     assert.ok(12 + layout.railWidth <= boardScreenRect(w, h).left - HUD_GAP + 1e-9, `${w}x${h}`);
   }
   // A narrower strip stacks the two skill buttons.
-  const small = hudLayout(568, 320);
-  assert.equal(small.rail, true);
-  assert.equal(small.stacked, true);
+  for (const [w, h] of [[568, 320], [800, 600]]) {
+    const small = hudLayout(w, h);
+    assert.equal(small.rail, true, `${w}x${h}`);
+    assert.equal(small.stacked, true, `${w}x${h}`);
+    assert.ok(12 + small.railWidth <= boardScreenRect(w, h).left - HUD_GAP + 1e-9, `${w}x${h}`);
+  }
 });

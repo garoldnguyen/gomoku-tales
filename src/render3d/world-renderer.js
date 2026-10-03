@@ -4,16 +4,19 @@
 //                              and ui/online-game.js)
 //   drawMenuScreen(ctx, time)  the world with an empty board behind the
 //                              DOM lobby and room screens, and the title
-//   hitTest(px, py)            the board cell under an internal point
+//   hitTest(px, py)            the board cell under a point of the WebGL
+//                              canvas (its drawing buffer pixels)
 // The WebGL canvas shows the world (src/render3d/world.js) with the board's
 // stones and rocks as sprites on the farmland board, and the v3 flat
 // decals (docs/art-direction-v3.md section 3) for hover, skill targeting,
 // announced skills, the last move and the winning line. ctx is the
-// transparent 2D canvas stacked above it, which only shows the skill
+// transparent 2D canvas stacked above it (a 16:9 box in the middle of the
+// window that takes no pointer events), which only shows the skill
 // banners, the quality and FPS line and the menu title: the player cards,
 // skill buttons, turn and messages are the DOM glass HUD (src/ui/hud.js,
 // docs/art-direction-v3.md section 8). Board picking is a ray from the
-// camera (src/render3d/hit-test.js). The Q key calls
+// camera (src/render3d/hit-test.js). The WebGL canvas fills the whole
+// window (docs/art-direction-v3-1.md section 3). The Q key calls
 // setQuality(cycleQuality(quality)) through cycleQuality().
 //
 // The world also comes alive from the logic events (sections D and G):
@@ -140,7 +143,10 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       drawQuality(ctx);
     },
 
-    hitTest: createWorldHitTest(world.cameraSetup),
+    // The board cell under a point in the WebGL canvas's drawing buffer
+    // pixels (src/main.js attaches the pointer to that canvas), through the
+    // live camera: right at every window shape.
+    hitTest: createWorldHitTest(world.cameraSetup, worldCanvas),
 
     // Switches this window's quality level ('low', 'medium' or 'high';
     // unknown values are medium), saves it and keeps the game as it is.

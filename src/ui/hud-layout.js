@@ -2,9 +2,9 @@
 // so they never lie over the board's plots and take its clicks. Pure (no
 // DOM): src/ui/hud.js calls hudLayout() when the window size changes.
 //
-// The 3D stage is 16:9, as large as fits and centred in the window
-// (index.html #stage); the HUD covers the whole window. The cards are 332 px
-// wide, 56 px from the sides and 120 px from the top at full size. Where the
+// The 3D view fills the whole window (docs/art-direction-v3-1.md section
+// 3), and so does the HUD. The cards are 332 px wide, 56 px from the sides
+// and 120 px from the top at full size. Where the
 // space beside the board is narrower they shrink (scale), and below 700 px
 // wide, or when they would have to shrink so far that the skill rows lose
 // their 44 px touch height, they become the slim bars (compact) with 48 px
@@ -15,8 +15,6 @@
 
 import { BOARD_SIZE, CELL_SIZE } from '../config.js';
 import { gameCamera, projectToNdc } from '../render3d/camera.js';
-
-const STAGE_ASPECT = 16 / 9;
 
 export const CARD_WIDTH = 332;
 export const CARD_SIDE = 56;
@@ -42,39 +40,27 @@ export const RAIL_WIDTH_ROW = 124;
 export const RAIL_WIDTH_STACKED = 108;
 const RAIL_WIDTH_MAX = 180;
 
-// The board's outer plot corners on the 16:9 stage, as shares of its width
-// and height (the camera is fixed, so this is worked out once).
-const BOARD_SHARE = (() => {
-  const setup = gameCamera(STAGE_ASPECT);
+// The rectangle around the board's plots in window pixels: its corners
+// seen through the game camera at the window's shape (camera.js, the same
+// camera the world draws with, whose view widens for narrow windows).
+// Called when the window size changes, not per frame.
+export function boardScreenRect(viewW, viewH) {
+  const setup = gameCamera(viewW / viewH);
   const half = (BOARD_SIZE * CELL_SIZE) / 2;
-  let left = 1;
-  let right = 0;
-  let top = 1;
-  let bottom = 0;
+  let left = Infinity;
+  let right = -Infinity;
+  let top = Infinity;
+  let bottom = -Infinity;
   for (const x of [-half, half]) {
     for (const z of [-half, half]) {
       const ndc = projectToNdc({ x, y: 0, z }, setup);
-      left = Math.min(left, (ndc.x + 1) / 2);
-      right = Math.max(right, (ndc.x + 1) / 2);
-      top = Math.min(top, (1 - ndc.y) / 2);
-      bottom = Math.max(bottom, (1 - ndc.y) / 2);
+      left = Math.min(left, ((ndc.x + 1) / 2) * viewW);
+      right = Math.max(right, ((ndc.x + 1) / 2) * viewW);
+      top = Math.min(top, ((1 - ndc.y) / 2) * viewH);
+      bottom = Math.max(bottom, ((1 - ndc.y) / 2) * viewH);
     }
   }
-  return Object.freeze({ left, right, top, bottom });
-})();
-
-// The rectangle around the board's plots in window pixels.
-export function boardScreenRect(viewW, viewH) {
-  const stageW = Math.min(viewW, viewH * STAGE_ASPECT);
-  const stageH = Math.min(viewH, viewW / STAGE_ASPECT);
-  const stageX = (viewW - stageW) / 2;
-  const stageY = (viewH - stageH) / 2;
-  return {
-    left: stageX + BOARD_SHARE.left * stageW,
-    right: stageX + BOARD_SHARE.right * stageW,
-    top: stageY + BOARD_SHARE.top * stageH,
-    bottom: stageY + BOARD_SHARE.bottom * stageH,
-  };
+  return { left, right, top, bottom };
 }
 
 const FULL = Object.freeze({ compact: false, rail: false, railWidth: 0, stacked: false, scale: 1 });

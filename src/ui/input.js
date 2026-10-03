@@ -1,5 +1,7 @@
 // Canvas pointer and keyboard input. Converts window coordinates to the
-// 960x540 internal resolution and forwards internal points to the handlers.
+// canvas's own pixels (the 960x540 internal resolution of the 2D canvas, or
+// the drawing buffer of the full window WebGL canvas) and forwards those
+// points to the handlers.
 
 import { characterForStone } from '../logic/characters.js';
 import { HUD_2D, cellAtPoint, skillButtonAt } from '../render/layout.js';
