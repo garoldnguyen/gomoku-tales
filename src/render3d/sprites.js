@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { PX_WORLD, SPRITE_STRETCH_Y, SUN_SHADOW_OPACITY } from '../config.js';
 import { sunShadowCorners } from './shadow-math.js';
-import { anchorForward, anchorShift, faceYaw, frameAt, SPRITE_ALPHA_TEST } from './sprite-frames.js';
+import { anchorForward, anchorShift, faceYaw, frameAt, SPRITE_ALPHA_TEST, visibleTopRow } from './sprite-frames.js';
 import { bendTowardPx, swayLeanSide, swayPhase } from './wind.js';
 
 const SHADOW_OPACITY = 0.35;
@@ -94,10 +94,11 @@ export const PLANT_SWAY = { uSwayAngle: { value: 0 }, uSwayPx: { value: 0 } };
 // A sprite material that, while uSwayOn is 1, leans each art pixel row of
 // the frame downwind by whole pixels (and on any frame leans it by uBendPx
 // at the top towards a Tornado Zone, see bendRowPx in wind.js): the lean grows with the square of
-// the row's height above the root row (rootRow from the bottom), the same
-// formula as plantSwayLeanPx in wind.js. It shifts where each row reads the
+// the row's height above the root row (rootRow from the bottom) over the
+// height of the top visible row (topRow), the same formula as
+// plantSwayLeanPx with swayRowFraction in wind.js. It shifts where each row reads the
 // sheet, so the single quad stays put and no pixel is ever split.
-function swayingSpriteMaterial(map, { frames, widthPx, heightPx, rootRow }) {
+function swayingSpriteMaterial(map, { frames, widthPx, heightPx, rootRow, topRow }) {
   const material = spriteMaterial(map);
   const uniforms = {
     ...PLANT_SWAY,
@@ -121,7 +122,7 @@ vec2 swayUv = vMapUv;
 float swayPx = uSwayPx * uSwayOn;
 if (swayPx > 0.0 || uBendPx != 0.0) {
   float row = floor(vMapUv.y * ${heightPx.toFixed(1)});
-  float h = clamp((row - ${rootRow.toFixed(1)}) / ${Math.max(heightPx - 1 - rootRow, 1).toFixed(1)}, 0.0, 1.0);
+  float h = clamp((row - ${rootRow.toFixed(1)}) / ${Math.max(topRow - rootRow, 1).toFixed(1)}, 0.0, 1.0);
   float leanPx = 0.0;
   if (swayPx > 0.0) {
     // Same formula as plantSwayLeanPx in wind.js.
@@ -142,7 +143,7 @@ if (floor(swayUv.x * ${frames.toFixed(1)}) != floor(vMapUv.x * ${frames.toFixed(
 diffuseColor *= sampledDiffuseColor;
 #endif`);
   };
-  material.customProgramCacheKey = () => `sprite-sway-${frames}-${widthPx}-${heightPx}-${rootRow}`;
+  material.customProgramCacheKey = () => `sprite-sway-${frames}-${widthPx}-${heightPx}-${rootRow}-${topRow}`;
   material.userData.sway = uniforms;
   return material;
 }
@@ -244,6 +245,34 @@ diffuseColor.a *= step(${SPRITE_ALPHA_TEST.toFixed(2)}, texture2D(map, vMapUv).a
 const sheetTextures = new WeakMap(); // sheet canvas -> base texture
 const geometries = new Map(); // "w x h" -> shared upright plane geometry
 
+// The top visible row of frame `frame` of a sheet (visibleTopRow), read
+// once per sheet and frame. A sheet whose pixels cannot be read gives its
+// top row.
+const sheetTopRows = new WeakMap();
+function sheetTopRow(sheet, frameWidth, frame) {
+  let rows = sheetTopRows.get(sheet);
+  if (!rows) {
+    rows = new Map();
+    sheetTopRows.set(sheet, rows);
+  }
+  if (!rows.has(frame)) {
+    let top = sheet.height - 1;
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = sheet.width;
+      canvas.height = sheet.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(sheet, 0, 0);
+      const { data } = ctx.getImageData(0, 0, sheet.width, sheet.height);
+      top = visibleTopRow((x, y) => data[(y * sheet.width + x) * 4 + 3], frameWidth, sheet.height, frame);
+    } catch (error) {
+      console.warn('Sway: cannot read the sprite sheet pixels, swaying from its top row', error);
+    }
+    rows.set(frame, top);
+  }
+  return rows.get(frame);
+}
+
 function baseTexture(sheet) {
   let texture = sheetTextures.get(sheet);
   if (!texture) {
@@ -293,6 +322,7 @@ export class PixelSprite {
       widthPx: frameWidth,
       heightPx: sheet.height,
       rootRow: anchor ? sheet.height - 1 - anchor.y : 0,
+      topRow: sheetTopRow(sheet, frameWidth, swayFrame),
     });
     this.sway = material.userData.sway ?? null;
     // The pull of a Tornado Zone swirl (setBend): how far the top leans

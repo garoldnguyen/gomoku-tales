@@ -14,6 +14,20 @@ export function fadedAlphaTest(opacity, alphaTest = SPRITE_ALPHA_TEST) {
   return alphaTest * opacity;
 }
 
+// The highest art pixel row, counted from the bottom (0), of frame `frame`
+// of a sheet `frameWidth` art pixels per frame and `heightPx` tall that
+// keeps any pixel through the alpha test. `alphaAt(x, y)` gives the alpha
+// (0 to 255) of sheet pixel (x, y), y counted from the top. A frame with
+// no visible pixel gives heightPx - 1, the top of the frame.
+export function visibleTopRow(alphaAt, frameWidth, heightPx, frame = 0, alphaTest = SPRITE_ALPHA_TEST) {
+  for (let y = 0; y < heightPx; y++) {
+    for (let x = frame * frameWidth; x < (frame + 1) * frameWidth; x++) {
+      if (alphaAt(x, y) >= alphaTest * 255) return heightPx - 1 - y;
+    }
+  }
+  return heightPx - 1;
+}
+
 // Index of the sprite sheet frame to show `timeMs` after the animation
 // started. Every frame lasts `frameMs`. A looping animation wraps around; a
 // one-shot animation (loop: false) holds its last frame. Times before the

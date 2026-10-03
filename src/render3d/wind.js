@@ -104,10 +104,13 @@ export function plantSwayLeanPx(h, phase, timeMs, amplitudePx, periodMs = SWAY_P
 
 // The height fraction h of art pixel row `rowFromBottom` (0 is the bottom
 // row) of a sprite whose root (anchor) is row `rootRow` from the bottom
-// and whose top row is `heightPx - 1`: 0 at and below the root, 1 at the
-// top. Each row leans as one, by whole pixels, so the art stays crisp.
-export function swayRowFraction(rowFromBottom, heightPx, rootRow = 0) {
-  const span = heightPx - 1 - rootRow;
+// and whose top row is `topRow` (default `heightPx - 1`; a frame with
+// transparent rows on top passes its top visible row, visibleTopRow in
+// sprite-frames.js, so its top really reaches h = 1): 0 at and below the
+// root, 1 at the top. Each row leans as one, by whole pixels, so the art
+// stays crisp.
+export function swayRowFraction(rowFromBottom, heightPx, rootRow = 0, topRow = heightPx - 1) {
+  const span = Math.min(topRow, heightPx - 1) - rootRow;
   if (!(span > 0)) return 0;
   return Math.min(Math.max((rowFromBottom - rootRow) / span, 0), 1);
 }
