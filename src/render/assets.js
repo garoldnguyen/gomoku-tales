@@ -17,8 +17,9 @@ export const MANIFEST_URL = 'assets/manifest.json';
 // the file is a sprite sheet with all frames in one row, so the whole file
 // is width * frames by height. frameMs is the time per frame of an
 // animation; 0 means the frames are still (variants, not an animation).
-// use says what draws it: '2d' (the 2D renderer), 'hud' (the 2D HUD, in
-// both renderers) or '3d' (the 3D world).
+// use says what draws it: '2d' (the 2D renderer, its canvas panels and
+// portraits included), 'hud' (the skill icons and v3 portraits of either
+// renderer's HUD) or '3d' (the 3D world).
 export function parseManifest(data) {
   if (!data || typeof data !== 'object' || !data.assets || typeof data.assets !== 'object') {
     throw new Error('Asset manifest needs an "assets" object');
@@ -78,9 +79,15 @@ export function createAssetStore(images = {}) {
   };
 }
 
-// Loads the manifest and every image in it. Never rejects: a missing or bad
-// manifest gives an empty store, a missing image leaves that asset unloaded,
-// and an image of the wrong size is left unloaded with a warning.
+// The uses the 3D game draws (see parseManifest). It never requests the 2D
+// renderer's art, so the 2D files that are still placeholders do not show
+// up as failed requests in the console.
+export const USES_3D = Object.freeze(['3d', 'hud']);
+
+// Loads the manifest and every image in it, or with `uses` only the images
+// of those uses. Never rejects: a missing or bad manifest gives an empty
+// store, a missing image leaves that asset unloaded, and an image of the
+// wrong size is left unloaded with a warning.
 //   fetchJson(url) -> Promise of parsed JSON
 //   loadImage(url) -> Promise of an image with width and height
 export async function loadAssets({
@@ -88,6 +95,7 @@ export async function loadAssets({
   fetchJson = fetchJsonFile,
   loadImage = loadImageFile,
   warn = () => {},
+  uses = null,
 } = {}) {
   let entries;
   try {
@@ -99,7 +107,8 @@ export async function loadAssets({
 
   const base = manifestUrl.slice(0, manifestUrl.lastIndexOf('/') + 1);
   const images = {};
-  await Promise.all(entries.map(async (entry) => {
+  const wanted = uses ? entries.filter((entry) => uses.includes(entry.use)) : entries;
+  await Promise.all(wanted.map(async (entry) => {
     let image;
     try {
       image = await loadImage(base + entry.file);

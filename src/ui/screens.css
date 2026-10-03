@@ -1,9 +1,19 @@
-/* Lobby and room screens drawn as DOM over the canvas, in the same pixel
-   look as the canvas panels: dark outlines, wooden signboards, hard
-   shadows and a bold monospace font. Sizes use --u (one internal pixel,
-   set on #stage in index.html) so everything scales with the canvas. */
+/* Lobby and room screens drawn as DOM over the canvas, in the quiet glass
+   look of the HUD (src/ui/hud.css, docs/art-direction-v3.md section 8):
+   dark translucent cards with a hairline border, round corners, DM Sans and
+   no wood. The cards need no backdrop blur, because on Medium and High the
+   world behind the screens is already blurred (index.html .backdrop-blur),
+   so they look the same on every quality level and the 2D renderer. Sizes
+   use --u (one internal pixel, set on #stage in index.html) so everything
+   scales with the canvas. */
 
 #screens {
+  --ink: #f4f7fb;
+  --ink-2: rgba(244, 247, 251, 0.74);
+  --card: rgba(14, 20, 34, 0.82);
+  --line: rgba(255, 255, 255, 0.18);
+  --row: rgba(255, 255, 255, 0.08);
+  --row-hover: rgba(255, 255, 255, 0.16);
   position: absolute;
   inset: 0;
   display: flex;
@@ -11,14 +21,15 @@
   justify-content: center;
   padding-top: calc(var(--u) * 70);
   box-sizing: border-box;
-  font: bold calc(var(--u) * 16) / 1.3 monospace;
-  color: #fff;
+  font: 500 calc(var(--u) * 15) / 1.35 "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
   z-index: 2; /* above the glass HUD (hud.css) */
 }
 
 #screens.over {
   padding-top: 0;
-  background: rgba(20, 18, 28, 0.55);
+  background: rgba(14, 20, 34, 0.4);
 }
 
 #screens .card {
@@ -29,17 +40,17 @@
   min-width: calc(var(--u) * 360);
   max-width: calc(var(--u) * 560);
   padding: calc(var(--u) * 22) calc(var(--u) * 28);
-  background: #a8703c;
-  border: calc(var(--u) * 5) solid #5a3418;
-  outline: calc(var(--u) * 3) solid #1a1020;
-  box-shadow: calc(var(--u) * 6) calc(var(--u) * 6) 0 rgba(26, 16, 32, 0.6);
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--u) * 20);
+  box-shadow: 0 calc(var(--u) * 10) calc(var(--u) * 28) rgba(10, 20, 40, 0.3);
   text-align: center;
-  text-shadow: calc(var(--u) * 2) calc(var(--u) * 2) 0 #1a1020;
 }
 
 #screens .card h2 {
   margin: 0;
   font-size: calc(var(--u) * 24);
+  font-weight: 700;
 }
 
 #screens .card p {
@@ -48,28 +59,33 @@
 
 #screens .card .lead {
   font-size: calc(var(--u) * 15);
+  color: var(--ink-2);
 }
 
 #screens button {
   min-width: calc(var(--u) * 200);
+  min-height: 44px;
   padding: calc(var(--u) * 8) calc(var(--u) * 16);
   font: inherit;
-  color: #3a2410;
-  text-shadow: none;
-  background: #e8c08a;
-  border: calc(var(--u) * 3) solid #1a1020;
-  box-shadow: inset calc(var(--u) * -3) calc(var(--u) * -3) 0 #c49a64;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--row);
+  border: 1px solid var(--line);
+  border-radius: 999px;
   cursor: pointer;
 }
 
-#screens button:hover:not(:disabled),
+#screens button:hover:not(:disabled) {
+  background: var(--row-hover);
+}
+
 #screens button:focus-visible {
-  background: #f6d8a8;
-  outline: calc(var(--u) * 3) solid #fff27a;
+  outline: 3px solid #fff;
+  outline-offset: 2px;
 }
 
 #screens button:active:not(:disabled) {
-  box-shadow: inset calc(var(--u) * 3) calc(var(--u) * 3) 0 #c49a64;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 #screens button:disabled {
@@ -80,7 +96,7 @@
 #screens button.secondary {
   min-width: calc(var(--u) * 120);
   font-size: calc(var(--u) * 13);
-  background: #c48a50;
+  background: transparent;
 }
 
 .choices {
@@ -94,26 +110,29 @@
   align-items: center;
   gap: calc(var(--u) * 6);
   min-width: calc(var(--u) * 170);
+  border-radius: calc(var(--u) * 14);
 }
 
 .choice small {
   font-size: calc(var(--u) * 11);
+  color: var(--ink-2);
 }
 
 .disc {
   display: inline-block;
-  width: calc(var(--u) * 20);
-  height: calc(var(--u) * 20);
-  border: calc(var(--u) * 2) solid #1a1020;
+  width: calc(var(--u) * 16);
+  height: calc(var(--u) * 16);
   border-radius: 50%;
 }
 
 .disc.x {
   background: #3b8cff;
+  box-shadow: 0 0 0 calc(var(--u) * 3) rgba(59, 140, 255, 0.28);
 }
 
 .disc.o {
   background: #ff4b5c;
+  box-shadow: 0 0 0 calc(var(--u) * 3) rgba(255, 75, 92, 0.28);
 }
 
 .join-row {
@@ -124,18 +143,24 @@
 
 #join-code {
   width: calc(var(--u) * 110);
+  min-height: 44px;
+  box-sizing: border-box;
   padding: calc(var(--u) * 6) calc(var(--u) * 8);
   font: inherit;
   font-size: calc(var(--u) * 20);
+  font-weight: 700;
   letter-spacing: calc(var(--u) * 3);
+  text-align: center;
   text-transform: uppercase;
-  color: #1a1020;
-  background: #fff6e0;
-  border: calc(var(--u) * 3) solid #1a1020;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--u) * 10);
 }
 
 #join-code:focus {
-  outline: calc(var(--u) * 3) solid #fff27a;
+  outline: 3px solid #fff;
+  outline-offset: 2px;
 }
 
 #screens .join-row button {
@@ -144,7 +169,7 @@
 
 .error {
   min-height: 1.3em;
-  color: #ffd6d6;
+  color: #ffd0d5;
 }
 
 .error:empty,
@@ -165,11 +190,12 @@
 .code {
   padding: calc(var(--u) * 4) calc(var(--u) * 12);
   font-size: calc(var(--u) * 36);
+  font-weight: 700;
   letter-spacing: calc(var(--u) * 6);
-  color: #1a1020;
-  text-shadow: none;
-  background: #fff6e0;
-  border: calc(var(--u) * 3) solid #1a1020;
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--line);
+  border-radius: calc(var(--u) * 12);
   user-select: all;
 }
 
@@ -177,7 +203,7 @@
   min-width: calc(var(--u) * 90);
 }
 
-/* "Waiting for opponent" with dots that step like a pixel animation. */
+/* "Waiting for opponent" with dots that step in turn. */
 .waiting::after {
   content: '';
   display: inline-block;

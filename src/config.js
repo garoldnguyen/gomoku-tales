@@ -76,13 +76,9 @@ export const PATH_STONES = [0.7, 1.7]; // stepping stones, cells from the curb
 
 // HD-2D sprites from docs/art-direction-hd2d.md section D. One art pixel is
 // PX_WORLD world units for every sprite, so all sprite pixels look the same
-// size. 1/32 matches the 480 px board texture (32 px per cell).
+// size. 1/32 matches the 480 px farm board texture (32 px per cell).
 export const PX_WORLD = 1 / 32;
-export const PIECE_SPRITE_PX = 32; // X and O stones and the rock, square frames
 export const CHARACTER_SPRITE_PX = 96; // Wind Rabbit and Earth Bear, square frames
-export const BOARD_TEXTURE_PX = 480; // the board top texture, square, so one cell is 32 px
-export const DECAL_PX = 16; // flat cell decals (hover, marks, skill targets), square
-export const CLOUD_VARIANTS = 4; // cloud shapes, the frames of the cloud sheet
 // The camera looks down CAMERA_PITCH_DEG, so an upright sprite looks only
 // cos(pitch) as tall as it is. Sprites stay upright but are stretched in
 // height by this factor, so their art pixels look square on screen. Set it
@@ -115,11 +111,6 @@ export const CHARACTER_GLOW_FADE_MS = 400; // the current player's glow fades in
 export const CHARACTER_GLOW_PULSE_MS = 2400; // one slow breath of the glow
 
 // Map 1, Windy Spring Breeze Hill (section C).
-export const CLOUD_COUNT = 7;
-export const CLOUD_SPEED = 0.6; // world units per second, drifting towards +x
-export const CLOUD_PX_WORLD = 1 / 8; // clouds are far away, so their art pixels are bigger
-export const WIND3D_STREAK_COUNT = 10;
-export const WIND3D_STREAK_SPEED = 5; // world units per second, towards +x
 // Light fog for depth, in world units from the camera, starting a little
 // behind the board.
 export const FOG_NEAR = CAMERA_DISTANCE + 15;
@@ -300,7 +291,6 @@ export const TONE_MAPPING_EXPOSURE = 1.0;
 // never change the game state. Particle counts and rates are for high; the
 // quality levels scale them down and cap the live particles
 // (particleCap in src/render3d/quality.js).
-export const PLACE_SPARKLE_COUNT = 12; // sparkles when a plant lands
 export const PLACE_DUST_COUNT = 10; // soil specks in a soil puff
 export const REVERSE_GROWTH_SPEED = 2.5; // a plant folds back through its stages this many times faster than it grows
 export const DASH_STREAK_MS = 420; // a resolved Wind Dash seed rides its gust to the target this fast

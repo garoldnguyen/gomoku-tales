@@ -89,10 +89,11 @@ Call the left window **A** (it creates the room and is the host) and the right w
 - [ ] Window A's top line says "Room CODE | You play Wind Rabbit (X)"; window B's says
       "... You play Earth Bear (O)". The joiner got the other character.
 - [ ] The Wind Rabbit panel is on the left and the Earth Bear panel on the right in both
-      windows, with the board between them. In 3D the panels are wooden signboards in the
-      bottom corners and the rabbit and bear sprites stand beside the board above them;
-      each panel shows the name, "Stone: X" or "Stone: O", and two skill buttons with an
-      icon, the name and "Ready". [2D: tall panels beside the board, each with a portrait
+      windows, with the board between them. In 3D the panels are quiet glass cards
+      (docs/art-direction-v3.md section 8), each with the portrait, the name, "Plays X" or
+      "Plays O" with the planted count, a status chip and two skill rows with an icon, the
+      name and "Ready"; the rabbit and bear are not drawn in the world for now
+      (SHOW_WORLD_CHARACTERS). [2D: tall panels beside the board, each with a portrait
       (placeholder square with a letter) above the name.]
 - [ ] Only your own panel has the green "You" tag (left in A, right in B).
 - [ ] The Wind Rabbit panel has the yellow turn highlight and "Taking a turn". The status
@@ -115,7 +116,8 @@ Call the left window **A** (it creates the room and is the host) and the right w
       stone (a flower bud; 2D: a red disc) appears in both windows. The turn highlight moves each turn.
 - [ ] In B, click one of Wind Rabbit's skill buttons: "That is your opponent's skill."
 - [ ] Right-click or Esc does nothing harmful when no skill is being targeted.
-- [ ] Faint wind streaks drift left to right across the scene all the time.
+- [ ] 3D: no straight wind streak lines anywhere; on High, petals and leaves drift from the
+      upper left toward the lower right. [2D: faint wind streaks drift left to right.]
 
 ## 6. Skills checklist
 
@@ -282,6 +284,9 @@ Start a fresh room for each case and play a few moves first.
 The unit tests cannot see the 3D scene, so check these by eye. Use the two windows A and B
 from section 3, side by side and both visible.
 
+The short Farmland v3 checklist for the owner (the look on each quality level, plant
+growth, clouds, flowers, glass cards, skills and a clean console) is docs/visual-qa.md.
+
 ### 10.1 Both windows draw the scene
 
 - [ ] Both windows show the 3D scene at the same time, each with its own FPS counter
@@ -294,12 +299,12 @@ from section 3, side by side and both visible.
 
 ### 10.2 Screens over the scene
 
-- [ ] Lobby, Create Room, Join Room and Waiting are wooden cards above the 3D scene. On
+- [ ] Lobby, Create Room, Join Room and Waiting are dark glass cards above the 3D scene. On
       medium and high the scene behind them is blurred; on low it is sharp (the blur is
       skipped to save GPU time). The title and the quality line are never blurred, and no
       dark fringe shows at the edges of the blurred scene.
-- [ ] The scene behind the screens shows an empty board, both characters idling, clouds
-      and wind streaks moving.
+- [ ] The scene behind the screens shows an empty field, and on High the clouds drifting
+      and the wind petals moving.
 - [ ] Game over: the card shows over a dimmed but sharp scene, with the final board, the
       yellow winning line and the winner's and loser's poses in view.
 - [ ] Back to Lobby: the board behind the lobby is empty again, the characters idle and no
@@ -316,7 +321,7 @@ clouds; low has no shadows, no scenery, flowers, hills or clouds and no effect p
       is sharp, the trees and the board cast soft sun shadows on the grass, the corners are
       a little darker and the white rabbit and the hover glow have a faint bloom.
 - [ ] medium: everything is sharp, no vignette; no sun shadows, only the blobs under the
-      sprites; the clouds stand still and the wind streaks are gone.
+      sprites; the clouds stand still and the wind petals are gone.
 - [ ] low: no shadows, trees, flowers, hills or clouds; placing a stone or using a skill
       shows no particles and no screen shake; colours look about the same as on medium.
 - [ ] Switching level in the middle of a game keeps every stone, rock, cooldown and the

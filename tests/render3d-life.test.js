@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import {
   CHARACTER_CAST_FRAME_MS, CHARACTER_CAST_MS, CHARACTER_GLOW_FADE_MS, CHARACTER_IDLE_FRAME_MS,
-  CHARACTER_POSE_FRAME_MS, CHARACTER_SPRITE_PX, CHARACTER_X, PIECE_POP_IN_MS, PIECE_SPRITE_PX, SHOW_WORLD_CHARACTERS,
+  CHARACTER_POSE_FRAME_MS, CHARACTER_SPRITE_PX, CHARACTER_X, PIECE_POP_IN_MS, SHOW_WORLD_CHARACTERS,
 } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
@@ -12,7 +12,7 @@ import {
   CHARACTER_ANIMS, CHARACTER_FRAME_COUNT, characterFrame, createCharacterDirector, glowPulse, popCellsForEvents,
   popInScale, stepGlow, worldCharacterSpots,
 } from '../src/render3d/character-poses.js';
-import { bearFrames, CHARACTER_POSES, rabbitFrames, stoneGrid } from '../src/render3d/placeholder-art.js';
+import { bearFrames, CHARACTER_POSES, rabbitFrames } from '../src/render3d/placeholder-art.js';
 
 test('character animations sit side by side in one sheet row, in pose order', () => {
   let next = 0;
@@ -181,24 +181,6 @@ test('character sheets hold every pose at the configured size', () => {
     assert.equal(rabbitFrames(pose).length, CHARACTER_ANIMS[pose].count);
     assert.equal(bearFrames(pose).length, CHARACTER_ANIMS[pose].count);
   }
-});
-
-test('X is a green sprout and O a pink flower bud, each in a pot of its player colour', () => {
-  const sprout = stoneGrid(X);
-  const bud = stoneGrid(O);
-  for (const grid of [sprout, bud]) {
-    assert.equal(grid.width, PIECE_SPRITE_PX);
-    assert.equal(grid.height, PIECE_SPRITE_PX);
-    assert.ok(grid.pixels.slice(-grid.width).some(Boolean), 'stands on the bottom row');
-    assert.ok(grid.pixels.includes('#6cc04a'), 'has green leaves');
-  }
-  assert.ok(sprout.pixels.includes('#4a8fe0'), 'X has a blue pot');
-  assert.ok(!sprout.pixels.includes('#ff8fb0'), 'X has no bud');
-  assert.ok(bud.pixels.includes('#e85a6e'), 'O has a red pot');
-  assert.ok(bud.pixels.includes('#ff8fb0'), 'O has a pink bud');
-  // The bud stands taller than the sprout, so the shapes read apart too.
-  const top = (grid) => Math.floor(grid.pixels.findIndex(Boolean) / grid.width);
-  assert.ok(top(bud) < top(sprout));
 });
 
 test('SHOW_WORLD_CHARACTERS switches the world characters off for now, and back on in one line', () => {

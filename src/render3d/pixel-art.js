@@ -71,22 +71,3 @@ export function outline(grid, color) {
   for (let i = 0; i < edge.length; i += 2) setPixel(grid, edge[i], edge[i + 1], color);
 }
 
-// Grid from rows of characters, one character per pixel. `palette` maps a
-// character to a colour; characters missing from it are transparent.
-export function gridFromRows(rows, palette) {
-  const grid = createGrid(rows[0].length, rows.length);
-  rows.forEach((row, y) => {
-    for (let x = 0; x < row.length; x++) setPixel(grid, x, y, palette[row[x]] ?? null);
-  });
-  return grid;
-}
-
-// Copies the painted pixels of `source` into `target` at (x, y).
-export function blit(target, source, x = 0, y = 0) {
-  for (let sy = 0; sy < source.height; sy++) {
-    for (let sx = 0; sx < source.width; sx++) {
-      const color = getPixel(source, sx, sy);
-      if (color) setPixel(target, x + sx, y + sy, color);
-    }
-  }
-}

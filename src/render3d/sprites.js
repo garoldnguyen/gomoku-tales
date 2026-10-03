@@ -409,23 +409,3 @@ export class PixelSprite {
   }
 }
 
-// Many copies of one still billboard drawn in a single draw call (for
-// example wildflowers). Each faces the camera around the vertical axis.
-// Instanced billboards are scenery and have no blob shadows.
-export function createInstancedBillboards({ sheet, positions, cameraPosition }) {
-  const geometry = uprightPlaneGeometry(sheet.width, sheet.height);
-  const mesh = new THREE.InstancedMesh(geometry, spriteMaterial(baseTexture(sheet)), positions.length);
-  const matrix = new THREE.Matrix4();
-  const rotation = new THREE.Quaternion();
-  const up = new THREE.Vector3(0, 1, 0);
-  const scale = new THREE.Vector3(1, 1, 1);
-  const position = new THREE.Vector3();
-  positions.forEach((p, i) => {
-    rotation.setFromAxisAngle(up, faceYaw(p, cameraPosition));
-    matrix.compose(position.set(p.x, p.y, p.z), rotation, scale);
-    mesh.setMatrixAt(i, matrix);
-  });
-  mesh.instanceMatrix.needsUpdate = true;
-  mesh.computeBoundingSphere();
-  return mesh;
-}

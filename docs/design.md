@@ -9,8 +9,14 @@ Players meet in an online room made with a room code. In version 1 the online co
 
 ## 2. Tech and architecture
 - Plain HTML, CSS and JavaScript (ES modules). No framework, bundler or build step. Node is used only to run unit tests (node --test).
-- Canvas 2D at a fixed internal resolution of 960x540, scaled to fit the window, with pixelated scaling (image-rendering: pixelated). Screens that are easier as HTML (lobby, room code input) may use DOM overlays styled in the same pixel look.
-- Folders: src/logic (pure rules), src/net (transport and room sync), src/render (canvas drawing and effects), src/ui (screens and input), assets/ (images and manifest), tests/, docs/.
+- Canvas 2D at a fixed internal resolution of 960x540, scaled to fit the window, with pixelated scaling (image-rendering: pixelated). Screens that are easier as HTML (lobby, room code input) may use DOM overlays (in the Farmland v3 quiet glass look, src/ui/screens.css).
+- Folders: src/logic (pure rules), src/net (transport and room sync), src/render (the old 2D canvas renderer, kept for ?render=2d, and the shared asset loader), src/render3d (the 3D farm, the default renderer), src/ui (screens, input and the glass HUD), assets/ (images, manifest and tuning data), tests/, docs/.
+- Rendering and art now follow docs/art-direction-v3.md (Farmland v3), which replaces sections 3.1, 7 and 8 of this file for the 3D game; those sections still describe the 2D fallback renderer (?render=2d). The v3 modules:
+  - src/render3d/quality.js: the ONE quality table (low, medium, high, art direction v3 section 5), the pure level picking, saving and automatic step down, and the URL debug switches (?shadows=off, ?bloom=off, ?dof=off, ?wind=off, ?rays=off, ?ripples=off, ?fx=off). No other code tests a level name.
+  - src/render3d/v3-meta.js: reads assets/v3-meta.json, the tuning data of the v3 art pack (sprite anchors, plant growth stage times, flower looks, wind bit kinds), with defaults when the file is missing or bad.
+  - src/render3d/meadow.js: planMeadow(seed), the pure seeded plan of the meadow (flower drifts of one kind, grass tufts, clover, trees, bushes and hay bales), kept off the field, curb, fence and path; meadow-scene.js draws it with one instanced mesh per kind.
+  - src/ui/hud.css with src/ui/hud.js, hud-view.js (pure hudViewModel) and hud-layout.js: the HUD as a DOM overlay of quiet glass cards over the 3D world, instead of the canvas panels. The lobby and room screens (src/ui/screens.css) use the same glass look.
+  - The full file map is in AGENTS.md and CLAUDE.md.
 - src/config.js holds all tunable values (section 10).
 - Game state is one plain, serializable object. Logic functions take a state and an action and return a new state plus a list of events (stone placed, skill announced, stone thrown, rock broken, and so on). Rendering and effects react to events. The logic never draws.
 - Randomness (Tornado Zone) is decided only by the host and sent to the other player inside the resulting state or event. It never runs separately in both windows. In tests the random function is injected.
@@ -77,6 +83,7 @@ STONE CONVERSION (long cooldown). Uses your turn.
 - Dev mode: opening the page with ?local=1 puts both sides in one window so the rules can be tested without rooms.
 
 ## 7. Art direction
+For the 3D game, docs/art-direction-v3.md replaces this section (a farm field of tilled plots instead of the wooden board, X and O as growing plants, painted clouds and petals instead of wind streaks, glass HUD cards instead of signboards). This section describes the 2D fallback renderer (?render=2d).
 - 16-bit pixel art, bright saturated candy colours, cute. Stones have a bold dark outline so they stand out on the wooden board.
 - Map 1, Windy Spring Breeze Hill: a green grass hill with wild flowers and blossoming trees, a clear blue sky and white clouds. The 15x15 wooden grid board sits in the middle of the grass. Faint wind streaks drift across the screen all the time to stress the wind theme.
 - Stones: no plain cross and no plain circle. Custom art that is unique to this map. X (Wind Rabbit, blue theme): a young twig or vine sprout piece. O (Earth Bear, red theme): a round stone flower bud piece. Both with outlines.
@@ -88,6 +95,7 @@ STONE CONVERSION (long cooldown). Uses your turn.
 - Generated art must be cleaned to a true pixel grid with a limited palette before it is added.
 
 ## 8. Effects and polish
+For the 3D game see docs/art-direction-v3.md sections 4, 7 and 9 (no straight wind streaks there). This section describes the 2D fallback renderer.
 - When a stone is placed, or a skill hits a stone: small sparkles, a puff of dust and a light screen shake.
 - Wind streaks drift across the background at all times.
 - Skill announcements appear as a short text banner (for example "Wind Dash!").

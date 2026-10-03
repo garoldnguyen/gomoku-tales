@@ -1,15 +1,12 @@
-// The textures and sprite sheets of the 3D world (docs/art-direction-hd2d.md
-// section H): their names in assets/manifest.json and the placeholder that
-// is generated while a file is missing. docs/art-spec.md lists the same
-// files for the artist. src/render3d/art.js turns these into canvases.
+// The textures and sprite sheets of the 3D world: the Farmland v3 pack
+// (docs/art-direction-v3.md section 2) and the world character sheets
+// (docs/art-direction-hd2d.md section H), their names in
+// assets/manifest.json and the placeholder that is generated while a file
+// is missing. src/render3d/art.js turns these into canvases.
 // Pure: no DOM or Three.js, so it runs under node --test.
 
-import { BOARD_TEXTURE_PX, CLOUD_VARIANTS, DECAL_PX } from '../config.js';
 import { CHARACTER_ANIMS } from './character-poses.js';
-import {
-  drawBoardTop, drawDashTarget, drawHover, drawSelectFrame, drawWhirl, drawWinFrame, drawZone,
-} from './decal-art.js';
-import { bearFrames, cloudGrid, flowerGrid, rabbitFrames, rockGrid, stoneGrid } from './placeholder-art.js';
+import { bearFrames, rabbitFrames } from './placeholder-art.js';
 import { blockSheetPainter, farmBoardPainter, ringPainter, stripPainter } from './v3-placeholder-art.js';
 
 // Pose names in character sheet order (see CHARACTER_ANIMS).
@@ -18,21 +15,9 @@ const poseNames = (prefix) => Object.fromEntries(POSES.map((pose) => [pose, `${p
 
 // Manifest names of everything the 3D world draws from an art file. Each
 // character pose is its own sheet; art.js puts them side by side into the
-// one sheet the character sprite plays.
+// one sheet the character sprite plays (shown when SHOW_WORLD_CHARACTERS).
 export const ART = {
-  board: 'board-top',
-  piece: { X: 'piece-x', O: 'piece-o', rock: 'piece-rock' },
   character: { X: poseNames('wind-rabbit'), O: poseNames('earth-bear') },
-  flower: { pink: 'flower-pink', yellow: 'flower-yellow', white: 'flower-white', blue: 'flower-blue', tuft: 'grass-tuft' },
-  cloud: 'cloud', // CLOUD_VARIANTS still frames, one cloud shape each
-  decal: {
-    hover: 'decal-hover',
-    select: 'decal-select',
-    win: 'decal-win',
-    dashTarget: 'decal-dash-target',
-    whirl: 'decal-whirl',
-    zone: 'decal-zone',
-  },
   // Farmland v3 pack in assets/3d/v3/ (docs/art-direction-v3.md section 2).
   // Tuning data for these names is in assets/v3-meta.json (v3-meta.js).
   v3: {
@@ -173,31 +158,20 @@ const painted = (size, paint) => ({ width: size, height: size, frames: 1, paint 
 //   { width, height, frames: n, paint(ctx) }  drawn on a canvas of n frames
 //                                             of that size side by side
 export const PLACEHOLDERS_3D = {
-  [ART.board]: painted(BOARD_TEXTURE_PX, drawBoardTop),
-  [ART.piece.X]: pixelArt(() => [stoneGrid('X')]),
-  [ART.piece.O]: pixelArt(() => [stoneGrid('O')]),
-  [ART.piece.rock]: pixelArt(() => [rockGrid()]),
   ...Object.fromEntries(POSES.flatMap((pose) => [
     [ART.character.X[pose], pixelArt(() => rabbitFrames(pose))],
     [ART.character.O[pose], pixelArt(() => bearFrames(pose))],
   ])),
-  ...Object.fromEntries(Object.entries(ART.flower).map(([variant, name]) => [name, pixelArt(() => [flowerGrid(variant)])])),
-  [ART.cloud]: pixelArt(() => Array.from({ length: CLOUD_VARIANTS }, (_, i) => cloudGrid(100 + i))),
-  [ART.decal.hover]: painted(DECAL_PX, drawHover),
-  [ART.decal.select]: painted(DECAL_PX, drawSelectFrame),
-  [ART.decal.win]: painted(DECAL_PX, drawWinFrame),
-  [ART.decal.dashTarget]: painted(DECAL_PX, drawDashTarget),
-  [ART.decal.whirl]: painted(DECAL_PX, drawWhirl),
-  [ART.decal.zone]: painted(DECAL_PX, drawZone),
   ...Object.fromEntries(artNames(ART.v3).map((name) => [name, v3Placeholder(name)])),
 };
 
 // Placeholder for a name that has none: a small pink square.
-export const UNKNOWN_PLACEHOLDER = painted(DECAL_PX, (ctx) => {
+const UNKNOWN_PX = 16;
+export const UNKNOWN_PLACEHOLDER = painted(UNKNOWN_PX, (ctx) => {
   ctx.fillStyle = '#2b1d3a';
-  ctx.fillRect(0, 0, DECAL_PX, DECAL_PX);
+  ctx.fillRect(0, 0, UNKNOWN_PX, UNKNOWN_PX);
   ctx.fillStyle = '#ff6ad5';
-  ctx.fillRect(1, 1, DECAL_PX - 2, DECAL_PX - 2);
+  ctx.fillRect(1, 1, UNKNOWN_PX - 2, UNKNOWN_PX - 2);
 });
 
 // { width, height, frames } of the placeholder of `name`: the size of one

@@ -5,7 +5,7 @@ import { ANIMATION_FRAME_MS } from '../src/config.js';
 import { X, O, ROCK } from '../src/logic/board.js';
 import { createInitialState } from '../src/logic/game.js';
 import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../src/logic/skills.js';
-import { createAssetStore, loadAssets, parseManifest, sizeProblem } from '../src/render/assets.js';
+import { createAssetStore, loadAssets, parseManifest, sizeProblem, USES_3D } from '../src/render/assets.js';
 import { SPRITES, drawGameScreen, drawMenuScreen, setAssets } from '../src/render/game-renderer.js';
 
 const manifest = JSON.parse(readFileSync(new URL('../assets/manifest.json', import.meta.url), 'utf8'));
@@ -101,6 +101,27 @@ test('loadAssets loads the files that exist and leaves missing ones unloaded', a
   assert.equal(store.has('gone'), false);
   assert.equal(store.get('gone'), null);
   assert.equal(store.entry('gone'), null);
+});
+
+test('loadAssets with uses requests only the images of those uses', async () => {
+  const requested = [];
+  const store = await loadAssets({
+    fetchJson: async () => ({
+      assets: {
+        world: entry({ file: 'world.png', use: '3d' }),
+        icon: entry({ file: 'icon.png', use: 'hud' }),
+        flat: entry({ file: 'flat.png', use: '2d' }),
+      },
+    }),
+    loadImage: async (url) => {
+      requested.push(url);
+      return fakeImage(url);
+    },
+    uses: USES_3D,
+  });
+  assert.deepEqual(requested.sort(), ['assets/icon.png', 'assets/world.png'], 'the 2D art is never requested');
+  assert.equal(store.has('flat'), false);
+  assert.equal(store.has('world'), true);
 });
 
 test('an image of the wrong size stays unloaded with a warning, so its placeholder is drawn', async () => {

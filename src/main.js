@@ -1,7 +1,7 @@
 import { INTERNAL_WIDTH, INTERNAL_HEIGHT, RESUME_GAP_MS } from './config.js';
 import { CHARACTERS } from './logic/characters.js';
 import { createBroadcastTransport } from './net/transport.js';
-import { loadAssets } from './render/assets.js';
+import { loadAssets, USES_3D } from './render/assets.js';
 import { createEffects } from './render/effects.js';
 import { drawGameScreen, drawMenuScreen, setAssets } from './render/game-renderer.js';
 import { createResumeWatch } from './render3d/frame-gap.js';
@@ -21,15 +21,19 @@ canvas.height = INTERNAL_HEIGHT;
 const ctx = canvas.getContext('2d');
 ctx.imageSmoothingEnabled = false;
 
+const params = new URLSearchParams(window.location.search);
+const wants2d = params.get('render') === '2d';
+
 // The 2D renderer and HUD draw placeholders until the art from
 // assets/manifest.json has loaded, and for good for any file that is
-// missing. The 3D world waits for the art before it is built.
+// missing. The 3D world waits for the art before it is built. The 3D game
+// loads only the art it draws (USES_3D), so the 2D art that is still a
+// placeholder is never requested; load3dRenderer loads the rest if it has
+// to fall back to the 2D renderer.
 const warn = (message) => console.warn(message);
-const assetsLoaded = loadAssets({ warn });
+const assetsLoaded = loadAssets({ warn, uses: wants2d ? null : USES_3D });
 assetsLoaded.then(setAssets);
 const metaLoaded = loadV3Meta({ warn });
-
-const params = new URLSearchParams(window.location.search);
 
 // The 2D renderer. The 3D one (src/render3d/world-renderer.js) has the same
 // interface and draws the world on the WebGL canvas under this one.
@@ -50,7 +54,7 @@ document.addEventListener('visibilitychange', () => {
 // choice is used, else medium. The game works without storage.
 const storage = browserStorage();
 const quality = startQuality(params.get('quality'), storage);
-const renderer = params.get('render') === '2d' ? RENDERER_2D : await load3dRenderer();
+const renderer = wants2d ? RENDERER_2D : await load3dRenderer();
 
 // The 3D game's HUD is the DOM glass overlay (src/ui/hud.js); the 2D
 // renderer draws its own panels on the canvas. The game modes set the
@@ -83,6 +87,8 @@ async function load3dRenderer() {
   } catch (err) {
     console.warn('The 3D renderer is not available, using the 2D one.', err);
     worldCanvas.hidden = true;
+    await assetsLoaded; // so the full store below is the one the 2D renderer keeps
+    loadAssets({ warn }).then(setAssets);
     return RENDERER_2D;
   }
 }

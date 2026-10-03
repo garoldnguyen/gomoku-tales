@@ -37,3 +37,21 @@ Read `docs/art-direction-v3.md` before any work in `src/render3d` or `src/ui`. I
 5. One wind and one sun: everything moves from the upper left toward the lower right, shadows fall toward the lower right. No straight streak lines, no outlined clouds, no wood except the curb and fence.
 6. All art is vendored under `assets/` (sprites in `assets/3d/v3/`, tuning data in `assets/v3-meta.json`, font in `assets/fonts/`). Missing or wrong-size assets only warn, never crash. No new libraries or network requests for art.
 7. Pure helpers get unit tests. All existing tests must keep passing. Do not allocate per frame in the render loop.
+
+## File map (Farmland v3)
+
+Entry points: `index.html` (the game, import map for `vendor/three`) loads `src/main.js`; `hd2d-lab.html` loads the look lab `src/render3d/lab.js`.
+
+- `src/config.js`: every tunable value (board, cooldowns, timings, sizes, sway, shadows, bloom).
+- `src/logic/`: pure game rules (`board.js`, `game.js`, `skills.js`, `characters.js`, `wind-rabbit-skills.js`, `earth-bear-skills.js`). No DOM, no rendering.
+- `src/net/`: rooms over BroadcastChannel (`transport.js`, `room.js`, `room-code.js`, `presence.js`, `clock.js`, `fake-transport.js` for tests).
+- `src/ui/`: screen flow and input (`app.js`, `screens.js` + `screens.css` for the lobby and room screens, `input.js`, `targeting.js`, `local-game.js`, `online-game.js`) and the glass HUD: `hud-view.js` (pure `hudViewModel`), `hud-layout.js` (pure card placement), `hud.js` (renders the view model into the DOM) and `hud.css` (the quiet glass styles from `docs/reference/v3/hud.css`).
+- `src/render/`: the old 2D canvas renderer, kept for `?render=2d` (`game-renderer.js`, `layout.js`, `effects.js`), and the asset loader `assets.js` shared by both renderers (`USES_3D`: the 3D game loads only `3d` and `hud` art).
+- `src/render3d/`, the 3D farm (Three.js only in the scene modules):
+  - Quality: `quality.js` holds the ONE quality table (low, medium, high) and the URL debug switches (`?shadows=off`, `?bloom=off`, `?dof=off`, `?wind=off`, `?rays=off`, `?ripples=off`, `?fx=off`); `fps.js` the FPS meter (`?fps=1`).
+  - Art: `art-assets.js` (manifest names in `ART`, sizes, placeholders), `art.js` (loaded file or placeholder), `v3-meta.js` (reads `assets/v3-meta.json`: anchors, growth stage times, flower looks), `v3-placeholder-art.js`, `placeholder-art.js` (rabbit and bear stand-ins), `pixel-art.js`, `seeded-random.js`.
+  - Scene: `world.js` (renderer, camera, lights, board, hover), `world-renderer.js` (the game renderer used by `main.js`), `farm-field.js` + `farm-layout.js` (plots, curb, fence, path), `breeze-hill.js` (assembles the surroundings), `meadow.js` (pure `planMeadow`: flower drifts, trees, bushes, kept off the field) + `meadow-scene.js`, `horizon.js`, `terrain.js`, `framing.js`, `camera.js`, `sky.js` + `sky-scene.js` (gradient, painted clouds, wisps, rays, petals), `petals.js`, `wind.js` (wind and sway math), `cloud-shadows.js`, `shadow-math.js`, `post-processing.js` (depth of field, bloom, grade), `depth-of-field.js`, `screen-grade.js`, `view-size.js`, `frame-gap.js`.
+  - Plants and effects: `growth.js` (pure `growthStage` timing), `sprites.js` + `sprite-frames.js`, `board-marks.js`, `effect-plans.js` (pure) + `effects3d.js`, `particle-pool.js`, `picking.js` + `hit-test.js`.
+  - World characters: `characters3d.js` + `character-poses.js` (off while `SHOW_WORLD_CHARACTERS` is false; kept).
+- `assets/`: `manifest.json` (every art file by name), `v3-meta.json`, the v3 pack in `assets/3d/v3/`, the character sheets in `assets/3d/`, skill icons and 2D panels in `assets/`, the DM Sans font in `assets/fonts/`.
+- `tests/*.test.js`: `node --test`. `docs/`: design, art direction (`art-direction-v3.md` is current), art spec, testing, lab, and `visual-qa.md` (the owner's checklist).

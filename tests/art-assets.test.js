@@ -1,17 +1,17 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import {
-  BOARD_TEXTURE_PX, CHARACTER_SPRITE_PX, CLOUD_VARIANTS, DECAL_PX, INTERNAL_HEIGHT, INTERNAL_WIDTH,
-  PIECE_SPRITE_PX, PORTRAIT_PX, ROCK_PX, SKILL_ICON_PX, STONE_PX, TORNADO_PX,
+  CHARACTER_SPRITE_PX, INTERNAL_HEIGHT, INTERNAL_WIDTH, PORTRAIT_PX, ROCK_PX, SKILL_ICON_PX, STONE_PX, TORNADO_PX,
 } from '../src/config.js';
-import { parseManifest } from '../src/render/assets.js';
+import { parseManifest, USES_3D } from '../src/render/assets.js';
 import { SPRITES } from '../src/render/game-renderer.js';
 import { BOARD_FRAME_PX, BOARD_PX, PANEL_H, PANEL_W } from '../src/render/layout.js';
 import {
   ART, artNames, artProblem, PLACEHOLDERS_3D, placeholderShape, UNKNOWN_PLACEHOLDER,
 } from '../src/render3d/art-assets.js';
 import { CHARACTER_ANIMS, CHARACTER_FRAME_COUNT } from '../src/render3d/character-poses.js';
+import { PORTRAIT_ART, SKILL_ICON_ART } from '../src/ui/hud-view.js';
 
 const raw = JSON.parse(readFileSync(new URL('../assets/manifest.json', import.meta.url), 'utf8'));
 const entries = parseManifest(raw);
@@ -90,8 +90,25 @@ test('the manifest lists only assets the code uses, each tagged with what draws 
     if (entry.use === '3d' || v3.has(entry.name)) assert.ok(used3d.has(entry.name), `"${entry.name}" is not drawn by the 3D world`);
     else assert.ok(used2d.has(entry.name), `"${entry.name}" is not drawn by the 2D renderer or HUD`);
   }
-  const hud = [...spriteNames(SPRITES.panel), ...spriteNames(SPRITES.portrait), ...spriteNames(SPRITES.icon)];
-  for (const name of hud) assert.equal(byName[name].use, 'hud', `"${name}" is HUD art, drawn by both renderers`);
+  // The skill icons are drawn by the 2D canvas HUD and the DOM glass HUD;
+  // the canvas panels and 96 px portraits only by the 2D renderer.
+  for (const name of spriteNames(SPRITES.icon)) assert.equal(byName[name].use, 'hud', `"${name}" is drawn by both HUDs`);
+  for (const name of [...spriteNames(SPRITES.panel), ...spriteNames(SPRITES.portrait)]) {
+    assert.equal(byName[name].use, '2d', `"${name}" is drawn only by the 2D renderer`);
+  }
+});
+
+test('the 3D game loads everything it draws and requests no file that is missing', () => {
+  const loaded3d = entries.filter((entry) => USES_3D.includes(entry.use));
+  const names = new Set(loaded3d.map((entry) => entry.name));
+  for (const name of artNames()) assert.ok(names.has(name), `the 3D world draws "${name}" but USES_3D skips it`);
+  for (const name of [...Object.values(PORTRAIT_ART), ...Object.values(SKILL_ICON_ART)]) {
+    assert.ok(names.has(name), `the glass HUD draws "${name}" but USES_3D skips it`);
+  }
+  // A missing file would be a failed request (a 404) in the browser console.
+  for (const entry of loaded3d) {
+    assert.ok(existsSync(new URL(`../assets/${entry.file}`, import.meta.url)), `assets/${entry.file} is missing`);
+  }
 });
 
 test('2D and HUD art sizes match the sizes they are drawn at', () => {
@@ -111,11 +128,27 @@ test('2D and HUD art sizes match the sizes they are drawn at', () => {
 test('every 3D manifest entry has the frame size and count its placeholder has', () => {
   for (const name of artNames()) assert.equal(artProblem(name, byName[name]), null);
   const size = (name) => [byName[name].width, byName[name].height, byName[name].frames];
-  assert.deepEqual(size(ART.board), [BOARD_TEXTURE_PX, BOARD_TEXTURE_PX, 1]);
-  for (const name of artNames(ART.piece)) assert.deepEqual(size(name), [PIECE_SPRITE_PX, PIECE_SPRITE_PX, 1]);
-  for (const name of artNames(ART.decal)) assert.deepEqual(size(name), [DECAL_PX, DECAL_PX, 1]);
-  assert.equal(byName[ART.cloud].frames, CLOUD_VARIANTS);
-  assert.equal(byName[ART.cloud].frameMs, 0, 'cloud frames are shapes, not an animation');
+  assert.deepEqual(size(ART.v3.board.field), [480, 480, 1]);
+  assert.deepEqual(size(ART.v3.clouds), [148, 56, 6]);
+  assert.equal(byName[ART.v3.clouds].frameMs, 0, 'cloud frames are shapes, not an animation');
+});
+
+test('the retired wood board, pot pieces and the old flower, grass, cloud and decal entries are gone', () => {
+  const retired = [
+    'board-top', 'piece-x', 'piece-o', 'piece-rock', 'flower-pink', 'flower-yellow', 'flower-white', 'flower-blue',
+    'grass-tuft', 'cloud', 'decal-hover', 'decal-select', 'decal-win', 'decal-dash-target', 'decal-whirl', 'decal-zone',
+  ];
+  for (const name of retired) {
+    assert.equal(byName[name], undefined, `"${name}" is still in the manifest`);
+    assert.equal(PLACEHOLDERS_3D[name], undefined, `"${name}" still has a 3D placeholder`);
+  }
+  const files = readdirSync(new URL('../assets/3d/', import.meta.url));
+  for (const file of ['board-top.png', 'piece-x.png', 'piece-o.png', 'piece-rock.png']) {
+    assert.ok(!files.includes(file), `assets/3d/${file} is still there`);
+  }
+  // Kept: the world characters (SHOW_WORLD_CHARACTERS) and the 2D renderer's own art.
+  for (const name of artNames(ART.character)) assert.ok(byName[name], `"${name}" is missing`);
+  for (const name of spriteNames()) assert.ok(byName[name], `2D "${name}" is missing`);
 });
 
 test('character sheets follow the poses: one file per pose with its frame count and frame time', () => {
@@ -163,5 +196,5 @@ test('artProblem refuses loaded art whose frames do not fit the 3D code', () => 
   const idle = byName[ART.character.X.idle];
   assert.equal(artProblem(idle.name, idle), null);
   assert.match(artProblem(idle.name, { ...idle, frames: 3 }), /must be 4 frame\(s\) of 96x96, the manifest says 3 of 96x96/);
-  assert.match(artProblem(ART.piece.X, { ...byName[ART.piece.X], width: 64, height: 64 }), /32x32.*64x64/);
+  assert.match(artProblem(ART.v3.rock, { ...byName[ART.v3.rock], width: 64, height: 64 }), /32x32.*64x64/);
 });

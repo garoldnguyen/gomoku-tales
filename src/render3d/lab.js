@@ -7,7 +7,7 @@
 // found by raycast picking. The Q key cycles the quality; ?quality=low,
 // medium or high picks one. See docs/lab.md.
 
-import { loadAssets } from '../render/assets.js';
+import { loadAssets, USES_3D } from '../render/assets.js';
 import { createPieceSprite, createWorld, placeOnCell } from './world.js';
 import { pointerToNdc } from './picking.js';
 import { loadV3Meta } from './v3-meta.js';
@@ -24,7 +24,7 @@ const hud = document.getElementById('hud');
 
 // Art files from assets/manifest.json; missing ones are placeholders.
 const warn = (message) => console.warn(message);
-const [assets, meta] = await Promise.all([loadAssets({ warn }), loadV3Meta({ warn })]);
+const [assets, meta] = await Promise.all([loadAssets({ warn, uses: USES_3D }), loadV3Meta({ warn })]);
 
 let world;
 try {

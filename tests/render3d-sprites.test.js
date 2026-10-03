@@ -1,13 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  BOARD_SIZE, CAMERA_PITCH_DEG, CELL_SIZE, CHARACTER_SPRITE_PX, CHARACTER_X, PIECE_SPRITE_PX, PX_WORLD,
+  BOARD_SIZE, CAMERA_PITCH_DEG, CELL_SIZE, CHARACTER_SPRITE_PX, CHARACTER_X, PX_WORLD,
   SPRITE_STRETCH_Y,
 } from '../src/config.js';
 import { faceYaw, fadedAlphaTest, frameAt, SPRITE_ALPHA_TEST } from '../src/render3d/sprite-frames.js';
-import {
-  bearFrames, cloudGrid, FLOWER_PX, FLOWER_VARIANTS, flowerGrid, IDLE_BOB, rabbitFrames, rockGrid, stoneGrid,
-} from '../src/render3d/placeholder-art.js';
+import { bearFrames, IDLE_BOB, rabbitFrames } from '../src/render3d/placeholder-art.js';
 import { GROUND_Y, terrainHeight } from '../src/render3d/terrain.js';
 
 test('frameAt steps one frame every frameMs and loops', () => {
@@ -56,8 +54,8 @@ test('faceYaw turns a +z facing plane towards the target around the vertical axi
   assert.equal(faceYaw(origin, { x: 0, y: 5, z: 0 }), 0);
 });
 
-test('one PX_WORLD makes a piece frame exactly one cell wide', () => {
-  assert.equal(PIECE_SPRITE_PX * PX_WORLD, CELL_SIZE);
+test('one PX_WORLD makes a 32 px farm board cell exactly one cell wide', () => {
+  assert.equal(32 * PX_WORLD, CELL_SIZE);
 });
 
 test('the sprite height stretch cancels the camera pitch, so pixels look square', () => {
@@ -90,21 +88,6 @@ test('the rabbit wears a blue scarf and the bear is brown', () => {
   const bear = new Set(bearFrames()[0].pixels);
   assert.ok(rabbit.has('#ffffff') && rabbit.has('#3f7fd8'));
   assert.ok(bear.has('#9b6235'));
-});
-
-test('pieces, flowers and clouds are generated at their sizes', () => {
-  for (const grid of [stoneGrid('X'), stoneGrid('O'), rockGrid()]) {
-    assert.equal(grid.width, PIECE_SPRITE_PX);
-    assert.equal(grid.height, PIECE_SPRITE_PX);
-    assert.ok(grid.pixels.slice(-grid.width).some(Boolean), 'stands on the bottom row');
-  }
-  assert.notDeepEqual(stoneGrid('X').pixels, stoneGrid('O').pixels);
-  for (const variant of FLOWER_VARIANTS) {
-    const grid = flowerGrid(variant);
-    assert.equal(grid.width, FLOWER_PX);
-    assert.equal(grid.height, FLOWER_PX);
-  }
-  assert.deepEqual(cloudGrid(3).pixels, cloudGrid(3).pixels, 'clouds are the same on every load');
 });
 
 test('the meadow is flat: the board and both characters stand on the ground plane', () => {
