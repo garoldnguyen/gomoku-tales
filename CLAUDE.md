@@ -69,3 +69,14 @@ Read `docs/art-direction-v3-1.md` before any work in `src/render3d` or `src/ui`.
 6. The builder can see the game. Read `docs/shots.md`. After a change that affects what is drawn, run `bash tools/shots.sh --set <name>` as the task says, read `shots/report.json` first and fix every problem it lists, then open at most 3 of the PNG files with the image reading tool and compare them with the picture the task names. Write a paragraph that starts with `Seen:` in the final summary: what the pictures show in plain words, with the key numbers from the report. Write only what you saw. At most 3 rounds of fix and shoot, then stop and say what is still wrong. If the tool cannot run, say so and do not claim a visual check.
 7. The pictures come from software rendering. They show layout, colour, shapes, density and overlaps, not frame rate. Never state an FPS number: the owner measures it. The reviewer may not see pictures, so quote the report numbers in the summary.
 <!-- /GOMOKU-V31-FOREST -->
+
+<!-- GOMOKU-FLOW-V1 -->
+## Flow rules (menu, waiting room, rematch)
+Source of truth: docs/flow-design.md.
+1. Which screen is shown is decided only by src/ui/flow.js (flowReducer). No screen switches itself with its own timer or flag.
+2. The host owns the room: the start after the join delay, the rematch, the round number and the phases. The guest follows messages and never changes phase on its own.
+3. All text of the menu, How to Play, Settings, lobby, waiting room and game over screens lives in src/ui/strings.js (English). Numbers inside text come from src/config.js or SKILL_INFO and are never typed twice.
+4. Global key shortcuts must ignore typing targets (isTypingTarget in src/ui/input.js). Room code letters include C, F, Z, H and V.
+5. Every new screen gets a shot scene, data-hud-box names and a Seen: paragraph (see docs/shots.md and the screenshot rule in this file).
+6. New CSS uses the existing glass tokens only. No new hex colours.
+<!-- /GOMOKU-FLOW-V1 -->
