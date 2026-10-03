@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- Static visual reference for the HUD. Open it in a browser. Not production code: copy the numbers, not the markup. -->
+<meta charset="utf-8">
+<title>HUD collapsed cards (reference)</title>
+
+</head>
+<body>
+
+
+<style>@font-face{font-family:'DM Sans';font-weight:400;src:url('../../../assets/fonts/dm-sans-latin-400-normal.woff2') format('woff2')}@font-face{font-family:'DM Sans';font-weight:500;src:url('../../../assets/fonts/dm-sans-latin-500-normal.woff2') format('woff2')}@font-face{font-family:'DM Sans';font-weight:600;src:url('../../../assets/fonts/dm-sans-latin-600-normal.woff2') format('woff2')}@font-face{font-family:'DM Sans';font-weight:700;src:url('../../../assets/fonts/dm-sans-latin-700-normal.woff2') format('woff2')}</style>
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+</style>
+
+<div style="position: relative; width: 1920px; height: 1080px; overflow: hidden; font-family: 'DM Sans', system-ui, sans-serif; color: #f4f7fb; background: #5a9a48">
+<img src="scene-forest-high.jpg" alt="The farm with a forest behind it, soft haze at the horizon and the board in the middle" style="position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover">
+
+<div style="position: absolute; left: 0; right: 0; top: 28px; display: flex; justify-content: center">
+<div style="display: flex; align-items: center; gap: 14px; padding: 12px 24px; border-radius: 999px; background: rgba(14, 20, 34, 0.62); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(10, 20, 40, 0.28)">
+<div style="width: 12px; height: 12px; border-radius: 50%; background: #3b8cff; box-shadow: 0 0 0 4px rgba(59, 140, 255, 0.28)"></div>
+<div style="font-size: 18px; font-weight: 700">Wind Rabbit's turn</div>
+<div style="font-size: 15px; font-weight: 500; color: rgba(244, 247, 251, 0.74)">Plant a seed</div>
+</div>
+</div>
+
+<div style="position: absolute; right: 40px; top: 28px; display: flex; gap: 4px; padding: 5px; border-radius: 999px; background: rgba(14, 20, 34, 0.62); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px)">
+<button style="border: 0; background: transparent; color: rgba(244, 247, 251, 0.78); font-size: 15px; font-weight: 600; padding: 9px 18px; border-radius: 999px; min-height: 44px">Low</button>
+<button style="border: 0; background: transparent; color: rgba(244, 247, 251, 0.78); font-size: 15px; font-weight: 600; padding: 9px 18px; border-radius: 999px; min-height: 44px">Medium</button>
+<button style="border: 0; background: #f4f7fb; color: #141a2a; font-size: 15px; font-weight: 700; padding: 9px 18px; border-radius: 999px; min-height: 44px">High</button>
+</div>
+
+<div style="position: absolute; left: 56px; top: 120px; display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 32px; background: rgba(14, 20, 34, 0.64); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.3), 0 0 0 2px rgba(59, 140, 255, 0.55)">
+<div style="position: relative; width: 72px; height: 72px; border-radius: 22px; background: rgba(59, 140, 255, 0.26); display: flex; align-items: center; justify-content: center">
+<img src="../v3/portrait-wind-rabbit.png" alt="Wind Rabbit portrait, your turn" style="width: 64px; height: 64px; image-rendering: pixelated">
+<div style="position: absolute; right: -2px; top: -2px; width: 16px; height: 16px; border-radius: 50%; background: #3b8cff; border: 3px solid rgba(14, 20, 34, 0.92)"></div>
+</div>
+<button aria-label="Wind Dash, ready" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 3px solid #f4f7fb; background: rgba(255, 255, 255, 0.14); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.22)">
+<img src="../v3/icon-wind-dash.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px">
+<span style="position: absolute; right: -6px; bottom: -6px; width: 16px; height: 16px; border-radius: 50%; background: #8fe3a8; border: 3px solid rgba(14, 20, 34, 0.92)"></span>
+</button>
+<button aria-label="Tornado Zone, ready" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); display: flex; align-items: center; justify-content: center">
+<img src="../v3/icon-tornado-zone.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px">
+<span style="position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: #8fe3a8; border: 3px solid rgba(14, 20, 34, 0.92)"></span>
+</button>
+<button aria-label="Expand Wind Rabbit panel" aria-expanded="false" style="margin-left: 4px; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); color: #f4f7fb; display: flex; align-items: center; justify-content: center">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+</button>
+</div>
+
+<div style="position: absolute; left: 56px; top: 226px; width: 344px; box-sizing: border-box; padding: 16px 18px 16px 18px; border-radius: 22px; background: rgba(14, 20, 34, 0.80); border: 1px solid rgba(255, 255, 255, 0.22); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.34); display: flex; flex-direction: column; gap: 8px">
+<div style="position: absolute; left: 112px; top: -8px; width: 16px; height: 16px; transform: rotate(45deg); background: rgba(14, 20, 34, 0.80); border-left: 1px solid rgba(255, 255, 255, 0.22); border-top: 1px solid rgba(255, 255, 255, 0.22)"></div>
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<div style="font-size: 17px; font-weight: 700">Wind Dash</div>
+<div style="padding: 4px 10px; border-radius: 999px; background: rgba(143, 227, 168, 0.18); color: #8fe3a8; font-size: 12px; font-weight: 700">Ready</div>
+</div>
+<div style="font-size: 14px; line-height: 1.45; color: rgba(244, 247, 251, 0.88)">Pick one of your plants, then a target plot. The plant folds back into a seed, rides a gust of petals to the target and grows again there.</div>
+<div style="height: 1px; background: rgba(255, 255, 255, 0.14)"></div>
+<div style="font-size: 12px; font-weight: 600; color: rgba(244, 247, 251, 0.7)">Click to select, then choose a plot</div>
+</div>
+
+<div style="position: absolute; right: 56px; top: 120px; display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 32px; background: rgba(14, 20, 34, 0.64); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.3)">
+<div style="position: relative; width: 72px; height: 72px; border-radius: 22px; background: rgba(255, 75, 92, 0.24); display: flex; align-items: center; justify-content: center">
+<img src="../v3/portrait-earth-bear.png" alt="Earth Bear portrait, waiting" style="width: 64px; height: 64px; image-rendering: pixelated">
+</div>
+<button aria-label="Terrain Creation, ready in 2 turns" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: center">
+<img src="../v3/icon-terrain-creation.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px; opacity: 0.4">
+<svg viewBox="0 0 72 72" width="72" height="72" style="position: absolute; left: 0; top: 0"><circle cx="36" cy="36" r="33" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="4"></circle><circle cx="36" cy="36" r="33" fill="none" stroke="#8fe3a8" stroke-width="4" stroke-linecap="round" stroke-dasharray="69 207" transform="rotate(-90 36 36)"></circle></svg>
+<span style="position: absolute; font-size: 30px; font-weight: 700; color: #f4f7fb; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6)">2</span>
+</button>
+<button aria-label="Stone Conversion, wait for your turn" aria-disabled="true" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: center">
+<img src="../v3/icon-stone-conversion.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px; opacity: 0.55">
+</button>
+<button aria-label="Expand Earth Bear panel" aria-expanded="false" style="margin-left: 4px; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); color: #f4f7fb; display: flex; align-items: center; justify-content: center">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+</button>
+</div>
+</div>
+
+
+</body>
+</html>

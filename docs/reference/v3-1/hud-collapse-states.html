@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- Static visual reference for the HUD. Open it in a browser. Not production code: copy the numbers, not the markup. -->
+<meta charset="utf-8">
+<title>HUD collapse states and skill descriptions (reference)</title>
+
+</head>
+<body>
+
+
+<style>@font-face{font-family:'DM Sans';font-weight:400;src:url('../../../assets/fonts/dm-sans-latin-400-normal.woff2') format('woff2')}@font-face{font-family:'DM Sans';font-weight:500;src:url('../../../assets/fonts/dm-sans-latin-500-normal.woff2') format('woff2')}@font-face{font-family:'DM Sans';font-weight:600;src:url('../../../assets/fonts/dm-sans-latin-600-normal.woff2') format('woff2')}@font-face{font-family:'DM Sans';font-weight:700;src:url('../../../assets/fonts/dm-sans-latin-700-normal.woff2') format('woff2')}</style>
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+</style>
+
+<div style="width: 1920px; height: 1500px; box-sizing: border-box; padding: 64px; background: #f4f1e8; color: #1b2230; font-family: 'DM Sans', system-ui, sans-serif; display: flex; flex-direction: column; gap: 44px">
+
+<div style="display: flex; flex-direction: column; gap: 14px; max-width: 1200px">
+<div style="font-size: 15px; font-weight: 700; letter-spacing: 0.12em; color: #6b6f7b">HUD CARDS</div>
+<div style="font-size: 60px; font-weight: 700; line-height: 1.05">Small when you want the view, full when you want the details</div>
+<div style="font-size: 22px; line-height: 1.45; color: #3c4252">Every card folds into one slim pill: the portrait, both skill buttons and a chevron. The skills stay one click away, and every skill can explain itself.</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div style="font-size: 28px; font-weight: 700">Four states of the collapsed card</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px">
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="position: relative; height: 190px; overflow: hidden; border-radius: 24px; border: 1px solid #e3ddcc; background: #5a9a48">
+<img src="scene-forest-high.jpg" alt="Meadow backdrop" style="position: absolute; left: -40px; top: -560px; width: 1920px; height: 1080px">
+<div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 32px; background: rgba(14, 20, 34, 0.64); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.3), 0 0 0 2px rgba(59, 140, 255, 0.55); color: #f4f7fb">
+<div style="position: relative; width: 72px; height: 72px; border-radius: 22px; background: rgba(59, 140, 255, 0.26); display: flex; align-items: center; justify-content: center">
+<img src="../v3/portrait-wind-rabbit.png" alt="Wind Rabbit portrait, your turn" style="width: 64px; height: 64px; image-rendering: pixelated">
+<div style="position: absolute; right: -2px; top: -2px; width: 16px; height: 16px; border-radius: 50%; background: #3b8cff; border: 3px solid rgba(14, 20, 34, 0.92)"></div>
+</div>
+<button aria-label="Wind Dash, ready" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); display: flex; align-items: center; justify-content: center">
+<img src="../v3/icon-wind-dash.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px">
+<span style="position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: #8fe3a8; border: 3px solid rgba(14, 20, 34, 0.92)"></span>
+</button>
+<button aria-label="Tornado Zone, ready" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); display: flex; align-items: center; justify-content: center">
+<img src="../v3/icon-tornado-zone.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px">
+<span style="position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: #8fe3a8; border: 3px solid rgba(14, 20, 34, 0.92)"></span>
+</button>
+<button aria-label="Expand Wind Rabbit panel" aria-expanded="false" style="margin-left: 4px; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); color: #f4f7fb; display: flex; align-items: center; justify-content: center">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+</button>
+</div>
+</div>
+<div style="font-size: 20px; font-weight: 700">Your turn, skills ready</div>
+<div style="font-size: 16px; line-height: 1.4; color: #3c4252">The ring and the dot on the portrait show whose turn it is. A green dot on a skill means ready.</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="position: relative; height: 190px; overflow: hidden; border-radius: 24px; border: 1px solid #e3ddcc; background: #5a9a48">
+<img src="scene-forest-high.jpg" alt="Meadow backdrop" style="position: absolute; left: -40px; top: -560px; width: 1920px; height: 1080px">
+<div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 32px; background: rgba(14, 20, 34, 0.64); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.3), 0 0 0 2px rgba(59, 140, 255, 0.55); color: #f4f7fb">
+<div style="position: relative; width: 72px; height: 72px; border-radius: 22px; background: rgba(59, 140, 255, 0.26); display: flex; align-items: center; justify-content: center">
+<img src="../v3/portrait-wind-rabbit.png" alt="Wind Rabbit portrait, your turn" style="width: 64px; height: 64px; image-rendering: pixelated">
+<div style="position: absolute; right: -2px; top: -2px; width: 16px; height: 16px; border-radius: 50%; background: #3b8cff; border: 3px solid rgba(14, 20, 34, 0.92)"></div>
+</div>
+<button aria-label="Wind Dash, selected" aria-pressed="true" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 3px solid #3b8cff; background: rgba(59, 140, 255, 0.28); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 4px rgba(59, 140, 255, 0.32), 0 0 22px rgba(59, 140, 255, 0.55)">
+<img src="../v3/icon-wind-dash.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px">
+<span style="position: absolute; right: -6px; bottom: -6px; width: 16px; height: 16px; border-radius: 50%; background: #ffffff; border: 3px solid #3b8cff"></span>
+</button>
+<button aria-label="Tornado Zone, ready" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); display: flex; align-items: center; justify-content: center">
+<img src="../v3/icon-tornado-zone.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px">
+<span style="position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: #8fe3a8; border: 3px solid rgba(14, 20, 34, 0.92)"></span>
+</button>
+<button aria-label="Expand Wind Rabbit panel" aria-expanded="false" style="margin-left: 4px; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); color: #f4f7fb; display: flex; align-items: center; justify-content: center">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+</button>
+</div>
+</div>
+<div style="font-size: 20px; font-weight: 700">Skill selected</div>
+<div style="font-size: 16px; line-height: 1.4; color: #3c4252">The chosen skill gets a team-coloured ring and a glow. Clicking it again cancels, as today.</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="position: relative; height: 190px; overflow: hidden; border-radius: 24px; border: 1px solid #e3ddcc; background: #5a9a48">
+<img src="scene-forest-high.jpg" alt="Meadow backdrop" style="position: absolute; left: -40px; top: -560px; width: 1920px; height: 1080px">
+<div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 32px; background: rgba(14, 20, 34, 0.64); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.3), 0 0 0 2px rgba(59, 140, 255, 0.55); color: #f4f7fb">
+<div style="position: relative; width: 72px; height: 72px; border-radius: 22px; background: rgba(59, 140, 255, 0.26); display: flex; align-items: center; justify-content: center">
+<img src="../v3/portrait-wind-rabbit.png" alt="Wind Rabbit portrait, your turn" style="width: 64px; height: 64px; image-rendering: pixelated">
+<div style="position: absolute; right: -2px; top: -2px; width: 16px; height: 16px; border-radius: 50%; background: #3b8cff; border: 3px solid rgba(14, 20, 34, 0.92)"></div>
+</div>
+<button aria-label="Wind Dash, ready" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); display: flex; align-items: center; justify-content: center">
+<img src="../v3/icon-wind-dash.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px">
+<span style="position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: #8fe3a8; border: 3px solid rgba(14, 20, 34, 0.92)"></span>
+</button>
+<button aria-label="Tornado Zone, ready in 2 turns" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: center">
+<img src="../v3/icon-tornado-zone.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px; opacity: 0.4">
+<svg viewBox="0 0 72 72" width="72" height="72" style="position: absolute; left: 0; top: 0"><circle cx="36" cy="36" r="33" fill="none" stroke="rgba(255,255,255,0.22)" stroke-width="4"></circle><circle cx="36" cy="36" r="33" fill="none" stroke="#8fe3a8" stroke-width="4" stroke-linecap="round" stroke-dasharray="69 207" transform="rotate(-90 36 36)"></circle></svg>
+<span style="position: absolute; font-size: 30px; font-weight: 700; color: #f4f7fb; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6)">2</span>
+</button>
+<button aria-label="Expand Wind Rabbit panel" aria-expanded="false" style="margin-left: 4px; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); color: #f4f7fb; display: flex; align-items: center; justify-content: center">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+</button>
+</div>
+</div>
+<div style="font-size: 20px; font-weight: 700">Cooling down</div>
+<div style="font-size: 16px; line-height: 1.4; color: #3c4252">The icon dims, a ring fills as turns pass, and the number shows the turns left. The same as the expanded card.</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 12px">
+<div style="position: relative; height: 190px; overflow: hidden; border-radius: 24px; border: 1px solid #e3ddcc; background: #5a9a48">
+<img src="scene-forest-high.jpg" alt="Meadow backdrop" style="position: absolute; left: -40px; top: -560px; width: 1920px; height: 1080px">
+<div style="position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: 32px; background: rgba(14, 20, 34, 0.64); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.3); color: #f4f7fb">
+<div style="position: relative; width: 72px; height: 72px; border-radius: 22px; background: rgba(255, 75, 92, 0.24); display: flex; align-items: center; justify-content: center">
+<img src="../v3/portrait-earth-bear.png" alt="Earth Bear portrait, waiting" style="width: 64px; height: 64px; image-rendering: pixelated">
+</div>
+<button aria-label="Terrain Creation, wait for your turn" aria-disabled="true" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: center">
+<img src="../v3/icon-terrain-creation.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px; opacity: 0.55">
+</button>
+<button aria-label="Stone Conversion, wait for your turn" aria-disabled="true" style="position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.06); display: flex; align-items: center; justify-content: center">
+<img src="../v3/icon-stone-conversion.png" alt="" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px; opacity: 0.55">
+</button>
+<button aria-label="Expand Earth Bear panel" aria-expanded="false" style="margin-left: 4px; width: 44px; height: 44px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); color: #f4f7fb; display: flex; align-items: center; justify-content: center">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+</button>
+</div>
+</div>
+<div style="font-size: 20px; font-weight: 700">Waiting for the other player</div>
+<div style="font-size: 16px; line-height: 1.4; color: #3c4252">No ring, dimmed skills. They cannot be used, but hover still shows what they do.</div>
+</div>
+
+</div>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 20px">
+<div style="font-size: 28px; font-weight: 700">Reading a skill: hover or keyboard focus on a button</div>
+<div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 32px">
+
+<div style="position: relative; height: 252px; overflow: hidden; border-radius: 24px; border: 1px solid #e3ddcc; background: #5a9a48; display: flex; align-items: center; justify-content: center">
+<img src="scene-forest-high.jpg" alt="Meadow backdrop" style="position: absolute; left: -40px; top: -520px; width: 1920px; height: 1080px">
+<div style="position: relative; width: 372px; box-sizing: border-box; padding: 16px 18px; border-radius: 22px; background: rgba(14, 20, 34, 0.80); border: 1px solid rgba(255, 255, 255, 0.22); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.34); display: flex; flex-direction: column; gap: 8px; color: #f4f7fb">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<div style="font-size: 17px; font-weight: 700">Wind Dash</div>
+<div style="padding: 4px 10px; border-radius: 999px; background: rgba(143, 227, 168, 0.18); color: #8fe3a8; font-size: 12px; font-weight: 700">Ready</div>
+</div>
+<div style="font-size: 14px; line-height: 1.45; color: rgba(244, 247, 251, 0.88)">Pick one of your plants, then a target plot. The plant folds back into a seed, rides a gust of petals to the target and grows again there.</div>
+<div style="height: 1px; background: rgba(255, 255, 255, 0.14)"></div>
+<div style="font-size: 12px; font-weight: 600; color: rgba(244, 247, 251, 0.7)">Click to select, then choose a plot</div>
+</div>
+</div>
+
+<div style="position: relative; height: 252px; overflow: hidden; border-radius: 24px; border: 1px solid #e3ddcc; background: #5a9a48; display: flex; align-items: center; justify-content: center">
+<img src="scene-forest-high.jpg" alt="Meadow backdrop" style="position: absolute; left: -40px; top: -520px; width: 1920px; height: 1080px">
+<div style="position: relative; width: 372px; box-sizing: border-box; padding: 16px 18px; border-radius: 22px; background: rgba(14, 20, 34, 0.80); border: 1px solid rgba(255, 255, 255, 0.22); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.34); display: flex; flex-direction: column; gap: 8px; color: #f4f7fb">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<div style="font-size: 17px; font-weight: 700">Tornado Zone</div>
+<div style="padding: 4px 10px; border-radius: 999px; background: rgba(143, 227, 168, 0.18); color: #8fe3a8; font-size: 12px; font-weight: 700">Ready</div>
+</div>
+<div style="font-size: 14px; line-height: 1.45; color: rgba(244, 247, 251, 0.88)">Pick the centre of a 3 by 3 zone. A swirl of petals and leaves throws the plants inside off their plots.</div>
+<div style="height: 1px; background: rgba(255, 255, 255, 0.14)"></div>
+<div style="font-size: 12px; font-weight: 600; color: rgba(244, 247, 251, 0.7)">Click to select, then choose the zone centre</div>
+</div>
+</div>
+
+<div style="position: relative; height: 252px; overflow: hidden; border-radius: 24px; border: 1px solid #e3ddcc; background: #5a9a48; display: flex; align-items: center; justify-content: center">
+<img src="scene-forest-high.jpg" alt="Meadow backdrop" style="position: absolute; left: -40px; top: -520px; width: 1920px; height: 1080px">
+<div style="position: relative; width: 372px; box-sizing: border-box; padding: 16px 18px; border-radius: 22px; background: rgba(14, 20, 34, 0.80); border: 1px solid rgba(255, 255, 255, 0.22); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.34); display: flex; flex-direction: column; gap: 8px; color: #f4f7fb">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<div style="font-size: 17px; font-weight: 700">Terrain Creation</div>
+<div style="padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: rgba(244, 247, 251, 0.86); font-size: 12px; font-weight: 700">Ready in 2 turns</div>
+</div>
+<div style="font-size: 14px; line-height: 1.45; color: rgba(244, 247, 251, 0.88)">Drops a rock on a plot. The rock stays for 4 turns, then crumbles back into plain soil.</div>
+<div style="height: 1px; background: rgba(255, 255, 255, 0.14)"></div>
+<div style="font-size: 12px; font-weight: 600; color: rgba(244, 247, 251, 0.7)">Click to select, then choose a plot</div>
+</div>
+</div>
+
+<div style="position: relative; height: 252px; overflow: hidden; border-radius: 24px; border: 1px solid #e3ddcc; background: #5a9a48; display: flex; align-items: center; justify-content: center">
+<img src="scene-forest-high.jpg" alt="Meadow backdrop" style="position: absolute; left: -40px; top: -520px; width: 1920px; height: 1080px">
+<div style="position: relative; width: 372px; box-sizing: border-box; padding: 16px 18px; border-radius: 22px; background: rgba(14, 20, 34, 0.80); border: 1px solid rgba(255, 255, 255, 0.22); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.34); display: flex; flex-direction: column; gap: 8px; color: #f4f7fb">
+<div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+<div style="font-size: 17px; font-weight: 700">Stone Conversion</div>
+<div style="padding: 4px 10px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: rgba(244, 247, 251, 0.86); font-size: 12px; font-weight: 700">Wait for your turn</div>
+</div>
+<div style="font-size: 14px; line-height: 1.45; color: rgba(244, 247, 251, 0.88)">Pick a plant. It wilts and regrows as the other team's plant: X becomes O, or O becomes X.</div>
+<div style="height: 1px; background: rgba(255, 255, 255, 0.14)"></div>
+<div style="font-size: 12px; font-weight: 600; color: rgba(244, 247, 251, 0.7)">Click to select, then choose a plant</div>
+</div>
+</div>
+
+</div>
+<div style="font-size: 16px; line-height: 1.45; color: #5a5f6d; max-width: 1300px">Draft wording. The builder takes the final text and every number (turns, sizes) from the game rules and config, so a tooltip can never disagree with the game.</div>
+</div>
+
+<div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px">
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 28px; background: #ffffff; border: 1px solid #e3ddcc; border-radius: 28px">
+<div style="font-size: 24px; font-weight: 700">How collapsing works</div>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 18px; line-height: 1.4">
+<div style="display: flex; gap: 12px"><div style="width: 8px; height: 8px; margin-top: 8px; flex-shrink: 0; background: #3b8cff"></div><div>Each card has its own round chevron button, 44 px, named after the card.</div></div>
+<div style="display: flex; gap: 12px"><div style="width: 8px; height: 8px; margin-top: 8px; flex-shrink: 0; background: #3b8cff"></div><div>Press C to collapse or expand both cards at once. The choice is remembered on this device.</div></div>
+<div style="display: flex; gap: 12px"><div style="width: 8px; height: 8px; margin-top: 8px; flex-shrink: 0; background: #3b8cff"></div><div>Collapsed skills stay real buttons: select, then pick the plot, exactly as today.</div></div>
+<div style="display: flex; gap: 12px"><div style="width: 8px; height: 8px; margin-top: 8px; flex-shrink: 0; background: #3b8cff"></div><div>The fold takes about 180 ms, and is instant for players who ask for reduced motion.</div></div>
+<div style="display: flex; gap: 12px"><div style="width: 8px; height: 8px; margin-top: 8px; flex-shrink: 0; background: #3b8cff"></div><div>Phone width keeps the slim bottom bars you already have.</div></div>
+</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 14px; padding: 28px; background: #ffffff; border: 1px solid #e3ddcc; border-radius: 28px">
+<div style="font-size: 24px; font-weight: 700">How skills explain themselves</div>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 18px; line-height: 1.4">
+<div style="display: flex; gap: 12px"><div style="width: 8px; height: 8px; margin-top: 8px; flex-shrink: 0; background: #f0a43a"></div><div>Expanded card: the description is always written under the skill.</div></div>
+<div style="display: flex; flex-direction: column; gap: 0"><div style="display: flex; gap: 12px"><div style="width: 8px; height: 8px; margin-top: 8px; flex-shrink: 0; background: #f0a43a"></div><div>Collapsed card: hover or keyboard focus opens the tooltip.</div></div></div>
+<div style="display: flex; gap: 12px"><div style="width: 8px; height: 8px; margin-top: 8px; flex-shrink: 0; background: #f0a43a"></div><div>Touch: press and hold for a moment to read it, a normal tap still selects the skill.</div></div>
+<div style="display: flex; gap: 12px"><div style="width: 8px; height: 8px; margin-top: 8px; flex-shrink: 0; background: #f0a43a"></div><div>The tooltip never blocks a click, never covers the pill, and closes with Escape.</div></div>
+<div style="display: flex; gap: 12px"><div style="width: 8px; height: 8px; margin-top: 8px; flex-shrink: 0; background: #f0a43a"></div><div>One description table feeds the tooltip and the expanded card, with numbers read from the game config.</div></div>
+</div>
+</div>
+</div>
+
+</div>
+
+
+</body>
+</html>

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<!-- Static visual reference for the HUD. Open it in a browser. Not production code: copy the numbers, not the markup. -->
+<meta charset="utf-8">
+<title>HUD expanded cards with skill descriptions (reference)</title>
+
+</head>
+<body>
+
+
+<style>@font-face{font-family:'DM Sans';font-weight:400;src:url('../../../assets/fonts/dm-sans-latin-400-normal.woff2') format('woff2')}@font-face{font-family:'DM Sans';font-weight:500;src:url('../../../assets/fonts/dm-sans-latin-500-normal.woff2') format('woff2')}@font-face{font-family:'DM Sans';font-weight:600;src:url('../../../assets/fonts/dm-sans-latin-600-normal.woff2') format('woff2')}@font-face{font-family:'DM Sans';font-weight:700;src:url('../../../assets/fonts/dm-sans-latin-700-normal.woff2') format('woff2')}</style>
+<style>
+body{margin:0}
+button{font-family:inherit;cursor:pointer}
+</style>
+
+<div style="position: relative; width: 1920px; height: 1080px; overflow: hidden; font-family: 'DM Sans', system-ui, sans-serif; color: #f4f7fb; background: #5a9a48">
+<img src="scene-forest-high.jpg" alt="The farm with a forest behind it and the board in the middle" style="position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; object-fit: cover">
+
+<div style="position: absolute; left: 0; right: 0; top: 28px; display: flex; justify-content: center">
+<div style="display: flex; align-items: center; gap: 14px; padding: 12px 24px; border-radius: 999px; background: rgba(14, 20, 34, 0.62); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(10, 20, 40, 0.28)">
+<div style="width: 12px; height: 12px; border-radius: 50%; background: #3b8cff; box-shadow: 0 0 0 4px rgba(59, 140, 255, 0.28)"></div>
+<div style="font-size: 18px; font-weight: 700">Wind Rabbit's turn</div>
+<div style="font-size: 15px; font-weight: 500; color: rgba(244, 247, 251, 0.74)">Plant a seed</div>
+</div>
+</div>
+
+<div style="position: absolute; right: 40px; top: 28px; display: flex; gap: 4px; padding: 5px; border-radius: 999px; background: rgba(14, 20, 34, 0.62); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px)">
+<button style="border: 0; background: transparent; color: rgba(244, 247, 251, 0.78); font-size: 15px; font-weight: 600; padding: 9px 18px; border-radius: 999px; min-height: 44px">Low</button>
+<button style="border: 0; background: transparent; color: rgba(244, 247, 251, 0.78); font-size: 15px; font-weight: 600; padding: 9px 18px; border-radius: 999px; min-height: 44px">Medium</button>
+<button style="border: 0; background: #f4f7fb; color: #141a2a; font-size: 15px; font-weight: 700; padding: 9px 18px; border-radius: 999px; min-height: 44px">High</button>
+</div>
+
+<div style="position: absolute; left: 56px; top: 120px; width: 332px; box-sizing: border-box; padding: 20px; border-radius: 28px; background: rgba(14, 20, 34, 0.64); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.3); display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: center; gap: 14px">
+<div style="width: 68px; height: 68px; flex-shrink: 0; border-radius: 20px; background: rgba(59, 140, 255, 0.26); display: flex; align-items: center; justify-content: center">
+<img src="../v3/portrait-wind-rabbit.png" alt="Wind Rabbit portrait" style="width: 64px; height: 64px; image-rendering: pixelated">
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1">
+<div style="font-size: 22px; font-weight: 700; line-height: 1.1">Wind Rabbit</div>
+<div style="font-size: 14px; font-weight: 500; color: rgba(244, 247, 251, 0.74)">Plays X, 7 planted</div>
+</div>
+<button aria-label="Collapse Wind Rabbit panel" aria-expanded="true" style="width: 44px; height: 44px; flex-shrink: 0; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); color: #f4f7fb; display: flex; align-items: center; justify-content: center">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg>
+</button>
+</div>
+<div style="align-self: flex-start; padding: 6px 12px; border-radius: 999px; background: rgba(59, 140, 255, 0.28); color: #cfe4ff; font-size: 13px; font-weight: 700">Your turn</div>
+<div style="height: 1px; background: rgba(255, 255, 255, 0.14)"></div>
+<div style="font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: rgba(244, 247, 251, 0.7)">SKILLS</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.08)">
+<button style="display: flex; align-items: center; gap: 14px; width: 100%; box-sizing: border-box; text-align: left; padding: 0; border: 0; background: transparent; color: #f4f7fb">
+<img src="../v3/icon-wind-dash.png" alt="Wind Dash icon" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px">
+<span style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 17px; font-weight: 700">Wind Dash</span><span style="font-size: 13px; font-weight: 500; color: #8fe3a8">Ready</span></span>
+</button>
+<div style="font-size: 13px; line-height: 1.45; color: rgba(244, 247, 251, 0.8)">Pick one of your plants, then a target plot. The plant folds back into a seed, rides a gust of petals to the target and grows again there.</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.08)">
+<button style="display: flex; align-items: center; gap: 14px; width: 100%; box-sizing: border-box; text-align: left; padding: 0; border: 0; background: transparent; color: #f4f7fb">
+<img src="../v3/icon-tornado-zone.png" alt="Tornado Zone icon" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px">
+<span style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 17px; font-weight: 700">Tornado Zone</span><span style="font-size: 13px; font-weight: 500; color: #8fe3a8">Ready</span></span>
+</button>
+<div style="font-size: 13px; line-height: 1.45; color: rgba(244, 247, 251, 0.8)">Pick the centre of a 3 by 3 zone. A swirl of petals and leaves throws the plants inside off their plots.</div>
+</div>
+</div>
+</div>
+
+<div style="position: absolute; right: 56px; top: 120px; width: 332px; box-sizing: border-box; padding: 20px; border-radius: 28px; background: rgba(14, 20, 34, 0.64); border: 1px solid rgba(255, 255, 255, 0.18); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.3); display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: center; gap: 14px">
+<div style="width: 68px; height: 68px; flex-shrink: 0; border-radius: 20px; background: rgba(255, 75, 92, 0.24); display: flex; align-items: center; justify-content: center">
+<img src="../v3/portrait-earth-bear.png" alt="Earth Bear portrait" style="width: 64px; height: 64px; image-rendering: pixelated">
+</div>
+<div style="display: flex; flex-direction: column; gap: 4px; flex-grow: 1">
+<div style="font-size: 22px; font-weight: 700; line-height: 1.1">Earth Bear</div>
+<div style="font-size: 14px; font-weight: 500; color: rgba(244, 247, 251, 0.74)">Plays O, 7 planted</div>
+</div>
+<button aria-label="Collapse Earth Bear panel" aria-expanded="true" style="width: 44px; height: 44px; flex-shrink: 0; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.10); color: #f4f7fb; display: flex; align-items: center; justify-content: center">
+<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"></path></svg>
+</button>
+</div>
+<div style="align-self: flex-start; padding: 6px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.14); color: rgba(244, 247, 251, 0.82); font-size: 13px; font-weight: 700">Waiting</div>
+<div style="height: 1px; background: rgba(255, 255, 255, 0.14)"></div>
+<div style="font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: rgba(244, 247, 251, 0.7)">SKILLS</div>
+<div style="display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05)">
+<button style="display: flex; align-items: center; gap: 14px; width: 100%; box-sizing: border-box; text-align: left; padding: 0; border: 0; background: transparent; color: rgba(244, 247, 251, 0.78)">
+<img src="../v3/icon-terrain-creation.png" alt="Terrain Creation icon" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px; opacity: 0.55">
+<span style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 17px; font-weight: 700">Terrain Creation</span><span style="font-size: 13px; font-weight: 500">Ready in 2 turns</span></span>
+</button>
+<div style="font-size: 13px; line-height: 1.45; color: rgba(244, 247, 251, 0.74)">Drops a rock on a plot. The rock stays for 4 turns, then crumbles back into plain soil.</div>
+</div>
+<div style="display: flex; flex-direction: column; gap: 10px; padding: 10px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.05)">
+<button style="display: flex; align-items: center; gap: 14px; width: 100%; box-sizing: border-box; text-align: left; padding: 0; border: 0; background: transparent; color: rgba(244, 247, 251, 0.78)">
+<img src="../v3/icon-stone-conversion.png" alt="Stone Conversion icon" style="width: 64px; height: 64px; image-rendering: pixelated; border-radius: 8px; opacity: 0.55">
+<span style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 17px; font-weight: 700">Stone Conversion</span><span style="font-size: 13px; font-weight: 500">Wait for your turn</span></span>
+</button>
+<div style="font-size: 13px; line-height: 1.45; color: rgba(244, 247, 251, 0.74)">Pick a plant. It wilts and regrows as the other team's plant: X becomes O, or O becomes X.</div>
+</div>
+</div>
+</div>
+</div>
+
+
+</body>
+</html>

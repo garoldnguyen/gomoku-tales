@@ -62,6 +62,14 @@
     "rock-small": { "file": "3d/v3/rock-small.png", "use": "3d", "width": 16, "height": 12, "frames": 1, "frameMs": 0 },
     "rock-v3": { "file": "3d/v3/rock.png", "use": "3d", "width": 32, "height": 32, "frames": 1, "frameMs": 0 },
     "trees": { "file": "3d/v3/trees.png", "use": "3d", "width": 34, "height": 48, "frames": 3, "frameMs": 0 },
-    "wind-bits": { "file": "3d/v3/wind-bits.png", "use": "3d", "width": 7, "height": 5, "frames": 6, "frameMs": 0 }
+    "wind-bits": { "file": "3d/v3/wind-bits.png", "use": "3d", "width": 7, "height": 5, "frames": 6, "frameMs": 0 },
+
+    "forest-wall-pine": { "file": "3d/v3/forest-wall-pine.png", "use": "3d", "width": 192, "height": 64, "frames": 1, "frameMs": 0 },
+    "forest-wall-round": { "file": "3d/v3/forest-wall-round.png", "use": "3d", "width": 192, "height": 56, "frames": 1, "frameMs": 0 },
+    "tree-birch": { "file": "3d/v3/tree-birch.png", "use": "3d", "width": 30, "height": 58, "frames": 2, "frameMs": 0 },
+    "tree-oak": { "file": "3d/v3/tree-oak.png", "use": "3d", "width": 56, "height": 58, "frames": 2, "frameMs": 0 },
+    "tree-pine": { "file": "3d/v3/tree-pine.png", "use": "3d", "width": 32, "height": 64, "frames": 3, "frameMs": 0 },
+    "tree-poplar": { "file": "3d/v3/tree-poplar.png", "use": "3d", "width": 22, "height": 70, "frames": 2, "frameMs": 0 },
+    "undergrowth": { "file": "3d/v3/undergrowth.png", "use": "3d", "width": 28, "height": 22, "frames": 9, "frameMs": 0 }
   }
 }

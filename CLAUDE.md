@@ -55,3 +55,14 @@ Entry points: `index.html` (the game, import map for `vendor/three`) loads `src/
   - World characters: `characters3d.js` + `character-poses.js` (off while `SHOW_WORLD_CHARACTERS` is false; kept).
 - `assets/`: `manifest.json` (every art file by name), `v3-meta.json`, the v3 pack in `assets/3d/v3/`, the character sheets in `assets/3d/`, skill icons and 2D panels in `assets/`, the DM Sans font in `assets/fonts/`.
 - `tests/*.test.js`: `node --test`. `docs/`: design, art direction (`art-direction-v3.md` is current), art spec, testing, lab, and `visual-qa.md` (the owner's checklist).
+
+<!-- GOMOKU-V31-FOREST -->
+## FOREST, HORIZON, FULL WINDOW AND COLLAPSIBLE HUD (v3.1), adds to the farmland art rules
+
+Read `docs/art-direction-v3-1.md` before any work in `src/render3d` or `src/ui`. It changes only what it lists from `docs/art-direction-v3.md`; where the two differ, v3.1 wins. Game rules, networking and cell numbering do not change.
+
+1. The canvas fills the whole window. Only `fitView(aspect)` in `framing.js` changes the field of view, and only for windows narrower than 16:9.
+2. Far things fade into `HAZE_COLOR` through the functions in `haze.js`. Haze never uses blur. The sky is a plain gradient with no dithering.
+3. The forest (`planForest`) exists on Medium and High only. Trees and wall strips are always scale 1. Low stays plain: only the sky gradient and the soft ground edge.
+4. HUD cards are collapsible. Skill text comes only from the `SKILL_INFO` table, and numbers in it come from the game config constants.
+5. Every number of the doc that code uses lives in one named constant, shared by code and tests. Pure helpers get unit tests. No per frame allocation. All existing tests keep passing.

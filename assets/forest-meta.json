@@ -1,0 +1,56 @@
+{
+ "forest-wall-pine": {
+  "note": "far conifer strip, no outline, tinted by the haze",
+  "tile": "repeat-x"
+ },
+ "forest-wall-round": {
+  "note": "far canopy strip, no outline, tinted by the haze",
+  "tile": "repeat-x"
+ },
+ "tree-birch": {
+  "anchor": [
+   15,
+   56
+  ],
+  "kind": "broadleaf"
+ },
+ "tree-oak": {
+  "anchor": [
+   28,
+   56
+  ],
+  "kind": "broadleaf"
+ },
+ "tree-pine": {
+  "anchor": [
+   16,
+   62
+  ],
+  "kind": "conifer",
+  "note": "three sizes: tall, medium, small"
+ },
+ "tree-poplar": {
+  "anchor": [
+   11,
+   68
+  ],
+  "kind": "columnar"
+ },
+ "undergrowth": {
+  "anchor": [
+   14,
+   21
+  ],
+  "looks": [
+   "fern",
+   "fern small",
+   "shrub",
+   "shrub with berries",
+   "shrub with flowers",
+   "tall grass",
+   "sapling",
+   "log",
+   "stump"
+  ]
+ }
+}
