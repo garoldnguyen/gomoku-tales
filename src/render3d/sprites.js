@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
 import { anchorForward, anchorShift, faceYaw, frameAt, SPRITE_ALPHA_TEST } from './sprite-frames.js';
-import { swayLeanSide, swayPhase } from './wind.js';
+import { bendTowardPx, swayLeanSide, swayPhase } from './wind.js';
 
 const SHADOW_OPACITY = 0.35;
 export const SHADOW_DEPTH = 0.8; // the blob is an ellipse this much shorter in z
@@ -89,7 +89,8 @@ export function spriteMaterial(map) {
 export const PLANT_SWAY = { uSwayAngle: { value: 0 }, uSwayPx: { value: 0 } };
 
 // A sprite material that, while uSwayOn is 1, leans each art pixel row of
-// the frame downwind by whole pixels: the lean grows with the square of
+// the frame downwind by whole pixels (and on any frame leans it by uBendPx
+// at the top towards a Tornado Zone, see bendRowPx in wind.js): the lean grows with the square of
 // the row's height above the root row (rootRow from the bottom), the same
 // formula as plantSwayLeanPx in wind.js. It shifts where each row reads the
 // sheet, so the single quad stays put and no pixel is ever split.
@@ -100,6 +101,7 @@ function swayingSpriteMaterial(map, { frames, widthPx, heightPx, rootRow }) {
     uSwayOn: { value: 0 },
     uSwayPhase: { value: 0 },
     uWindSide: { value: 1 },
+    uBendPx: { value: 0 },
   };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -109,20 +111,27 @@ uniform float uSwayAngle;
 uniform float uSwayPx;
 uniform float uSwayOn;
 uniform float uSwayPhase;
-uniform float uWindSide;`)
+uniform float uWindSide;
+uniform float uBendPx;`)
       .replace('#include <map_fragment>', `#ifdef USE_MAP
 vec2 swayUv = vMapUv;
 float swayPx = uSwayPx * uSwayOn;
-if (swayPx > 0.0) {
+if (swayPx > 0.0 || uBendPx != 0.0) {
   float row = floor(vMapUv.y * ${heightPx.toFixed(1)});
   float h = clamp((row - ${rootRow.toFixed(1)}) / ${Math.max(heightPx - 1 - rootRow, 1).toFixed(1)}, 0.0, 1.0);
-  // Same formula as plantSwayLeanPx in wind.js.
-  float reach = swayPx * h * h;
-  float wave = sin(uSwayAngle + uSwayPhase);
-  float leanPx = reach >= 1.0
-    ? floor(reach * (0.5 + 0.5 * wave) + 0.5)
-    : (reach > 0.0 && wave >= cos(${(Math.PI / 2).toFixed(6)} * reach) ? 1.0 : 0.0);
-  swayUv.x -= leanPx * uWindSide / ${(widthPx * frames).toFixed(1)};
+  float leanPx = 0.0;
+  if (swayPx > 0.0) {
+    // Same formula as plantSwayLeanPx in wind.js.
+    float reach = swayPx * h * h;
+    float wave = sin(uSwayAngle + uSwayPhase);
+    leanPx = uWindSide * (reach >= 1.0
+      ? floor(reach * (0.5 + 0.5 * wave) + 0.5)
+      : (reach > 0.0 && wave >= cos(${(Math.PI / 2).toFixed(6)} * reach) ? 1.0 : 0.0));
+  }
+  // The bend towards a Tornado Zone, same formula as bendRowPx in wind.js.
+  float bend = uBendPx * h * h;
+  leanPx += sign(bend) * floor(abs(bend) + 0.5);
+  swayUv.x -= leanPx / ${(widthPx * frames).toFixed(1)};
 }
 vec4 sampledDiffuseColor = texture2D(map, swayUv);
 // A row never reads from the next frame of the sheet.
@@ -237,6 +246,11 @@ export class PixelSprite {
       rootRow: anchor ? sheet.height - 1 - anchor.y : 0,
     });
     this.sway = material.userData.sway ?? null;
+    // The pull of a Tornado Zone swirl (setBend): how far the top leans
+    // when the swirl is straight beside the plant, and where the swirl is.
+    this.bendPx = 0;
+    this.bendX = 0;
+    this.bendZ = 0;
     this.plane = new THREE.Mesh(sharedGeometry(frameWidth, sheet.height), material);
     this.anchor = anchorShift(frameWidth, sheet.height, anchor, PX_WORLD, SPRITE_STRETCH_Y);
     this.shadow = createBlobShadow(shadowRadius ?? (frameWidth * PX_WORLD) / 3);
@@ -259,6 +273,14 @@ export class PixelSprite {
     if (this.sway) this.sway.uSwayOn.value = frame === this.swayFrame ? 1 : 0;
   }
 
+  // Leans a swaying sprite's top up to `px` art pixels towards the point
+  // (x, z) on the ground (a Tornado Zone swirl); 0 stands it straight.
+  setBend(px, x, z) {
+    this.bendPx = px;
+    this.bendX = x;
+    this.bendZ = z;
+  }
+
   // Advances the animation and turns the sprite towards the camera. An
   // anchored plane is moved along its own width and towards the camera so
   // the anchor pixel stays on the ground point, along this sprite's own
@@ -272,6 +294,11 @@ export class PixelSprite {
       // Per-plant phase from where it stands; downwind along its width.
       this.sway.uSwayPhase.value = swayPhase(this.object.position.x, this.object.position.z);
       this.sway.uWindSide.value = swayLeanSide(Math.cos(yaw), Math.sin(yaw));
+      const { uBendPx } = this.sway;
+      if (this.bendPx !== 0 || uBendPx.value !== 0) {
+        const { x, z } = this.object.position;
+        uBendPx.value = bendTowardPx(x, z, this.bendX, this.bendZ, Math.cos(yaw), Math.sin(yaw), this.bendPx);
+      }
     }
     const { side, lift } = this.anchor;
     if (side !== 0 || lift !== 0) {

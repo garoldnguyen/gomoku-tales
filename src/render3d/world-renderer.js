@@ -53,7 +53,8 @@ export function createWorldRenderer(worldCanvas, options = {}) {
   const decals = createDecalLayer(world);
   const ghosts = createGhosts(world);
   const lastMove = createLastMoveMark(world);
-  const effects = createEffects3d(world);
+  // A plant that a skill moves or converts regrows from Land (effects3d.js).
+  const effects = createEffects3d(world, { regrow: (x, y, player, plantedAt) => pieces.growOne(x, y, player, plantedAt) });
 
   // The level and FPS of this window, top left on the HUD.
   const drawQuality = (ctx) => {
@@ -153,9 +154,12 @@ const UNPLANTED = -1; // growth stage of a cell before its seed drops
 // pool, hidden. A plant whose seed was planted by an event given to grow()
 // grows through Drop, Land, Sprout, Open and Rest at the stage start times
 // of v3-meta.json, with the Land soil puff and the Open sparkles of the
-// effects (shown on the levels that have them). Every other plant, one
-// that already stood there when the game started or loaded, or one a skill
-// moved, shows Rest at once. Growth only animates: the board is always the
+// effects (shown on the levels that have them). A plant that a skill
+// moved or converted regrows from Land once its flying seed arrives (the
+// effects call growOne with a planting time in the past or future). Every
+// other plant, one that already stood there when the game started or
+// loaded, shows Rest at once. Plants inside a Tornado Zone bend towards it
+// on the levels that have it (effects.bendAt). Growth only animates: the board is always the
 // logic's. A piece stays hidden while the effects show a flying copy
 // arriving on its cell.
 function createPieceLayer(world) {
@@ -191,16 +195,22 @@ function createPieceLayer(world) {
     if (shownSprite[i]) rest(shownSprite[i], shownKind[i]);
   };
 
+  const growOne = (x, y, player, time) => {
+    const i = y * BOARD_SIZE + x;
+    growStart[i] = time;
+    growKind[i] = player;
+    lastStage[i] = UNPLANTED;
+  };
+
   return {
     // Cells { x, y, player } whose seed was planted at `time`.
     grow(cells, time) {
-      for (const { x, y, player } of cells) {
-        const i = y * BOARD_SIZE + x;
-        growStart[i] = time;
-        growKind[i] = player;
-        lastStage[i] = UNPLANTED;
-      }
+      for (const { x, y, player } of cells) growOne(x, y, player, time);
     },
+
+    // The plant of `player` on cell (x, y) grows as if its seed was planted
+    // at `time` (which may lie ahead: it shows its first stage until then).
+    growOne,
 
     // Every plant shows Rest (a new game).
     settleAll() {
@@ -218,6 +228,7 @@ function createPieceLayer(world) {
           if (current) {
             const old = shownSprite[i];
             rest(old, current);
+            old.setBend(0, 0, 0);
             old.object.visible = false;
             free[current].push(old);
           }
@@ -241,6 +252,9 @@ function createPieceLayer(world) {
           continue;
         }
         sprite.object.visible = !effects.holds(i, time);
+        const x = i % BOARD_SIZE;
+        const y = (i - x) / BOARD_SIZE;
+        sprite.setBend(effects.bendAt(x, y), effects.bendCentre.x, effects.bendCentre.z);
         if (Number.isNaN(growStart[i])) continue;
         const player = shownKind[i];
         const { stages, anchorY } = look(player);
@@ -248,8 +262,6 @@ function createPieceLayer(world) {
         sprite.setFrame(pose.frame);
         sprite.plane.position.y = pose.dropPx * PX_WORLD * SPRITE_STRETCH_Y;
         sprite.object.scale.set(pose.scale, pose.scale, pose.scale);
-        const x = i % BOARD_SIZE;
-        const y = (i - x) / BOARD_SIZE;
         if (enteredStage(lastStage[i], pose.frame, STAGE_LAND)) effects.soilPuff(x, y);
         if (enteredStage(lastStage[i], pose.frame, STAGE_OPEN)) effects.openSparkles(x, y, player, anchorY);
         lastStage[i] = pose.frame;

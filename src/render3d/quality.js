@@ -158,6 +158,12 @@ export function particleScale(features) {
   return features.particleCap / MAX_PARTICLE_CAP;
 }
 
+// True on levels whose skill effects are plain slides: the Wind Dash seed
+// and a thrown seed glide straight along the ground, with no curve or arc.
+export function plainSlides(features) {
+  return features.skillEffects === 'simple';
+}
+
 // True when the scene behind the lobby and room menus is blurred: on
 // levels whose HUD glass is frosted. features is undefined for the 2D
 // renderer, which never blurs.

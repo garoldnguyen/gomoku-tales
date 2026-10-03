@@ -1,7 +1,9 @@
-// Pure planning and timing for the 3D effects (docs/art-direction-hd2d.md
-// section G): which visuals the logic events show, which board cells keep
-// their piece hidden while a flying copy is on its way there, the shape of
-// every skill animation over time, and the camera shake. Effects only
+// Pure planning and timing for the 3D effects (docs/art-direction-v3.md
+// sections 4 and 9): which visuals the logic events show, which board cells
+// keep their plant hidden while a flying seed is on its way there and when
+// that plant regrows from Land, the shape of every skill animation over
+// time (reverse growth, the Wind Dash gust curve, the thrown seed's arc, the
+// falling rock, the conversion spark), and the camera shake. Effects only
 // follow the events returned by src/logic; nothing here feeds back into the
 // rules. No DOM or Three.js, so it runs under node --test. The pose and
 // shake functions read their time from, and write their results into, one
@@ -9,24 +11,27 @@
 // animation never allocates or passes loose numbers around.
 
 import {
-  CONVERT_LIFT, CONVERT_MS, DASH_STREAK_MS, ROCK_CRUMBLE_MS, ROCK_FALL_HEIGHT, ROCK_FALL_MS,
-  ROCK_SETTLE_MS, SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS,
+  CONVERT_SPARK_MS, DASH_CURVE, DASH_LIFT, DASH_STREAK_MS, REVERSE_GROWTH_SPEED, ROCK_CRUMBLE_MS,
+  ROCK_FALL_HEIGHT, ROCK_FALL_MS, ROCK_SETTLE_MS, SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS,
+  THROW_MS,
 } from '../config.js';
 import { bannerTexts } from '../render/effects.js';
-import { popInScaleInto } from './character-poses.js';
+import { dropOffsetPx, STAGE_DROP, STAGE_LAND, STAGE_REST, STAGE_SPROUT } from './growth.js';
 
 // Visual specs for the events of one action, in order:
 //   { kind: 'place', x, y, player }       a seed planted (its growth cues are the piece layer's)
-//   { kind: 'dashMark', from, to, player } swirl on the source, red frame on the target, until the dash ends
-//   { kind: 'dashStreak', from, to, player } the stone streaks to the target with a trail
+//   { kind: 'dashMark', from, to, player } petals circle the source, red brackets on the target, until the dash ends
+//   { kind: 'dashStreak', from, to, player } the source bloom folds into a seed that rides a gust of
+//                                         petals along a curve to the target and regrows there from Land
 //   { kind: 'dashFizzle', from, to }      a failed dash: the mark ends with a puff
-//   { kind: 'tornado', x, y, cells }      the swirling column over the zone, until it ends
+//   { kind: 'tornado', x, y, cells }      the swirl of petals and leaves over the zone, until it ends
 //   { kind: 'tornadoEnd' }
-//   { kind: 'throw', from, to, player }   a stone thrown in an arc, landing with a dust puff
-//   { kind: 'throwBlocked', x, y }        a gust around a stone with nowhere to go
-//   { kind: 'rockFall', x, y }            a rock falls with a growing shadow, dust and a light shake
-//   { kind: 'rockCrumble', x, y }         a rock breaks into rubble and dust
-//   { kind: 'convert', x, y, from, to }   the stone glows, lifts, flips and lands as `to`
+//   { kind: 'throw', from, to, player }   a seed thrown in an arc, landing with a soil puff, then regrowing from Land
+//   { kind: 'throwBlocked', x, y }        a gust around a plant with nowhere to go
+//   { kind: 'rockFall', x, y }            a rock falls with a growing shadow, a soil puff and a light shake
+//   { kind: 'rockCrumble', x, y }         a rock breaks into soil crumbs and pebbles
+//   { kind: 'convert', x, y, from, to }   the plant wilts to Sprout, a spark runs through the soil and
+//                                         it regrows from Land as `to`
 //   { kind: 'endLingering' }              the game is over: marks and columns end
 //   { kind: 'banner', text }              HUD banner text (same texts as the 2D game)
 export function visualsForEvents(events) {
@@ -113,22 +118,85 @@ export function catchUpVisuals(events) {
   return specs;
 }
 
-// The cell whose piece stays hidden while a flying copy is on its way
-// there, and for how long: { x, y, ms }, or null. The board already holds
-// the piece; the effect shows it arriving.
-export function heldCell(spec) {
+// How long a plant takes to fold back from stage `fromStage` to stage
+// `toStage` when its growth plays backwards REVERSE_GROWTH_SPEED times
+// faster than it grows (docs/art-direction-v3.md section 4). stageStartMs
+// are the plant's stage start times (v3-meta.js stageStartMs).
+export function reverseGrowthMs(stageStartMs, fromStage, toStage) {
+  return Math.max(0, stageStartMs[fromStage] - stageStartMs[toStage]) / REVERSE_GROWTH_SPEED;
+}
+
+// The stage a plant shows pose.ageMs into folding back from `fromStage` to
+// `toStage`: the growth timeline played backwards from the start of
+// `fromStage`. Writes pose.frame and pose.done (from the end on, where it
+// stays on `toStage`).
+export function reverseGrowthInto(out, stageStartMs, fromStage, toStage) {
+  const age = out.ageMs > 0 ? out.ageMs : 0;
+  if (age >= reverseGrowthMs(stageStartMs, fromStage, toStage)) {
+    out.frame = toStage;
+    out.done = true;
+    return out;
+  }
+  const forward = stageStartMs[fromStage] - age * REVERSE_GROWTH_SPEED;
+  let frame = fromStage;
+  while (frame > toStage && forward < stageStartMs[frame]) frame--;
+  out.frame = frame;
+  out.done = false;
+  return out;
+}
+
+// Wind Dash: the resting bloom folds all the way back into a seed.
+export function dashFoldMs(stageStartMs) {
+  return reverseGrowthMs(stageStartMs, STAGE_REST, STAGE_DROP);
+}
+
+// Stone Conversion: the plant wilts back to Sprout, then the spark runs.
+export function convertWiltMs(stageStartMs) {
+  return reverseGrowthMs(stageStartMs, STAGE_REST, STAGE_SPROUT);
+}
+
+export function convertMs(stageStartMs) {
+  return convertWiltMs(stageStartMs) + CONVERT_SPARK_MS;
+}
+
+// The cell whose plant stays hidden while a flying seed (or a falling
+// rock, or the wilting old plant) shows it arriving, and for how long:
+// { x, y, ms }, or null. The board already holds the piece; the effect
+// shows it arriving. stageStartMs times the reverse growth.
+export function heldCell(spec, stageStartMs) {
   switch (spec.kind) {
     case 'throw':
       return { x: spec.to.x, y: spec.to.y, ms: THROW_DELAY_MS + THROW_MS };
     case 'dashStreak':
-      return { x: spec.to.x, y: spec.to.y, ms: DASH_STREAK_MS };
+      return { x: spec.to.x, y: spec.to.y, ms: dashFoldMs(stageStartMs) + DASH_STREAK_MS };
     case 'rockFall':
       return { x: spec.x, y: spec.y, ms: ROCK_FALL_MS + ROCK_SETTLE_MS };
     case 'convert':
-      return { x: spec.x, y: spec.y, ms: CONVERT_MS };
+      return { x: spec.x, y: spec.y, ms: convertMs(stageStartMs) };
     default:
       return null;
   }
+}
+
+// The plant that regrows from Land once its held cell shows again (a seed
+// that flew there, a converted plant): { x, y, player, startMs }, or null.
+// startMs is when, counted from the event, its seed would have been
+// planted for it to enter Land just as the hold ends.
+export function regrowCell(spec, stageStartMs) {
+  let player;
+  switch (spec.kind) {
+    case 'throw':
+    case 'dashStreak':
+      player = spec.player;
+      break;
+    case 'convert':
+      player = spec.to;
+      break;
+    default:
+      return null;
+  }
+  const { x, y, ms } = heldCell(spec, stageStartMs);
+  return { x, y, player, startMs: ms - stageStartMs[STAGE_LAND] };
 }
 
 // Shake strength in world units for a spec, 0 for none: only a rock
@@ -150,29 +218,53 @@ export function arcHeight(t, height) {
   return 4 * height * u * (1 - u);
 }
 
-// Wind Dash pose.ageMs into the streak: pose.progress (0 to 1 along the
-// way, easing in and out), pose.lift above the board, pose.done.
-export function dashPose(out) {
-  const { ageMs } = out;
-  const t = clamp01(ageMs / DASH_STREAK_MS);
-  out.progress = smoothstep(t);
-  out.lift = 0.18 * Math.sin(Math.PI * t);
-  out.done = ageMs >= DASH_STREAK_MS;
+// A point pose.progress (0 to 1) along the Wind Dash gust from (fx, fz)
+// to (tx, tz): a quadratic curve that bows sideways by DASH_CURVE of the
+// way's length, rising DASH_LIFT above the board halfway. With `plain`
+// (quality.js plainSlides) it is a straight slide along the ground. Writes
+// pose.x, pose.z and pose.lift.
+export function dashCurveInto(out, fx, fz, tx, tz, plain = false) {
+  const u = clamp01(out.progress);
+  const dx = tx - fx;
+  const dz = tz - fz;
+  const bow = plain ? 0 : DASH_CURVE;
+  const cx = (fx + tx) / 2 - dz * bow;
+  const cz = (fz + tz) / 2 + dx * bow;
+  const a = (1 - u) * (1 - u);
+  const b = 2 * u * (1 - u);
+  const c = u * u;
+  out.x = a * fx + b * cx + c * tx;
+  out.z = a * fz + b * cz + c * tz;
+  out.lift = plain ? 0 : arcHeight(u, DASH_LIFT);
   return out;
 }
 
-// A thrown stone pose.ageMs after it was placed: it shows on that cell
-// (popping in) for THROW_DELAY_MS, then flies in an arc for THROW_MS.
-// pose.progress along the way, pose.height, pose.scaleX and pose.scaleY,
-// pose.done.
-export function throwPose(out) {
+// Wind Dash pose.ageMs after it resolved: the source bloom folds back into
+// a seed (reverse growth, dashFoldMs), then the seed rides the gust for
+// DASH_STREAK_MS, easing in and out. pose.frame (the stage shown),
+// pose.flying, pose.progress (0 to 1 along the gust), pose.done.
+export function dashPose(out, stageStartMs) {
   const { ageMs } = out;
-  popInScaleInto(ageMs, out, THROW_DELAY_MS);
+  reverseGrowthInto(out, stageStartMs, STAGE_REST, STAGE_DROP);
+  const flight = ageMs - dashFoldMs(stageStartMs);
+  out.flying = out.done && flight > 0;
+  out.progress = smoothstep(flight / DASH_STREAK_MS);
+  out.done = flight >= DASH_STREAK_MS;
+  out.ageMs = ageMs;
+  return out;
+}
+
+// A thrown seed pose.ageMs after it was planted: it drops onto its plot
+// for THROW_DELAY_MS (pose.dropPx art pixels above it, as a growing seed
+// drops), then flies in an arc for THROW_MS (with `plain`, quality.js
+// plainSlides, it slides along the ground instead). pose.progress along the
+// way, pose.height, pose.done.
+export function throwPose(out, plain = false) {
+  const { ageMs } = out;
+  out.dropPx = dropOffsetPx(ageMs);
   const t = clamp01((ageMs - THROW_DELAY_MS) / THROW_MS);
   out.progress = t;
-  out.height = arcHeight(t, THROW_ARC_HEIGHT);
-  out.scaleX = out.x;
-  out.scaleY = out.y;
+  out.height = plain ? 0 : arcHeight(t, THROW_ARC_HEIGHT);
   out.done = ageMs >= THROW_DELAY_MS + THROW_MS;
   return out;
 }
@@ -195,8 +287,8 @@ export function rockFallPose(out) {
   return out;
 }
 
-// A breaking rock pose.ageMs after it broke sinks and spreads into rubble:
-// pose.scaleX, pose.scaleY, pose.done.
+// A breaking rock pose.ageMs after it broke sinks and spreads into soil
+// crumbs and pebbles: pose.scaleX, pose.scaleY, pose.done.
 export function crumblePose(out) {
   const { ageMs } = out;
   const t = clamp01(ageMs / ROCK_CRUMBLE_MS);
@@ -206,30 +298,33 @@ export function crumblePose(out) {
   return out;
 }
 
-// Stone Conversion phases, as shares of CONVERT_MS.
-export const CONVERT_PHASES = Object.freeze({ glowEnd: 0.25, liftEnd: 0.42, flipEnd: 0.78 });
-
-// Stone Conversion pose.ageMs in: the stone glows, lifts, flips like a
-// coin (it turns edge-on halfway, where the other colour takes over) and
-// lands. pose.glow (0 to 1), pose.lift, pose.width (horizontal scale),
-// pose.showNew, pose.done.
-export function convertPose(out) {
+// Stone Conversion pose.ageMs in: the old plant wilts back to Sprout
+// (reverse growth, convertWiltMs), then a small spark runs through the soil
+// for CONVERT_SPARK_MS, after which the other team's plant regrows from
+// Land (the piece layer grows it, see regrowCell). pose.frame (the old
+// plant's stage), pose.spark (-1 before the spark, then 0 to 1 along its
+// path), pose.done.
+export function convertPose(out, stageStartMs) {
   const { ageMs } = out;
-  const { glowEnd, liftEnd, flipEnd } = CONVERT_PHASES;
-  const t = clamp01(ageMs / CONVERT_MS);
-  if (t < glowEnd) out.glow = t / glowEnd;
-  else if (t < flipEnd) out.glow = 1;
-  else out.glow = 1 - (t - flipEnd) / (1 - flipEnd);
+  reverseGrowthInto(out, stageStartMs, STAGE_REST, STAGE_SPROUT);
+  const wiltMs = convertWiltMs(stageStartMs);
+  out.spark = ageMs < wiltMs ? -1 : clamp01((ageMs - wiltMs) / CONVERT_SPARK_MS);
+  out.done = ageMs >= wiltMs + CONVERT_SPARK_MS;
+  out.ageMs = ageMs;
+  return out;
+}
 
-  if (t < glowEnd) out.lift = 0;
-  else if (t < liftEnd) out.lift = CONVERT_LIFT * (1 - (1 - (t - glowEnd) / (liftEnd - glowEnd)) ** 2);
-  else if (t < flipEnd) out.lift = CONVERT_LIFT;
-  else out.lift = CONVERT_LIFT * (1 - ((t - flipEnd) / (1 - flipEnd)) ** 2);
-
-  const angle = Math.PI * smoothstep((t - liftEnd) / (flipEnd - liftEnd));
-  out.width = Math.max(0.08, Math.abs(Math.cos(angle)));
-  out.showNew = angle > Math.PI / 2;
-  out.done = ageMs >= CONVERT_MS;
+// Where the conversion spark is at pose.spark (0 to 1) on the plot centred
+// on (wx, wz): it enters at the plot's upper left (where the wind comes
+// from), wriggles through the soil and ends under the plant at the centre.
+// Writes pose.x and pose.z.
+export const SPARK_REACH = 0.42; // world units from the plot centre where the spark starts
+export function sparkPathInto(out, wx, wz) {
+  const t = clamp01(out.spark);
+  const along = SPARK_REACH * (1 - t);
+  const wriggle = 0.08 * Math.sin(3 * Math.PI * t) * (1 - t);
+  out.x = wx - along + wriggle;
+  out.z = wz - along - wriggle;
   return out;
 }
 

@@ -1,21 +1,26 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CAMERA_DISTANCE, CAMERA_FOV, CONVERT_LIFT, CONVERT_MS, DASH_STREAK_MS, ROCK_CRUMBLE_MS, ROCK_FALL_HEIGHT,
-  ROCK_FALL_MS, ROCK_SETTLE_MS, SHAKE3D_HEAVY, SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS,
+  CAMERA_DISTANCE, CAMERA_FOV, CONVERT_SPARK_MS, DASH_LIFT, DASH_STREAK_MS, PLANT_DROP_PX, REVERSE_GROWTH_SPEED,
+  ROCK_CRUMBLE_MS, ROCK_FALL_HEIGHT, ROCK_FALL_MS, ROCK_SETTLE_MS, SHAKE3D_HEAVY, SHAKE3D_LIGHT, SHAKE3D_MS,
+  THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS,
 } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
 import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
 import { bannerTexts } from '../src/render/effects.js';
 import {
-  convertPose, crumblePose, dashPose, heldCell, rockFallPose, shakeLeft, shakeOffset3d, shakeStrength,
-  snapToStep, throwPose, visualsForEvents, worldUnitsPerPixel,
+  convertMs, convertPose, convertWiltMs, crumblePose, dashCurveInto, dashFoldMs, dashPose, heldCell, regrowCell,
+  reverseGrowthInto, reverseGrowthMs, rockFallPose, shakeLeft, shakeOffset3d, shakeStrength, snapToStep,
+  SPARK_REACH, sparkPathInto, throwPose, visualsForEvents, worldUnitsPerPixel,
 } from '../src/render3d/effect-plans.js';
+import { growthStage, STAGE_DROP, STAGE_LAND, STAGE_OPEN, STAGE_REST, STAGE_SPROUT } from '../src/render3d/growth.js';
+import { DEFAULT_V3_META, stageStartMs } from '../src/render3d/v3-meta.js';
+import { bendRowPx, bendTowardPx } from '../src/render3d/wind.js';
 import {
   createParticlePool, createSpawnParams, emit, FLOOR_Y, scaledCount, SHAPE_PLUS, SHAPE_SQUARE,
 } from '../src/render3d/particle-pool.js';
-import { particleScale, QUALITY_LEVELS, QUALITY_ORDER } from '../src/render3d/quality.js';
+import { particleScale, plainSlides, QUALITY_LEVELS, QUALITY_ORDER } from '../src/render3d/quality.js';
 import { effectRandom } from '../src/render3d/seeded-random.js';
 
 function ok(result) {
@@ -24,6 +29,7 @@ function ok(result) {
 }
 
 const kinds = (specs) => specs.map((spec) => spec.kind);
+const STAGES = stageStartMs(DEFAULT_V3_META, 'plant-x'); // [0, 150, 450, 850, 1200]
 
 // Plays moves from the start; each move is [x, y] for a stone or
 // { skill, target } for a skill. Returns the results.
@@ -64,7 +70,7 @@ test('only a rock landing shakes the camera, and only lightly', () => {
   assert.equal(shakeStrength({ kind: 'rockFall' }), SHAKE3D_LIGHT);
 });
 
-test('Wind Dash: the announcement marks source and target, then the stone streaks across', () => {
+test('Wind Dash: the announcement marks source and target, then the seed rides a gust across', () => {
   const results = play([
     [7, 7], [0, 0],
     { skill: WIND_DASH, target: { from: { x: 7, y: 7 }, to: { x: 9, y: 9 } } },
@@ -78,7 +84,10 @@ test('Wind Dash: the announcement marks source and target, then the stone streak
   const resolved = visualsForEvents(results[3].events);
   assert.deepEqual(kinds(resolved), ['place', 'dashStreak', 'banner']);
   assert.deepEqual(resolved[1], { kind: 'dashStreak', from: { x: 7, y: 7 }, to: { x: 9, y: 9 }, player: X });
-  assert.deepEqual(heldCell(resolved[1]), { x: 9, y: 9, ms: DASH_STREAK_MS });
+  const holdMs = dashFoldMs(STAGES) + DASH_STREAK_MS;
+  assert.deepEqual(heldCell(resolved[1], STAGES), { x: 9, y: 9, ms: holdMs });
+  assert.deepEqual(regrowCell(resolved[1], STAGES), { x: 9, y: 9, player: X, startMs: holdMs - STAGES[STAGE_LAND] },
+    'the plant regrows at the target from Land as the seed arrives');
 });
 
 test('a failed Wind Dash fizzles and ends the marks', () => {
@@ -90,10 +99,11 @@ test('a failed Wind Dash fizzles and ends the marks', () => {
   const specs = visualsForEvents(results[3].events);
   assert.deepEqual(kinds(specs), ['place', 'dashFizzle', 'banner']);
   assert.deepEqual(specs[1], { kind: 'dashFizzle', from: { x: 7, y: 7 }, to: { x: 9, y: 9 } });
-  assert.equal(heldCell(specs[1]), null);
+  assert.equal(heldCell(specs[1], STAGES), null);
+  assert.equal(regrowCell(specs[1], STAGES), null);
 });
 
-test('Tornado Zone: the column shows over the zone and a thrown stone flies in an arc', () => {
+test('Tornado Zone: the swirl shows over the zone and a thrown seed flies in an arc, then regrows', () => {
   const results = play([
     { skill: TORNADO_ZONE, target: { x: 7, y: 7 } },
     [7, 7], // the bear places inside the zone; random 0 throws it to (6, 6)
@@ -106,7 +116,8 @@ test('Tornado Zone: the column shows over the zone and a thrown stone flies in a
   const thrown = visualsForEvents(results[1].events);
   assert.deepEqual(kinds(thrown), ['place', 'throw', 'tornadoEnd', 'banner']);
   assert.deepEqual(thrown[1], { kind: 'throw', from: { x: 7, y: 7 }, to: { x: 6, y: 6 }, player: O });
-  assert.deepEqual(heldCell(thrown[1]), { x: 6, y: 6, ms: THROW_DELAY_MS + THROW_MS });
+  assert.deepEqual(heldCell(thrown[1], STAGES), { x: 6, y: 6, ms: THROW_DELAY_MS + THROW_MS });
+  assert.deepEqual(regrowCell(thrown[1], STAGES), { x: 6, y: 6, player: O, startMs: THROW_DELAY_MS + THROW_MS - STAGES[STAGE_LAND] });
   assert.equal(shakeStrength(thrown[1]), 0);
 });
 
@@ -118,7 +129,8 @@ test('Terrain Creation: the rock falls with a light shake and crumbles when it b
   ]);
   const fell = visualsForEvents(results[1].events);
   assert.deepEqual(kinds(fell), ['rockFall', 'banner']);
-  assert.deepEqual(heldCell(fell[0]), { x: 7, y: 7, ms: ROCK_FALL_MS + ROCK_SETTLE_MS });
+  assert.deepEqual(heldCell(fell[0], STAGES), { x: 7, y: 7, ms: ROCK_FALL_MS + ROCK_SETTLE_MS });
+  assert.equal(regrowCell(fell[0], STAGES), null, 'a rock does not grow');
   assert.equal(shakeStrength(fell[0]), SHAKE3D_LIGHT);
 
   for (const result of results.slice(2, 5)) assert.ok(!kinds(visualsForEvents(result.events)).includes('rockCrumble'));
@@ -126,14 +138,17 @@ test('Terrain Creation: the rock falls with a light shake and crumbles when it b
   assert.deepEqual(broke.filter((s) => s.kind === 'rockCrumble'), [{ kind: 'rockCrumble', x: 7, y: 7 }]);
 });
 
-test('Stone Conversion: the stone flips from the old colour to the new one', () => {
+test('Stone Conversion: the old plant wilts and the other team\'s plant regrows from Land', () => {
   const results = play([
     [7, 7],
     { skill: STONE_CONVERSION, target: { x: 7, y: 7 } },
   ]);
   const specs = visualsForEvents(results[1].events);
   assert.deepEqual(specs[0], { kind: 'convert', x: 7, y: 7, from: X, to: O });
-  assert.deepEqual(heldCell(specs[0]), { x: 7, y: 7, ms: CONVERT_MS });
+  const holdMs = convertMs(STAGES);
+  assert.deepEqual(heldCell(specs[0], STAGES), { x: 7, y: 7, ms: holdMs });
+  assert.deepEqual(regrowCell(specs[0], STAGES), { x: 7, y: 7, player: O, startMs: holdMs - STAGES[STAGE_LAND] },
+    'X becomes O, so the shape changes too');
 });
 
 test('a win ends the lingering marks, since it drops a pending dash and the zone without events', () => {
@@ -176,7 +191,9 @@ test('planning visuals never changes the events', () => {
 
 test('only pieces that arrive by flying are held hidden', () => {
   for (const kind of ['place', 'dashMark', 'dashFizzle', 'tornado', 'tornadoEnd', 'throwBlocked', 'rockCrumble', 'endLingering', 'banner']) {
-    assert.equal(heldCell({ kind, x: 1, y: 1, from: { x: 0, y: 0 }, to: { x: 1, y: 1 } }), null, kind);
+    const spec = { kind, x: 1, y: 1, from: { x: 0, y: 0 }, to: { x: 1, y: 1 } };
+    assert.equal(heldCell(spec, STAGES), null, kind);
+    assert.equal(regrowCell(spec, STAGES), null, kind);
   }
 });
 
@@ -188,36 +205,134 @@ function at(pose, ageMs) {
   return pose;
 }
 
-test('a dashing stone eases from source to target with a small lift', () => {
+test('reverse growth plays the stages backwards at 2.5 times speed', () => {
+  assert.equal(REVERSE_GROWTH_SPEED, 2.5);
+  assert.equal(reverseGrowthMs(STAGES, STAGE_REST, STAGE_DROP), 1200 / 2.5);
+  assert.equal(reverseGrowthMs(STAGES, STAGE_REST, STAGE_SPROUT), (1200 - 450) / 2.5);
+  assert.equal(dashFoldMs(STAGES), 480);
+  assert.equal(convertWiltMs(STAGES), 300);
+  assert.equal(convertMs(STAGES), 300 + CONVERT_SPARK_MS);
+
   const out = {};
-  assert.equal(dashPose(at(out, 0)).progress, 0);
-  assert.equal(out.lift, 0);
-  assert.equal(out.done, false);
-  let last = 0;
-  for (let t = 0; t <= DASH_STREAK_MS; t += 10) {
-    dashPose(at(out, t));
-    assert.ok(out.progress >= last, 'never moves back');
-    assert.ok(out.lift >= 0 && out.lift < 0.5);
-    last = out.progress;
+  assert.deepEqual(reverseGrowthInto(at(out, 0), STAGES, STAGE_REST, STAGE_DROP), { ageMs: 0, frame: STAGE_REST, done: false });
+  let last = STAGE_REST;
+  for (let t = 0; t <= 600; t += 5) {
+    reverseGrowthInto(at(out, t), STAGES, STAGE_REST, STAGE_DROP);
+    assert.ok(out.frame <= last && last - out.frame <= 1, 'one stage back at a time, never forward');
+    // The mirror of growth: the stage shown is the stage growth shows at
+    // the same point of the timeline counted back from Rest.
+    if (t > 0 && t < 480) assert.equal(out.frame, growthStage(1200 - t * 2.5, STAGES).frame, `t=${t}`);
+    last = out.frame;
   }
-  dashPose(at(out, DASH_STREAK_MS));
-  assert.equal(out.progress, 1);
-  assert.ok(Math.abs(out.lift) < 1e-9);
+  assert.equal(out.frame, STAGE_DROP);
   assert.equal(out.done, true);
+  // Each stage lasts its growing time divided by 2.5: Open shows for (1200 - 850) / 2.5 ms.
+  reverseGrowthInto(at(out, 139), STAGES, STAGE_REST, STAGE_DROP);
+  assert.equal(out.frame, STAGE_OPEN);
+  reverseGrowthInto(at(out, 141), STAGES, STAGE_REST, STAGE_DROP);
+  assert.equal(out.frame, STAGE_SPROUT);
+
+  reverseGrowthInto(at(out, 10_000), STAGES, STAGE_REST, STAGE_SPROUT);
+  assert.deepEqual([out.frame, out.done], [STAGE_SPROUT, true], 'a wilt stops at Sprout');
+  reverseGrowthInto(at(out, -50), STAGES, STAGE_REST, STAGE_SPROUT);
+  assert.deepEqual([out.frame, out.done], [STAGE_REST, false]);
 });
 
-test('a thrown stone pops in on its cell, then flies in an arc and lands', () => {
+test('the Wind Dash gust is a curve from source to target that bows sideways and lifts', () => {
   const out = {};
+  const p = (t, fx, fz, tx, tz) => {
+    out.progress = t;
+    const { x, z, lift } = dashCurveInto(out, fx, fz, tx, tz);
+    return { x, z, lift };
+  };
+  assert.deepEqual(p(0, 1, 2, 5, 2), { x: 1, z: 2, lift: 0 });
+  const end = p(1, 1, 2, 5, 2);
+  assert.ok(Math.abs(end.x - 5) < 1e-9 && Math.abs(end.z - 2) < 1e-9 && Math.abs(end.lift) < 1e-9);
+  const mid = p(0.5, 1, 2, 5, 2);
+  assert.ok(Math.abs(mid.x - 3) < 1e-9, 'halfway across');
+  assert.ok(Math.abs(mid.z - 2) > 0.2, 'it bows off the straight line');
+  assert.ok(Math.abs(mid.lift - DASH_LIFT) < 1e-9, 'highest halfway');
+  // Continuous: small steps make small moves.
+  let prev = p(0, 0, 0, 3, 4);
+  for (let t = 0.01; t <= 1; t += 0.01) {
+    const next = p(t, 0, 0, 3, 4);
+    assert.ok(Math.hypot(next.x - prev.x, next.z - prev.z) < 0.15);
+    prev = next;
+  }
+  assert.deepEqual(p(-1, 0, 0, 3, 4), p(0, 0, 0, 3, 4), 'clamped');
+});
+
+test('on plain-slide levels the Wind Dash seed slides straight along the ground', () => {
+  const out = {};
+  for (let t = 0; t <= 1; t += 0.05) {
+    out.progress = t;
+    dashCurveInto(out, 1, 2, 5, 6, true);
+    assert.equal(out.lift, 0, 'it never leaves the ground');
+    assert.ok(Math.abs((out.x - 1) - (out.z - 2)) < 1e-9, 'it stays on the straight line');
+  }
+  out.progress = 1;
+  dashCurveInto(out, 1, 2, 5, 6, true);
+  assert.ok(Math.abs(out.x - 5) < 1e-9 && Math.abs(out.z - 6) < 1e-9, 'it ends on the target');
+});
+
+test('only Low uses plain slides; Medium and High keep the curves and arcs', () => {
+  assert.equal(plainSlides(QUALITY_LEVELS.low), true);
+  assert.equal(plainSlides(QUALITY_LEVELS.medium), false);
+  assert.equal(plainSlides(QUALITY_LEVELS.high), false);
+});
+
+test('a dashing plant folds into a seed, then the seed rides the gust and lands', () => {
+  const fold = dashFoldMs(STAGES);
+  const out = {};
+  dashPose(at(out, 0), STAGES);
+  assert.deepEqual([out.frame, out.flying, out.progress, out.done], [STAGE_REST, false, 0, false]);
+  dashPose(at(out, fold / 2), STAGES);
+  assert.equal(out.flying, false, 'it does not move while it folds');
+  assert.ok(out.frame < STAGE_REST && out.frame > STAGE_DROP);
+  let last = 0;
+  for (let t = fold + 1; t <= fold + DASH_STREAK_MS; t += 10) {
+    dashPose(at(out, t), STAGES);
+    assert.equal(out.frame, STAGE_DROP, 'a seed while it flies');
+    assert.equal(out.flying, true);
+    assert.ok(out.progress >= last, 'never moves back');
+    last = out.progress;
+  }
+  dashPose(at(out, fold + DASH_STREAK_MS), STAGES);
+  assert.deepEqual([out.progress, out.done], [1, true]);
+  assert.equal(out.ageMs, fold + DASH_STREAK_MS, 'the time it read is left alone');
+});
+
+test('a thrown seed drops onto its plot, then flies in an arc and lands', () => {
+  const out = {};
+  throwPose(at(out, 0));
+  assert.equal(out.dropPx, PLANT_DROP_PX, 'it starts above its plot like a planted seed');
   throwPose(at(out, THROW_DELAY_MS / 2));
-  assert.equal(out.progress, 0, 'it waits on the cell where it was placed');
+  assert.equal(out.progress, 0, 'it waits on the cell where it was planted');
   assert.equal(out.height, 0);
+  throwPose(at(out, THROW_DELAY_MS));
+  assert.equal(out.dropPx, 0, 'it has landed before it is thrown');
+  let lastProgress = 0;
+  for (let t = THROW_DELAY_MS; t <= THROW_DELAY_MS + THROW_MS; t += 10) {
+    throwPose(at(out, t));
+    assert.ok(out.progress >= lastProgress);
+    assert.ok(out.height >= 0 && out.height <= THROW_ARC_HEIGHT + 1e-9);
+    lastProgress = out.progress;
+  }
   throwPose(at(out, THROW_DELAY_MS + THROW_MS / 2));
   assert.ok(Math.abs(out.height - THROW_ARC_HEIGHT) < 1e-9, 'highest halfway');
-  assert.deepEqual([out.scaleX, out.scaleY], [1, 1]);
   throwPose(at(out, THROW_DELAY_MS + THROW_MS));
   assert.equal(out.progress, 1);
   assert.equal(out.height, 0);
   assert.equal(out.done, true);
+});
+
+test('on plain-slide levels a thrown seed slides along the ground', () => {
+  const out = {};
+  for (let t = 0; t <= THROW_DELAY_MS + THROW_MS; t += 10) {
+    throwPose(at(out, t), true);
+    assert.equal(out.height, 0);
+  }
+  assert.deepEqual([out.progress, out.done], [1, true]);
 });
 
 test('a falling rock speeds up, its shadow grows, and it squashes on impact', () => {
@@ -257,32 +372,70 @@ test('a breaking rock sinks into rubble', () => {
   assert.equal(out.done, true);
 });
 
-test('a converted stone glows, lifts, flips once to the new colour and lands', () => {
+test('a converted plant wilts back to Sprout, then a spark runs through the soil to it', () => {
+  const wilt = convertWiltMs(STAGES);
   const out = {};
-  convertPose(at(out, 0));
-  assert.deepEqual([out.glow, out.lift, out.width, out.showNew, out.done], [0, 0, 1, false, false]);
-  let flips = 0;
-  let shown = false;
-  let peakLift = 0;
-  let peakGlow = 0;
-  for (let t = 0; t <= CONVERT_MS; t += 5) {
-    convertPose(at(out, t));
-    if (out.showNew !== shown) flips++;
-    shown = out.showNew;
-    peakLift = Math.max(peakLift, out.lift);
-    peakGlow = Math.max(peakGlow, out.glow);
-    assert.ok(out.width > 0 && out.width <= 1, 'never zero width');
-    if (out.width < 0.2) assert.ok(out.lift === CONVERT_LIFT, 'it turns edge-on while lifted');
+  convertPose(at(out, 0), STAGES);
+  assert.deepEqual([out.frame, out.spark, out.done], [STAGE_REST, -1, false]);
+  let last = STAGE_REST;
+  for (let t = 0; t < wilt; t += 5) {
+    convertPose(at(out, t), STAGES);
+    assert.ok(out.frame <= last && out.frame >= STAGE_SPROUT, 'it only wilts, down to Sprout');
+    assert.equal(out.spark, -1, 'no spark while it wilts');
+    last = out.frame;
   }
-  assert.equal(flips, 1, 'the colour changes exactly once');
-  assert.equal(peakLift, CONVERT_LIFT);
-  assert.equal(peakGlow, 1);
-  convertPose(at(out, CONVERT_MS));
-  assert.equal(out.showNew, true);
-  assert.equal(out.lift, 0);
-  assert.equal(out.glow, 0);
-  assert.ok(Math.abs(out.width - 1) < 1e-9);
-  assert.equal(out.done, true);
+  let lastSpark = 0;
+  for (let t = wilt; t <= wilt + CONVERT_SPARK_MS; t += 5) {
+    convertPose(at(out, t), STAGES);
+    assert.equal(out.frame, STAGE_SPROUT);
+    assert.ok(out.spark >= lastSpark && out.spark <= 1);
+    lastSpark = out.spark;
+  }
+  convertPose(at(out, wilt + CONVERT_SPARK_MS), STAGES);
+  assert.deepEqual([out.spark, out.done], [1, true]);
+});
+
+test('the conversion spark enters at the plot\'s upper left and ends under the plant', () => {
+  const out = {};
+  const p = (spark) => {
+    out.spark = spark;
+    const { x, z } = sparkPathInto(out, 4, -2);
+    return { x, z };
+  };
+  assert.deepEqual(p(0), { x: 4 - SPARK_REACH, z: -2 - SPARK_REACH });
+  const end = p(1);
+  assert.ok(Math.abs(end.x - 4) < 1e-9 && Math.abs(end.z + 2) < 1e-9);
+  for (let t = 0; t <= 1; t += 0.05) {
+    const { x, z } = p(t);
+    assert.ok(Math.abs(x - 4) < 0.5 && Math.abs(z + 2) < 0.5, 'it stays inside its plot');
+  }
+});
+
+test('plants in a Tornado Zone bend towards it by whole pixels, across the view only', () => {
+  // A sprite facing the camera straight on (yaw 0): its width runs along world x.
+  assert.equal(bendTowardPx(0, 0, 1, 0, 1, 0, 3), 3, 'swirl to the right: lean right');
+  assert.equal(bendTowardPx(2, 0, 1, 0, 1, 0, 3), -3, 'swirl to the left: lean left');
+  assert.equal(bendTowardPx(0, 0, 0, 1, 1, 0, 3), 0, 'swirl straight behind: no sideways lean');
+  assert.equal(bendTowardPx(1, 1, 1, 1, 1, 0, 3), 0, 'the plant under the swirl stands straight');
+  assert.equal(bendTowardPx(0, 0, 1, 1, 1, 0, 3), 2, 'diagonal: the part across the view');
+  assert.equal(bendTowardPx(0, 0, 1, 0, 1, 0, 0), 0);
+  // Turned half round, its width runs the other way.
+  assert.equal(bendTowardPx(0, 0, 1, 0, -1, 0, 3), -3);
+  for (let i = 0; i < 50; i++) {
+    const v = bendTowardPx(Math.sin(i), Math.cos(i * 3), 0.3, -0.2, Math.cos(i), Math.sin(i), 2.6);
+    assert.ok(Number.isInteger(v) && Math.abs(v) <= 3);
+  }
+  // Along the height the lean grows with its square, in whole pixels, root still.
+  assert.equal(bendRowPx(3, 0), 0);
+  assert.equal(bendRowPx(3, 1), 3);
+  assert.equal(bendRowPx(-3, 1), -3);
+  assert.equal(bendRowPx(3, 0.5), 1);
+  let last = 0;
+  for (let h = 0; h <= 1; h += 0.05) {
+    const lean = bendRowPx(3, h);
+    assert.ok(Number.isInteger(lean) && lean >= last);
+    last = lean;
+  }
 });
 
 // --- Camera shake ---

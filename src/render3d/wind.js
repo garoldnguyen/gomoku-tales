@@ -158,3 +158,28 @@ export function fleckSpeed(gust) {
 export function swayLeanSide(cosYaw, sinYaw) {
   return WIND_GROUND.x * cosYaw - WIND_GROUND.z * sinYaw < 0 ? -1 : 1;
 }
+
+// How many art pixels the top of a plant standing at (x, z), seen on an
+// upright plane turned by yaw (as cos and sin of it), leans towards a
+// Tornado Zone swirl at (cx, cz), when a plant straight beside the swirl
+// leans maxPx: a whole number, positive along the plane's +x (its width as
+// the camera sees it), negative the other way, 0 for the plant under the
+// swirl. Only the part of the pull across the camera's view shows on an
+// upright sprite.
+export function bendTowardPx(x, z, cx, cz, cosYaw, sinYaw, maxPx) {
+  const dx = cx - x;
+  const dz = cz - z;
+  const distance = Math.hypot(dx, dz);
+  if (!(distance > 1e-6) || !(maxPx > 0)) return 0;
+  const across = (dx * cosYaw - dz * sinYaw) / distance; // -1 to 1 along the plane's width
+  return Math.round(maxPx * across) || 0;
+}
+
+// The lean in whole art pixels of a row at height share h (0 at the root
+// row, 1 at the top, see swayRowFraction) of a plant whose top bends
+// bendPx: it grows with the square of the height like the sway. The
+// sprite shader uses the same formula.
+export function bendRowPx(bendPx, h) {
+  const reach = bendPx * h * h;
+  return (Math.sign(reach) * Math.floor(Math.abs(reach) + 0.5)) || 0;
+}
