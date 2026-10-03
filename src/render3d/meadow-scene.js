@@ -447,13 +447,10 @@ if (uSwayPx > 0.0) {
 }
 
 // One mesh of soft blob shadows { x, z, r }: flat quads lying
-// MEADOW_SHADOW_LIFT above the flat ground. Built once, one draw call.
+// MEADOW_SHADOW_LIFT (0) above the flat ground, drawn over it by polygon offset. Built once, one draw call.
 function blobShadows(spots, opacity) {
   const material = blobShadowMaterial().clone();
-  material.opacity *= opacity;
-  material.polygonOffset = true; // drawn over the ground it lies on
-  material.polygonOffsetFactor = -1;
-  material.polygonOffsetUnits = -4;
+  material.opacity *= opacity; // drawn over the ground by its polygon offset (ON_SURFACE)
   const positions = new Float32Array(spots.length * 12);
   const uvs = new Float32Array(spots.length * 8);
   const indices = [];

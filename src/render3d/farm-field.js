@@ -8,13 +8,12 @@ import { CURB_HEIGHT_PX, CURB_PX, PX_WORLD, SPRITE_STRETCH_Y } from '../config.j
 import { artSource } from './art.js';
 import { ART } from './art-assets.js';
 import { CURB, CURB_FACES, CURB_SIDES, curbTopCorners, FENCE_RAIL_HEIGHTS, fencePosts, fenceRails, FIELD, PATH, pathStones } from './farm-layout.js';
-import { PixelSprite, pixelTexture } from './sprites.js';
+import { ON_SURFACE, PixelSprite, pixelTexture } from './sprites.js';
 
 const CURB_TILE = 32 * PX_WORLD; // curb-wood is 32 px long
 const RAIL_TILE = 16 * PX_WORLD; // fence-rail is 16 px long
 const RAIL_THICKNESS_PX = 6;
 const PATH_TILE = 32 * PX_WORLD; // path-tile repeats every 32 px in y
-const PATH_LIFT = 0.006; // keeps the path just above the meadow
 const COLORS = {
   curbFace: 0xa8a8a8, // the front face is the curb wood, darker
   curbInner: 0xc0c0c0,
@@ -178,14 +177,15 @@ function createRail(run, height) {
   return rail;
 }
 
-// The dirt path: path-tile repeated along z, lying flat on the meadow.
+// The dirt path: path-tile repeated along z, lying flat on the meadow and
+// drawn over it by polygon offset (ON_SURFACE).
 function createPath() {
   const length = PATH.endZ - PATH.startZ;
   const geometry = new THREE.PlaneGeometry(PATH.width, length).rotateX(-Math.PI / 2);
-  geometry.translate(PATH.x, CURB.ground + PATH_LIFT, (PATH.startZ + PATH.endZ) / 2);
+  geometry.translate(PATH.x, CURB.ground, (PATH.startZ + PATH.endZ) / 2);
   const texture = repeatingTexture(artSource(ART.v3.path));
   texture.repeat.set(1, length / PATH_TILE);
-  const path = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ map: texture, alphaTest: 0.5 }));
+  const path = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ map: texture, alphaTest: 0.5, ...ON_SURFACE }));
   path.receiveShadow = true;
   return path;
 }

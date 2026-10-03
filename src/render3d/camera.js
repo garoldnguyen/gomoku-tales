@@ -24,15 +24,16 @@ export function gameCamera(aspect = 16 / 9) {
   };
 }
 
-const CAMERA_NEAR = 0.5;
-const CAMERA_FAR = 260; // past the far hills
+const LOOSE_CLIP = Object.freeze({ near: 0.5, far: 260 });
 
 // The fixed Three.js camera of gameCamera at `aspect`, built with the
 // Three.js module `three` passed in (this file stays free of Three.js
 // imports), so world.js and the tests project through the same camera.
-export function createGameCamera(three, aspect = 16 / 9) {
+// `clip` { near, far } are its clip planes; world.js passes the tight ones
+// of clipPlanes (depth-of-field.js), which cannot be imported here.
+export function createGameCamera(three, aspect = 16 / 9, clip = LOOSE_CLIP) {
   const { position, target, fovDeg } = gameCamera(aspect);
-  const camera = new three.PerspectiveCamera(fovDeg, aspect, CAMERA_NEAR, CAMERA_FAR);
+  const camera = new three.PerspectiveCamera(fovDeg, aspect, clip.near, clip.far);
   camera.position.set(position.x, position.y, position.z);
   camera.lookAt(target.x, target.y, target.z);
   camera.updateMatrixWorld();

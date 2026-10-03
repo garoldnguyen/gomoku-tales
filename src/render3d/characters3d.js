@@ -5,12 +5,15 @@
 // current player's character: a soft halo behind the sprite and a little
 // extra brightness, both breathing slowly. The poses follow the events
 // returned by src/logic through trigger(); nothing here touches the rules.
+// Only the characters of worldCharacterSpots are drawn: none while
+// SHOW_WORLD_CHARACTERS (src/config.js) is off.
 
 import * as THREE from 'three';
-import { CHARACTER_IDLE_FRAME_MS, CHARACTER_X } from '../config.js';
 import { combinedSheet } from './art.js';
 import { ART } from './art-assets.js';
-import { CHARACTER_FRAME_COUNT, characterFrame, createCharacterDirector, glowPulse, stepGlow } from './character-poses.js';
+import {
+  CHARACTER_FRAME_COUNT, characterFrame, createCharacterDirector, glowPulse, stepGlow, worldCharacterSpots,
+} from './character-poses.js';
 import { PixelSprite, pixelTexture, uprightPlaneGeometry } from './sprites.js';
 import { GROUND_Y } from './terrain.js';
 
@@ -27,8 +30,8 @@ const HALO_BEHIND = 0.05; // world units behind the sprite plane
 
 // Builds both characters and adds their sprites with `addSprite` (see
 // world.js). Returns the controller; call update(now, dtMs) every frame
-// before the sprites update.
-export function createCharacters(addSprite) {
+// before the sprites update. `show` defaults to SHOW_WORLD_CHARACTERS.
+export function createCharacters(addSprite, show) {
   const director = createCharacterDirector();
   const haloGeometry = uprightPlaneGeometry(HALO_WIDTH_PX, HALO_HEIGHT_PX);
   const haloMap = pixelTexture(drawHalo());
@@ -70,16 +73,14 @@ export function createCharacters(addSprite) {
     return { sprite, material, halo, glow: 0 };
   };
 
-  // Wind Rabbit (X) on the left, Earth Bear (O) on the right; their idle
-  // bobs are offset so they do not move in step.
-  const parts = {
-    X: make('X', -CHARACTER_X, 0),
-    O: make('O', CHARACTER_X, CHARACTER_IDLE_FRAME_MS * 2),
-  };
+  // Wind Rabbit (X) on the left, Earth Bear (O) on the right, when shown.
+  const parts = {};
+  for (const spot of worldCharacterSpots(show)) parts[spot.player] = make(spot.player, spot.x, spot.phaseMs);
 
   return {
-    X: parts.X.sprite,
-    O: parts.O.sprite,
+    // Their sprites, null while not drawn.
+    X: parts.X?.sprite ?? null,
+    O: parts.O?.sprite ?? null,
 
     // Logic events at time `now`: 'skillUsed' casts, 'win' sets the win and
     // lose poses.

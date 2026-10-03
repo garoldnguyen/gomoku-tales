@@ -12,12 +12,16 @@ import { PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
 import { anchorForward, anchorShift, faceYaw, frameAt, SPRITE_ALPHA_TEST } from './sprite-frames.js';
 import { swayLeanSide, swayPhase } from './wind.js';
 
-const SHADOW_LIFT = 0.005; // keeps the blob shadow just above the ground
 const SHADOW_OPACITY = 0.35;
 export const SHADOW_DEPTH = 0.8; // the blob is an ellipse this much shorter in z
 // Sprite normals lean back towards the sky, so the sun and the hemisphere
 // light an upright sprite about as brightly as the ground it stands on.
 const NORMAL_LEAN_RAD = Math.PI / 4;
+
+// Flat things lying on the field or the meadow (decals, the path, blob
+// shadows) sit at the same height as it and are drawn over it by polygon
+// offset, never lifted by a tiny height, so they never fight in depth.
+export const ON_SURFACE = Object.freeze({ polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 });
 
 // Canvas texture with crisp pixels: NearestFilter both ways, no mipmaps, sRGB.
 export function pixelTexture(source) {
@@ -161,6 +165,7 @@ export function blobShadowMaterial() {
     transparent: true,
     opacity: SHADOW_OPACITY,
     depthWrite: false,
+    ...ON_SURFACE,
   });
   return blobMaterial;
 }
@@ -175,7 +180,6 @@ export function blobShadowGeometry() {
 export function createBlobShadow(radius) {
   const shadow = new THREE.Mesh(blobShadowGeometry(), blobShadowMaterial());
   shadow.scale.set(radius * 2, 1, radius * 2 * SHADOW_DEPTH);
-  shadow.position.y = SHADOW_LIFT;
   return shadow;
 }
 

@@ -16,7 +16,7 @@
 // world. Nothing here allocates per frame.
 
 import * as THREE from 'three';
-import { PETAL_TRAIL_MS, PX_WORLD, SUN_RAY_ANGLES_DEG, SUN_RAY_COUNT, SUN_RAY_LENGTH, WIND_LANES, WISP_ALPHA } from '../config.js';
+import { PETAL_TRAIL_MS, PX_WORLD, SUN_RAY_ANGLES_DEG, SUN_RAY_COUNT, SUN_RAY_DEPTH, SUN_RAY_LENGTH, WIND_LANES, WISP_ALPHA } from '../config.js';
 import { artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
 import { LANE_NAMES, petalAt, petalPoint, planPetals, trailAt } from './petals.js';
@@ -28,7 +28,6 @@ import { SPRITE_ALPHA_TEST } from './sprite-frames.js';
 import { pixelTexture } from './sprites.js';
 
 const SKY_TEXTURE_ROWS = 1024;
-const RAY_DEPTH = 10; // sun rays hang this far in front of the camera, over everything
 const RAY_WIDTH = 0.2; // the far end of a ray, in ray lengths
 const RAY_COLOR = 0xfff1cf; // warm sunlight
 const TRAIL = PETAL_TRAIL_MS.length; // ghost copies behind every petal
@@ -37,8 +36,8 @@ const SKY_RENDER_ORDER = -10; // drifting clouds and wisps draw before the field
 
 // Builds the sky into `scene` for the fixed `camera` (its rotation never
 // changes) at plain position `cameraPosition`. Returns { setFeatures(features),
-// update(timeMs) }.
-export function createSky(scene, camera, cameraPosition) {
+// update(timeMs) }. `sunRays` false leaves the sun rays out (?rays=off).
+export function createSky(scene, camera, cameraPosition, { sunRays = true } = {}) {
   scene.background = skyTexture();
 
   // Clouds, wisps and rays in camera space.
@@ -96,6 +95,7 @@ export function createSky(scene, camera, cameraPosition) {
     return { plan: w, mesh };
   });
   const rays = createSunRays();
+  rays.group.visible = sunRays;
   drifting.add(rays.group);
   view.add(drifting);
 
@@ -206,9 +206,9 @@ function bell(t) {
 function createSunRays() {
   const group = new THREE.Group();
   const map = pixelTexture(rayCanvas());
-  const length = SUN_RAY_LENGTH * 2 * viewHalfExtent(RAY_DEPTH).halfW;
+  const length = SUN_RAY_LENGTH * 2 * viewHalfExtent(SUN_RAY_DEPTH).halfW;
   const geometry = new THREE.PlaneGeometry(length, length * RAY_WIDTH).translate(length / 2, 0, 0);
-  const corner = screenToView(-0.03, -0.05, RAY_DEPTH);
+  const corner = screenToView(-0.03, -0.05, SUN_RAY_DEPTH);
   const materials = [];
   for (let i = 0; i < SUN_RAY_COUNT; i++) {
     const material = new THREE.MeshBasicMaterial({
@@ -222,7 +222,7 @@ function createSunRays() {
       fog: false,
     });
     const mesh = new THREE.Mesh(geometry, material);
-    mesh.position.set(corner.x, corner.y, -RAY_DEPTH);
+    mesh.position.set(corner.x, corner.y, -SUN_RAY_DEPTH);
     mesh.rotation.z = (SUN_RAY_ANGLES_DEG[i] * Math.PI) / 180;
     mesh.renderOrder = 10; // after the scene, as light over it
     group.add(mesh);

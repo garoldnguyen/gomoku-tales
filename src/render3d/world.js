@@ -18,6 +18,7 @@ import { ART, placeholderShape } from './art-assets.js';
 import { buildBreezeHill } from './breeze-hill.js';
 import { cameraRay, createGameCamera, gameCamera } from './camera.js';
 import { createCharacters } from './characters3d.js';
+import { clipPlanes } from './depth-of-field.js';
 import { createFarmField } from './farm-field.js';
 import { zonePieceUv } from './farm-layout.js';
 import { snapToStep, worldUnitsPerPixel } from './effect-plans.js';
@@ -26,15 +27,14 @@ import { STAGE_REST } from './growth.js';
 import { cellToWorld, pickCell } from './picking.js';
 import { createPostProcessing } from './post-processing.js';
 import {
-  browserStorage, changedFeatures, createSlowFrameWatch, cycleQuality, loadSavedQuality, lowerQuality,
-  normalizeQuality, QUALITY_FALLBACK, QUALITY_LEVELS, saveQuality,
+  browserStorage, changedFeatures, createSlowFrameWatch, cycleQuality, fxFeatures, loadSavedQuality, lowerQuality,
+  normalizeQuality, parseFxSwitches, QUALITY_FALLBACK, QUALITY_LEVELS, saveQuality,
 } from './quality.js';
-import { PixelSprite, pixelTexture } from './sprites.js';
+import { ON_SURFACE, PixelSprite, pixelTexture } from './sprites.js';
 import { metaAnchor } from './v3-meta.js';
 import { sameViewSize, viewSize } from './view-size.js';
 
 export const WORLD_ASPECT = 16 / 9;
-export const DECAL_LIFT = 0.01; // keeps flat decals just above the board
 const SHADOW_EXTENT = 20; // the sun's shadow map covers the board, characters and trees
 const PIECE_SHADOW_RADIUS = 0.36;
 const ROCK_SHADOW_RADIUS = PIECE_SHADOW_RADIUS * 1.2;
@@ -57,13 +57,16 @@ const COLORS = {
 // whose file is missing are generated placeholders (src/render3d/art.js).
 // `meta` is the v3 tuning data from loadV3Meta (src/render3d/v3-meta.js).
 // `quality` is the level to start with (default: the one saved in
-// `storage`, else medium); `storage` is localStorage or null.
+// `storage`, else medium); `storage` is localStorage or null. `fx` are the
+// URL switches for the High-only effects (parseFxSwitches in quality.js),
+// read from the page's URL by default.
 export function createWorld(canvas, {
   storage = browserStorage(),
   quality: startLevel = loadSavedQuality(storage) ?? QUALITY_FALLBACK,
   assets = createAssetStore(),
   meta,
   warn = () => {},
+  fx = parseFxSwitches(globalThis.location?.search ?? ''),
 } = {}) {
   setArtAssets(assets, { warn, meta });
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -76,7 +79,8 @@ export function createWorld(canvas, {
   // Fixed camera: no rotation or zoom (section B).
   const cameraSetup = gameCamera(WORLD_ASPECT);
   const cameraPos = cameraSetup.position;
-  const camera = createGameCamera(THREE, WORLD_ASPECT);
+  // Its near and far planes hug what it can show, for depth precision.
+  const camera = createGameCamera(THREE, WORLD_ASPECT, clipPlanes(cameraSetup));
   // The camera's own right and up directions, for the screen shake.
   camera.updateMatrixWorld();
   const cameraRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
@@ -94,7 +98,7 @@ export function createWorld(canvas, {
   scene.add(new THREE.HemisphereLight(COLORS.hemiSky, COLORS.hemiGround, 1.2));
 
   // Windy Spring Breeze Hill around the board (section C).
-  const scenery = buildBreezeHill(scene, cameraPos, camera);
+  const scenery = buildBreezeHill(scene, cameraPos, camera, { sunRays: fx.rays });
 
   // Hover highlight: the gold decal on the plot under the pointer, always
   // fully visible (docs/art-direction-v3.md section 3).
@@ -105,7 +109,8 @@ export function createWorld(canvas, {
 
   // Pixel sprites (section D). Wind Rabbit (X) stands on the left of the
   // board and Earth Bear (O) on the right, with idle, cast, win and lose
-  // poses and a glow for the player to move (src/render3d/characters3d.js).
+  // poses and a glow for the player to move (src/render3d/characters3d.js),
+  // when SHOW_WORLD_CHARACTERS is on; for now the HUD cards carry them.
   const sprites = new Set();
   let blobShadows = true; // false when the quality level has no shadows
   // A sprite with noBlobShadow set (the see-through ghosts) never shows one.
@@ -123,15 +128,15 @@ export function createWorld(canvas, {
   // The farmland board: field, curb, and with scenery the fence and path.
   const farm = createFarmField(scene, addSprite);
 
-  // Post-processing focused on the board centre.
-  const postProcessing = createPostProcessing(renderer, scene, camera, CAMERA_DISTANCE);
+  // Post-processing; the depth of field follows the live camera.
+  const postProcessing = createPostProcessing(renderer, scene, camera);
   const slowFrames = createSlowFrameWatch({
     targetFrameMs: TARGET_FRAME_MS,
     holdMs: QUALITY_STEP_DOWN_MS,
     stallMs: QUALITY_STALL_MS,
   });
   let quality = null;
-  let features = null; // the quality table row of `quality`
+  let features = null; // the quality table row of `quality`, with the URL switches (fxFeatures)
   let autoStepped = false; // true after the last change was an automatic step down
 
   // The drawing buffer follows the canvas's CSS box and this window's
@@ -156,7 +161,7 @@ export function createWorld(canvas, {
   // alone. `auto` marks an automatic step down.
   function applyQuality(level, auto) {
     const next = normalizeQuality(level);
-    const nextFeatures = QUALITY_LEVELS[next];
+    const nextFeatures = fxFeatures(QUALITY_LEVELS[next], fx);
     const changed = changedFeatures(features, nextFeatures);
     quality = next;
     features = nextFeatures;
@@ -321,16 +326,17 @@ export function decalMaterial(source) {
     transparent: true,
     depthWrite: false,
     fog: false,
+    ...ON_SURFACE,
   });
 }
 
-// A flat one-cell decal lying just above the plot, hidden until placed.
+// A flat one-cell decal lying on the plot, drawn over it by polygon
+// offset (ON_SURFACE), hidden until placed.
 // `geometry` defaults to the whole texture on one cell.
 let cellDecalGeometry = null;
 export function createCellDecal(material, geometry = null) {
   cellDecalGeometry ??= new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE).rotateX(-Math.PI / 2);
   const decal = new THREE.Mesh(geometry ?? cellDecalGeometry, material);
-  decal.position.y = DECAL_LIFT;
   decal.visible = false;
   return decal;
 }

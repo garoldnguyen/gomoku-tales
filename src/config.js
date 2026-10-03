@@ -90,6 +90,10 @@ export const CLOUD_VARIANTS = 4; // cloud shapes, the frames of the cloud sheet
 export const SPRITE_STRETCH_Y = 1 / Math.cos((CAMERA_PITCH_DEG * Math.PI) / 180);
 export const CHARACTER_IDLE_FRAME_MS = 220; // time per frame of the 4 frame idle bob
 export const CHARACTER_X = 9.75; // characters stand this far left and right of the board centre
+// Wind Rabbit and Earth Bear are not drawn in the world for now: the HUD
+// player cards carry the characters. Set to true to show them again; their
+// poses keep following the events either way.
+export const SHOW_WORLD_CHARACTERS = false;
 
 // Living pieces and characters (sections D and G). They only animate; they
 // never change the game state.
@@ -141,7 +145,8 @@ export const MEADOW_BALES = 3;
 export const MEADOW_TUFTS = [120, 160]; // grass tufts in all, edges of patches included
 export const GROUND_STRIPE_CELLS = 3; // Low: mown stripes this many cells wide
 // Blob shadows in the meadow lie flat this far above the flat ground.
-export const MEADOW_SHADOW_LIFT = 0.01;
+// They are layered over it by polygon offset, not by height, so 0.
+export const MEADOW_SHADOW_LIFT = 0;
 // The two HUD glass cards (docs/art-direction-v3.md section 8) at 1920 x
 // 1080: no tall flowers or trees may show behind them. The height is the
 // card with both skill rows.
@@ -210,6 +215,7 @@ export const SUN_RAY_LOW = 0.45; // share of SUN_RAY_ALPHA at the bottom of a br
 export const SUN_RAY_PERIOD_MS = 14000; // one slow breath
 export const SUN_RAY_ANGLES_DEG = [-24, -37, -50]; // below the screen's horizontal, toward the lower right
 export const SUN_RAY_LENGTH = 0.85; // in view widths
+export const SUN_RAY_DEPTH = 10; // sun rays hang this far in front of the camera, over everything
 // Wind petals from wind-bits (High only), in three lanes. Each lane is a
 // band along the wind: `centre` on the ground, `length` along the wind,
 // `width` across it, petals `height` world units up. Petals wrap around
@@ -240,8 +246,15 @@ export const TARGET_FRAME_MS = 20;
 export const QUALITY_STEP_DOWN_MS = 3000; // the average must stay above TARGET_FRAME_MS this long
 export const QUALITY_STALL_MS = 250; // a longer frame is a stall (hidden tab, shader compile), not load
 export const RESUME_GAP_MS = 1000; // a longer gap between frames means the page was hidden; events from meanwhile show settled, without replaying their effects
-export const DOF_APERTURE = 0.0002; // high, depth of field focused on the board centre
-export const DOF_MAX_BLUR = 0.006; // in screen widths
+// High: a gentle depth of field (src/render3d/depth-of-field.js). Every
+// depth from DOF_SHARP_MARGIN world units in front of the field's front edge
+// to DOF_SHARP_MARGIN behind its back edge (and the back row of trees) is
+// perfectly sharp. Outside that band the blur radius grows by
+// DOF_BLUR_PER_UNIT per world unit of depth, up to DOF_MAX_BLUR. Radii are
+// fractions of the screen height (0.0015 is 1.6 px at 1080 px tall).
+export const DOF_SHARP_MARGIN = 3;
+export const DOF_BLUR_PER_UNIT = 0.00003;
+export const DOF_MAX_BLUR = 0.0015;
 export const BLOOM_STRENGTH = 0.3; // subtle bloom on bright things only
 export const BLOOM_RADIUS = 0.3;
 export const BLOOM_THRESHOLD = 0.85; // linear brightness a pixel needs before it blooms

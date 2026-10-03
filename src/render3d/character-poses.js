@@ -8,9 +8,23 @@
 
 import {
   CHARACTER_CAST_FRAME_MS, CHARACTER_CAST_MS, CHARACTER_GLOW_FADE_MS, CHARACTER_GLOW_PULSE_MS,
-  CHARACTER_IDLE_FRAME_MS, CHARACTER_POSE_FRAME_MS, PIECE_POP_IN_MS,
+  CHARACTER_IDLE_FRAME_MS, CHARACTER_POSE_FRAME_MS, CHARACTER_X, PIECE_POP_IN_MS, SHOW_WORLD_CHARACTERS,
 } from '../config.js';
 import { frameAt } from './sprite-frames.js';
+
+// Where the characters stand in the world, { player, x, phaseMs } each:
+// Wind Rabbit (X) on the left, Earth Bear (O) on the right, their idle
+// bobs offset so they do not move in step. Empty while `show` is off
+// (SHOW_WORLD_CHARACTERS, false for now: the HUD cards carry the
+// characters). Only the drawing depends on it; the poses keep following
+// the events and nothing in the rules reads them.
+export function worldCharacterSpots(show = SHOW_WORLD_CHARACTERS) {
+  if (!show) return [];
+  return [
+    { player: 'X', x: -CHARACTER_X, phaseMs: 0 },
+    { player: 'O', x: CHARACTER_X, phaseMs: CHARACTER_IDLE_FRAME_MS * 2 },
+  ];
+}
 
 // The poses in a character sheet, in order, all frames in one row:
 // 4 idle bob frames, 4 cast frames (the last one holds), then 2 win and 2

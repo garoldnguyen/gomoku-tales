@@ -356,7 +356,8 @@ test('every meadow root and shadow sits on the flat ground', () => {
   const spots = meadowShadowSpots(plan);
   assert.equal(spots.scenery.length, plan.trees.length + plan.bushes.length + plan.bales.length);
   assert.equal(spots.patches.length, plan.patches.length);
-  assert.ok(MEADOW_SHADOW_LIFT > 0 && MEADOW_SHADOW_LIFT < PX_WORLD, 'flat shadows lie just above the ground');
+  // Flat shadows lie on the ground and are drawn over it by polygon offset, not lifted.
+  assert.equal(MEADOW_SHADOW_LIFT, 0, 'flat shadows lie on the ground');
 });
 
 test('the sway lean is whole art pixels, downwind along the plane', () => {

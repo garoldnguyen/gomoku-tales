@@ -1,15 +1,16 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { readdirSync, readFileSync } from 'node:fs';
 import {
   CHARACTER_CAST_FRAME_MS, CHARACTER_CAST_MS, CHARACTER_GLOW_FADE_MS, CHARACTER_IDLE_FRAME_MS,
-  CHARACTER_POSE_FRAME_MS, CHARACTER_SPRITE_PX, PIECE_POP_IN_MS, PIECE_SPRITE_PX,
+  CHARACTER_POSE_FRAME_MS, CHARACTER_SPRITE_PX, CHARACTER_X, PIECE_POP_IN_MS, PIECE_SPRITE_PX, SHOW_WORLD_CHARACTERS,
 } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
 import { TERRAIN_CREATION } from '../src/logic/skills.js';
 import {
   CHARACTER_ANIMS, CHARACTER_FRAME_COUNT, characterFrame, createCharacterDirector, glowPulse, popCellsForEvents,
-  popInScale, stepGlow,
+  popInScale, stepGlow, worldCharacterSpots,
 } from '../src/render3d/character-poses.js';
 import { bearFrames, CHARACTER_POSES, rabbitFrames, stoneGrid } from '../src/render3d/placeholder-art.js';
 
@@ -198,4 +199,30 @@ test('X is a green sprout and O a pink flower bud, each in a pot of its player c
   // The bud stands taller than the sprout, so the shapes read apart too.
   const top = (grid) => Math.floor(grid.pixels.findIndex(Boolean) / grid.width);
   assert.ok(top(bud) < top(sprout));
+});
+
+test('SHOW_WORLD_CHARACTERS switches the world characters off for now, and back on in one line', () => {
+  assert.equal(SHOW_WORLD_CHARACTERS, false, 'the HUD cards carry the characters for now');
+  assert.deepEqual(worldCharacterSpots(), worldCharacterSpots(SHOW_WORLD_CHARACTERS));
+  assert.deepEqual(worldCharacterSpots(false), [], 'nothing drawn while off');
+  assert.deepEqual(worldCharacterSpots(true), [
+    { player: 'X', x: -CHARACTER_X, phaseMs: 0 },
+    { player: 'O', x: CHARACTER_X, phaseMs: CHARACTER_IDLE_FRAME_MS * 2 },
+  ], 'Wind Rabbit left and Earth Bear right when on');
+});
+
+test('no rule, turn or skill code depends on the world characters being drawn', () => {
+  // Only the drawing reads the switch; the logic, the HUD and the director never do.
+  const files = [
+    ...readdirSync(new URL('../src/logic/', import.meta.url)).map((f) => `logic/${f}`),
+    ...readdirSync(new URL('../src/ui/', import.meta.url)).map((f) => `ui/${f}`),
+    'render3d/world-renderer.js',
+  ].filter((f) => f.endsWith('.js'));
+  for (const file of files) {
+    const source = readFileSync(new URL(`../src/${file}`, import.meta.url), 'utf8');
+    assert.ok(!/SHOW_WORLD_CHARACTERS|worldCharacterSpots/.test(source), file);
+  }
+  const director = createCharacterDirector();
+  director.trigger([{ type: 'skillUsed', player: X, skill: TERRAIN_CREATION }], 0);
+  assert.equal(director.poseAt(X, 0).pose, 'cast', 'the poses still follow the events');
 });

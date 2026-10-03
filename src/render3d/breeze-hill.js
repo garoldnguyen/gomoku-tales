@@ -21,11 +21,12 @@ const COLORS = {
 // Builds the scene around the board and returns { update(timeMs, dtMs),
 // setFeatures(features) } for the moving parts and the quality switches
 // (a row of src/render3d/quality.js). `camera` is the fixed camera and
-// `cameraPosition` its position as a plain { x, y, z }.
-export function buildBreezeHill(scene, cameraPosition, camera) {
+// `cameraPosition` its position as a plain { x, y, z }. `sunRays` false
+// hides the sun rays (the ?rays=off switch, see fxFeatures in quality.js).
+export function buildBreezeHill(scene, cameraPosition, camera, { sunRays = true } = {}) {
   scene.fog = new THREE.Fog(COLORS.haze, FOG_NEAR, FOG_FAR);
   const meadow = createMeadow(scene, cameraPosition, { haze: COLORS.haze });
-  const sky = createSky(scene, camera, cameraPosition);
+  const sky = createSky(scene, camera, cameraPosition, { sunRays });
   return {
     update(timeMs, dtMs) {
       meadow.update(timeMs, dtMs);

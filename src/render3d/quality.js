@@ -70,6 +70,66 @@ export const QUALITY_LEVELS = deepFreeze({
   },
 });
 
+// --- URL switches for the High-only effects (docs/art-direction-v3.md section 5) ---
+
+// ?fx=off turns off every High-only effect; ?dof=off, ?bloom=off,
+// ?wind=off, ?rays=off, ?shadows=off and ?ripples=off one each. Each also
+// takes 'on', so ?fx=off&dof=on leaves only the depth of field.
+export const FX_SWITCHES = Object.freeze(['dof', 'bloom', 'wind', 'rays', 'shadows', 'ripples']);
+// What each parsed switch is: true is on. grade (the warm grade and the
+// vignette) has no URL switch of its own; only ?fx=off turns it off.
+export const FX_ALL_ON = Object.freeze({ dof: true, bloom: true, wind: true, rays: true, shadows: true, ripples: true, grade: true });
+
+function switchValue(value) {
+  const word = typeof value === 'string' ? value.trim().toLowerCase() : '';
+  return word === 'off' ? false : word === 'on' ? true : null; // null: ignored
+}
+
+// The switches of a URL query (a string such as '?fx=off&dof=on' or a
+// URLSearchParams). Unknown names and values are ignored.
+export function parseFxSwitches(search) {
+  const params = typeof search === 'string' || search == null ? new URLSearchParams(search ?? '') : search;
+  const result = { ...FX_ALL_ON };
+  const all = switchValue(params.get('fx'));
+  if (all !== null) for (const key of Object.keys(result)) result[key] = all;
+  for (const name of FX_SWITCHES) {
+    const value = switchValue(params.get(name));
+    if (value !== null) result[name] = value;
+  }
+  return Object.freeze(result);
+}
+
+const fxRows = new Map(); // switches key -> the high row with them applied
+
+// The feature row to use for `row` with the URL `switches` applied. They
+// only apply to the high row: a switched-off feature falls back to the
+// medium row's value, and the screen effects turn off. rays is not a column
+// of the table; the sky reads it from the switches. With every switch on,
+// and for every other row, the row comes back unchanged.
+export function fxFeatures(row, switches = FX_ALL_ON) {
+  if (row !== QUALITY_LEVELS.high) return row;
+  const key = Object.keys(FX_ALL_ON).map((name) => (switches[name] === false ? 0 : 1)).join('');
+  if (!key.includes('0')) return row; // every switch on: the table row itself
+  if (!fxRows.has(key)) {
+    const on = (name) => switches[name] !== false;
+    const below = QUALITY_LEVELS.medium;
+    fxRows.set(key, deepFreeze({
+      ...row,
+      postEffects: {
+        bloom: row.postEffects.bloom && on('bloom'),
+        depthOfField: row.postEffects.depthOfField && on('dof'),
+        warmGrade: row.postEffects.warmGrade && on('grade'),
+        vignette: row.postEffects.vignette && on('grade'),
+      },
+      wind: on('wind') ? row.wind : below.wind,
+      meadowFlowers: on('wind') ? row.meadowFlowers : below.meadowFlowers, // the sway
+      shadows: on('shadows') ? row.shadows : below.shadows,
+      ground: on('ripples') ? row.ground : below.ground,
+    }));
+  }
+  return fxRows.get(key);
+}
+
 // The most live particles any level allows; effect counts are written for it.
 export const MAX_PARTICLE_CAP = Math.max(...QUALITY_ORDER.map((level) => QUALITY_LEVELS[level].particleCap));
 

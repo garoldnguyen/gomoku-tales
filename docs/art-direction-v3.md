@@ -62,6 +62,8 @@ Reference pictures in `docs/reference/v3/`: `assets-overview.png` (every sprite,
 
 Old assets to retire in the last task: `3d/board-top.png`, `3d/piece-x.png`, `3d/piece-o.png`, `3d/piece-rock.png` and the old flower, grass, cloud and decal entries that never had files. Keep the 2D fallback renderer (`?render=2d`) working with its own assets.
 
+Wind Rabbit and Earth Bear are switched off in the world for now (`SHOW_WORLD_CHARACTERS = false` in `src/config.js`) because the HUD player cards carry the characters; their art, manifest entries and code stay, and setting the constant to `true` brings them back.
+
 ## 3. The farmland board
 
 Geometry. The board is a flat plane of 15 by 15 world units (one cell = one unit = 32 art pixels) using `farm-board` (Medium, High) or `farm-board-low` (Low) with NearestFilter and no mipmaps. Cell (0, 0) is the same cell as today; do not change how cells are numbered or picked. Raycast picking must still return the same cell indices.
@@ -137,6 +139,10 @@ Particle budgets (hard caps): low 0, medium 60, high 220 live particles at once,
 Persistence: the choice is saved in `localStorage` (guarded with try/catch, the game must work without it) and applied at startup. The `Q` key and the HUD switch call the same `setQuality(level)`. Switching rebuilds only what changed and never resets the game.
 
 Unknown level values fall back to `medium`.
+
+URL switches for finding a culprit on High (parsed by `parseFxSwitches` in `src/render3d/quality.js`, applied by `fxFeatures` on High only; Low and Medium ignore them, and unknown names or values are ignored). `?fx=off` turns off every High-only screen effect: bloom, depth of field, warm grade and vignette, wind and sway, sun rays, long shadows (blob shadows instead) and ripples. `?dof=off`, `?bloom=off`, `?wind=off`, `?rays=off`, `?shadows=off` and `?ripples=off` turn off one each. Each also takes `on`, so `?fx=off&dof=on` keeps only the depth of field. Example: `http://localhost:8000/?quality=high&dof=off`.
+
+The depth of field never softens the field: its blur radius is exactly 0 from 3 world units in front of the field's front edge to 3 world units behind its back edge (which covers the fence and the back row of trees) and grows only gently outside that band (`blurRadius` in `src/render3d/depth-of-field.js`). It reads the scene's own depth, where sprites write depth only where their alpha test keeps a pixel and soft quads (wisps, rays, petals, ghost trails, decals) write none.
 
 ## 6. Meadow, flowers and scenery
 
