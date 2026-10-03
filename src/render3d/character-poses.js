@@ -41,7 +41,7 @@ export const CHARACTER_FRAME_COUNT = Object.values(CHARACTER_ANIMS).reduce((n, a
 // Sheet frame index for `pose` shown for `ageMs`.
 export function characterFrame(pose, ageMs) {
   const anim = CHARACTER_ANIMS[pose] ?? CHARACTER_ANIMS.idle;
-  return anim.start + frameAt(ageMs, anim.count, anim.frameMs, { loop: anim.loop });
+  return anim.start + frameAt(ageMs, anim.count, anim.frameMs, anim); // anim carries `loop`
 }
 
 // Follows logic events to choose each character's pose. A 'skillUsed'
@@ -70,16 +70,30 @@ export function createCharacterDirector() {
     // { pose, ageMs } for `player` at `now`; ageMs is how long the pose has
     // shown, except idle, which runs on `now` so it never restarts.
     poseAt(player, now) {
-      const start = castStart[player];
-      const casting = start !== undefined && now >= start && now - start < CHARACTER_CAST_MS;
-      if (casting) return { pose: 'cast', ageMs: now - start };
-      if (result) {
-        const from = Math.max(result.at, start !== undefined ? start + CHARACTER_CAST_MS : -Infinity);
-        return { pose: result.winner === player ? 'win' : 'lose', ageMs: Math.max(0, now - from) };
-      }
-      return { pose: 'idle', ageMs: now };
+      return poseAtInto(player, now, { pose: 'idle', ageMs: 0 });
     },
+
+    // poseAt written into `out` { pose, ageMs } (no allocation, for the
+    // render loop). Returns `out`.
+    poseAtInto,
   };
+
+  function poseAtInto(player, now, out) {
+    const start = castStart[player];
+    const casting = start !== undefined && now >= start && now - start < CHARACTER_CAST_MS;
+    if (casting) {
+      out.pose = 'cast';
+      out.ageMs = now - start;
+    } else if (result) {
+      const from = Math.max(result.at, start !== undefined ? start + CHARACTER_CAST_MS : -Infinity);
+      out.pose = result.winner === player ? 'win' : 'lose';
+      out.ageMs = Math.max(0, now - from);
+    } else {
+      out.pose = 'idle';
+      out.ageMs = now;
+    }
+    return out;
+  }
 }
 
 // Cells where a placed stone pops in. Pieces that arrive another way (a

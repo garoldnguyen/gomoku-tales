@@ -304,8 +304,17 @@ function drawWinLine(ctx, winLine) {
   }
 }
 
-export function drawText(ctx, text, px, py, { color = COLORS.text, size = 18, align = 'center' } = {}) {
-  ctx.font = `bold ${size}px monospace`;
+// The font string of each size is built once, so drawing text every frame
+// (the 3D render loop) allocates none.
+const NO_STYLE = Object.freeze({});
+const fonts = new Map(); // size -> font string
+function newFont(size) {
+  const font = `bold ${size}px monospace`;
+  fonts.set(size, font);
+  return font;
+}
+export function drawText(ctx, text, px, py, { color = COLORS.text, size = 18, align = 'center' } = NO_STYLE) {
+  ctx.font = fonts.get(size) ?? newFont(size);
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
   ctx.fillStyle = COLORS.textShadow;

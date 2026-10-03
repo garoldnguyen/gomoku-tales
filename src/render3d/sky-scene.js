@@ -16,7 +16,7 @@
 // world. Nothing here allocates per frame.
 
 import * as THREE from 'three';
-import { PETAL_TRAIL_MS, PX_WORLD, SUN_RAY_ANGLES_DEG, SUN_RAY_COUNT, SUN_RAY_DEPTH, SUN_RAY_LENGTH, WIND_LANES, WISP_ALPHA } from '../config.js';
+import { BLOOM_PETAL_LUMINANCE, PETAL_TRAIL_MS, PX_WORLD, SUN_RAY_ANGLES_DEG, SUN_RAY_COUNT, SUN_RAY_DEPTH, SUN_RAY_LENGTH, WIND_LANES, WISP_ALPHA } from '../config.js';
 import { artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
 import { LANE_NAMES, petalAt, petalPoint, planPetals, trailAt } from './petals.js';
@@ -25,6 +25,7 @@ import {
   skyDrift, skyGradientStops, sunRayAlpha, viewHalfExtent,
 } from './sky.js';
 import { SPRITE_ALPHA_TEST } from './sprite-frames.js';
+import { GLOW } from './post-processing.js';
 import { pixelTexture } from './sprites.js';
 
 const SKY_TEXTURE_ROWS = 1024;
@@ -107,7 +108,8 @@ export function createSky(scene, camera, cameraPosition, { sunRays = true } = {}
   let moving = false;
   const drift = { x: 0, y: 0 };
   const placeDrifting = (things, timeMs) => {
-    for (const thing of things) {
+    for (let i = 0; i < things.length; i++) {
+      const thing = things[i];
       skyDrift(thing.plan, timeMs, drift);
       thing.mesh.position.x = drift.x;
       thing.mesh.position.y = drift.y;
@@ -262,6 +264,7 @@ const PETAL_FRAGMENT = /* glsl */ `
   uniform sampler2D uMap;
   uniform float uFrames;
   uniform vec2 uBlur; // in frame UVs, 0 for crisp pixels
+  uniform float uPetalGlow;
   varying vec2 vUv;
   varying float vAlpha;
   varying float vFrame;
@@ -289,6 +292,8 @@ const PETAL_FRAGMENT = /* glsl */ `
       color = sum.rgb / max(sum.a, 0.001);
     }
     if (alpha <= 0.01) discard;
+    // Bright petals glow while bloom is on (GLOW in post-processing.js).
+    color *= mix(1.0, uPetalGlow, step(${BLOOM_PETAL_LUMINANCE.toFixed(2)}, dot(color, vec3(0.2126, 0.7152, 0.0722))));
     gl_FragColor = vec4(color, alpha * vAlpha);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
@@ -332,6 +337,7 @@ function createWindPetals(camera, cameraPosition) {
         uUp: { value: up },
         uSize: { value: new THREE.Vector2(width * pxWorld, height * pxWorld) },
         uBlur: { value: new THREE.Vector2(blur / width, blur / height) },
+        uPetalGlow: GLOW.uPetalGlow,
       },
       vertexShader: PETAL_VERTEX,
       fragmentShader: PETAL_FRAGMENT,
@@ -353,7 +359,8 @@ function createWindPetals(camera, cameraPosition) {
   return {
     group,
     update(timeMs) {
-      for (const lane of lanes) {
+      for (let l = 0; l < lanes.length; l++) {
+        const lane = lanes[l];
         for (let i = 0; i < lane.petals.length; i++) {
           const petal = lane.petals[i];
           const base = i * (TRAIL + 1);

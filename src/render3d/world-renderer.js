@@ -33,10 +33,12 @@ import { createInitialState, isGameOver } from '../logic/game.js';
 import { drawText } from '../render/game-renderer.js';
 import { artMeta, artSource } from './art.js';
 import { ART } from './art-assets.js';
-import { boardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
+import { boardMarksInto, createBoardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
 import { createEffects3d } from './effects3d.js';
 import { enteredStage, plantedCells, plantPoseInto, STAGE_LAND, STAGE_OPEN, STAGE_REST } from './growth.js';
 import { createWorldHitTest } from './hit-test.js';
+import { parseFpsSwitch } from './fps.js';
+import { QUALITY_ORDER } from './quality.js';
 import { fadedAlphaTest } from './sprite-frames.js';
 import { metaAnchor, stageStartMs } from './v3-meta.js';
 import { createCellDecal, createPieceSprite, createWorld, decalMaterial, placeOnCell, zonePieceGeometry } from './world.js';
@@ -44,10 +46,29 @@ import { createCellDecal, createPieceSprite, createWorld, decalMaterial, placeOn
 const GHOST_OPACITY = 0.45; // see-through stone or rock where it would go
 const EMPTY_BOARD = createInitialState().board; // the menus show the board bare
 const NO_DECALS = [];
+const TITLE_STYLE = { size: 48 };
+const QUALITY_TEXT_STYLE = { size: 11, align: 'left' };
+const FPS_TEXT_MAX = 1000; // FPS readings above this are drawn as this
+
+const NO_LOWEST_TEXT = 'Lowest FPS -';
+
+// The quality and FPS line, e.g. "Quality high [Q]  FPS 60".
+function qualityText(quality, auto, fps) {
+  return `Quality ${quality}${auto ? ' (auto)' : ''} [Q]  FPS ${fps}`;
+}
+
+// The ?fps=1 line under it, e.g. "Lowest FPS 52".
+function lowestText(fps) {
+  return `Lowest FPS ${fps}`;
+}
 
 // Throws if WebGL is not available. `options.assets` is the loaded art
 // (see createWorld in world.js); missing files show placeholders.
+// `options.showFps` adds the lowest FPS reading of the current level under
+// the FPS line (default: ?fps=1 in the page's URL), on every level, for the
+// owner's FPS measurement (docs/art-direction-v3.md, Performance results).
 export function createWorldRenderer(worldCanvas, options = {}) {
+  const { showFps = parseFpsSwitch(globalThis.location?.search ?? '') } = options;
   const world = createWorld(worldCanvas, options);
   const pieces = createPieceLayer(world);
   const decals = createDecalLayer(world);
@@ -56,10 +77,31 @@ export function createWorldRenderer(worldCanvas, options = {}) {
   // A plant that a skill moves or converts regrows from Land (effects3d.js).
   const effects = createEffects3d(world, { regrow: (x, y, player, plantedAt) => pieces.growOne(x, y, player, plantedAt) });
 
-  // The level and FPS of this window, top left on the HUD.
+  const marks = createBoardMarks(); // reused every frame
+
+  // The level and FPS of this window, top left on the HUD (shown on every
+  // level, the FPS counter of docs/art-direction-v3.md section 10). Each
+  // line is built once, the first time it shows, and kept: per level and
+  // auto flag, one string per whole FPS value. So the render loop
+  // allocates no string for it.
+  const qualityLines = [];
+  for (let i = 0; i < QUALITY_ORDER.length * 2; i++) qualityLines.push([]);
+  const lowestLines = [];
   const drawQuality = (ctx) => {
-    const autoText = world.autoStepped ? ' (auto)' : '';
-    drawText(ctx, `Quality ${world.quality}${autoText} [Q]  FPS ${Math.round(world.fps)}`, 8, 12, { size: 11, align: 'left' });
+    const fps = Math.min(Math.max(Math.round(world.fps), 0), FPS_TEXT_MAX);
+    const level = Math.max(0, QUALITY_ORDER.indexOf(world.quality));
+    const lines = qualityLines[level * 2 + (world.autoStepped ? 1 : 0)];
+    lines[fps] ??= qualityText(world.quality, world.autoStepped, fps);
+    drawText(ctx, lines[fps], 8, 12, QUALITY_TEXT_STYLE);
+    if (!showFps) return;
+    const lowest = world.fpsLowest;
+    if (lowest === Infinity) {
+      drawText(ctx, NO_LOWEST_TEXT, 8, 26, QUALITY_TEXT_STYLE);
+      return;
+    }
+    const low = Math.min(Math.max(Math.round(lowest), 0), FPS_TEXT_MAX);
+    lowestLines[low] ??= lowestText(low);
+    drawText(ctx, lowestLines[low], 8, 26, QUALITY_TEXT_STYLE);
   };
 
   return {
@@ -67,8 +109,8 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       const time = view.time ?? performance.now();
       pieces.sync(view.state.board, time, effects);
       world.characters.setActive(isGameOver(view.state) ? null : view.state.currentPlayer);
-      const marks = boardMarks(view);
-      decals.show(marks.decals, time);
+      boardMarksInto(view, marks);
+      decals.show(marks.decals, marks.count, time);
       lastMove.show(view.state.board, time);
       ghosts.show(marks.ghost);
       world.setHoveredCell(view.hover ?? null);
@@ -83,7 +125,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
     drawMenuScreen(ctx, time = performance.now()) {
       pieces.sync(EMPTY_BOARD, time, effects);
       world.characters.setActive(null);
-      decals.show(NO_DECALS, time);
+      decals.show(NO_DECALS, 0, time);
       lastMove.hide();
       ghosts.show(null);
       world.setHoveredCell(null);
@@ -91,7 +133,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       world.render(time);
 
       ctx.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
-      drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 90, { size: 48 });
+      drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 90, TITLE_STYLE);
       drawQuality(ctx);
     },
 
@@ -141,6 +183,13 @@ export function createWorldRenderer(worldCanvas, options = {}) {
   };
 }
 
+// The stage start times and anchor row of the plant of `player`.
+function plantLook(player) {
+  const name = ART.v3.plant[player];
+  const meta = artMeta();
+  return { stages: stageStartMs(meta, name), anchorY: metaAnchor(meta, name)?.y ?? 0 };
+}
+
 function pieceKind(cell) {
   if (cell === X || cell === O) return cell;
   if (cell === ROCK) return 'rock';
@@ -171,15 +220,8 @@ function createPieceLayer(world) {
   const growKind = []; // the player whose seed it is
   const lastStage = new Int8Array(cellCount).fill(UNPLANTED);
   const pose = { frame: 0, progress: 0, dropPx: 0, scale: 1 }; // written by plantPoseInto
-  const looks = {}; // per player: { stages, anchorY }
-  const look = (player) => {
-    if (!looks[player]) {
-      const name = ART.v3.plant[player];
-      const meta = artMeta();
-      looks[player] = { stages: stageStartMs(meta, name), anchorY: metaAnchor(meta, name)?.y ?? 0 };
-    }
-    return looks[player];
-  };
+  const looks = {}; // per player: { stages, anchorY }, made the first time
+  const look = (player) => (looks[player] ??= plantLook(player));
 
   const rest = (sprite, kind) => {
     if (kind === 'rock') return;
@@ -282,19 +324,21 @@ const DECALS = {
   select: { order: 5, art: ART.v3.decal.select },
 };
 
-// Pools of flat cell decals; show() places this frame's decals and hides
-// the rest. A zone decal shows its own part of the 3x3 zone art.
+// Pools of flat cell decals; show(decals, count, time) places the first
+// `count` decals and hides the rest. A zone decal shows its own part of the 3x3 zone art.
 function createDecalLayer(world) {
   const pools = {};
   for (const [kind, look] of Object.entries(DECALS)) {
     const material = decalMaterial(artSource(look.art));
     pools[kind] = { material, order: look.order, meshes: [], used: 0 };
   }
+  const poolList = Object.values(pools);
   return {
-    show(decals, time) {
+    show(decals, count, time) {
       pools.win.material.opacity = winPulseOpacity(time);
-      for (const pool of Object.values(pools)) pool.used = 0;
-      for (const decal of decals) {
+      for (let p = 0; p < poolList.length; p++) poolList[p].used = 0;
+      for (let d = 0; d < count; d++) {
+        const decal = decals[d];
         const pool = pools[decal.kind];
         if (!pool) continue;
         let mesh = pool.meshes[pool.used];
@@ -309,7 +353,8 @@ function createDecalLayer(world) {
         mesh.visible = true;
         placeOnCell(mesh, decal.x, decal.y);
       }
-      for (const pool of Object.values(pools)) {
+      for (let p = 0; p < poolList.length; p++) {
+        const pool = poolList[p];
         for (let i = pool.used; i < pool.meshes.length; i++) pool.meshes[i].visible = false;
       }
     },
@@ -380,12 +425,16 @@ function createGhosts(world) {
     material.depthWrite = false;
     sprite.noBlobShadow = true;
     sprite.shadow.visible = false;
+    sprite.sunShadow.visible = false;
     sprite.object.visible = false;
     ghosts[kind] = sprite;
   }
+  const kinds = Object.keys(ghosts);
   return {
     show(ghost) {
-      for (const [kind, sprite] of Object.entries(ghosts)) {
+      for (let i = 0; i < kinds.length; i++) {
+        const kind = kinds[i];
+        const sprite = ghosts[kind];
         const visible = ghost !== null && ghost.kind === kind;
         sprite.object.visible = visible;
         if (visible) placeOnCell(sprite, ghost.x, ghost.y);

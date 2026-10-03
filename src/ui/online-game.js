@@ -10,12 +10,23 @@ import { COUNTDOWN } from '../net/presence.js';
 import { describeEvents, panelView, skillLockReason } from './local-game.js';
 import { startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
 
+// takeEvents' answer when nothing happened, shared so the render loop makes
+// no new list on an ordinary frame.
+const NO_EVENTS = Object.freeze([]);
+
 export function createOnlineGame(room) {
   let hover = null; // board cell under the pointer
   let hoverSkill = null; // { player, skillId } of the button under the pointer
   let targeting = null; // skill target flow in progress, see targeting.js
   let message = null;
   let pendingEvents = []; // events of applied actions not yet taken for effects
+  // The pending events, with a new list for the next ones (only on a frame
+  // with events).
+  const handOverEvents = () => {
+    const events = pendingEvents;
+    pendingEvents = [];
+    return events;
+  };
 
   const unsubscribe = room.onEvent((event) => {
     if (event.type === 'state') {
@@ -58,9 +69,8 @@ export function createOnlineGame(room) {
     // Events the room applied since the last call, oldest first, for the
     // effects (render/effects.js). Both windows get the same events.
     takeEvents() {
-      const events = pendingEvents;
-      pendingEvents = [];
-      return events;
+      if (pendingEvents.length === 0) return NO_EVENTS; // most frames: nothing new, nothing made
+      return handOverEvents();
     },
 
     setHover(cell) {

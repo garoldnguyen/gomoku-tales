@@ -43,6 +43,15 @@ export function cellToWorld(x, y, { boardSize, cellSize } = BOARD) {
   return { x: (x - offset) * cellSize, z: (y - offset) * cellSize };
 }
 
+// cellToWorld on the game board, written into `out` { x, z } (no
+// allocation, for the render loop). Returns `out`.
+export function cellToWorldInto(x, y, out) {
+  const offset = (BOARD.boardSize - 1) / 2;
+  out.x = (x - offset) * BOARD.cellSize;
+  out.z = (y - offset) * BOARD.cellSize;
+  return out;
+}
+
 // The cell a ray hits on the board plane at height planeY, or null.
 export function pickCell(origin, direction, { planeY = 0, boardSize = BOARD_SIZE, cellSize = CELL_SIZE } = {}) {
   const hit = intersectHorizontalPlane(origin, direction, planeY);

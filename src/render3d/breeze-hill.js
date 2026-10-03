@@ -2,7 +2,8 @@
 // everything around the board. The meadow (meadow-scene.js,
 // docs/art-direction-v3.md section 6: the ground, far hills, trees,
 // bushes, hay bales, grass tufts and flowers), the sky, clouds and wind
-// petals (sky-scene.js, section 7) and light fog.
+// petals (sky-scene.js, section 7), the cloud shadows on High
+// (cloud-shadows.js) and light fog.
 //
 // The meadow is flat. The camera looks steeply down, so the ground ends at a
 // far edge placed on purpose 21 percent down the view (horizon.js
@@ -11,6 +12,7 @@
 
 import * as THREE from 'three';
 import { FOG_FAR, FOG_NEAR } from '../config.js';
+import { createCloudShadows } from './cloud-shadows.js';
 import { createMeadow } from './meadow-scene.js';
 import { createSky } from './sky-scene.js';
 
@@ -27,14 +29,17 @@ export function buildBreezeHill(scene, cameraPosition, camera, { sunRays = true 
   scene.fog = new THREE.Fog(COLORS.haze, FOG_NEAR, FOG_FAR);
   const meadow = createMeadow(scene, cameraPosition, { haze: COLORS.haze });
   const sky = createSky(scene, camera, cameraPosition, { sunRays });
+  const cloudShadows = createCloudShadows(scene);
   return {
     update(timeMs, dtMs) {
       meadow.update(timeMs, dtMs);
       sky.update(timeMs);
+      cloudShadows.update(timeMs);
     },
     setFeatures(features) {
       meadow.setFeatures(features);
       sky.setFeatures(features);
+      cloudShadows.setFeatures(features);
     },
   };
 }

@@ -38,12 +38,13 @@ export function createCharacters(addSprite, show) {
   let active = null;
 
   const make = (player, x, phaseMs) => {
+    const posed = { pose: 'idle', ageMs: 0 }; // reused every frame
     const sprite = addSprite(new PixelSprite({
       sheet: combinedSheet(Object.values(ART.character[player])),
       frameCount: CHARACTER_FRAME_COUNT,
       shadowRadius: SHADOW_RADIUS,
       frameFor: (timeMs) => {
-        const { pose, ageMs } = director.poseAt(player, timeMs);
+        const { pose, ageMs } = director.poseAtInto(player, timeMs, posed);
         return characterFrame(pose, pose === 'idle' ? ageMs + phaseMs : ageMs);
       },
     }).placeAt(x, GROUND_Y, 0));
@@ -70,12 +71,13 @@ export function createCharacters(addSprite, show) {
     halo.position.z = -HALO_BEHIND;
     halo.visible = false;
     sprite.plane.add(halo);
-    return { sprite, material, halo, glow: 0 };
+    return { player, sprite, material, halo, glow: 0 };
   };
 
   // Wind Rabbit (X) on the left, Earth Bear (O) on the right, when shown.
   const parts = {};
   for (const spot of worldCharacterSpots(show)) parts[spot.player] = make(spot.player, spot.x, spot.phaseMs);
+  const partList = Object.values(parts); // for the render loop
 
   return {
     // Their sprites, null while not drawn.
@@ -99,8 +101,9 @@ export function createCharacters(addSprite, show) {
     },
 
     update(now, dtMs) {
-      for (const [player, part] of Object.entries(parts)) {
-        part.glow = stepGlow(part.glow, active === player, dtMs);
+      for (let i = 0; i < partList.length; i++) {
+        const part = partList[i];
+        part.glow = stepGlow(part.glow, active === part.player, dtMs);
         const strength = part.glow * glowPulse(now);
         part.material.emissiveIntensity = GLOW_EMISSIVE * strength;
         part.halo.material.opacity = HALO_OPACITY * strength;

@@ -1,13 +1,18 @@
 // Post-processing for the farmland scene, using passes that ship with
 // Three.js plus one small depth of field pass of our own:
 //   render -> depth of field -> bloom (UnrealBloomPass)
-//          -> vignette -> tone mapping and sRGB (OutputPass)
+//          -> warm grade and vignette -> tone mapping and sRGB (OutputPass)
 // Every pass is built once; the postEffects switches of the quality table
-// (src/render3d/quality.js) only turn passes on and off. With every switch
-// off (low and medium: no blur at all) the composer is skipped and the
-// scene renders straight to the screen, where the renderer applies the same
-// tone mapping. The warm grade switch is drawn by a later part
-// (docs/art-direction-v3.md section 5 and task part 9).
+// (src/render3d/quality.js) only turn passes on and off, so a quality switch
+// creates and replaces no texture, material or render target. With every
+// switch off (low and medium: no blur at all) the composer is skipped and
+// the scene renders straight to the screen, where the renderer applies the
+// same tone mapping.
+//
+// The bloom threshold (BLOOM_THRESHOLD) lies above anything the lit scene
+// and the sky reach, so only what GLOW lifts over it glows: while bloom is
+// on, the sparkles (effects3d.js) and the bright wind petals (sky-scene.js)
+// are drawn brighter through the shared GLOW uniforms.
 //
 // The depth of field reads the depth buffer of the scene render itself, so
 // the depth comes from each object's own material: a sprite writes depth
@@ -26,13 +31,20 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { FullScreenQuad, Pass } from 'three/addons/postprocessing/Pass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { VignetteShader } from 'three/addons/shaders/VignetteShader.js';
 import {
-  BLOOM_RADIUS, BLOOM_STRENGTH, BLOOM_THRESHOLD, TONE_MAPPING_EXPOSURE, VIGNETTE_DARKNESS, VIGNETTE_OFFSET,
+  BLOOM_PETAL_GLOW, BLOOM_RADIUS, BLOOM_SPARKLE_GLOW, BLOOM_STRENGTH, BLOOM_THRESHOLD, TONE_MAPPING_EXPOSURE,
+  VIGNETTE_DARKNESS, VIGNETTE_OFFSET, WARM_GRADE_GAIN, WARM_GRADE_SATURATION,
 } from '../config.js';
 import { createDofState, updateDofUniforms } from './depth-of-field.js';
 
 const DOF_TAPS = 12; // samples of the blur disc
+
+// How much brighter sparkles and bright petals are drawn: 1 (no change)
+// unless bloom is on. Shader materials share these uniform objects.
+export const GLOW = Object.freeze({
+  uSparkleGlow: { value: 1 },
+  uPetalGlow: { value: 1 },
+});
 
 // renderer   a THREE.WebGLRenderer
 // camera     the world's live camera: the blur reads its pose every frame
@@ -53,10 +65,8 @@ export function createPostProcessing(renderer, scene, camera) {
   const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM_STRENGTH, BLOOM_RADIUS, BLOOM_THRESHOLD);
   composer.addPass(bloom);
 
-  const vignette = new ShaderPass(VignetteShader);
-  vignette.uniforms.offset.value = VIGNETTE_OFFSET;
-  vignette.uniforms.darkness.value = VIGNETTE_DARKNESS;
-  composer.addPass(vignette);
+  const grade = new ShaderPass(GRADE_SHADER);
+  composer.addPass(grade);
 
   composer.addPass(new OutputPass());
 
@@ -75,7 +85,11 @@ export function createPostProcessing(renderer, scene, camera) {
     setEffects(postEffects) {
       depthOfField.enabled = postEffects.depthOfField;
       bloom.enabled = postEffects.bloom;
-      vignette.enabled = postEffects.vignette;
+      GLOW.uSparkleGlow.value = postEffects.bloom ? BLOOM_SPARKLE_GLOW : 1;
+      GLOW.uPetalGlow.value = postEffects.bloom ? BLOOM_PETAL_GLOW : 1;
+      grade.enabled = postEffects.warmGrade || postEffects.vignette;
+      grade.uniforms.uWarm.value = postEffects.warmGrade ? 1 : 0;
+      grade.uniforms.uVignette.value = postEffects.vignette ? 1 : 0;
       useComposer = postEffects.depthOfField || postEffects.bloom || postEffects.vignette || postEffects.warmGrade;
     },
     resize,
@@ -85,6 +99,53 @@ export function createPostProcessing(renderer, scene, camera) {
     },
   };
 }
+
+// The warm grade and the light vignette in one pass, the same formulas as
+// warmGrade and vignetteMix in screen-grade.js. Linear colour, before tone
+// mapping (OutputPass).
+const GRADE_SHADER = {
+  name: 'WarmGradeVignette',
+  uniforms: {
+    tDiffuse: { value: null },
+    uWarm: { value: 0 },
+    uVignette: { value: 0 },
+    uGain: { value: new THREE.Vector3(...WARM_GRADE_GAIN) },
+    uSaturation: { value: WARM_GRADE_SATURATION },
+    uOffset: { value: VIGNETTE_OFFSET },
+    uDarkness: { value: Math.min(Math.max(VIGNETTE_DARKNESS, 0), 1) },
+  },
+  vertexShader: /* glsl */ `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tDiffuse;
+    uniform float uWarm;
+    uniform float uVignette;
+    uniform vec3 uGain;
+    uniform float uSaturation;
+    uniform float uOffset;
+    uniform float uDarkness;
+    varying vec2 vUv;
+    void main() {
+      vec4 texel = texture2D(tDiffuse, vUv);
+      vec3 color = texel.rgb;
+      if (uWarm > 0.5) {
+        color *= uGain;
+        float luma = dot(color, vec3(0.2126, 0.7152, 0.0722));
+        color = max(vec3(0.0), vec3(luma) + (color - vec3(luma)) * uSaturation);
+      }
+      if (uVignette > 0.5) {
+        vec2 p = (vUv - 0.5) * uOffset;
+        color *= 1.0 - dot(p, p) * uDarkness;
+      }
+      gl_FragColor = vec4(color, texel.a);
+    }
+  `,
+};
 
 // Blurs each pixel by blurRadius (depth-of-field.js) of its depth, with a
 // disc of DOF_TAPS samples. A sample counts only when it is at least as

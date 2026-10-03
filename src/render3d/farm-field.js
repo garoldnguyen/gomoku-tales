@@ -36,7 +36,6 @@ export function createFarmField(scene, addSprite) {
   const fieldMaterial = new THREE.MeshStandardMaterial({ map: fieldTexture(ART.v3.board.field), roughness: 0.95 });
   const field = new THREE.Mesh(new THREE.PlaneGeometry(FIELD.size, FIELD.size).rotateX(-Math.PI / 2), fieldMaterial);
   field.position.y = FIELD.y;
-  field.receiveShadow = true;
   scene.add(field);
 
   scene.add(createCurb());
@@ -144,8 +143,6 @@ function createCurb() {
     new THREE.MeshLambertMaterial({ map: wood, color: COLORS.curbFace }),
     new THREE.MeshLambertMaterial({ map: wood, color: COLORS.curbInner }),
   ]);
-  mesh.castShadow = true;
-  mesh.receiveShadow = true;
   return mesh;
 }
 
@@ -173,7 +170,6 @@ function createRail(run, height) {
   const rail = new THREE.Mesh(new THREE.PlaneGeometry(length, thickness), material);
   rail.position.set((run.from.x + run.to.x) / 2, CURB.ground + height, (run.from.z + run.to.z) / 2);
   rail.rotation.y = -Math.atan2(run.to.z - run.from.z, run.to.x - run.from.x);
-  rail.castShadow = true;
   return rail;
 }
 
@@ -186,6 +182,5 @@ function createPath() {
   const texture = repeatingTexture(artSource(ART.v3.path));
   texture.repeat.set(1, length / PATH_TILE);
   const path = new THREE.Mesh(geometry, new THREE.MeshLambertMaterial({ map: texture, alphaTest: 0.5, ...ON_SURFACE }));
-  path.receiveShadow = true;
   return path;
 }

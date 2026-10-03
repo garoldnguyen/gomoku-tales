@@ -15,39 +15,82 @@
 //   'select'      a chosen or pickable source plant (Wind Dash, Stone Conversion)
 //   'win'         a cell of the winning line
 
-// Returns { decals: [{ kind, x, y, dx?, dy? }], ghost: { kind, x, y } | null }
-// where a ghost kind is 'X' or 'O' (a stone about to be placed) or 'rock'.
+// Returns { decals: [{ kind, x, y, dx, dy }], ghost: { kind, x, y } | null }
+// where a ghost kind is 'X' or 'O' (a stone about to be placed) or 'rock',
+// and dx, dy place a zone preview cell in its zone (0 for other decals).
+// A fresh result each call; the render loop uses boardMarksInto.
 export function boardMarks(view) {
+  const marks = boardMarksInto(view, createBoardMarks());
+  return { decals: marks.decals.slice(0, marks.count), ghost: marks.ghost && { ...marks.ghost } };
+}
+
+// A reusable result for boardMarksInto: decals[0] to decals[count - 1] are
+// this frame's decals (the list only grows, so it never reallocates) and
+// ghost is ghostSpot or null.
+export function createBoardMarks() {
+  return { decals: [], count: 0, ghost: null, ghostSpot: { kind: null, x: 0, y: 0 } };
+}
+
+// boardMarks written into `out` from createBoardMarks, reusing its
+// objects, so the render loop allocates nothing. Returns `out`.
+export function boardMarksInto(view, out) {
   const { state, hover, preview } = view;
-  const decals = [];
-  const add = (kind, cell) => decals.push({ kind, x: cell.x, y: cell.y });
+  out.count = 0;
+  out.ghost = null;
 
-  if (state.winLine) for (const cell of state.winLine) add('win', cell);
+  if (state.winLine) {
+    for (let i = 0; i < state.winLine.length; i++) addDecal(out, 'win', state.winLine[i].x, state.winLine[i].y, 0, 0);
+  }
 
-  let ghost = null;
-  if (hover) ghost = { kind: state.currentPlayer, x: hover.x, y: hover.y };
+  if (hover) setGhost(out, state.currentPlayer, hover.x, hover.y);
 
   // Hover preview for the skill target flow (see ui/targeting.js).
   if (preview) {
     switch (preview.type) {
       case 'select':
-        add('select', preview);
+        addDecal(out, 'select', preview.x, preview.y, 0, 0);
         break;
       case 'dash':
-        add('select', preview.from);
-        if (preview.to) add('dashTarget', preview.to);
+        addDecal(out, 'select', preview.from.x, preview.from.y, 0, 0);
+        if (preview.to) addDecal(out, 'dashTarget', preview.to.x, preview.to.y, 0, 0);
         break;
       case 'zone':
-        for (const cell of preview.cells) {
-          decals.push({ kind: 'zonePreview', x: cell.x, y: cell.y, dx: cell.x - preview.x, dy: cell.y - preview.y });
+        for (let i = 0; i < preview.cells.length; i++) {
+          const cell = preview.cells[i];
+          addDecal(out, 'zonePreview', cell.x, cell.y, cell.x - preview.x, cell.y - preview.y);
         }
         break;
       case 'rock':
-        ghost = { kind: 'rock', x: preview.x, y: preview.y };
+        setGhost(out, 'rock', preview.x, preview.y);
         break;
     }
   }
-  return { decals, ghost };
+  return out;
+}
+
+function addDecal(marks, kind, x, y, dx, dy) {
+  const decal = marks.count < marks.decals.length ? marks.decals[marks.count] : newDecal(marks);
+  marks.count++;
+  decal.kind = kind;
+  decal.x = x;
+  decal.y = y;
+  decal.dx = dx;
+  decal.dy = dy;
+}
+
+// One more decal object, made the first time this many decals show at once.
+function newDecal(marks) {
+  const decal = { kind: null, x: 0, y: 0, dx: 0, dy: 0 };
+  marks.decals.push(decal);
+  return decal;
+}
+
+function setGhost(marks, kind, x, y) {
+  const ghost = marks.ghostSpot;
+  ghost.kind = kind;
+  ghost.x = x;
+  ghost.y = y;
+  marks.ghost = ghost;
 }
 
 const WIN_PULSE_MS = 1000; // the winner marks pulse once a second

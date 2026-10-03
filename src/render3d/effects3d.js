@@ -67,7 +67,8 @@ import { STAGE_DROP, STAGE_REST } from './growth.js';
 import {
   createParticlePool, createSpawnParams, emit, scaledCount, SHAPE_PLUS, SHAPE_SQUARE,
 } from './particle-pool.js';
-import { cellToWorld } from './picking.js';
+import { cellToWorld, cellToWorldInto } from './picking.js';
+import { GLOW } from './post-processing.js';
 import { MAX_PARTICLE_CAP, particleScale, plainSlides } from './quality.js';
 import { effectRandom } from './seeded-random.js';
 import { stageStartMs } from './v3-meta.js';
@@ -141,6 +142,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
   // The pose functions read ageMs (and progress, spark) and write the pose here.
   const pose = { ageMs: 0.5, frame: 0, done: false, flying: false, progress: 0.5, spark: 0.5, x: 0.5, z: 0.5, lift: 0.5 };
   const at = { x: 0.5, y: 0.5, z: 0.5 }; // where a trail is left this frame
+  const cellAt = { x: 0.5, z: 0.5 }; // a cell centre, for the growth cues
   const pointScaleFactor = 1 / (2 * Math.tan((CAMERA_FOV * Math.PI) / 360));
 
   // --- Particle bursts ---
@@ -544,8 +546,8 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     openSparkles(x, y, player, anchorY) {
       if (!world.features.growthExtras.openSparkles) return;
       pool.limit = Math.min(pool.capacity, world.features.particleCap);
-      const { x: wx, z: wz } = cellToWorld(x, y);
-      bloomSparkles(wx, wz, (anchorY - BLOOM_ROW_PX) * PX * SPRITE_STRETCH_Y, player);
+      cellToWorldInto(x, y, cellAt);
+      bloomSparkles(cellAt.x, cellAt.z, (anchorY - BLOOM_ROW_PX) * PX * SPRITE_STRETCH_Y, player);
     },
 
     // The Land soil puff of a seed on cell (x, y), on levels with the
@@ -553,8 +555,8 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     soilPuff(x, y) {
       if (!world.features.growthExtras.soilPuff) return;
       pool.limit = Math.min(pool.capacity, world.features.particleCap);
-      const { x: wx, z: wz } = cellToWorld(x, y);
-      soilPixels(wx, wz);
+      cellToWorldInto(x, y, cellAt);
+      soilPixels(cellAt.x, cellAt.z);
     },
 
     // True while the plant on cell index `i` (y * BOARD_SIZE + x) is shown
@@ -638,15 +640,12 @@ function createActorPool(world) {
     material.emissive.set(COLORS.glow);
     material.emissiveMap = sprite.texture;
     material.emissiveIntensity = 0;
-    const shadowX = sprite.shadow.scale.x;
-    const shadowZ = sprite.shadow.scale.z;
     return {
       kind,
       sprite,
       material,
       setShadow(factor) {
-        sprite.shadow.scale.x = shadowX * factor;
-        sprite.shadow.scale.z = shadowZ * factor;
+        sprite.setShadowScale(factor);
       },
     };
   }
@@ -777,11 +776,12 @@ function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
   // The zone's centre cell (cx, cy) and its world point (x, z); fade is
   // this frame's markFade, so the bend eases off as the zone ends.
   const mark = { active: false, endStart: NaN, cx: 0, cy: 0, x: 0.5, z: 0.5, fade: 0.5, carry: 0.5 };
+  const centreAt = { x: 0, z: 0 }; // the zone centre's world point, rewritten by show()
 
   const hide = () => {
     mark.active = false;
     mark.endStart = NaN;
-    for (const mesh of decals) mesh.visible = false;
+    for (let i = 0; i < decals.length; i++) decals[i].visible = false;
   };
 
   return {
@@ -795,11 +795,11 @@ function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
         decals[i].geometry = zonePieceGeometry(cell.x - x, cell.y - y);
         placeOnCell(decals[i], cell.x, cell.y);
       }
-      const centre = cellToWorld(x, y);
+      cellToWorldInto(x, y, centreAt);
       mark.cx = x;
       mark.cy = y;
-      mark.x = centre.x;
-      mark.z = centre.z;
+      mark.x = centreAt.x;
+      mark.z = centreAt.z;
       mark.fade = 1;
       mark.carry = 0;
       mark.active = true;
@@ -870,7 +870,7 @@ function createParticlePoints(capacity) {
   geometry.setDrawRange(0, 0);
 
   const material = new THREE.ShaderMaterial({
-    uniforms: { uScale: { value: 1 } },
+    uniforms: { uScale: { value: 1 }, uSparkleGlow: GLOW.uSparkleGlow },
     vertexShader: /* glsl */ `
       attribute vec3 aColor;
       attribute float aAlpha;
@@ -891,13 +891,16 @@ function createParticlePoints(capacity) {
       }
     `,
     fragmentShader: /* glsl */ `
+      uniform float uSparkleGlow;
       varying vec3 vColor;
       varying float vAlpha;
       varying float vShape;
       void main() {
         vec2 p = abs(gl_PointCoord - 0.5);
         if (vShape > 0.5 && min(p.x, p.y) > 0.17) discard; // plus-shaped twinkle
-        gl_FragColor = vec4(pow(vColor, vec3(2.2)), vAlpha); // sRGB colours to linear
+        vec3 color = pow(vColor, vec3(2.2)); // sRGB colours to linear
+        if (vShape > 0.5) color *= uSparkleGlow; // sparkles glow while bloom is on (GLOW)
+        gl_FragColor = vec4(color, vAlpha);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }

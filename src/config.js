@@ -147,6 +147,25 @@ export const GROUND_STRIPE_CELLS = 3; // Low: mown stripes this many cells wide
 // Blob shadows in the meadow lie flat this far above the flat ground.
 // They are layered over it by polygon offset, not by height, so 0.
 export const MEADOW_SHADOW_LIFT = 0;
+// High: long sun shadows (docs/art-direction-v3.md sections 5 and 7). The
+// sun is in the upper left, so each upright sprite casts its dark sheared
+// silhouette on the ground toward the lower right of the screen (+x, and
+// +z toward the camera), SUN_SHADOW_LENGTH times the sprite's height long.
+export const SUN_SHADOW_DIR = [1, 0, 0.9];
+export const SUN_SHADOW_LENGTH = 0.9;
+export const SUN_SHADOW_OPACITY = 0.35;
+// High: slow cloud shadows, a soft multiply layer on the plots and the
+// meadow that slides with the near cloud layer. Its darkest spot keeps at
+// least 75 percent of the light in every channel, so a plot stays readable.
+export const CLOUD_SHADOW_TINT = [0.75, 0.78, 0.85]; // multiply colour at full shadow
+export const CLOUD_SHADOW_TILE = 48; // world units: the soft pattern repeats this often
+// The cloud shadow layer's resolution: its soft mask tile is this many
+// pixels square. The first cost to cut if High is below 60 FPS (64 is fine).
+export const CLOUD_SHADOW_MASK_PX = 128;
+// Long sun shadows for the meadow flowers (13 instanced kinds) as well as
+// for the trees, bushes, bales and board sprites. The second cost to cut
+// (false keeps only the scenery and board shadows).
+export const SUN_SHADOW_MEADOW_FLOWERS = true;
 // The two HUD glass cards (docs/art-direction-v3.md section 8) at 1920 x
 // 1080: no tall flowers or trees may show behind them. The height is the
 // card with both skill rows.
@@ -257,7 +276,20 @@ export const DOF_BLUR_PER_UNIT = 0.00003;
 export const DOF_MAX_BLUR = 0.0015;
 export const BLOOM_STRENGTH = 0.3; // subtle bloom on bright things only
 export const BLOOM_RADIUS = 0.3;
-export const BLOOM_THRESHOLD = 0.85; // linear brightness a pixel needs before it blooms
+// Linear brightness a pixel needs before it blooms. Above anything the lit
+// scene, the sky and the clouds reach (at most about 1.0), so only what
+// BLOOM_GLOW lifts over it glows: sparkles and bright wind petals.
+export const BLOOM_THRESHOLD = 1.0;
+// While bloom is on, sparkles are drawn this many times brighter and bright
+// wind petals (linear luminance above BLOOM_PETAL_LUMINANCE) BLOOM_PETAL_GLOW
+// times, so they pass BLOOM_THRESHOLD. Tone mapping keeps them in range.
+export const BLOOM_SPARKLE_GLOW = 2.2;
+export const BLOOM_PETAL_GLOW = 1.25;
+export const BLOOM_PETAL_LUMINANCE = 0.6;
+// High: a warm colour grade, a gain per linear channel (red and green up a
+// little, blue down), and a slight lift of saturation.
+export const WARM_GRADE_GAIN = [1.05, 1.015, 0.92];
+export const WARM_GRADE_SATURATION = 1.06;
 // Light vignette: corners are mixed VIGNETTE_OFFSET^2 / 2 of the way (18%)
 // towards the colour 1 - VIGNETTE_DARKNESS (black), the centre not at all.
 export const VIGNETTE_OFFSET = 0.6;

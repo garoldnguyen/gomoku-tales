@@ -242,6 +242,51 @@ Quality: Low shows the marks and plain slides, Medium adds a few particles, High
 - Pure helpers with unit tests: `growthStage(elapsedMs)`, the quality table, `planMeadow`, wind and sway math, cloud wrap-around, `hudViewModel`, the v3 manifest checks.
 - All existing tests (317 at the time of writing) must still pass.
 
+### Performance results
+
+FPS is measured by the owner, not by the builder: part 9 was built with no browser and no GPU, so nothing in this section is a measurement yet, and no number may be written here that was not measured on the target machine. This is a pending owner-run acceptance item.
+
+Steps for the owner, once per level (`low`, `medium`, `high`):
+
+1. Serve the game: `python3 -m http.server 8000` in the project folder.
+2. Open a browser window of 1920 x 1080 (full screen on a 1080p monitor, page zoom 100 percent) at `http://localhost:8000/?local=1&quality=low&fps=1` (then `quality=medium`, then `quality=high`). `?fps=1` shows the FPS counter on every level in the top left corner: the line `Quality low [Q]  FPS N` and under it `Lowest FPS N`, the lowest reading since the level was set (each reading is averaged over `FPS_SAMPLE_MS`).
+3. Plant a few seeds, then leave the window alone in front, without moving the mouse, and wait 30 seconds.
+4. Write down the lowest number (`Lowest FPS`) and the typical number (the `FPS` value it shows most of the time) in the table below, with the machine, GPU and browser.
+5. If `(auto)` appears after the level name, the automatic step down left that level (it ran slower than `TARGET_FRAME_MS` for 3 seconds); write that in the notes and measure that level again after reloading the page.
+
+| level | lowest FPS | typical FPS | machine, GPU and browser | notes |
+|---|---|---|---|---|
+| Low | not measured yet, owner to fill in | not measured yet, owner to fill in | | |
+| Medium | not measured yet, owner to fill in | not measured yet, owner to fill in | | |
+| High | not measured yet, owner to fill in | not measured yet, owner to fill in | | |
+
+If High is below 60 FPS, cut costs in this order, measuring again after each step, and stop as soon as High holds 60:
+
+1. The cloud shadow layer resolution: `CLOUD_SHADOW_MASK_PX` in `src/config.js` (for example from 128 to 64).
+2. The long shadow count: `SUN_SHADOW_MEADOW_FLOWERS = false` in `src/config.js` keeps the long shadows of the board sprites, trees, bushes and bales and drops the 13 instanced flower kinds.
+3. The bloom: `BLOOM_STRENGTH` and `BLOOM_RADIUS` in `src/config.js`, or bloom off in the High row of `src/render3d/quality.js`.
+4. The depth of field: fewer samples (`DOF_TAPS` in `src/render3d/post-processing.js`). Never change its zero band (part 6d), so the whole field stays sharp.
+
+To find the culprit quickly before cutting anything, use the URL switches from part 6d (section 5), one at a time on top of `?local=1&quality=high&fps=1`: `&shadows=off` (long and cloud shadows, blob shadows instead), `&bloom=off`, `&dof=off`, `&wind=off`, `&rays=off`, `&ripples=off`, or `&fx=off` for every High-only screen effect at once. A switch that brings the number up a lot points at its feature.
+
+What part 9 changed for cost, without measurements:
+
+- The sun's shadow map is gone (it rendered the scene a second time into a 2048 x 2048 map, and its shadows fell the wrong way). Long sun shadows are flat decals instead: one quad per board sprite, and one instanced draw call per meadow kind (3 scenery kinds plus 13 flower kinds), all built once.
+- Cloud shadows are one flat quad with one texture read per pixel from a `CLOUD_SHADOW_MASK_PX` square soft mask, discarded where there is no shadow.
+- The warm grade and the vignette share one full screen pass. The bloom threshold is above everything but the sparkles and the bright petals.
+- The 3D frame path (everything `drawGameScreen` and `drawMenuScreen` run each frame) allocates nothing once its pools are warm; `tests/render3d-high-polish.test.js` checks it by reading the source of every function on it and by counting the Three.js objects made over 200 frames on each level.
+- A quality switch makes, replaces and disposes nothing: every pass, texture, material and shadow mesh is built once and only turned on and off; the same test file checks it on the real scene.
+
+#### Known allocations
+
+The test lists every function of the 3D frame path by file and name (`FRAME_PATH` in `tests/render3d-high-polish.test.js`), and none of them allocates on an ordinary frame. Pools and caches that grow only on a miss (piece sprites, decals, zone pieces, the FPS text lines) and work done only on a frame with game events or a quality change are named there with their reason (`NOT_EACH_FRAME`). Three.js's own renderer and EffectComposer, and the DOM HUD view model (`hudViewModel` and `hud.render`, called only when something on the HUD changed), are out of scope.
+
+These still allocate on every frame. They are the game view models the render loop reads, outside `src/render3d`, and were not removed in part 9 because rewriting them in place changes the shared view contract of the HUD, the screens and the 2D renderer:
+
+- `src/ui/local-game.js` `getView` (with `panelView`, `targetPreview` and `statusText`): a new view object and a new panels list each frame (`?local=1`).
+- `src/ui/online-game.js` `getView` and `getOutcome`: a new view object and panels each frame, and an outcome object (`gameOutcome`) each frame in an online game.
+- `src/net/room.js` `getView`: a new room view object, called by the two above each frame in an online game.
+
 ## 11. Visual QA checklist (for the owner, after the last task)
 
 1. Low, Medium and High look clearly different and each matches its `scene-*.jpg` in spirit.

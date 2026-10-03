@@ -252,12 +252,16 @@ test('(10) Low shows no scenery or flowers; Medium adds blob shadows under trees
   assert.match(scene, /tufts\.visible = features\.ground !== 'mown'/);
   assert.match(scene, /scenery\.visible = features\.scenery/);
   assert.match(scene, /flowers\.visible = features\.meadowFlowers !== 'off'/);
-  assert.match(scene, /const shadows = features\.shadows !== 'none'/);
+  // Blob shadows on Medium; High has the long sun shadows instead (part 9).
+  assert.match(scene, /const blob = features\.shadows === 'blob'/);
+  assert.match(scene, /sceneryShadows\.visible = blob;/);
+  assert.match(scene, /flowerShadows\.visible = blob;/);
   assert.match(source('../src/render3d/farm-field.js'), /for \(const post of fencePosts\(\)\) \{\n\s+const sprite = addSprite\(new PixelSprite\(/);
   // Fence, path and stepping stones are scenery too: off on Low (curb only).
   assert.match(source('../src/render3d/farm-field.js'), /extras\.visible = features\.scenery;/);
   assert.match(source('../src/render3d/farm-field.js'), /for \(const sprite of extraSprites\) sprite\.object\.visible = features\.scenery;/);
   assert.match(source('../src/render3d/world.js'), /sprite\.shadow\.visible = blobShadows && !sprite\.noBlobShadow/);
+  assert.match(source('../src/render3d/world.js'), /blobShadows = features\.shadows === 'blob'/);
 });
 
 test('(11) High sway: square of height, 1 pixel calm and 2 in a gust, wind (1, 0, 0.35), gusts, plants at half', () => {

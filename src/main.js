@@ -106,17 +106,50 @@ function attachQualityKey() {
 
 // Shows a game on the HUD. localPlayer is this window's stone online, or
 // null in local mode. The automatic step down changes the level without
-// setQuality, so the level is passed every frame.
+// setQuality, so the level is checked every frame. hud.render depends only
+// on the model, so the model is rebuilt only when something in it changed:
+// hudInputs is the last one, rewritten in place, so a frame with nothing new
+// makes nothing.
+const hudInputs = {
+  state: null, targeting: null, status: null, message: null, peerCountdown: null, winner: null, quality: null, hint: null,
+};
+let hudPlayer = null;
+let hudShown = false;
 function showHud(game, view, localPlayer, winner, hint) {
-  hud.render(hudViewModel(view.state, {
-    targeting: game.getTargeting(),
-    status: view.status,
-    message: view.message,
-    peerCountdown: view.peerCountdown ?? null,
-    winner,
-    quality: renderer.quality,
-    hint,
-  }, localPlayer));
+  const targeting = game.getTargeting();
+  const peerCountdown = view.peerCountdown ?? null;
+  const quality = renderer.quality;
+  if (hudShown && hudInputs.state === view.state && hudInputs.targeting === targeting && hudInputs.status === view.status
+    && hudInputs.message === view.message && hudInputs.peerCountdown === peerCountdown && hudInputs.winner === winner
+    && hudInputs.quality === quality && hudInputs.hint === hint && hudPlayer === localPlayer) return;
+  hudShown = true;
+  hudPlayer = localPlayer;
+  hudInputs.state = view.state;
+  hudInputs.targeting = targeting;
+  hudInputs.status = view.status;
+  hudInputs.message = view.message;
+  hudInputs.peerCountdown = peerCountdown;
+  hudInputs.winner = winner;
+  hudInputs.quality = quality;
+  hudInputs.hint = hint;
+  hud.render(hudViewModel(view.state, hudInputs, localPlayer));
+}
+
+// The game view with this frame's time, effects and hint, for the
+// renderer: one object, rewritten every frame (a mode's views always have
+// the same keys), so the render loop does not copy the view into a new one.
+const frameView = {};
+function frameViewOf(view, time, effects, hint) {
+  for (const key in view) frameView[key] = view[key];
+  frameView.time = time;
+  frameView.effects = effects;
+  frameView.hint = hint;
+  return frameView;
+}
+
+// The online game's hint line, e.g. "Room ABCD  |  You play Wind Rabbit (X)".
+function roomHint(code, name, stone) {
+  return `Room ${code}  |  You play ${name} (${stone})`;
 }
 
 // Hands the events of applied actions to the effects. On the first frame
@@ -170,6 +203,10 @@ function startOnlineMode() {
   const effects = renderer === RENDERER_2D ? createEffects() : null;
   let shownGame = null; // the game the effects and the 3D world belong to
   let blurred = false;
+  // The hint line, made again only when the room or seat changes.
+  let hint = '';
+  let hintCode = null;
+  let hintStone = null;
 
   const forgetGame = () => {
     effects?.clear();
@@ -184,13 +221,17 @@ function startOnlineMode() {
       if (game !== shownGame) {
         forgetGame();
         shownGame = game;
+        hintCode = null; // a new game may be a new character
       }
       showEvents(game.takeEvents(), effects, time, resumed);
       const view = game.getView();
       canvas.style.cursor = screen === GAME && view.pointer ? 'pointer' : 'default';
-      const you = CHARACTERS[app.getView().character]?.name;
-      const hint = `Room ${view.code}  |  You play ${you} (${view.you})`;
-      renderer.drawGameScreen(ctx, { ...view, time, effects, hint });
+      if (view.code !== hintCode || view.you !== hintStone) {
+        hintCode = view.code;
+        hintStone = view.you;
+        hint = roomHint(view.code, CHARACTERS[app.getView().character]?.name, view.you);
+      }
+      renderer.drawGameScreen(ctx, frameViewOf(view, time, effects, hint));
       if (hud) {
         showHud(game, view, view.you, game.getOutcome()?.winner ?? null, hint);
         hud.show(true);
@@ -252,7 +293,7 @@ function startLocalMode() {
     showEvents(game.takeEvents(), effects, time, resumeWatch.tick(time));
     const view = game.getView();
     canvas.style.cursor = view.pointer ? 'pointer' : 'default';
-    renderer.drawGameScreen(ctx, { ...view, time, effects, hint });
+    renderer.drawGameScreen(ctx, frameViewOf(view, time, effects, hint));
     if (hud) showHud(game, view, null, null, hint);
     requestAnimationFrame(frame);
   };

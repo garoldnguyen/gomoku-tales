@@ -11,14 +11,17 @@
 //   meadowFlowers  'off', 'still' or 'sway' (a vertex shader lean, and
 //                  dandelion puffs letting seed flecks go)
 //   farHills       'off', 'on' or 'haze'
-//   shadows        soft blob shadows under every tree, bush, bale and
-//                  flower patch unless 'none'
+//   shadows        'blob' soft blob shadows under every tree, bush, bale
+//                  and flower patch; 'sun' the long sun shadows of every
+//                  tree, bush, bale and flower instead (sheared
+//                  silhouettes falling toward the lower right, one
+//                  instanced draw call per kind)
 // Nothing here allocates per frame.
 
 import * as THREE from 'three';
 import {
   DANDELION_FLECK_MS, DANDELION_FLECK_POOL, GROUND_STRIPE_CELLS, MEADOW_SEED, MEADOW_SHADOW_LIFT, PX_WORLD,
-  SPRITE_STRETCH_Y, SWAY_PERIOD_MS,
+  SPRITE_STRETCH_Y, SUN_SHADOW_MEADOW_FLOWERS, SWAY_PERIOD_MS,
 } from '../config.js';
 import { artMeta, artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
@@ -28,7 +31,9 @@ import {
 } from './meadow.js';
 import { effectRandom, seededRandom } from './seeded-random.js';
 import { anchorForward, anchorShift, faceYaw, SPRITE_ALPHA_TEST } from './sprite-frames.js';
-import { blobShadowMaterial, pixelTexture, PLANT_SWAY, SHADOW_DEPTH, uprightPlaneGeometry } from './sprites.js';
+import {
+  blobShadowMaterial, pixelTexture, PLANT_SWAY, SHADOW_DEPTH, sunShadowGeometry, sunShadowMaterial, uprightPlaneGeometry,
+} from './sprites.js';
 import { farEdgeWave } from './horizon.js';
 import { GROUND_Y, TERRAIN_GRID } from './terrain.js';
 import { bitKinds, metaAnchor } from './v3-meta.js';
@@ -74,22 +79,33 @@ export function createMeadow(scene, cameraPosition, { haze }) {
   const scenery = new THREE.Group();
   const trees = billboards(ART.v3.trees, plan.trees, cameraPosition, null); // mirrored and shaded per tree
   const bushes = billboards(ART.v3.bushes, plan.bushes, cameraPosition, null);
-  const bales = billboards(ART.v3.hayBale, plan.bales.map((b) => ({ ...b, look: 0 })), cameraPosition, null);
+  const baleItems = plan.bales.map((b) => ({ ...b, look: 0 }));
+  const bales = billboards(ART.v3.hayBale, baleItems, cameraPosition, null);
   scenery.add(trees, bushes, bales);
   const shadowSpots = meadowShadowSpots(plan);
   const sceneryShadows = blobShadows(shadowSpots.scenery, 1);
-  scenery.add(sceneryShadows);
+  const scenerySunShadows = new THREE.Group();
+  scenerySunShadows.add(
+    sunShadows(trees, ART.v3.trees, plan.trees),
+    sunShadows(bushes, ART.v3.bushes, plan.bushes),
+    sunShadows(bales, ART.v3.hayBale, baleItems),
+  );
+  scenery.add(sceneryShadows, scenerySunShadows);
   scene.add(scenery);
 
   const tufts = billboards(ART.v3.grassTufts, plan.tufts, cameraPosition, sway);
   scene.add(tufts);
 
   const flowers = new THREE.Group();
+  const flowerSunShadows = new THREE.Group();
   for (const group of meadowInstanceGroups(plan)) {
-    flowers.add(billboards(ART.v3.flower[group.species], group.items, cameraPosition, sway));
+    const name = ART.v3.flower[group.species];
+    const mesh = billboards(name, group.items, cameraPosition, sway);
+    flowers.add(mesh);
+    if (SUN_SHADOW_MEADOW_FLOWERS) flowerSunShadows.add(sunShadows(mesh, name, group.items));
   }
   const flowerShadows = blobShadows(shadowSpots.patches, PATCH_SHADOW_OPACITY);
-  flowers.add(flowerShadows);
+  flowers.add(flowerShadows, flowerSunShadows);
   scene.add(flowers);
 
   const flecks = createSeedFlecks(dandelionPuffs(plan), cameraPosition);
@@ -114,9 +130,12 @@ export function createMeadow(scene, cameraPosition, { haze }) {
       flecks.mesh.visible = swaying;
       if (!swaying) flecks.clear();
       hills.setStyle(features.farHills);
-      const shadows = features.shadows !== 'none';
-      sceneryShadows.visible = shadows;
-      flowerShadows.visible = shadows;
+      const blob = features.shadows === 'blob';
+      const sun = features.shadows === 'sun';
+      sceneryShadows.visible = blob;
+      flowerShadows.visible = blob;
+      scenerySunShadows.visible = sun;
+      flowerSunShadows.visible = sun;
     },
 
     update(timeMs, dtMs) {
@@ -191,7 +210,6 @@ if (uRipple > 0.0) {
   painted.customProgramCacheKey = () => 'meadow-ground-ripple';
 
   const mesh = new THREE.Mesh(geometry, painted);
-  mesh.receiveShadow = true;
   return {
     mesh,
     setStyle(style) {
@@ -471,6 +489,53 @@ function blobShadows(spots, opacity) {
   geometry.setIndex(indices);
   geometry.computeBoundingSphere();
   return new THREE.Mesh(geometry, material);
+}
+
+// The long sun shadows of the billboards `mesh` (made by billboards() from
+// sheet `name` and `items`): one instanced mesh of flat sheared
+// silhouettes (sunShadowGeometry in sprites.js), each with its root under
+// the item's anchor pixel, showing the item's frame (look) and mirroring,
+// with the billboards' own texture. Built once, one draw call.
+function sunShadows(mesh, name, items) {
+  const { width, height, frames } = placeholderShape(name);
+  const anchor = metaAnchor(artMeta(), name);
+  const { side } = anchorShift(width, height, anchor, PX_WORLD, SPRITE_STRETCH_Y);
+  // A copy: the per-instance attributes below belong to this mesh only.
+  const geometry = sunShadowGeometry(width, height, anchor ? height - 1 - anchor.y : 0).clone();
+  const looks = new Float32Array(items.length);
+  const mirrors = new Float32Array(items.length);
+  const uniforms = { uFrameWidth: { value: 1 / frames } };
+  const material = sunShadowMaterial(mesh.material.map, {
+    key: 'meadow-sun-shadow',
+    vertex: (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', `#include <common>
+attribute float aLook;
+attribute float aMirror;
+uniform float uFrameWidth;`)
+        .replace('#include <uv_vertex>', `#include <uv_vertex>
+#ifdef USE_MAP
+vMapUv.x = (mix(vMapUv.x, 1.0 - vMapUv.x, aMirror) + aLook) * uFrameWidth;
+#endif`);
+    },
+  });
+  const shadows = new THREE.InstancedMesh(geometry, material, items.length);
+  const matrix = new THREE.Matrix4();
+  items.forEach((item, i) => {
+    const s = item.scale ?? 1;
+    // A mirrored frame has its anchor pixel on the other side.
+    const shift = (item.mirror ? -side : side) * s;
+    matrix.makeScale(s, 1, s).setPosition(item.x + shift, GROUND_Y, item.z);
+    shadows.setMatrixAt(i, matrix);
+    looks[i] = Math.min(Math.max(item.look ?? 0, 0), frames - 1);
+    mirrors[i] = item.mirror ? 1 : 0;
+  });
+  geometry.setAttribute('aLook', new THREE.InstancedBufferAttribute(looks, 1));
+  geometry.setAttribute('aMirror', new THREE.InstancedBufferAttribute(mirrors, 1));
+  shadows.instanceMatrix.needsUpdate = true;
+  shadows.computeBoundingSphere();
+  return shadows;
 }
 
 // Seed flecks from the dandelion seed puffs: each puff lets one go every

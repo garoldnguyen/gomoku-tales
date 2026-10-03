@@ -113,7 +113,7 @@ export function drawWindStreaks(ctx, time) {
 // gives several of them (a skill used on the turn a pending Wind Dash
 // resolves) or actions come fast.
 export function createBanners() {
-  const banners = []; // { text, start }, in the order they show
+  const banners = []; // { text, start, width }, in the order they show
 
   // Banners start in order and all last BANNER_MS, so the finished ones
   // are always at the front.
@@ -125,7 +125,7 @@ export function createBanners() {
     add(text, time) {
       const last = banners[banners.length - 1];
       const start = last ? Math.max(time, last.start + BANNER_MS) : time;
-      banners.push({ text, start });
+      banners.push({ text, start, width: 0 }); // width: measured when first drawn
     },
 
     clear() {
@@ -150,7 +150,9 @@ export function createBanners() {
       ctx.save();
       ctx.globalAlpha = Math.max(0, fade);
       ctx.font = 'bold 22px monospace';
-      const w = Math.ceil(ctx.measureText(banner.text).width) + 40;
+      // Measured once per banner: measureText makes a new object each call.
+      if (banner.width === 0) banner.width = Math.ceil(ctx.measureText(banner.text).width) + 40;
+      const w = banner.width;
       const h = 36;
       const x = Math.round(INTERNAL_WIDTH / 2 - w / 2);
       const top = Math.round(y - (1 - slide) * 20);

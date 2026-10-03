@@ -7,6 +7,10 @@ import { createInitialState, canUseSkill, isGameOver, placeStone, skillCooldown,
 import { getSkill } from '../logic/skills.js';
 import { startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
 
+// takeEvents' answer when nothing happened, shared so the render loop makes
+// no new list on an ordinary frame.
+const NO_EVENTS = Object.freeze([]);
+
 // options.random is passed to placeStone for the Tornado Zone throw.
 export function createLocalGame(options = {}) {
   const { random = Math.random } = options;
@@ -16,6 +20,13 @@ export function createLocalGame(options = {}) {
   let targeting = null; // skill target flow in progress, see targeting.js
   let message = null;
   let pendingEvents = []; // events of applied actions not yet taken for effects
+  // The pending events, with a new list for the next ones (only on a frame
+  // with events).
+  const handOverEvents = () => {
+    const events = pendingEvents;
+    pendingEvents = [];
+    return events;
+  };
 
   // Takes the result of a rules action. Returns true if it was applied.
   const apply = (result) => {
@@ -42,9 +53,8 @@ export function createLocalGame(options = {}) {
     // Events of the actions applied since the last call, oldest first, for
     // the effects (render/effects.js).
     takeEvents() {
-      const events = pendingEvents;
-      pendingEvents = [];
-      return events;
+      if (pendingEvents.length === 0) return NO_EVENTS; // most frames: nothing new, nothing made
+      return handOverEvents();
     },
 
     setHover(cell) {

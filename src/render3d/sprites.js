@@ -5,14 +5,17 @@
 // pixel is PX_WORLD world units wide for every sprite (and SPRITE_STRETCH_Y
 // times that tall, so pixels look square from the tilted camera). Textures use NearestFilter
 // without mipmaps and alphaTest cutout edges. Animations are sprite sheets
-// with all frames in one row. Every sprite has a soft blob shadow.
+// with all frames in one row. Every sprite has a soft blob shadow (Medium)
+// and a long sun shadow (High), and its owner shows at most one of them.
 
 import * as THREE from 'three';
-import { PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
+import { PX_WORLD, SPRITE_STRETCH_Y, SUN_SHADOW_OPACITY } from '../config.js';
+import { sunShadowCorners } from './shadow-math.js';
 import { anchorForward, anchorShift, faceYaw, frameAt, SPRITE_ALPHA_TEST } from './sprite-frames.js';
 import { bendTowardPx, swayLeanSide, swayPhase } from './wind.js';
 
 const SHADOW_OPACITY = 0.35;
+const SHADOW_COLOR = 0x1a1030; // dark plum, for blob and sun shadows alike
 export const SHADOW_DEPTH = 0.8; // the blob is an ellipse this much shorter in z
 // Sprite normals lean back towards the sky, so the sun and the hemisphere
 // light an upright sprite about as brightly as the ground it stands on.
@@ -170,7 +173,7 @@ let blobGeometry = null;
 export function blobShadowMaterial() {
   blobMaterial ??= new THREE.MeshBasicMaterial({
     map: blobShadowTexture(),
-    color: 0x1a1030,
+    color: SHADOW_COLOR,
     transparent: true,
     opacity: SHADOW_OPACITY,
     depthWrite: false,
@@ -190,6 +193,52 @@ export function createBlobShadow(radius) {
   const shadow = new THREE.Mesh(blobShadowGeometry(), blobShadowMaterial());
   shadow.scale.set(radius * 2, 1, radius * 2 * SHADOW_DEPTH);
   return shadow;
+}
+
+// Flat geometry on y = 0 for the long sun shadow of a frame widthPx x
+// heightPx whose root row is rootRow rows up (sunShadowCorners in
+// shadow-math.js), its root at the origin. Shared per size.
+const sunShadowGeometries = new Map();
+export function sunShadowGeometry(widthPx, heightPx, rootRow = 0) {
+  const key = `${widthPx}x${heightPx}@${rootRow}`;
+  if (!sunShadowGeometries.has(key)) {
+    const corners = sunShadowCorners(widthPx, heightPx, rootRow);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(corners.flatMap((c) => [c.x, 0, c.z]), 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(corners.flatMap(() => [0, 1, 0]), 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(corners.flatMap((c) => [c.u, c.v]), 2));
+    geometry.setIndex([0, 2, 1, 1, 2, 3]);
+    geometry.computeBoundingSphere();
+    sunShadowGeometries.set(key, geometry);
+  }
+  return sunShadowGeometries.get(key);
+}
+
+// The material of a long sun shadow: the frame's silhouette (every texel
+// the sprite's alpha test keeps) in dark plum at SUN_SHADOW_OPACITY,
+// lying on the ground and drawn over it by polygon offset. `map` is the
+// sprite's own texture, so the shadow shows the same frame. Both sides
+// draw, whichever way the shear turns the quad. `onBeforeCompile` may add
+// more shader code (the meadow's frame and mirror per instance).
+export function sunShadowMaterial(map, { key = 'sun-shadow', vertex = null } = {}) {
+  const material = new THREE.MeshBasicMaterial({
+    map,
+    color: SHADOW_COLOR,
+    transparent: true,
+    opacity: SUN_SHADOW_OPACITY,
+    alphaTest: 0.01, // the cut-out texels
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    ...ON_SURFACE,
+  });
+  material.onBeforeCompile = (shader) => {
+    if (vertex) vertex(shader);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <map_fragment>', `#ifdef USE_MAP
+diffuseColor.a *= step(${SPRITE_ALPHA_TEST.toFixed(2)}, texture2D(map, vMapUv).a);
+#endif`);
+  };
+  material.customProgramCacheKey = () => key;
+  return material;
 }
 
 const sheetTextures = new WeakMap(); // sheet canvas -> base texture
@@ -254,10 +303,29 @@ export class PixelSprite {
     this.plane = new THREE.Mesh(sharedGeometry(frameWidth, sheet.height), material);
     this.anchor = anchorShift(frameWidth, sheet.height, anchor, PX_WORLD, SPRITE_STRETCH_Y);
     this.shadow = createBlobShadow(shadowRadius ?? (frameWidth * PX_WORLD) / 3);
+    // The long sun shadow from the root row, under the anchor pixel. The
+    // camera faces the board almost straight on, so it lies along world x.
+    this.sunShadow = new THREE.Mesh(
+      sunShadowGeometry(frameWidth, sheet.height, anchor ? sheet.height - 1 - anchor.y : 0),
+      sunShadowMaterial(this.texture),
+    );
+    this.sunShadow.position.x = this.anchor.side;
+    this.sunShadow.visible = false;
 
     this.object = new THREE.Group();
-    this.object.add(this.shadow, this.plane);
+    this.object.add(this.shadow, this.sunShadow, this.plane);
+    this.blobScaleX = this.shadow.scale.x;
+    this.blobScaleZ = this.shadow.scale.z;
     this.setFrame(0);
+  }
+
+  // Scales both shadows around the feet by `factor` (1: full size), for a
+  // sprite lifted off the ground.
+  setShadowScale(factor) {
+    this.shadow.scale.x = this.blobScaleX * factor;
+    this.shadow.scale.z = this.blobScaleZ * factor;
+    this.sunShadow.scale.x = factor;
+    this.sunShadow.scale.z = factor;
   }
 
   // Puts the sprite's feet on a ground point.

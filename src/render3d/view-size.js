@@ -16,6 +16,16 @@ export function viewSize(cssWidth, cssHeight, devicePixelRatio, pixelRatioCap) {
   return { width: cssWidth, height: cssHeight, pixelRatio: cappedPixelRatio(devicePixelRatio, pixelRatioCap) };
 }
 
+// viewSize written into `out` { width, height, pixelRatio } (no
+// allocation, for the render loop): returns `out`, or null as viewSize.
+export function viewSizeInto(cssWidth, cssHeight, devicePixelRatio, pixelRatioCap, out) {
+  if (!(cssWidth > 0 && cssHeight > 0)) return null;
+  out.width = cssWidth;
+  out.height = cssHeight;
+  out.pixelRatio = cappedPixelRatio(devicePixelRatio, pixelRatioCap);
+  return out;
+}
+
 // True when two view sizes (or nulls) are the same, so nothing needs resizing.
 export function sameViewSize(a, b) {
   if (a === null || b === null) return a === b;

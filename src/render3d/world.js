@@ -24,7 +24,7 @@ import { zonePieceUv } from './farm-layout.js';
 import { snapToStep, worldUnitsPerPixel } from './effect-plans.js';
 import { createFpsMeter } from './fps.js';
 import { STAGE_REST } from './growth.js';
-import { cellToWorld, pickCell } from './picking.js';
+import { cellToWorldInto, pickCell } from './picking.js';
 import { createPostProcessing } from './post-processing.js';
 import {
   browserStorage, changedFeatures, createSlowFrameWatch, cycleQuality, fxFeatures, loadSavedQuality, lowerQuality,
@@ -32,10 +32,9 @@ import {
 } from './quality.js';
 import { ON_SURFACE, PixelSprite, pixelTexture } from './sprites.js';
 import { metaAnchor } from './v3-meta.js';
-import { sameViewSize, viewSize } from './view-size.js';
+import { sameViewSize, viewSizeInto } from './view-size.js';
 
 export const WORLD_ASPECT = 16 / 9;
-const SHADOW_EXTENT = 20; // the sun's shadow map covers the board, characters and trees
 const PIECE_SHADOW_RADIUS = 0.36;
 const ROCK_SHADOW_RADIUS = PIECE_SHADOW_RADIUS * 1.2;
 
@@ -59,7 +58,8 @@ const COLORS = {
 // `quality` is the level to start with (default: the one saved in
 // `storage`, else medium); `storage` is localStorage or null. `fx` are the
 // URL switches for the High-only effects (parseFxSwitches in quality.js),
-// read from the page's URL by default.
+// read from the page's URL by default. `createRenderer(canvas)` makes the
+// WebGL renderer (tests pass a stand-in, as Node has no WebGL).
 export function createWorld(canvas, {
   storage = browserStorage(),
   quality: startLevel = loadSavedQuality(storage) ?? QUALITY_FALLBACK,
@@ -67,12 +67,15 @@ export function createWorld(canvas, {
   meta,
   warn = () => {},
   fx = parseFxSwitches(globalThis.location?.search ?? ''),
+  createRenderer = (target) => new THREE.WebGLRenderer({ canvas: target, antialias: true }),
 } = {}) {
   setArtAssets(assets, { warn, meta });
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-  renderer.shadowMap.enabled = true; // the sun casts shadows only with the 'sun' shadow mode (see applyQuality)
-  // PCFShadowMap with a radius gives soft edges (this release removed PCFSoftShadowMap).
-  renderer.shadowMap.type = THREE.PCFShadowMap;
+  const renderer = createRenderer(canvas);
+  // No shadow maps: shadows are flat decals on the ground (blob shadows on
+  // Medium, the sheared silhouettes of the long sun shadows on High), which
+  // fall the documented way (toward the lower right) and cost no extra
+  // render of the scene.
+  renderer.shadowMap.enabled = false;
 
   const scene = new THREE.Scene();
 
@@ -86,14 +89,9 @@ export function createWorld(canvas, {
   const cameraRight = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 0);
   const cameraUp = new THREE.Vector3().setFromMatrixColumn(camera.matrixWorld, 1);
 
-  // Lights: a warm sun with soft shadows and a cool hemisphere fill (section D).
+  // Lights: a warm sun and a cool hemisphere fill (section D).
   const sun = new THREE.DirectionalLight(COLORS.sun, 2.6);
   sun.position.set(-12, 20, 10);
-  sun.shadow.mapSize.set(2048, 2048);
-  sun.shadow.radius = 4;
-  sun.shadow.bias = -0.0005;
-  sun.shadow.normalBias = 0.02;
-  Object.assign(sun.shadow.camera, { left: -SHADOW_EXTENT, right: SHADOW_EXTENT, top: SHADOW_EXTENT, bottom: -SHADOW_EXTENT, near: 1, far: 70 });
   scene.add(sun);
   scene.add(new THREE.HemisphereLight(COLORS.hemiSky, COLORS.hemiGround, 1.2));
 
@@ -111,15 +109,17 @@ export function createWorld(canvas, {
   // board and Earth Bear (O) on the right, with idle, cast, win and lose
   // poses and a glow for the player to move (src/render3d/characters3d.js),
   // when SHOW_WORLD_CHARACTERS is on; for now the HUD cards carry them.
-  const sprites = new Set();
-  let blobShadows = true; // false when the quality level has no shadows
-  // A sprite with noBlobShadow set (the see-through ghosts) never shows one.
-  const showBlobShadow = (sprite) => {
+  const sprites = []; // an array, so the render loop walks it without an iterator
+  let blobShadows = true; // the 'blob' shadow mode (Medium)
+  let sunShadows = false; // the 'sun' shadow mode (High): long sun shadows instead of blobs
+  // A sprite with noBlobShadow set (the see-through ghosts) never shows either.
+  const showShadow = (sprite) => {
     sprite.shadow.visible = blobShadows && !sprite.noBlobShadow;
+    sprite.sunShadow.visible = sunShadows && !sprite.noBlobShadow;
   };
   const addSprite = (sprite) => {
-    sprites.add(sprite);
-    showBlobShadow(sprite);
+    if (!sprites.includes(sprite)) sprites.push(sprite);
+    showShadow(sprite);
     scene.add(sprite.object);
     return sprite;
   };
@@ -135,6 +135,8 @@ export function createWorld(canvas, {
     holdMs: QUALITY_STEP_DOWN_MS,
     stallMs: QUALITY_STALL_MS,
   });
+  // A hidden page stops requestAnimationFrame; that gap is not a slow frame.
+  const fpsMeter = createFpsMeter(FPS_SAMPLE_MS, QUALITY_STALL_MS);
   let quality = null;
   let features = null; // the quality table row of `quality`, with the URL switches (fxFeatures)
   let autoStepped = false; // true after the last change was an automatic step down
@@ -146,11 +148,17 @@ export function createWorld(canvas, {
   // the world was built has no size at first. clientWidth ignores CSS
   // transforms, so the blurred backdrop behind the menus (index.html) does
   // not resize it.
-  let viewSizeNow = null;
+  // Both sizes are made once and rewritten, so the check allocates nothing.
+  const viewSizeNow = { width: 0, height: 0, pixelRatio: 0 };
+  const viewSizeNext = { width: 0, height: 0, pixelRatio: 0 };
+  let sized = false; // false until viewSizeNow holds the buffer's size
   function resize() {
-    const next = viewSize(canvas.clientWidth, canvas.clientHeight, window.devicePixelRatio, features.pixelRatioCap);
-    if (next === null || sameViewSize(viewSizeNow, next)) return;
-    viewSizeNow = next;
+    const next = viewSizeInto(canvas.clientWidth, canvas.clientHeight, globalThis.devicePixelRatio, features.pixelRatioCap, viewSizeNext);
+    if (next === null || (sized && sameViewSize(viewSizeNow, next))) return;
+    sized = true;
+    viewSizeNow.width = next.width;
+    viewSizeNow.height = next.height;
+    viewSizeNow.pixelRatio = next.pixelRatio;
     renderer.setPixelRatio(next.pixelRatio);
     renderer.setSize(next.width, next.height, false);
     postProcessing.resize();
@@ -167,18 +175,17 @@ export function createWorld(canvas, {
     features = nextFeatures;
     autoStepped = auto;
     slowFrames.reset();
+    fpsMeter.resetLowest(); // the lowest FPS reading is per level
     if (changed.includes('shadows')) {
-      // Real shadow maps only with the sun mode. Changing castShadow makes
-      // Three.js rebuild the lit materials once.
-      sun.castShadow = features.shadows === 'sun';
-      blobShadows = features.shadows !== 'none';
-      for (const sprite of sprites) showBlobShadow(sprite);
+      blobShadows = features.shadows === 'blob';
+      sunShadows = features.shadows === 'sun';
+      for (let i = 0; i < sprites.length; i++) showShadow(sprites[i]);
     }
     if (changed.includes('postEffects')) postProcessing.setEffects(features.postEffects);
     if (changed.some((key) => SCENERY_FEATURES.has(key))) scenery.setFeatures(features);
     if (changed.some((key) => FARM_FEATURES.has(key))) farm.setFeatures(features);
     if (changed.includes('pixelRatioCap')) {
-      viewSizeNow = null;
+      sized = false;
       resize();
     }
   }
@@ -190,8 +197,6 @@ export function createWorld(canvas, {
     saveQuality(storage, quality);
   }
 
-  // A hidden page stops requestAnimationFrame; that gap is not a slow frame.
-  const fpsMeter = createFpsMeter(FPS_SAMPLE_MS, QUALITY_STALL_MS);
   let lastNow = null;
 
   return {
@@ -205,7 +210,8 @@ export function createWorld(canvas, {
     addSprite,
 
     removeSprite(sprite) {
-      sprites.delete(sprite);
+      const i = sprites.indexOf(sprite);
+      if (i >= 0) sprites.splice(i, 1);
       scene.remove(sprite.object);
     },
 
@@ -262,6 +268,11 @@ export function createWorld(canvas, {
       return fpsMeter.fps;
     },
 
+    // The lowest FPS reading since this level was set (Infinity before the first).
+    get fpsLowest() {
+      return fpsMeter.lowest;
+    },
+
     setQuality,
 
     // The Q key: the next quality level, through setQuality.
@@ -280,7 +291,7 @@ export function createWorld(canvas, {
       lastNow = now;
       scenery.update(now, dtMs);
       characters.update(now, dtMs);
-      for (const sprite of sprites) sprite.update(now, camera.position);
+      for (let i = 0; i < sprites.length; i++) sprites[i].update(now, camera.position);
       postProcessing.render(dtMs / 1000);
     },
   };
@@ -308,12 +319,14 @@ export function createPieceSprite(kind) {
   return sprite;
 }
 
-// Puts a sprite or decal on the centre of board cell (x, y), keeping its height.
+// Puts a sprite or decal on the centre of board cell (x, y), keeping its
+// height. Called in the render loop, so it allocates nothing.
+const cellCentre = { x: 0, z: 0 };
 export function placeOnCell(object, x, y) {
-  const world = cellToWorld(x, y);
+  cellToWorldInto(x, y, cellCentre);
   const target = object.object ?? object;
-  target.position.x = world.x;
-  target.position.z = world.z;
+  target.position.x = cellCentre.x;
+  target.position.z = cellCentre.z;
 }
 
 // Unlit see-through material for flat decals drawn from a canvas or image.
@@ -344,15 +357,19 @@ export function createCellDecal(material, geometry = null) {
 // One-cell geometry showing the part of a 3x3-cell zone decal (decal-zone-v3)
 // that lies on the cell (dx, dy) from the zone centre, so a zone clipped at
 // the board edge shows only its part on the field.
+// Keyed by a number, not a string, so a lookup in the render loop (the zone
+// preview) makes nothing; a piece is built once, on its first use.
 const zonePieces = new Map();
 export function zonePieceGeometry(dx, dy) {
-  const key = `${dx},${dy}`;
-  if (!zonePieces.has(key)) {
-    const { u0, u1, v0, v1 } = zonePieceUv(dx, dy);
-    const geometry = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-    // PlaneGeometry corners: top left, top right, bottom left, bottom right.
-    geometry.attributes.uv.set([u0, v1, u1, v1, u0, v0, u1, v0]);
-    zonePieces.set(key, geometry.rotateX(-Math.PI / 2));
-  }
+  const key = (dy + 64) * 128 + (dx + 64);
+  return zonePieces.get(key) ?? newZonePiece(key, dx, dy);
+}
+
+function newZonePiece(key, dx, dy) {
+  const { u0, u1, v0, v1 } = zonePieceUv(dx, dy);
+  const geometry = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
+  // PlaneGeometry corners: top left, top right, bottom left, bottom right.
+  geometry.attributes.uv.set([u0, v1, u1, v1, u0, v0, u1, v0]);
+  zonePieces.set(key, geometry.rotateX(-Math.PI / 2));
   return zonePieces.get(key);
 }

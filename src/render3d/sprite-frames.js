@@ -17,11 +17,13 @@ export function fadedAlphaTest(opacity, alphaTest = SPRITE_ALPHA_TEST) {
 // Index of the sprite sheet frame to show `timeMs` after the animation
 // started. Every frame lasts `frameMs`. A looping animation wraps around; a
 // one-shot animation (loop: false) holds its last frame. Times before the
-// start show frame 0.
-export function frameAt(timeMs, frameCount, frameMs, { loop = true } = {}) {
+// start show frame 0. `options` is any object with a `loop` flag (missing:
+// true); the default is shared, so a call allocates nothing.
+const LOOPING = Object.freeze({ loop: true });
+export function frameAt(timeMs, frameCount, frameMs, options = LOOPING) {
   if (frameCount <= 1 || !(frameMs > 0) || !(timeMs > 0)) return 0;
   const step = Math.floor(timeMs / frameMs);
-  return loop ? step % frameCount : Math.min(step, frameCount - 1);
+  return (options.loop ?? true) ? step % frameCount : Math.min(step, frameCount - 1);
 }
 
 // Where art pixel `anchor` { x, y } of an upright sprite's frame (widthPx
