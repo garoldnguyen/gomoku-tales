@@ -3,7 +3,7 @@
 
 import { X, O, isEmptyCell } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
-import { canUseSkill, isGameOver, newGame, placeStone, skillCooldown, useSkill } from '../logic/game.js';
+import { canUseSkill, characterOf, isGameOver, newGame, placeStone, skillCooldown, useSkill } from '../logic/game.js';
 import { getSkill } from '../logic/skills.js';
 import { startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
 
@@ -171,12 +171,12 @@ export function skillLockReason(state, player, skillId) {
 
 // Everything a player panel shows (docs/design.md section 3.1).
 export function panelView(state, player, { you = false, targeting = null, hoverSkill = null } = {}) {
-  const character = characterForStone(player);
+  const character = characterOf(state, player);
   const active = !isGameOver(state) && state.currentPlayer === player;
   return {
     player,
     name: character.name,
-    stone: character.stone,
+    stone: player,
     active,
     you,
     winner: state.winner === player,

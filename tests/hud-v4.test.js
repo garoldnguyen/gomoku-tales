@@ -6,9 +6,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { HUD_CARD_HEIGHT_PX, HUD_CARD_WIDTH_PX, HUD_SKILL_ROW_PX } from '../src/config.js';
 import { X, O } from '../src/logic/board.js';
-import { characterForStone } from '../src/logic/characters.js';
-import { createInitialState, placeStone } from '../src/logic/game.js';
-import { SKILLS } from '../src/logic/skills.js';
+import { JADE_SERPENT, WIND_RABBIT, characterForStone } from '../src/logic/characters.js';
+import { createInitialState, newGame, placeStone } from '../src/logic/game.js';
 import { ALL_COLLAPSED, ALL_EXPANDED } from '../src/ui/hud-collapse.js';
 import { CARD_HEIGHT, CARD_WIDTH, MIN_CARD_SCALE, cardBox, hudBoxes, hudLayout } from '../src/ui/hud-layout.js';
 import { hudViewModel, skillPopupViewModel } from '../src/ui/hud-view.js';
@@ -55,11 +54,16 @@ function midGame() {
   return state; // X to move
 }
 
-test('the skill popup view model holds the description and hint of each of the four skills', () => {
-  const vm = hudViewModel(midGame(), {}, null);
+test('the skill popup view model holds the description and hint of each skill in play', () => {
+  check(midGame(), ['windDash', 'tornadoZone', 'terrainCreation', 'stoneConversion']);
+  check(newGame({ characters: { [X]: JADE_SERPENT, [O]: WIND_RABBIT } }), ['hiss', 'venom', 'windDash', 'tornadoZone']);
+});
+
+function check(state, expected) {
+  const vm = hudViewModel(state, {}, null);
   const seen = [];
   for (const player of [X, O]) {
-    for (const skillId of characterForStone(player).skills) {
+    for (const skillId of characterForStone(player, state.characters).skills) {
       const popup = skillPopupViewModel(vm, player, skillId);
       assert.equal(popup.player, player);
       assert.equal(popup.id, skillId);
@@ -70,10 +74,10 @@ test('the skill popup view model holds the description and hint of each of the f
       seen.push(skillId);
     }
   }
-  assert.deepEqual(seen.sort(), Object.keys(SKILLS).sort());
+  assert.deepEqual(seen.sort(), expected.sort());
   // A skill the card does not have gives null.
-  assert.equal(skillPopupViewModel(vm, X, characterForStone(O).skills[0]), null);
-});
+  assert.equal(skillPopupViewModel(vm, X, characterForStone(O, state.characters).skills[0]), null);
+}
 
 test('the skill popup state follows the view model', () => {
   const state = midGame();

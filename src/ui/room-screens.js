@@ -5,7 +5,7 @@
 
 import { ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH } from '../config.js';
 import { X } from '../logic/board.js';
-import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
+import { CHARACTERS, EARTH_BEAR, WIND_RABBIT, stoneForCharacter } from '../logic/characters.js';
 import { otherCharacter } from '../net/room.js';
 import { normalizeRoomCode } from '../net/room-code.js';
 import { ROLES, SCREENS } from './flow.js';
@@ -63,14 +63,15 @@ export function waitingViewModel(flow, room) {
     startingText: starting ? STRINGS.waitingStarting : null,
     cards: WAITING_CARD_ORDER.map((id) => {
       const character = CHARACTERS[id];
+      const stone = stoneForCharacter(id);
       const you = id === mine;
       return {
         character: id,
         name: character.name,
-        stone: character.stone,
-        team: character.stone === X ? 'blue' : 'red',
-        portrait: PORTRAIT_ART[character.stone],
-        note: character.stone === X ? STRINGS.waitingMovesFirst : null,
+        stone,
+        team: stone === X ? 'blue' : 'red',
+        portrait: PORTRAIT_ART[stone],
+        note: stone === X ? STRINGS.waitingMovesFirst : null,
         you,
         youText: you ? STRINGS.waitingYou : null,
         placeholder: !you && !starting,

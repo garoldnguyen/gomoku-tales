@@ -1,6 +1,5 @@
-// Skill registry (docs/design.md section 5). Only the framework data lives
-// here for now: which character owns each skill and its cooldown class.
-// Skill effects are added by later tasks.
+// Skill registry (docs/design.md section 5): which character owns each
+// skill and its cooldown class. The effects live in the character modules.
 
 import { COOLDOWN_SHORT, COOLDOWN_LONG } from '../config.js';
 
@@ -11,12 +10,16 @@ export const WIND_DASH = 'windDash';
 export const TORNADO_ZONE = 'tornadoZone';
 export const TERRAIN_CREATION = 'terrainCreation';
 export const STONE_CONVERSION = 'stoneConversion';
+export const HISS = 'hiss';
+export const VENOM = 'venom';
 
 export const SKILLS = {
   [WIND_DASH]: { id: WIND_DASH, name: 'Wind Dash', character: 'windRabbit', cooldownClass: SHORT },
   [TORNADO_ZONE]: { id: TORNADO_ZONE, name: 'Tornado Zone', character: 'windRabbit', cooldownClass: LONG },
   [TERRAIN_CREATION]: { id: TERRAIN_CREATION, name: 'Terrain Creation', character: 'earthBear', cooldownClass: SHORT },
   [STONE_CONVERSION]: { id: STONE_CONVERSION, name: 'Stone Conversion', character: 'earthBear', cooldownClass: LONG },
+  [HISS]: { id: HISS, name: 'Hiss', character: 'jadeSerpent', cooldownClass: SHORT },
+  [VENOM]: { id: VENOM, name: 'Venom', character: 'jadeSerpent', cooldownClass: LONG },
 };
 
 export function getSkill(skillId) {

@@ -108,7 +108,7 @@
 //                                         was dropped because the game ended by the rules
 
 import { HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS, WAITING_START_DELAY_MS } from '../config.js';
-import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
+import { CHARACTERS, EARTH_BEAR, WIND_RABBIT, stoneForCharacter } from '../logic/characters.js';
 import { isGameOver, newGame, placeStone, useSkill } from '../logic/game.js';
 import { systemClock } from './clock.js';
 import { ROOM_PHASES } from './phase.js';
@@ -154,7 +154,7 @@ export function createHostRoom(options) {
   } = options;
   if (!Object.hasOwn(CHARACTERS, character)) throw new Error(`Unknown character: ${character}`);
   const guestCharacter = otherCharacter(character);
-  const guestStone = CHARACTERS[guestCharacter].stone;
+  const guestStone = stoneForCharacter(guestCharacter);
 
   const room = createRoomCore({ role: HOST, transport, code, character, clock, id });
   room.phase = WAITING;
@@ -419,7 +419,7 @@ export function createGuestRoom(options) {
     // A result of a later round belongs to a game this side never took,
     // so it never replaces the outcome of this one.
     if ((message.type !== 'ping' && message.type !== 'welcome') || laterRound) return;
-    if (isClaim(message.result, CHARACTERS[room.hostCharacter].stone)) {
+    if (isClaim(message.result, stoneForCharacter(room.hostCharacter))) {
       room.setResult({ winner: message.result.winner, reason: 'opponentLeft' }); // the host decides
     } else if (room.result && isGameOver(room.state)) {
       room.setResult(null); // the game had already ended by the rules before this side counted down
@@ -522,7 +522,7 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
 
     setCharacter(value) {
       room.character = value;
-      room.stone = CHARACTERS[value].stone;
+      room.stone = stoneForCharacter(value);
     },
 
     send(message) {

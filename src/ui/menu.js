@@ -5,7 +5,7 @@
 
 import * as CONFIG from '../config.js';
 import { X } from '../logic/board.js';
-import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
+import { CHARACTERS, EARTH_BEAR, WIND_RABBIT, stoneForCharacter } from '../logic/characters.js';
 import { LONG, getSkill } from '../logic/skills.js';
 import { QUALITY_LEVELS } from '../render3d/quality.js';
 import { FLOW_EVENTS, OVERLAYS, SCREENS } from './flow.js';
@@ -111,12 +111,13 @@ export function howToViewModel(config = CONFIG) {
     skillsTitle: STRINGS.howToSkillsTitle,
     characters: [WIND_RABBIT, EARTH_BEAR].map((id) => {
       const character = CHARACTERS[id];
+      const stone = stoneForCharacter(id);
       return {
         id,
         name: character.name,
-        stone: character.stone,
-        team: character.stone === X ? 'blue' : 'red',
-        portrait: PORTRAIT_ART[character.stone],
+        stone,
+        team: stone === X ? 'blue' : 'red',
+        portrait: PORTRAIT_ART[stone],
         skills: character.skills.map((skillId) => {
           const turns = getSkill(skillId).cooldownClass === LONG ? config.COOLDOWN_LONG : config.COOLDOWN_SHORT;
           return {

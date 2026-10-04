@@ -62,11 +62,13 @@ test('newGame equals the documented fresh state', () => {
   const empty = Array.from({ length: BOARD_SIZE }, () => Array(BOARD_SIZE).fill(EMPTY));
   assert.deepEqual(newGame(), {
     board: empty,
+    characters: { [X]: 'windRabbit', [O]: 'earthBear' },
     currentPlayer: X,
     turn: 1,
     rocks: [],
     pendingDash: null,
     tornado: null,
+    skillLock: null,
     cooldowns: { [X]: { [WIND_DASH]: 0, [TORNADO_ZONE]: 0 }, [O]: { [TERRAIN_CREATION]: 0, [STONE_CONVERSION]: 0 } },
     winner: null,
     winLine: null,

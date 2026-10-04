@@ -9,7 +9,7 @@
 // getView, getScreen and onChange (its actions may be missing).
 
 import { COPY_FEEDBACK_MS } from '../config.js';
-import { CHARACTERS } from '../logic/characters.js';
+import { CHARACTERS, stoneForCharacter } from '../logic/characters.js';
 import { CHARACTER_CHOICES, GAME, GAME_OVER, JOIN, WAITING_SCREEN } from './app.js';
 import { copyFeedbackText, copyRoomCode, joinViewModel, lobbyViewModel } from './room-screens.js';
 import { STRINGS } from './strings.js';
@@ -50,17 +50,18 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   const choices = $('character-choices');
   for (const id of CHARACTER_CHOICES) {
     const character = CHARACTERS[id];
+    const stone = stoneForCharacter(id);
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'choice';
     button.dataset.character = id;
     button.dataset.hudBox = `create-${id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`; // create-wind-rabbit
     const disc = document.createElement('span');
-    disc.className = `disc ${character.stone.toLowerCase()}`;
+    disc.className = `disc ${stone.toLowerCase()}`;
     const name = document.createElement('span');
     name.textContent = character.name;
     const note = document.createElement('small');
-    note.textContent = `${character.stone} stones${character.stone === 'X' ? ', moves first' : ''}`;
+    note.textContent = `${stone} stones${stone === 'X' ? ', moves first' : ''}`;
     button.append(disc, name, note);
     button.addEventListener('click', () => act('createRoom', id));
     choices.append(button);

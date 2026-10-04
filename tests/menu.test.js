@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as config from '../src/config.js';
-import { CHARACTERS } from '../src/logic/characters.js';
+import { CHARACTERS, EARTH_BEAR, WIND_RABBIT, stoneForCharacter } from '../src/logic/characters.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { QUALITY_LEVELS } from '../src/render3d/quality.js';
@@ -112,12 +112,15 @@ test('rulesLines: six lines whose numbers come from the injected config', () => 
 test('How to Play: every skill of every character, with the SKILL_INFO text and the config cooldown', () => {
   const vm = howToViewModel();
   const shown = vm.characters.flatMap((c) => c.skills.map((s) => s.id));
-  const all = Object.values(CHARACTERS).flatMap((c) => c.skills);
+  // The How to Play page shows the two characters of the lobby (Wind
+  // Rabbit X, Earth Bear O by DEFAULT_SIDES); Jade Serpent joins with the
+  // character select (Game v5 part 2 and 3).
+  const all = [WIND_RABBIT, EARTH_BEAR].flatMap((id) => CHARACTERS[id].skills);
   assert.deepEqual([...shown].sort(), [...all].sort());
   for (const character of vm.characters) {
     assert.deepEqual(character.skills.map((s) => s.id), CHARACTERS[character.id].skills, 'grouped by character');
     assert.equal(character.name, CHARACTERS[character.id].name);
-    assert.equal(character.stone, CHARACTERS[character.id].stone);
+    assert.equal(character.stone, stoneForCharacter(character.id));
     assert.ok(character.portrait);
     for (const skill of character.skills) {
       assert.equal(skill.description, SKILL_INFO[skill.id].description, 'the text is SKILL_INFO\'s');

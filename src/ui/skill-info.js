@@ -10,10 +10,11 @@
 // on a plot that is still empty, Tornado Zone throws only the seed the
 // opponent plants inside it on that turn, Terrain Creation needs an empty
 // plot, and Stone Conversion takes only an opponent's plant (only Earth
-// Bear, who plays O, has it, so it only ever turns X into O).
+// Bear, who plays O in the two character lobby, has it, so it only ever
+// turns X into O there). Venom also takes only an opponent's plant.
 
 import { ROCK_LIFETIME_TURNS, TORNADO_SIZE } from '../config.js';
-import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH, getSkill } from '../logic/skills.js';
+import { HISS, STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, VENOM, WIND_DASH, getSkill } from '../logic/skills.js';
 
 const info = (skillId, description, hint) => Object.freeze({ title: getSkill(skillId).name, description, hint });
 
@@ -36,6 +37,16 @@ export const SKILL_INFO = Object.freeze({
   [STONE_CONVERSION]: info(
     STONE_CONVERSION,
     'Pick one of the opponent\'s plants. It wilts and regrows as your plant: X becomes O.',
+    'Click to select, then choose a plant',
+  ),
+  [HISS]: info(
+    HISS,
+    'A warning hiss. On their next turn the opponent cannot use a skill, but they can still plant a seed.',
+    'Click to select, no target needed',
+  ),
+  [VENOM]: info(
+    VENOM,
+    'Pick one of the opponent\'s plants. It withers and its plot is left empty. Rocks cannot be picked.',
     'Click to select, then choose a plant',
   ),
 });

@@ -6,10 +6,11 @@
 
 import { BOARD_SIZE } from '../config.js';
 import { X, O, cloneBoard, createBoard, inBounds, isBoardFull, isEmptyCell, findWinLineAt } from './board.js';
-import { characterForStone } from './characters.js';
-import { cooldownTurns, getSkill, TERRAIN_CREATION, STONE_CONVERSION, WIND_DASH, TORNADO_ZONE } from './skills.js';
+import { DEFAULT_SIDES, FIRST_PLAYER, assignSides, characterForStone } from './characters.js';
+import { cooldownTurns, getSkill, TERRAIN_CREATION, STONE_CONVERSION, WIND_DASH, TORNADO_ZONE, HISS, VENOM } from './skills.js';
 import { breakRocks, stoneConversion, terrainCreation } from './earth-bear-skills.js';
 import { inTornado, resolveDash, throwStone, tornadoZone, windDash } from './wind-rabbit-skills.js';
+import { hiss, isSkillLocked, venom } from './jade-serpent-skills.js';
 
 // Skill effects by skill id.
 const SKILL_EFFECTS = {
@@ -17,28 +18,35 @@ const SKILL_EFFECTS = {
   [TORNADO_ZONE]: tornadoZone,
   [TERRAIN_CREATION]: terrainCreation,
   [STONE_CONVERSION]: stoneConversion,
+  [HISS]: hiss,
+  [VENOM]: venom,
 };
 
 // A fresh game (docs/flow-design.md section 5), shared by the online host,
 // local mode and every rematch: empty board, no rocks, no pending Wind
-// Dash, no Tornado Zone, every cooldown 0, Wind Rabbit (X) to move, no
-// winner. Characters are tied to their stones, so they keep their sides.
-// options.size is the board size; random choices are not made here, the
-// actions keep taking the injected random function.
+// Dash, no Tornado Zone, no Hiss lock, every cooldown 0, X (the first
+// pick) to move, no winner. options.size is the board size;
+// options.characters the sides from assignSides (default DEFAULT_SIDES:
+// Wind Rabbit X, Earth Bear O), kept across a rematch by passing them
+// again. Random choices are not made here, the actions keep taking the
+// injected random function.
 export function newGame(options = {}) {
-  const { size = BOARD_SIZE } = options;
-  return createInitialState(size);
+  const { size = BOARD_SIZE, characters = DEFAULT_SIDES } = options;
+  return createInitialState(size, characters);
 }
 
-export function createInitialState(size = BOARD_SIZE) {
+export function createInitialState(size = BOARD_SIZE, characters = DEFAULT_SIDES) {
+  const sides = assignSides([characters[X], characters[O]]); // checks the two picks
   return {
     board: createBoard(size),
-    currentPlayer: X, // Wind Rabbit (X) always moves first
+    characters: sides, // { X: characterId, O: characterId } by pick order
+    currentPlayer: FIRST_PLAYER, // the first pick (X) always moves first
     turn: 1, // number of the turn being played, counting both players
     rocks: [], // [{ x, y, breaksAfterTurn }], also marked ROCK on the board
     pendingDash: null, // { player, from, to, resolvesAfterTurn } while a Wind Dash is announced
     tornado: null, // { player, x, y, cells, endsAfterTurn } while a Tornado Zone is active
-    cooldowns: { [X]: initialCooldowns(X), [O]: initialCooldowns(O) },
+    skillLock: null, // { player, endsAfterTurn } while a Hiss keeps that player from using skills
+    cooldowns: { [X]: initialCooldowns(sides, X), [O]: initialCooldowns(sides, O) },
     winner: null,
     winLine: null,
     draw: false,
@@ -46,8 +54,13 @@ export function createInitialState(size = BOARD_SIZE) {
 }
 
 // Every skill of the player's character starts ready (0 turns left).
-function initialCooldowns(player) {
-  return Object.fromEntries(characterForStone(player).skills.map((skillId) => [skillId, 0]));
+function initialCooldowns(sides, player) {
+  return Object.fromEntries(characterForStone(player, sides).skills.map((skillId) => [skillId, 0]));
+}
+
+// The character the player plays in this game.
+export function characterOf(state, player) {
+  return characterForStone(player, state.characters ?? DEFAULT_SIDES);
 }
 
 export function isGameOver(state) {
@@ -93,7 +106,7 @@ export function placeStone(state, action, options = {}) {
 // Uses one of the acting player's skills. Using a skill uses the whole
 // turn. action = { player, skill, target } where target is whatever the
 // skill needs: { from: { x, y }, to: { x, y } } for Wind Dash and a cell
-// { x, y } for the other skills.
+// { x, y } for the other skills (Hiss needs none).
 export function useSkill(state, action) {
   const { player, skill: skillId, target = null } = action;
   if (isGameOver(state)) return fail('The game is over.');
@@ -110,26 +123,29 @@ export function useSkill(state, action) {
 function checkSkill(state, player, skillId) {
   const skill = getSkill(skillId);
   if (!skill) return 'Unknown skill.';
-  const character = characterForStone(player);
+  const character = characterOf(state, player);
   if (!character || !character.skills.includes(skillId)) return 'That is not your skill.';
   const left = skillCooldown(state, player, skillId);
   if (left > 0) return `${skill.name} is on cooldown for ${left} more ${left === 1 ? 'turn' : 'turns'}.`;
+  if (isSkillLocked(state, player)) return 'Hiss: you cannot use a skill this turn.';
   return null;
 }
 
 // Runs the win check for the acting player on the cell whose stone
 // changed and, if the game goes on, ends their turn: a Wind Dash waiting
 // for this turn to end resolves (with a win check for the dashing player),
-// a Tornado Zone lasting through this turn disappears, rocks whose
+// a Tornado Zone lasting through this turn disappears, a Hiss lock lasting
+// through this turn ends, rocks whose
 // lifetime ends with this turn break, the draw check runs, their cooldowns
 // count down (a skill used this turn starts its full cooldown) and the
 // other player is to move. If the acting player wins, nothing else happens:
 // a pending dash never resolves and is dropped, and so is a Tornado Zone
-// (it only lasts through this turn), so neither is still shown as coming.
+// (it only lasts through this turn), so neither is still shown as coming;
+// a Hiss lock is dropped too.
 function finishTurn(state, player, events, changed, usedSkillId = null) {
   const winLine = changed ? findWinLineAt(state.board, changed.x, changed.y) : null;
   if (winLine) {
-    const ended = { ...state, winner: player, winLine, pendingDash: null, tornado: null };
+    const ended = { ...state, winner: player, winLine, pendingDash: null, tornado: null, skillLock: null };
     return done(ended, [...events, { type: 'win', player, line: winLine }]);
   }
 
@@ -140,7 +156,7 @@ function finishTurn(state, player, events, changed, usedSkillId = null) {
     events = [...events, ...resolved.events];
     const dashLine = resolved.changed ? findWinLineAt(state.board, resolved.changed.x, resolved.changed.y) : null;
     if (dashLine) {
-      return done({ ...state, winner: dash.player, winLine: dashLine }, [...events, { type: 'win', player: dash.player, line: dashLine }]);
+      return done({ ...state, winner: dash.player, winLine: dashLine, skillLock: null }, [...events, { type: 'win', player: dash.player, line: dashLine }]);
     }
   }
 
@@ -148,6 +164,12 @@ function finishTurn(state, player, events, changed, usedSkillId = null) {
   if (tornado && tornado.endsAfterTurn <= state.turn) {
     state = { ...state, tornado: null };
     events = [...events, { type: 'tornadoEnded', player: tornado.player, x: tornado.x, y: tornado.y }];
+  }
+
+  const { skillLock } = state;
+  if (skillLock && skillLock.endsAfterTurn <= state.turn) {
+    state = { ...state, skillLock: null };
+    events = [...events, { type: 'hissEnded', player: skillLock.player }];
   }
 
   const rocks = breakRocks(state.board, state.rocks, state.turn);

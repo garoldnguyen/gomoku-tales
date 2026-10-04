@@ -46,10 +46,12 @@ Which screen is shown is decided only by the flow reducer in src/ui/flow.js (scr
 - If the board is full and nobody has won, it is a draw.
 
 ## 5. Characters and skills
+There are three characters: Wind Rabbit, Earth Bear and Jade Serpent. Each owns two skills. A character has no fixed stone colour: the side is decided by pick order. The player who picks first plays X (blue) and moves first; the player who picks second plays O (red). Both players cannot pick the same character. (assignSides(pickOrder) in src/logic/characters.js; until the character select exists, the two character lobby uses Wind Rabbit as X and Earth Bear as O.) The X and O shapes and team colours belong to the side, not to the character.
+
 Cooldown rule: after you use a skill you cannot use it during your next N turns (short cooldown N = 3, long cooldown N = 6). Cooldowns count your own turns only.
 
-### 5.1 Player 1: Wind Rabbit (X stones)
-Look: a cute white pixel rabbit with a scarf fluttering in the wind. Stone colour theme: blue.
+### 5.1 Wind Rabbit
+Look: a cute white pixel rabbit with a scarf fluttering in the wind.
 
 WIND DASH (short cooldown). Uses your turn.
 - Choose one of your own stones and one empty target cell. The dash is announced: the opponent sees a red, translucent frame on the target cell and a swirl around the source stone.
@@ -64,8 +66,8 @@ TORNADO ZONE (long cooldown). Uses your turn.
 - The zone disappears at the end of the opponent's turn. It does not affect Wind Dash landings, rocks or Stone Conversion.
 - Visual: a whirlwind icon tossing small stones, and a translucent whirlwind over the 3x3 area.
 
-### 5.2 Player 2: Earth Bear (O stones)
-Look: a chubby brown pixel bear wearing a miner's jacket or a badge with an earth or rock symbol. Stone colour theme: red.
+### 5.2 Earth Bear
+Look: a chubby brown pixel bear wearing a miner's jacket or a badge with an earth or rock symbol.
 
 TERRAIN CREATION (short cooldown). Uses your turn.
 - Choose any empty cell. A rock falls onto it immediately.
@@ -74,9 +76,22 @@ TERRAIN CREATION (short cooldown). Uses your turn.
 - Visual: a square rock icon. A real rock sprite drops onto the cell with a small bounce, dust and a light screen shake. When it breaks it crumbles.
 
 STONE CONVERSION (long cooldown). Uses your turn.
-- Choose one opponent stone on the board. It becomes one of your stones (O) at once, then the win check runs for you.
-- Visual: an icon with an arrow from an X stone to an O stone with light rays. The chosen stone glows brightly and flips into the Earth Bear stone look.
+- Choose one opponent stone on the board. It becomes one of your stones at once, then the win check runs for you.
+- Visual: an icon with an arrow from an opponent stone to your stone with light rays. The chosen stone glows brightly and flips into your stone look.
 - If the converted stone was the source of a pending Wind Dash, that dash fails when it resolves (see 5.1).
+
+### 5.3 Jade Serpent
+Look: a slim jade green pixel serpent with a leaf on its head.
+
+HISS (short cooldown, COOLDOWN_SHORT). Uses your turn. No target.
+- On the opponent's next turn they cannot use any skill. They can still place a stone.
+- The lock ends at the end of that turn. It is not a cooldown: the opponent's cooldowns do not change.
+- If the game ends on that turn, the lock is dropped.
+
+VENOM (long cooldown, COOLDOWN_LONG). Uses your turn.
+- Choose one opponent stone (plant) on the board. It is removed at once and its cell is left empty.
+- The target must be an opponent stone. An empty cell, a rock, your own stone or a cell off the board is rejected like the other skills: nothing happens, the turn and the cooldown are not used.
+- If the removed stone was the source of a pending Wind Dash, that dash fails when it resolves (see 5.1).
 
 ## 6. Online rooms (version 1)
 - Room code: 5 characters, uppercase letters and digits, leaving out easily confused characters (no 0, O, 1, I).

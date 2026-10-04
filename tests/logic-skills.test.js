@@ -2,14 +2,16 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { COOLDOWN_SHORT, COOLDOWN_LONG } from '../src/config.js';
 import { X, O } from '../src/logic/board.js';
-import { CHARACTERS, EARTH_BEAR, WIND_RABBIT, characterForStone } from '../src/logic/characters.js';
+import { CHARACTERS, DEFAULT_SIDES, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT, characterForStone } from '../src/logic/characters.js';
 import {
   LONG,
   SHORT,
+  HISS,
   SKILLS,
   STONE_CONVERSION,
   TERRAIN_CREATION,
   TORNADO_ZONE,
+  VENOM,
   WIND_DASH,
   cooldownTurns,
   getSkill,
@@ -61,11 +63,12 @@ function filler() {
 
 // --- Characters and registry ---
 
-test('Wind Rabbit plays X and Earth Bear plays O', () => {
-  assert.equal(CHARACTERS[WIND_RABBIT].stone, X);
-  assert.equal(CHARACTERS[EARTH_BEAR].stone, O);
+test('without a pick order (DEFAULT_SIDES) Wind Rabbit plays X and Earth Bear plays O', () => {
+  assert.deepEqual(DEFAULT_SIDES, { [X]: WIND_RABBIT, [O]: EARTH_BEAR });
+  for (const character of Object.values(CHARACTERS)) assert.equal('stone' in character, false, 'no fixed stone');
   assert.equal(CHARACTERS[WIND_RABBIT].name, 'Wind Rabbit');
   assert.equal(CHARACTERS[EARTH_BEAR].name, 'Earth Bear');
+  assert.equal(CHARACTERS[JADE_SERPENT].name, 'Jade Serpent');
   assert.equal(characterForStone(X).id, WIND_RABBIT);
   assert.equal(characterForStone(O).id, EARTH_BEAR);
   assert.equal(characterForStone('ROCK'), null);
@@ -74,13 +77,14 @@ test('Wind Rabbit plays X and Earth Bear plays O', () => {
 test('each character owns its two skills', () => {
   assert.deepEqual(CHARACTERS[WIND_RABBIT].skills, [WIND_DASH, TORNADO_ZONE]);
   assert.deepEqual(CHARACTERS[EARTH_BEAR].skills, [TERRAIN_CREATION, STONE_CONVERSION]);
+  assert.deepEqual(CHARACTERS[JADE_SERPENT].skills, [HISS, VENOM]);
   for (const character of Object.values(CHARACTERS)) {
     for (const skillId of character.skills) assert.equal(SKILLS[skillId].character, character.id);
   }
 });
 
-test('the four skills have the design cooldown classes', () => {
-  assert.equal(Object.keys(SKILLS).length, 4);
+test('the six skills have the design cooldown classes', () => {
+  assert.equal(Object.keys(SKILLS).length, 6);
   assert.equal(getSkill(WIND_DASH).cooldownClass, SHORT);
   assert.equal(getSkill(TORNADO_ZONE).cooldownClass, LONG);
   assert.equal(getSkill(TERRAIN_CREATION).cooldownClass, SHORT);

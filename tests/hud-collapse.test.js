@@ -113,7 +113,9 @@ test("view model: the opponent's turn (waiting, disabled, no turn ring)", () => 
 test('view model: every skill has its description and hint from SKILL_INFO', () => {
   const vm = hudViewModel(midGame(), {}, null);
   const rows = vm.cards.flatMap((c) => c.skills);
-  assert.deepEqual(rows.map((r) => r.id).sort(), Object.keys(SKILLS).sort());
+  // The skills of the two characters in play (Wind Rabbit and Earth Bear).
+  assert.deepEqual(rows.map((r) => r.id).sort(), [WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION].sort());
+  assert.deepEqual(Object.keys(SKILL_INFO).sort(), Object.keys(SKILLS).sort(), 'every skill has its SKILL_INFO');
   for (const row of rows) {
     assert.equal(row.description, SKILL_INFO[row.id].description);
     assert.equal(row.hint, SKILL_INFO[row.id].hint);

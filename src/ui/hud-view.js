@@ -5,7 +5,7 @@
 
 import { X, O } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
-import { isGameOver, skillCooldown } from '../logic/game.js';
+import { characterOf, isGameOver, skillCooldown } from '../logic/game.js';
 import { cooldownTurns, getSkill } from '../logic/skills.js';
 import { ALL_EXPANDED } from './hud-collapse.js';
 import { skillInfo } from './skill-info.js';
@@ -113,7 +113,7 @@ function turnView(state, { over, winner, toMove, leaving, peerCountdown, targeti
 }
 
 function cardView(state, player, { over, winner, toMove, localPlayer, targeting, collapsed }) {
-  const character = characterForStone(player);
+  const character = characterOf(state, player);
   const isWinner = winner === player;
   const active = player === toMove;
   const yours = localPlayer === null || localPlayer === player;
