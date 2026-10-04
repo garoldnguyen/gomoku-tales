@@ -32,6 +32,7 @@ export const QUALITY_LEVELS = deepFreeze({
     shadows: 'none',
     postEffects: { bloom: false, depthOfField: false, warmGrade: false, vignette: false },
     wind: false,
+    plantInBetween: 0, // in-between growth frames per stage change (plant-frames.js): the 5 stage frames only
     growthExtras: { openSparkles: false, soilPuff: false, rockShake: false },
     skillEffects: 'simple', // marks and a short slide, no particles
     particleCap: 0,
@@ -58,6 +59,7 @@ export const QUALITY_LEVELS = deepFreeze({
     shadows: 'blob', // soft blob shadow under every plant, rock, post, tree, bush, bale
     postEffects: { bloom: false, depthOfField: false, warmGrade: false, vignette: false }, // no blur at all
     wind: false,
+    plantInBetween: 2, // 2 per stage change: 13 frames in all
     growthExtras: { openSparkles: true, soilPuff: false, rockShake: false },
     skillEffects: 'particles', // marks, slides, a few particles
     particleCap: 60,
@@ -84,6 +86,7 @@ export const QUALITY_LEVELS = deepFreeze({
     shadows: 'sun', // long sun shadows plus slow cloud shadows
     postEffects: { bloom: true, depthOfField: true, warmGrade: true, vignette: true },
     wind: true, // petals, leaves and seed fluff in 3 lanes; grass, flowers and plants sway
+    plantInBetween: 2,
     growthExtras: { openSparkles: true, soilPuff: true, rockShake: true },
     skillEffects: 'full',
     particleCap: 220,

@@ -111,6 +111,10 @@ export const PLANT_DROP_PX = 10; // the seed slides down this many art pixels on
 export const PLANT_DROP_MS = 150; // over this long, ease in
 export const PLANT_OPEN_POP_MS = 120; // the Open stage pops 1.0, 1.12, 1.0 over this long
 export const PLANT_OPEN_POP_SCALE = 1.12;
+// The in-between frames of the planting animation (plant-frames.js) move
+// the sprite up or down by at most this many art pixels. How many there are
+// is plantInBetween in the quality table (src/render3d/quality.js).
+export const PLANT_IN_BETWEEN_LIFT_PX = 2;
 export const PLANT_OPEN_SPARKLES = 4; // gold (X) or pink (O) sparkles when the bloom opens
 export const SOIL_PUFF_MIN = 6; // soil pixels flying out when a seed lands
 export const SOIL_PUFF_MAX = 8;

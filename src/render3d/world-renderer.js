@@ -36,14 +36,16 @@ import { O, ROCK, X } from '../logic/board.js';
 import { createInitialState, isGameOver } from '../logic/game.js';
 import { drawText } from '../render/game-renderer.js';
 import { artMeta, artSource } from './art.js';
-import { ART } from './art-assets.js';
+import { ART, placeholderShape } from './art-assets.js';
 import { boardMarksInto, createBoardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
 import { createEffects3d } from './effects3d.js';
 import { enteredStage, plantedCells, plantPoseInto, STAGE_LAND, STAGE_OPEN, STAGE_REST } from './growth.js';
 import { createWorldHitTest } from './hit-test.js';
 import { parseFpsSwitch } from './fps.js';
+import { plantFrameIndex, plantFrames } from './plant-frames.js';
 import { QUALITY_ORDER } from './quality.js';
 import { fadedAlphaTest } from './sprite-frames.js';
+import { sheetTopRow } from './sprites.js';
 import { metaAnchor, stageStartMs } from './v3-meta.js';
 import { createCellDecal, createPieceSprite, createWorld, decalMaterial, placeOnCell, zonePieceGeometry } from './world.js';
 
@@ -193,11 +195,28 @@ export function createWorldRenderer(worldCanvas, options = {}) {
   };
 }
 
-// The stage start times and anchor row of the plant of `player`.
+// The growth look of a player's plant: its stage start times, anchor row,
+// the top visible row of each stage frame (for the in-between nudges) and
+// its in-between frames (plant-frames.js), built for `inBetween` and again
+// whenever that changes (a quality switch), never per frame.
 function plantLook(player) {
   const name = ART.v3.plant[player];
   const meta = artMeta();
-  return { stages: stageStartMs(meta, name), anchorY: metaAnchor(meta, name)?.y ?? 0 };
+  const sheet = artSource(name);
+  const count = placeholderShape(name).frames;
+  const topRows = [];
+  for (let f = 0; f < count; f++) topRows.push(sheetTopRow(sheet, sheet.width / count, f));
+  return {
+    stages: stageStartMs(meta, name), anchorY: metaAnchor(meta, name)?.y ?? 0, topRows, inBetween: -1, frames: null,
+  };
+}
+
+function plantFramesOf(look, inBetween) {
+  if (look.inBetween !== inBetween) {
+    look.frames = plantFrames(look.topRows.length, inBetween, look.topRows);
+    look.inBetween = inBetween;
+  }
+  return look.frames;
 }
 
 function pieceKind(cell) {
@@ -230,12 +249,12 @@ function createPieceLayer(world) {
   const growKind = []; // the player whose seed it is
   const lastStage = new Int8Array(cellCount).fill(UNPLANTED);
   const pose = { frame: 0, progress: 0, dropPx: 0, scale: 1 }; // written by plantPoseInto
-  const looks = {}; // per player: { stages, anchorY }, made the first time
+  const looks = {}; // per player: plantLook, made the first time
   const look = (player) => (looks[player] ??= plantLook(player));
 
   const rest = (sprite, kind) => {
     if (kind === 'rock') return;
-    sprite.setFrame(STAGE_REST);
+    sprite.setBlend(STAGE_REST, STAGE_REST, 0);
     sprite.plane.position.y = 0;
     sprite.object.scale.set(1, 1, 1);
   };
@@ -309,10 +328,15 @@ function createPieceLayer(world) {
         sprite.setBend(effects.bendAt(x, y), effects.bendCentre.x, effects.bendCentre.z);
         if (Number.isNaN(growStart[i])) continue;
         const player = shownKind[i];
-        const { stages, anchorY } = look(player);
+        const plant = look(player);
+        const { stages, anchorY } = plant;
         plantPoseInto(time - growStart[i], stages, pose);
-        sprite.setFrame(pose.frame);
-        sprite.plane.position.y = pose.dropPx * PX_WORLD * SPRITE_STRETCH_Y;
+        // The in-between frames of the quality level (plantInBetween).
+        const inBetween = world.features?.plantInBetween ?? 0;
+        const frames = plantFramesOf(plant, inBetween);
+        const shown = frames[plantFrameIndex(pose.frame, pose.progress, plant.topRows.length, inBetween)];
+        sprite.setBlend(shown.from, shown.to, shown.mix);
+        sprite.plane.position.y = (pose.dropPx + shown.liftPx) * PX_WORLD * SPRITE_STRETCH_Y;
         sprite.object.scale.set(pose.scale, pose.scale, pose.scale);
         if (enteredStage(lastStage[i], pose.frame, STAGE_LAND)) effects.soilPuff(x, y);
         if (enteredStage(lastStage[i], pose.frame, STAGE_OPEN)) effects.openSparkles(x, y, player, anchorY);

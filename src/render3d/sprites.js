@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { PX_WORLD, SPRITE_STRETCH_Y, SUN_SHADOW_OPACITY } from '../config.js';
+import { FADE_THRESHOLD_GLSL } from './plant-frames.js';
 import { sunShadowCorners } from './shadow-math.js';
 import { anchorForward, anchorShift, faceYaw, frameAt, SPRITE_ALPHA_TEST, visibleTopRow } from './sprite-frames.js';
 import { bendTowardPx, swayLeanSide, swayPhase } from './wind.js';
@@ -97,7 +98,11 @@ export const PLANT_SWAY = { uSwayAngle: { value: 0 }, uSwayPx: { value: 0 } };
 // the row's height above the root row (rootRow from the bottom) over the
 // height of the top visible row (topRow), the same formula as
 // plantSwayLeanPx with swayRowFraction in wind.js. It shifts where each row reads the
-// sheet, so the single quad stays put and no pixel is ever split.
+// sheet, so the single quad stays put and no pixel is ever split. While
+// uFade is above 0 it also cross-fades into the frame uFadeShift (in sheet
+// UVs) further along (the in-between growth frames, plant-frames.js): the
+// colours mix by their alphas, and each art pixel shows or is cut whole by
+// an ordered threshold (fadeShows), so pixels in only one frame fade too.
 function swayingSpriteMaterial(map, { frames, widthPx, heightPx, rootRow, topRow }) {
   const material = spriteMaterial(map);
   const uniforms = {
@@ -106,6 +111,8 @@ function swayingSpriteMaterial(map, { frames, widthPx, heightPx, rootRow, topRow
     uSwayPhase: { value: 0 },
     uWindSide: { value: 1 },
     uBendPx: { value: 0 },
+    uFade: { value: 0 },
+    uFadeShift: { value: 0 },
   };
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -116,7 +123,10 @@ uniform float uSwayPx;
 uniform float uSwayOn;
 uniform float uSwayPhase;
 uniform float uWindSide;
-uniform float uBendPx;`)
+uniform float uBendPx;
+uniform float uFade;
+uniform float uFadeShift;
+${FADE_THRESHOLD_GLSL}`)
       .replace('#include <map_fragment>', `#ifdef USE_MAP
 vec2 swayUv = vMapUv;
 float swayPx = uSwayPx * uSwayOn;
@@ -140,6 +150,18 @@ if (swayPx > 0.0 || uBendPx != 0.0) {
 vec4 sampledDiffuseColor = texture2D(map, swayUv);
 // A row never reads from the next frame of the sheet.
 if (floor(swayUv.x * ${frames.toFixed(1)}) != floor(vMapUv.x * ${frames.toFixed(1)})) sampledDiffuseColor.a = 0.0;
+if (uFade > 0.0) {
+  vec4 fadeColor = texture2D(map, swayUv + vec2(uFadeShift, 0.0));
+  if (floor((swayUv.x + uFadeShift) * ${frames.toFixed(1)}) != floor((vMapUv.x + uFadeShift) * ${frames.toFixed(1)})) fadeColor.a = 0.0;
+  float fromA = sampledDiffuseColor.a * (1.0 - uFade);
+  float toA = fadeColor.a * uFade;
+  float sumA = fromA + toA;
+  // Whole art pixels: shown where the mixed cover passes the pixel's
+  // ordered threshold (fadeShows in plant-frames.js), else cut out.
+  vec2 artPx = floor(swayUv * vec2(${(widthPx * frames).toFixed(1)}, ${heightPx.toFixed(1)}));
+  float shows = sumA > plantFadeThreshold(artPx) ? 1.0 : 0.0;
+  sampledDiffuseColor = vec4(sumA > 0.0 ? (sampledDiffuseColor.rgb * fromA + fadeColor.rgb * toA) / sumA : sampledDiffuseColor.rgb, shows);
+}
 diffuseColor *= sampledDiffuseColor;
 #endif`);
   };
@@ -249,7 +271,7 @@ const geometries = new Map(); // "w x h" -> shared upright plane geometry
 // once per sheet and frame. A sheet whose pixels cannot be read gives its
 // top row.
 const sheetTopRows = new WeakMap();
-function sheetTopRow(sheet, frameWidth, frame) {
+export function sheetTopRow(sheet, frameWidth, frame) {
   let rows = sheetTopRows.get(sheet);
   if (!rows) {
     rows = new Map();
@@ -369,6 +391,15 @@ export class PixelSprite {
     this.frame = frame;
     this.texture.offset.x = frame / this.frameCount;
     if (this.sway) this.sway.uSwayOn.value = frame === this.swayFrame ? 1 : 0;
+  }
+
+  // Shows frame `from` cross-faded into frame `to` by `mix` (0: all
+  // `from`), on swaying sprites (the plants); others show `from`.
+  setBlend(from, to, mix) {
+    this.setFrame(from);
+    if (!this.sway) return;
+    this.sway.uFade.value = to === from ? 0 : mix;
+    this.sway.uFadeShift.value = (to - from) / this.frameCount;
   }
 
   // Leans a swaying sprite's top up to `px` art pixels towards the point
