@@ -1,0 +1,203 @@
+/* The lobby additions and the waiting room (docs/flow-design.md sections
+   3.4 and 3.5), on top of the glass cards of src/ui/screens.css, built by
+   src/ui/screens.js. Every colour is a token of the block below, and every
+   token value is one of the HUD glass (src/ui/hud.css): no new colours. A
+   test reads this file and fails on a colour literal outside the token
+   block. Sizes scale with --u (one internal pixel, index.html) but never
+   drop under the floors of the doc: the room code at least 40 px, every
+   button at least 44 px. */
+
+#screens {
+  --ink-3: rgba(244, 247, 251, 0.6);
+  --ink-dark: #141a2a;
+  --hair: rgba(255, 255, 255, 0.14);
+  --blue-tile: rgba(59, 140, 255, 0.26);
+  --blue-ink: #cfe4ff;
+  --red-tile: rgba(255, 75, 92, 0.24);
+  --red-ink: #ffd0d5;
+  --ready: #8fe3a8;
+}
+
+/* --- lobby --- */
+
+#lobby-hint {
+  max-width: calc(var(--u) * 300);
+  color: var(--ink-3);
+}
+
+#screens .join-row button {
+  min-width: max(96px, calc(var(--u) * 90));
+}
+
+/* The error region keeps its line even when empty, so a message coming
+   or going does not move the buttons, and the live region stays in the
+   page for screen readers. */
+#join-error {
+  min-height: 1.35em;
+}
+
+/* --- waiting room --- */
+
+#screens .room-card {
+  gap: calc(var(--u) * 10);
+}
+
+#screens .room-card .code {
+  font-size: max(40px, calc(var(--u) * 32));
+  line-height: 1.15;
+}
+
+#screens .status {
+  min-height: 1.35em;
+  font-size: calc(var(--u) * 13);
+  color: var(--ink-2);
+}
+
+#waiting-hint {
+  color: var(--ink-3);
+}
+
+#screens .seats {
+  display: flex;
+  gap: calc(var(--u) * 14);
+  margin: calc(var(--u) * 4) 0;
+}
+
+#screens .seat {
+  --team-tile: var(--blue-tile);
+  --team-ink: var(--blue-ink);
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 12);
+  width: calc(var(--u) * 210);
+  min-height: calc(var(--u) * 72);
+  padding: calc(var(--u) * 10) calc(var(--u) * 12);
+  box-sizing: border-box;
+  text-align: left;
+  background: var(--row);
+  border: 1px solid var(--hair);
+  border-radius: calc(var(--u) * 16);
+}
+
+#screens .seat.team-red {
+  --team-tile: var(--red-tile);
+  --team-ink: var(--red-ink);
+}
+
+/* The other player's seat before they join: dimmed, dashed, a slow pulse. */
+#screens .seat.is-placeholder {
+  justify-content: center;
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--line);
+  opacity: 0.6;
+  animation: seat-pulse 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes seat-pulse {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
+}
+
+#screens .seat-waiting {
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+#screens .seat .portrait {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: calc(var(--u) * 48);
+  height: calc(var(--u) * 48);
+  border-radius: calc(var(--u) * 12);
+  background: var(--team-tile);
+}
+
+#screens .seat .portrait img {
+  width: calc(var(--u) * 44);
+  height: calc(var(--u) * 44);
+  image-rendering: pixelated;
+}
+
+/* a missing portrait shows the first letter instead (the art only warns) */
+#screens .seat .initial {
+  display: none;
+  font-size: calc(var(--u) * 18);
+  font-weight: 700;
+  color: var(--team-ink);
+}
+
+#screens .seat .no-art img {
+  display: none;
+}
+
+#screens .seat .no-art .initial {
+  display: block;
+}
+
+#screens .seat-text {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 4);
+  min-width: 0;
+}
+
+#screens .seat-head {
+  display: flex;
+  align-items: baseline;
+  gap: calc(var(--u) * 8);
+}
+
+#screens .seat-name {
+  font-size: calc(var(--u) * 15);
+  font-weight: 700;
+}
+
+#screens .seat .stone {
+  padding: 0 calc(var(--u) * 7);
+  border-radius: 999px;
+  font-size: calc(var(--u) * 12);
+  font-weight: 700;
+  color: var(--team-ink);
+  background: var(--team-tile);
+}
+
+#screens .seat-tags {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 8);
+  font-size: calc(var(--u) * 12);
+}
+
+#screens .seat .you {
+  padding: 0 calc(var(--u) * 7);
+  border-radius: 999px;
+  font-weight: 700;
+  color: var(--ink-dark);
+  background: var(--ink);
+}
+
+#screens .seat-note {
+  color: var(--ink-3);
+}
+
+#screens .starting {
+  font-weight: 600;
+  color: var(--ready);
+}
+
+#screens .starting:empty {
+  visibility: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #screens .seat.is-placeholder {
+    animation: none;
+  }
+
+  #screens .waiting::after {
+    animation: none;
+  }
+}

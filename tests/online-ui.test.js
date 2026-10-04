@@ -7,7 +7,7 @@ import { createInitialState } from '../src/logic/game.js';
 import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
-import { BAD_CODE_ERROR, CREATE, GAME, GAME_OVER, JOIN, LOBBY, WAITING_SCREEN, createApp } from '../src/ui/app.js';
+import { BAD_CODE_ERROR, CREATE, GAME, GAME_OVER, JOIN, LOBBY, MENU, WAITING_SCREEN, createApp } from '../src/ui/app.js';
 import { gameOutcome, statusLine } from '../src/ui/online-game.js';
 
 // Windows that share one fake network (one room) and one fake clock. Each
@@ -72,7 +72,7 @@ test('the lobby leads to Create Room, and picking a character opens the Waiting 
   assert.equal(host.app.getGame(), null);
 });
 
-test('Back from Create and Cancel from Waiting return to the lobby and leave the room', () => {
+test('Back from Create returns to the lobby, and Leave in the waiting room leaves the room for the menu', () => {
   const { window, clock } = makeWorld();
   const host = window();
   host.app.openCreate();
@@ -81,7 +81,9 @@ test('Back from Create and Cancel from Waiting return to the lobby and leave the
   host.app.openCreate();
   host.app.createRoom(WIND_RABBIT);
   host.app.backToLobby();
-  assert.equal(host.app.getScreen(), LOBBY);
+  assert.equal(host.app.getScreen(), WAITING_SCREEN, 'the waiting room has Leave, not Back');
+  assert.equal(host.app.leaveRoom(), true);
+  assert.equal(host.app.getScreen(), MENU);
   assert.equal(host.transports[0].closed, true);
   assert.equal(host.app.getView().code, null);
 
@@ -102,7 +104,7 @@ test('Join Room checks the code before looking for the room', () => {
   assert.equal(guest.app.getScreen(), JOIN);
   assert.equal(guest.app.joinRoom('   '), false);
   assert.equal(guest.app.getView().joinError, 'Enter a room code.');
-  for (const bad of ['AB2C', 'AB2C9Z', 'AB0C9', 'ABOC9', 'AB1C9', 'ABIC9', 'AB-C9']) {
+  for (const bad of ['AB2C', 'AB0C9', 'ABOC9', 'AB1C9', 'ABIC9', 'AB-C9']) {
     assert.equal(guest.app.joinRoom(bad), false, bad);
     assert.equal(guest.app.getView().joinError, BAD_CODE_ERROR, bad);
   }

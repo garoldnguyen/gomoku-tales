@@ -5,12 +5,19 @@
 // the cell numbering: the scene is played through the local game's own
 // clicks.
 
+import { WIND_RABBIT } from '../logic/characters.js';
 import { normalizeQuality } from '../render3d/quality.js';
-import { FLOW_EVENTS, flowReducer, initialFlow } from './flow.js';
+import { LOBBY, WAITING_SCREEN } from './app.js';
+import { FLOW_EVENTS, SCREENS, flowReducer, initialFlow } from './flow.js';
 import { parseHudParam } from './hud-collapse.js';
+import { waitingViewModel } from './room-screens.js';
 import { SHOT_FIELD } from './shot-position.js';
 
-export const SHOT_SCENES = Object.freeze(['field', 'empty', 'menu', 'howto', 'settings']);
+export const SHOT_SCENES = Object.freeze(['field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting']);
+
+// The room of the waiting and starting scenes: a fixed code, this window
+// the host playing Wind Rabbit.
+export const SHOT_ROOM = Object.freeze({ code: 'ABCD5', character: WIND_RABBIT });
 
 // The flow screens of shot mode (docs/flow-design.md section 7): the scene
 // name and the flow events that lead to it from the first state. They show
@@ -19,6 +26,9 @@ const FLOW_SCENES = Object.freeze({
   menu: [],
   howto: [FLOW_EVENTS.OPEN_HOWTO],
   settings: [FLOW_EVENTS.OPEN_SETTINGS],
+  lobby: [FLOW_EVENTS.PLAY_ONLINE],
+  waiting: [FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.ROOM_CREATED],
+  starting: [FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.ROOM_CREATED, FLOW_EVENTS.OPPONENT_JOINED],
 });
 
 // The flow state (flow.js) a shot scene shows, or null for a game scene.
@@ -26,6 +36,38 @@ export function shotFlow(scene) {
   if (!Object.hasOwn(FLOW_SCENES, scene)) return null;
   return FLOW_SCENES[scene].reduce(flowReducer, initialFlow());
 }
+
+// What the lobby and room screens (screens.js) show in the lobby, waiting
+// and starting scenes, in the shape of the app's getView() (app.js): the
+// lobby panel, or the waiting room of SHOT_ROOM. null for other scenes.
+export function shotRoomView(scene) {
+  const flow = shotFlow(scene);
+  if (!flow || flow.screen === SCREENS.MENU) return null;
+  const inRoom = flow.screen === SCREENS.WAITING || flow.screen === SCREENS.STARTING;
+  return {
+    screen: inRoom ? WAITING_SCREEN : LOBBY,
+    flow,
+    waiting: inRoom ? waitingViewModel(flow, SHOT_ROOM) : null,
+    code: inRoom ? SHOT_ROOM.code : null,
+    character: inRoom ? SHOT_ROOM.character : null,
+    joining: false,
+    joiningCode: null,
+    joinError: null,
+    outcome: null,
+  };
+}
+
+// A still stand-in for the app (app.js) that the lobby and room screens
+// (screens.js) draw from in shot mode: always the same view, never a change,
+// and no actions.
+export function stillRoomApp(view) {
+  return {
+    getView: () => view,
+    getScreen: () => view.screen,
+    onChange: () => () => {},
+  };
+}
+
 const DEFAULT_SCENE = 'field';
 
 // The shot and quality parameters of a URL search string (or

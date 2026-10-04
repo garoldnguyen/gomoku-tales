@@ -193,11 +193,10 @@ test('the online app waits for the host start; a guest who leaves in starting se
   host.openCreate();
   host.createRoom(WIND_RABBIT);
   guest.openJoin();
-  const joinScreen = guest.getScreen();
   guest.joinRoom('AB2C9');
   clock.advance(700);
   assert.equal(host.getScreen(), WAITING_SCREEN, 'the host keeps the Waiting screen during starting');
-  assert.equal(guest.getScreen(), joinScreen, 'the guest keeps Join Room during starting');
+  assert.equal(guest.getScreen(), WAITING_SCREEN, 'the guest sees the same waiting room during starting');
   guest.close();
   assert.equal(host.getFlow().screen, 'waiting');
   assert.equal(host.getScreen(), WAITING_SCREEN);

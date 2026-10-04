@@ -16,9 +16,12 @@ export function generateRoomCode(random = Math.random) {
   return code;
 }
 
-// Typed input to code form: spaces removed, upper case.
+// Typed input to code form (docs/flow-design.md section 3.4): upper case,
+// every character that is not in ROOM_CODE_ALPHABET removed (so spaces,
+// dashes and the confusing 0, O, 1 and I vanish), cut to ROOM_CODE_LENGTH.
 export function normalizeRoomCode(input) {
-  return String(input ?? '').replace(/\s+/g, '').toUpperCase();
+  const kept = [...String(input ?? '').toUpperCase()].filter((char) => ROOM_CODE_ALPHABET.includes(char));
+  return kept.slice(0, ROOM_CODE_LENGTH).join('');
 }
 
 export function isValidRoomCode(code) {

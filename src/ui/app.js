@@ -5,23 +5,22 @@
 // getView(), and the canvas draws the game screen from getGame(). Which
 // screen is shown is decided by flowReducer (flow.js); Create Room and Join
 // Room are two panels of its lobby screen. The app starts on the main menu
-// (menu.js); leaving a room still goes through the menu straight back to
-// the lobby until the lobby gets its own Back button (Flow v1 step 5).
+// (menu.js); the lobby's Back and the waiting room's Leave return to it.
 //
 // The host owns the start (net/room.js): after a join both windows are in
-// phase starting (the host still on the Waiting screen, the guest still on
-// Join Room, looking for the room) until the host's start event, which both
-// get at the same moment.
+// phase starting (both on the waiting room, with both cards filled) until
+// the host's start event, which both get at the same moment.
 
 import { GAME_OVER_DELAY_MS } from '../config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
 import { systemClock } from '../net/clock.js';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../net/room-code.js';
 import { FULL, NO_ROOM, PLAYING, STARTING, createGuestRoom, createHostRoom } from '../net/room.js';
-import { FLOW_EVENTS, ROLES, SCREENS, flowReducer, initialFlow } from './flow.js';
+import { FLOW_EVENTS, NOTICE_HOST_LEFT, ROLES, SCREENS, flowReducer, initialFlow } from './flow.js';
 import { MENU_EVENTS } from './menu.js';
 import { characterName, createOnlineGame } from './online-game.js';
-import { STRINGS } from './strings.js';
+import { waitingViewModel } from './room-screens.js';
+import { STRINGS, withCode } from './strings.js';
 
 // Screens.
 export const MENU = 'menu';
@@ -32,7 +31,7 @@ export const WAITING_SCREEN = 'waiting';
 export const GAME = 'game';
 export const GAME_OVER = 'gameOver';
 
-export const BAD_CODE_ERROR = 'Room codes are 5 letters and digits (no 0, O, 1 or I).';
+export const BAD_CODE_ERROR = STRINGS.joinErrorBadCode;
 
 // options:
 //   openTransport(code) returns a transport for the room (net/transport.js)
@@ -67,14 +66,14 @@ export function createApp(options) {
   };
 
   // The screen of the old flow (the constants above) that the DOM screens
-  // and main.js know. starting shows the screen the player was on until
-  // the host starts the game.
+  // and main.js know. starting shows the waiting room to both players
+  // until the host starts the game.
   const screenNow = () => {
     switch (flow.screen) {
       case SCREENS.MENU: return MENU;
       case SCREENS.LOBBY: return lobbyPanel;
       case SCREENS.WAITING: return WAITING_SCREEN;
-      case SCREENS.STARTING: return flow.role === ROLES.HOST ? WAITING_SCREEN : JOIN;
+      case SCREENS.STARTING: return WAITING_SCREEN;
       case SCREENS.GAME: return GAME;
       case SCREENS.GAMEOVER: return GAME_OVER;
       default: return LOBBY;
@@ -121,9 +120,9 @@ export function createApp(options) {
     }
   };
 
-  // The host was waiting and the guest was joining: both are now starting.
-  // The guest keeps its joining code until the start, so Join Room keeps
-  // showing that the room is being joined.
+  // The host was waiting and the guest was joining: both are now starting
+  // and see the waiting room. The guest keeps its joining code until the
+  // start.
   const seated = () => {
     joinError = null;
     send(flow.screen === SCREENS.WAITING ? FLOW_EVENTS.OPPONENT_JOINED : FLOW_EVENTS.JOINED);
@@ -143,11 +142,11 @@ export function createApp(options) {
   // again (its room is back in waiting), the guest leaves for the lobby.
   const peerGone = (event) => {
     if (event.phase !== STARTING || flow.screen !== SCREENS.STARTING) return;
-    if (flow.role === ROLES.GUEST) {
-      closeRoom();
-      joinError = STRINGS.noticeHostLeft;
-    }
-    send(FLOW_EVENTS.OPPONENT_LEFT);
+    if (flow.role === ROLES.GUEST) closeRoom();
+    flow = flowReducer(flow, FLOW_EVENTS.OPPONENT_LEFT);
+    // The guest is back on Join Room with the notice as its inline error.
+    if (flow.notice === NOTICE_HOST_LEFT) joinError = STRINGS.noticeHostLeft;
+    changed();
   };
 
   const onRoomEvent = (event) => {
@@ -162,12 +161,12 @@ export function createApp(options) {
         peerGone(event);
         break;
       case 'full':
-        joinError = `Room ${joiningCode} is full.`;
+        joinError = withCode(STRINGS.joinErrorFull, joiningCode);
         closeRoom();
         changed();
         break;
       case 'noRoom':
-        joinError = `No room found with code ${joiningCode}.`;
+        joinError = withCode(STRINGS.joinErrorNotFound, joiningCode);
         closeRoom();
         changed();
         break;
@@ -227,6 +226,9 @@ export function createApp(options) {
       const screen = screenNow();
       return {
         screen,
+        flow,
+        // The waiting room (room-screens.js) in phases waiting and starting.
+        waiting: roomView ? waitingViewModel(flow, roomView) : null,
         code: roomView?.code ?? null,
         character: roomView?.character ?? null,
         characterName: roomView?.character ? characterName(roomView.character) : null,
@@ -279,7 +281,7 @@ export function createApp(options) {
       if (screenNow() !== JOIN || joiningCode !== null) return false;
       const code = normalizeRoomCode(input);
       if (!isValidRoomCode(code)) {
-        joinError = code.length === 0 ? 'Enter a room code.' : BAD_CODE_ERROR;
+        joinError = code.length === 0 ? STRINGS.joinErrorEmpty : BAD_CODE_ERROR;
         changed();
         return false;
       }
@@ -290,11 +292,42 @@ export function createApp(options) {
       return true;
     },
 
-    // Back from Create, Join, Waiting or Game over to the Lobby. Leaves
-    // the room if there is one. Leave is off while the game is starting.
+    // The player typed in the code box: the inline error goes away.
+    clearJoinError() {
+      if (joinError === null) return;
+      joinError = null;
+      changed();
+    },
+
+    // Back on the lobby (the button or Escape): the menu. On Create Room
+    // or Join Room (when no join is pending) it is the lobby's own panel.
+    back() {
+      const screen = screenNow();
+      if (screen === LOBBY) send(FLOW_EVENTS.BACK);
+      else if ((screen === CREATE || screen === JOIN) && joiningCode === null) {
+        joinError = null;
+        lobbyPanel = LOBBY;
+        changed();
+      }
+    },
+
+    // Leave in the waiting room (phase waiting only; it is off while the
+    // game is starting): closes the room, which stops its timers and its
+    // transport, so the code can no longer be joined, then the menu.
+    leaveRoom() {
+      if (flow.screen !== SCREENS.WAITING) return false;
+      closeRoom();
+      joinError = null;
+      lobbyPanel = LOBBY;
+      send(FLOW_EVENTS.LEAVE);
+      return true;
+    },
+
+    // Back from Create, Join or Game over to the Lobby. Leaves the room if
+    // there is one. The waiting room has Leave (leaveRoom) instead.
     backToLobby() {
       const screen = screenNow();
-      if (screen === MENU || screen === LOBBY || screen === GAME || flow.screen === SCREENS.STARTING) return;
+      if (screen === MENU || screen === LOBBY || screen === GAME || screen === WAITING_SCREEN) return;
       closeRoom();
       joinError = null;
       lobbyPanel = LOBBY;

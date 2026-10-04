@@ -23,7 +23,7 @@ import { createLocalGame } from './ui/local-game.js';
 import { menuViewModel } from './ui/menu.js';
 import { createMenu } from './ui/menu-dom.js';
 import { attachScreens } from './ui/screens.js';
-import { parseShotParams, setUpShotScene, shotFlow } from './ui/shot-mode.js';
+import { parseShotParams, setUpShotScene, shotFlow, shotRoomView, stillRoomApp } from './ui/shot-mode.js';
 
 const canvas = document.getElementById('game');
 canvas.width = INTERNAL_WIDTH;
@@ -295,7 +295,8 @@ function showEvents(events, effects, time, resumed) {
 // HUD glass (hudFrost in src/render3d/quality.js).
 function startOnlineMode() {
   const app = createApp({ openTransport: (code) => createBroadcastTransport(code) });
-  attachScreens(document.getElementById('screens'), app);
+  const screens = attachScreens(document.getElementById('screens'), app);
+  assetsLoaded.then((store) => screens.setAssets(store));
   // The main menu is the first screen. Play on this computer leaves the
   // online loop for the same local game as ?local=1.
   let local = false;
@@ -449,9 +450,16 @@ async function startShotMode({ scene }) {
   const game = createLocalGame({ random: seededRandom(SHOT_SEED) });
   const staged = setUpShotScene(game, scene);
   // The menu, howto and settings scenes show the menu layer over the empty
-  // farm, with no HUD, like the menu screen of the game.
+  // farm, with no HUD, like the menu screen of the game; the lobby, waiting
+  // and starting scenes show the lobby and room screens from a still view
+  // (no network). The farm stays sharp: the game's backdrop blur zooms the
+  // canvas past the window edges, which the window check counts as a gap.
   const flow = shotFlow(scene);
-  if (flow) {
+  const roomView = shotRoomView(scene);
+  if (roomView) {
+    const screens = attachScreens(document.getElementById('screens'), stillRoomApp(roomView));
+    assetsLoaded.then((store) => screens.setAssets(store));
+  } else if (flow) {
     createMenuLayer(() => {});
     showMenu(flow);
   }
@@ -480,7 +488,7 @@ async function startShotMode({ scene }) {
       drawn = 0;
     }
     if (flow) {
-      renderer.drawMenuScreen(ctx, SHOT_TIME_MS, false);
+      renderer.drawMenuScreen(ctx, SHOT_TIME_MS, roomView !== null);
     } else {
       const view = game.getView();
       renderer.drawGameScreen(ctx, frameViewOf(view, SHOT_TIME_MS, effects, null));

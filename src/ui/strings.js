@@ -1,10 +1,11 @@
-// All English text of the menu, How to Play, Settings and Game over screens
+// All English text of the menu, How to Play, Settings, lobby, waiting room
+// and Game over screens
 // (docs/flow-design.md sections 3 and 8): ONE flat object, the single place
 // to change or translate a sentence. Numbers in the text come from
 // src/config.js, and skill and character names from SKILL_INFO and the
 // character table, never typed twice. Pure (no DOM).
 
-import { COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS, WIN_LENGTH } from '../config.js';
+import { COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS, ROOM_CODE_LENGTH, WIN_LENGTH } from '../config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
 import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../logic/skills.js';
 import { SKILL_INFO } from './skill-info.js';
@@ -27,6 +28,11 @@ export function howToRules({ COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS,
     `A rock blocks a plot for both players and crumbles after ${ROCK_LIFETIME_TURNS} turns, counting both players' turns.`,
     `If the board fills up and nobody has ${WIN_LENGTH} in a row, the game is a draw.`,
   ];
+}
+
+// A text of STRINGS with its {code} filled in by a room code.
+export function withCode(text, code) {
+  return text.replace('{code}', code ?? '');
 }
 
 // howToRule1 to howToRule6 of STRINGS.
@@ -58,8 +64,36 @@ export const STRINGS = Object.freeze({
   settingsQualityHelpHigh: 'Everything: depth, moving clouds and wind.',
   settingsFullscreen: 'Fullscreen',
 
-  // Lobby notice (section 6): the host left while the room was starting.
+  // Lobby (section 3.4). Join errors show inline under the code box; the
+  // host-left one is the lobby notice of section 6 (the host left while the
+  // room was starting).
+  lobbyLead: 'Five in a row, with wind and earth skills.',
+  lobbySameBrowserHint: 'Online play works between two windows of this browser on this computer.',
+  lobbyCreate: 'Create Room',
+  lobbyCreateLead: 'Pick your character. Your opponent gets the other one.',
+  lobbyJoin: 'Join Room',
+  lobbyCodeLabel: 'Room code',
+  lobbyJoinButton: 'Join',
+  lobbyJoining: 'Joining',
+  back: 'Back',
+  joinErrorEmpty: 'Enter a room code.',
+  joinErrorBadCode: `Room codes are ${ROOM_CODE_LENGTH} letters and digits (no 0, O, 1 or I).`,
+  joinErrorNotFound: 'No room found with code {code}.',
+  joinErrorFull: 'Room {code} is full.',
   noticeHostLeft: 'The host left the room.',
+
+  // Waiting room (section 3.5), phases waiting and starting.
+  waitingTitle: 'Waiting for opponent',
+  startingTitle: 'Opponent joined',
+  waitingHint: 'Open a second window of this browser and join with this code.',
+  waitingPlaceholder: 'Waiting',
+  waitingYou: 'You',
+  waitingStarting: 'Starting',
+  waitingCopy: 'Copy',
+  waitingCopied: 'Copied',
+  waitingPressCtrlC: 'Press Ctrl+C',
+  waitingLeave: 'Leave',
+  waitingMovesFirst: 'Moves first',
 
   // Game over (section 3.7).
   gameOverYouWin: 'You win',

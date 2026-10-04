@@ -84,49 +84,53 @@
   <link rel="stylesheet" href="src/ui/screens.css">
   <link rel="stylesheet" href="src/ui/hud.css">
   <link rel="stylesheet" href="src/ui/menu.css">
+  <link rel="stylesheet" href="src/ui/room.css">
 </head>
 <body>
   <div id="stage">
     <canvas id="world" hidden></canvas>
     <canvas id="game" width="960" height="540"></canvas>
 
-    <!-- Lobby and room screens (docs/design.md section 3), shown over the canvas. -->
+    <!-- Lobby and room screens (docs/flow-design.md sections 3.4 and 3.5), shown over the canvas.
+         src/ui/screens.js fills in the text from src/ui/strings.js. -->
     <div id="screens" hidden>
-      <section class="card" data-screen="lobby">
-        <p class="lead">Five in a row, with wind and earth skills.</p>
-        <button type="button" data-action="openCreate">Create Room</button>
-        <button type="button" data-action="openJoin">Join Room</button>
+      <section class="card" data-screen="lobby" data-hud-box="lobby-panel">
+        <p class="lead" id="lobby-lead"></p>
+        <button type="button" id="lobby-create" data-action="openCreate" data-hud-box="lobby-create"></button>
+        <button type="button" id="lobby-join" data-action="openJoin" data-hud-box="lobby-join"></button>
+        <p class="note" id="lobby-hint"></p>
+        <button type="button" class="secondary" id="lobby-back" data-action="back" data-hud-box="lobby-back"></button>
       </section>
 
-      <section class="card" data-screen="create">
-        <h2>Create Room</h2>
-        <p>Pick your character. Your opponent gets the other one.</p>
+      <section class="card" data-screen="create" data-hud-box="create-panel">
+        <h2 id="create-title"></h2>
+        <p id="create-lead"></p>
         <div class="choices" id="character-choices"></div>
-        <button type="button" class="secondary" data-action="backToLobby">Back</button>
+        <button type="button" class="secondary back-button" data-action="backToLobby" data-hud-box="create-back"></button>
       </section>
 
-      <section class="card" data-screen="join">
-        <h2>Join Room</h2>
-        <form id="join-form" class="join-row" autocomplete="off">
-          <label for="join-code">Room code</label>
-          <input id="join-code" name="code" maxlength="12" spellcheck="false" placeholder="ABCDE">
-          <button type="submit" id="join-submit">Join</button>
+      <section class="card" data-screen="join" data-hud-box="join-panel">
+        <h2 id="join-title"></h2>
+        <form id="join-form" class="join-row" autocomplete="off" novalidate>
+          <label for="join-code" id="join-label"></label>
+          <input id="join-code" name="code" spellcheck="false" autocapitalize="characters" placeholder="ABCD5" aria-describedby="join-error" data-hud-box="join-code">
+          <button type="submit" id="join-submit" data-hud-box="join-submit"></button>
         </form>
-        <p class="error" id="join-error" role="alert"></p>
-        <p class="note" id="join-status"></p>
-        <button type="button" class="secondary" data-action="backToLobby">Back</button>
+        <p class="error" id="join-error" aria-live="polite"></p>
+        <button type="button" class="secondary back-button" data-action="backToLobby" data-hud-box="join-back"></button>
       </section>
 
-      <section class="card" data-screen="waiting">
-        <h2>Room code</h2>
+      <section class="card room-card" data-screen="waiting" data-hud-box="waiting-panel">
+        <h2 id="waiting-title"></h2>
         <div class="code-row">
-          <output class="code" id="room-code"></output>
-          <button type="button" id="copy-code">Copy</button>
+          <output class="code" id="room-code" data-hud-box="waiting-code"></output>
+          <button type="button" id="copy-code" data-hud-box="waiting-copy"></button>
         </div>
-        <p class="note" id="copy-status" aria-live="polite"></p>
-        <p class="waiting">Waiting for opponent</p>
-        <p class="note" id="waiting-character"></p>
-        <button type="button" class="secondary" data-action="backToLobby">Cancel</button>
+        <p class="status" id="copy-status" aria-live="polite"></p>
+        <p class="note" id="waiting-hint"></p>
+        <div class="seats" id="waiting-cards"></div>
+        <p class="status starting" id="waiting-starting" aria-live="polite"></p>
+        <button type="button" class="secondary" id="waiting-leave" data-hud-box="waiting-leave"></button>
       </section>
 
       <section class="card" data-screen="gameOver">

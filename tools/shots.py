@@ -70,7 +70,7 @@ DEFAULT_CONFIG = {
 
 # Flow screens (docs/flow-design.md section 7): the scenes of the flow set, drawn at these window shapes.
 # In these scenes every visible button must be at least MIN_BUTTON_SIDE px on both sides.
-FLOW_SCENES = ("menu", "howto", "settings")
+FLOW_SCENES = ("menu", "howto", "settings", "lobby", "waiting", "starting")
 FLOW_SHAPES = ("fhd", "hd")
 MIN_BUTTON_SIDE = 44
 
