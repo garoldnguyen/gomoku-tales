@@ -20,10 +20,13 @@ import { isCollapseKey, startCollapsed, toggleAll, withCollapsed, writeCollapsed
 import { hudViewModel } from './ui/hud-view.js';
 import { attachGameInput, hitTest, isQualityKey, shortcutKeyHandler } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
+import { watchNewGame } from './ui/new-game-watch.js';
 import { menuViewModel } from './ui/menu.js';
 import { createMenu } from './ui/menu-dom.js';
 import { attachScreens } from './ui/screens.js';
-import { parseShotParams, setUpShotScene, shotFlow, shotRoomView, stillRoomApp } from './ui/shot-mode.js';
+import {
+  parseShotParams, setUpShotScene, SHOT_GAME_OVER, shotFlow, shotGameOverView, shotRoomView, stillRoomApp,
+} from './ui/shot-mode.js';
 
 const canvas = document.getElementById('game');
 canvas.width = INTERNAL_WIDTH;
@@ -144,10 +147,8 @@ let qualityKeyAttached = false;
 
 if (shot) {
   startShotMode(shot);
-} else if (params.get('local') === '1') {
-  startLocalMode();
 } else {
-  startOnlineMode();
+  startAppMode({ local: params.get('local') === '1' });
 }
 
 // The 3D renderer, or the 2D one if WebGL or the 3D code fails to load.
@@ -288,27 +289,20 @@ function showEvents(events, effects, time, resumed) {
   renderer.trigger?.(events, time); // the 3D world: pop-ins, character poses and skill visuals
 }
 
-// Online rooms over a BroadcastChannel: the lobby and room screens are DOM
-// overlays above the canvases, the game is drawn on them. With the 3D
-// renderer the world stays on behind the overlays, blurred behind the
-// lobby and room screens when this window's quality level has frosted
-// HUD glass (hudFrost in src/render3d/quality.js).
-function startOnlineMode() {
-  const app = createApp({ openTransport: (code) => createBroadcastTransport(code) });
+// The app (src/ui/app.js): online rooms over a BroadcastChannel and the
+// local game (Play on this computer, or the ?local=1 page, which starts on
+// it). The lobby, room and game over screens are DOM overlays above the
+// canvases, the game is drawn on them. With the 3D renderer the world stays
+// on behind the overlays, blurred behind the lobby and room screens when
+// this window's quality level has frosted HUD glass (hudFrost in
+// src/render3d/quality.js). Every new game (a start, a rematch, a local
+// restart) clears the old game's visuals (watchNewGame).
+function startAppMode({ local = false } = {}) {
+  const app = createApp({ openTransport: (code) => createBroadcastTransport(code), local });
   const screens = attachScreens(document.getElementById('screens'), app);
   assetsLoaded.then((store) => screens.setAssets(store));
-  // The main menu is the first screen. Play on this computer leaves the
-  // online loop for the same local game as ?local=1.
-  let local = false;
   createMenuLayer((type) => app.menuEvent(type));
-  app.onChange(() => {
-    showMenu(app.getFlow());
-    if (!local && app.getFlow().mode === MODES.LOCAL) {
-      local = true;
-      app.close();
-      startLocalMode();
-    }
-  });
+  app.onChange(() => showMenu(app.getFlow()));
   showMenu(app.getFlow());
   // Tell the opponent at once when this window closes or reloads.
   window.addEventListener('pagehide', () => app.close());
@@ -331,53 +325,51 @@ function startOnlineMode() {
       else if (hit?.cell) game.click(hit.cell);
     },
     onCancel: () => playing()?.cancel(),
+    onRestart: () => app.restartLocal(), // local mode only
   });
   hudHandlers.onSkill = (player, skillId) => playing()?.clickSkill(player, skillId);
   hudHandlers.onCancel = () => playing()?.cancel();
   attachQualityKey();
 
   const effects = renderer === RENDERER_2D ? createEffects() : null;
-  let shownGame = null; // the game the effects and the 3D world belong to
+  const newGame = watchNewGame(() => {
+    effects?.clear();
+    renderer.reset?.();
+  });
   let blurred = false;
   // The hint line, made again only when the room or seat changes.
   let hint = '';
   let hintCode = null;
   let hintStone = null;
-
-  const forgetGame = () => {
-    effects?.clear();
-    renderer.reset?.();
-  };
+  const localHint = renderer === RENDERER_2D
+    ? 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts.'
+    : 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts. Q quality.';
 
   const frame = (time) => {
-    if (local) return; // the local game draws from now on
     const resumed = resumeWatch.tick(time);
     const screen = app.getScreen();
     const game = app.getGame();
-    if ((screen === GAME || screen === GAME_OVER) && game) {
-      if (game !== shownGame) {
-        forgetGame();
-        shownGame = game;
-        hintCode = null; // a new game may be a new character
-      }
+    const inGame = (screen === GAME || screen === GAME_OVER) && game !== null;
+    if (newGame.check(inGame ? game : null, app.getGameNumber())) hintCode = null; // a new game may be a new character
+    if (inGame) {
       showEvents(game.takeEvents(), effects, time, resumed);
       const view = game.getView();
       pointerCanvas.style.cursor = screen === GAME && view.pointer ? 'pointer' : 'default';
-      if (view.code !== hintCode || view.you !== hintStone) {
+      const local = app.getFlow().mode === MODES.LOCAL;
+      const you = local ? null : view.you;
+      if (local) {
+        hint = localHint;
+      } else if (view.code !== hintCode || view.you !== hintStone) {
         hintCode = view.code;
         hintStone = view.you;
         hint = roomHint(view.code, CHARACTERS[app.getView().character]?.name, view.you);
       }
       renderer.drawGameScreen(ctx, frameViewOf(view, time, effects, hint));
       if (hud) {
-        showHud(game, view, view.you, game.getOutcome()?.winner ?? null, hint);
+        showHud(game, view, you, game.getOutcome()?.winner ?? null, hint);
         hud.show(true);
       }
     } else {
-      if (shownGame) {
-        forgetGame();
-        shownGame = null;
-      }
       pointerCanvas.style.cursor = 'default';
       // The DOM menu has its own title.
       renderer.drawMenuScreen(ctx, time, !menuShown());
@@ -390,50 +382,6 @@ function startOnlineMode() {
       blurred = blur;
       stage.classList.toggle('backdrop-blur', blur);
     }
-    requestAnimationFrame(frame);
-  };
-  requestAnimationFrame(frame);
-}
-
-// Dev mode: one window plays both sides, skills included. The 2D
-// placeholder effects belong to the 2D renderer only, and the 3D renderer
-// takes the events itself.
-function startLocalMode() {
-  const game = createLocalGame();
-  const effects = renderer === RENDERER_2D ? createEffects() : null;
-  const hint = renderer === RENDERER_2D
-    ? 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts.'
-    : 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts. Q quality.';
-
-  attachGameInput(pointerCanvas, {
-    onHover: (point) => {
-      const hit = point ? renderer.hitTest(point.px, point.py) : null;
-      game.setHover(hit?.cell ?? null);
-      game.setHoverSkill(hit?.skill ?? null);
-    },
-    onClick: ({ px, py }) => {
-      const hit = renderer.hitTest(px, py);
-      if (hit?.skill) game.clickSkill(hit.skill.player, hit.skill.skillId);
-      else if (hit?.cell) game.click(hit.cell);
-    },
-    onCancel: () => game.cancel(),
-    onRestart: () => {
-      game.restart();
-      effects?.clear();
-      renderer.reset?.();
-    },
-  });
-  hudHandlers.onSkill = (player, skillId) => game.clickSkill(player, skillId);
-  hudHandlers.onCancel = () => game.cancel();
-  hud?.show(true);
-  attachQualityKey();
-
-  const frame = (time) => {
-    showEvents(game.takeEvents(), effects, time, resumeWatch.tick(time));
-    const view = game.getView();
-    pointerCanvas.style.cursor = view.pointer ? 'pointer' : 'default';
-    renderer.drawGameScreen(ctx, frameViewOf(view, time, effects, hint));
-    if (hud) showHud(game, view, null, null, hint);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
@@ -454,10 +402,17 @@ async function startShotMode({ scene }) {
   // and starting scenes show the lobby and room screens from a still view
   // (no network). The farm stays sharp: the game's backdrop blur zooms the
   // canvas past the window edges, which the window check counts as a gap.
+  // The gameover scenes show the game over card from a still view over the
+  // field scene, with the HUD of the online viewer whose Wind Rabbit won
+  // (no skill selected: the game is over).
   const flow = shotFlow(scene);
   const roomView = shotRoomView(scene);
-  if (roomView) {
-    const screens = attachScreens(document.getElementById('screens'), stillRoomApp(roomView));
+  const overView = shotGameOverView(scene);
+  if (overView) game.cancel();
+  const hudPlayer = overView ? SHOT_GAME_OVER.you : null;
+  const hudWinner = overView ? SHOT_GAME_OVER.winner : null;
+  if (roomView || overView) {
+    const screens = attachScreens(document.getElementById('screens'), stillRoomApp(roomView ?? overView));
     assetsLoaded.then((store) => screens.setAssets(store));
   } else if (flow) {
     createMenuLayer(() => {});
@@ -492,7 +447,8 @@ async function startShotMode({ scene }) {
     } else {
       const view = game.getView();
       renderer.drawGameScreen(ctx, frameViewOf(view, SHOT_TIME_MS, effects, null));
-      if (hud) showHud(game, view, null, null, null);
+      if (overView) view.status = null; // the turn pill reads the winner, as at the end of a game
+      if (hud) showHud(game, view, hudPlayer, hudWinner, null);
     }
     drawn++;
     state.ready = drawn >= SHOT_READY_FRAMES;

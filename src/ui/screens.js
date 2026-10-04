@@ -1,5 +1,5 @@
-// DOM side of the lobby and room screens (docs/flow-design.md sections 3.4
-// and 3.5). The markup lives in index.html; this fills in its text from
+// DOM side of the lobby, room and game over screens (docs/flow-design.md
+// sections 3.4, 3.5 and 3.7). The markup lives in index.html; this fills in its text from
 // strings.js, draws the view models of room-screens.js, wires the buttons
 // to the screen flow in app.js and shows the right screen whenever the app
 // changes. The Game screen itself is drawn on the canvas, so the overlay
@@ -24,6 +24,8 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   const copyStatus = $('copy-status');
   const roomCode = $('room-code');
   const leave = $('waiting-leave');
+  const overRematch = $('over-rematch');
+  const overMenu = $('over-menu');
   let shown = null;
   let copyTimer = null;
   let assets = null;
@@ -194,9 +196,16 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
       leave.disabled = !vm.leave.enabled;
       showCards(vm.cards);
       if (entering) clearCopy();
-    } else if (view.screen === GAME_OVER && view.outcome) {
-      $('over-title').textContent = view.outcome.title;
-      $('over-detail').textContent = view.outcome.detail;
+    } else if (view.screen === GAME_OVER && view.gameOver) {
+      // The game over card (game-over.js): headline, subline, Rematch with
+      // its state and hint, and Back to Menu (always enabled).
+      const vm = view.gameOver;
+      $('over-title').textContent = vm.headline;
+      $('over-detail').textContent = vm.subline;
+      overRematch.textContent = vm.rematch.label;
+      overRematch.disabled = vm.rematch.disabled;
+      $('over-hint').textContent = vm.rematch.hint ?? '';
+      overMenu.textContent = vm.backToMenu;
     }
     if (view.screen !== WAITING_SCREEN) clearCopy();
 

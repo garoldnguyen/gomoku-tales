@@ -31,7 +31,11 @@
 //                             later round until new-game arrives). Once
 //                             a side has a result it adds { result }, and
 //                             keeps pinging so a peer that is still there
-//                             learns the outcome
+//                             learns the outcome. A side that lost
+//                             the peer in over adds { gone }, so a
+//                             peer heard again after the connection
+//                             dropped learns that no rematch is left
+//                             (the ping counts as a leave)
 //   leave     both ways       sent when the page closes
 //   rematch   guest -> host   { round } asks for a rematch of the game of that round
 //   rematch-status host -> guest { round, host, guest, gone } after every change in
@@ -59,8 +63,9 @@
 // room); a repeat changes nothing. The host's own press is requestRematch().
 // When both asked, the host starts round plus 1 with newGame(), enters
 // playing, sends new-game and restarts the heartbeat; the guest takes
-// new-game as it is. A guest whose request is not yet shown in the host's
-// status sends it again with every host ping it hears in over.
+// new-game as it is, unless it lost the host in over. A guest whose
+// request is not yet shown in the host's status sends it again with every
+// host ping it hears in over.
 //
 // Presence by phase: the heartbeat runs in every phase and restarts when the
 // game starts. The leave countdown and the forfeit run only in playing. In
@@ -79,7 +84,8 @@
 // it, even over its own (the host decides when both counted down at once).
 // The host takes the guest's claim unless it already has a result or the
 // game already ended by the rules; a guest that resyncs to such a finished
-// game drops its claim.
+// game drops its claim. A guest in over ignores the result of a later round
+// it has not taken.
 //
 // Room events, passed to handlers given to onEvent:
 //   { type: 'joined', character }         host: the guest took a seat; guest: welcomed
@@ -369,7 +375,7 @@ export function createGuestRoom(options) {
       return;
     }
     if (message.type === 'new-game') {
-      if (room.phase !== OVER || !Number.isInteger(message.round) || message.round <= room.round || !message.state) return;
+      if (room.phase !== OVER || room.rematchGone || !Number.isInteger(message.round) || message.round <= room.round || !message.state) return;
       room.round = message.round;
       room.state = message.state;
       if (Number.isInteger(message.seq)) room.seq = message.seq;
@@ -403,12 +409,16 @@ export function createGuestRoom(options) {
       room.emit(stateEvent);
     } else if (message.type === 'rejected') {
       room.emit({ type: 'rejected', error: message.error, ...(message.reason ? { reason: message.reason } : {}) });
-    } else if (message.type === 'ping' && (message.seq > room.seq || (room.phase === STARTING && message.round > 0) || laterRound)) {
-      room.send({ type: 'join' }); // a state, start or new-game message was lost; the host answers with a fresh welcome (and start or new-game)
+    } else if (message.type === 'ping' && (message.seq > room.seq || (room.phase === STARTING && message.round > 0) || laterRound) && !(laterRound && room.rematchGone)) {
+      // A state, start or new-game message was lost; the host answers with a fresh welcome (and start or new-game).
+      // A guest that lost the host in over takes no later round, so it does not ask.
+      room.send({ type: 'join' });
     } else if (message.type === 'ping' && room.pending && !(message.handled >= room.pending.requestId)) {
       room.send({ type: 'action', to: room.peerId, ...room.pending }); // the request or its answer was lost
     }
-    if (message.type !== 'ping' && message.type !== 'welcome') return;
+    // A result of a later round belongs to a game this side never took,
+    // so it never replaces the outcome of this one.
+    if ((message.type !== 'ping' && message.type !== 'welcome') || laterRound) return;
     if (isClaim(message.result, CHARACTERS[room.hostCharacter].stone)) {
       room.setResult({ winner: message.result.winner, reason: 'opponentLeft' }); // the host decides
     } else if (room.result && isGameOver(room.state)) {
@@ -618,8 +628,9 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
     },
 
     // Handles what every message from the seated peer means for presence.
+    // A ping with gone (the peer lost this side in over) counts as a leave.
     receiveCommon(message) {
-      if (message.type === 'leave') {
+      if (message.type === 'leave' || (message.type === 'ping' && message.gone === true)) {
         presence = markLeft(presence, clock.now());
         check();
       } else {
@@ -637,6 +648,7 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
       ...(role === HOST ? { seq: room.seq, handled: room.handled } : {}),
       ...(role === HOST && room.round > 0 ? { round: room.round } : {}),
       ...(room.result ? { result: room.result } : {}),
+      ...(room.rematchGone ? { gone: true } : {}),
       ...(role === HOST && room.phase === OVER ? { rematch: room.rematchStatus() } : {}),
     });
   };

@@ -91,7 +91,7 @@
     <canvas id="world" hidden></canvas>
     <canvas id="game" width="960" height="540"></canvas>
 
-    <!-- Lobby and room screens (docs/flow-design.md sections 3.4 and 3.5), shown over the canvas.
+    <!-- Lobby, room and game over screens (docs/flow-design.md sections 3.4, 3.5 and 3.7), shown over the canvas.
          src/ui/screens.js fills in the text from src/ui/strings.js. -->
     <div id="screens" hidden>
       <section class="card" data-screen="lobby" data-hud-box="lobby-panel">
@@ -133,10 +133,15 @@
         <button type="button" class="secondary" id="waiting-leave" data-hud-box="waiting-leave"></button>
       </section>
 
-      <section class="card" data-screen="gameOver">
+      <!-- Game over card (docs/flow-design.md section 3.7): top centre, the finished board stays visible. -->
+      <section class="card over-card" data-screen="gameOver" data-hud-box="gameover-card" aria-labelledby="over-title">
         <h2 id="over-title"></h2>
         <p id="over-detail"></p>
-        <button type="button" data-action="backToLobby">Back to Lobby</button>
+        <div class="over-actions">
+          <button type="button" id="over-rematch" data-action="rematch" data-hud-box="gameover-rematch"></button>
+          <button type="button" class="secondary" id="over-menu" data-action="backToMenu" data-hud-box="gameover-menu"></button>
+        </div>
+        <p class="status" id="over-hint" aria-live="polite"></p>
       </section>
     </div>
   </div>

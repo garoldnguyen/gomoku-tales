@@ -10,10 +10,16 @@ import { startTargeting, targetClick, targetPreview, targetPrompt } from './targ
 // takeEvents' answer when nothing happened, shared so the render loop makes
 // no new list on an ordinary frame.
 const NO_EVENTS = Object.freeze([]);
+// The outcomes getOutcome returns (the frame loop reads it every frame).
+const X_WON = Object.freeze({ winner: X, reason: 'five' });
+const O_WON = Object.freeze({ winner: O, reason: 'five' });
+const DRAWN = Object.freeze({ winner: null, reason: 'draw' });
 
-// options.random is passed to placeStone for the Tornado Zone throw.
+// options.random is passed to placeStone for the Tornado Zone throw;
+// options.onApplied() is called after every applied action (the app checks
+// whether the game ended).
 export function createLocalGame(options = {}) {
-  const { random = Math.random } = options;
+  const { random = Math.random, onApplied = () => {} } = options;
   let state = newGame();
   let hover = null; // board cell under the pointer
   let hoverSkill = null; // { player, skillId } of the button under the pointer
@@ -38,6 +44,7 @@ export function createLocalGame(options = {}) {
     targeting = null;
     message = describeEvents(result.events);
     pendingEvents.push(...result.events);
+    onApplied();
     return true;
   };
 
@@ -123,6 +130,14 @@ export function createLocalGame(options = {}) {
 
     rematchLocal,
     restart: rematchLocal,
+
+    // How the game ended ({ winner, reason } with reason 'five' or 'draw'),
+    // or null while it goes on.
+    getOutcome() {
+      if (state.winner) return state.winner === X ? X_WON : O_WON;
+      if (state.draw) return DRAWN;
+      return null;
+    },
 
     getView() {
       const player = state.currentPlayer;

@@ -480,7 +480,6 @@ const NOT_EACH_FRAME = {
   'render3d/world-renderer.js qualityText': 'one string per level and FPS value, kept',
   'render3d/world-renderer.js lowestText': 'one string per lowest FPS value, kept',
   'main.js roomHint': 'only when the room or seat changes',
-  'main.js forgetGame': 'only when a game starts or is left (resets every effect)',
   'main.js showMenu': 'only when the flow, the fullscreen state or the quality level changes',
   'render3d/world.js createPieceSprite': 'a piece sprite pool that grows on a miss (pop() ??)',
   'render3d/world.js createCellDecal': 'a decal mesh pool that grows on a miss',
@@ -500,6 +499,10 @@ const FRAME_PATH_ELSEWHERE = [
   // The game state getters main.js's frame calls on the app and the game.
   ['ui/app.js', ['export function createApp(', 'getScreen(']],
   ['ui/app.js', ['export function createApp(', 'getGame(']],
+  ['ui/app.js', ['export function createApp(', 'getFlow(']],
+  ['ui/app.js', ['export function createApp(', 'getGameNumber(']],
+  ['ui/new-game-watch.js', ['export function watchNewGame(', 'check(']],
+  ['ui/local-game.js', ['export function createLocalGame(', 'getOutcome(']],
   ['ui/local-game.js', ['export function createLocalGame(', 'getTargeting(']],
   ['ui/local-game.js', ['export function createLocalGame(', 'takeEvents(']],
   ['ui/online-game.js', ['export function createOnlineGame(', 'getTargeting(']],

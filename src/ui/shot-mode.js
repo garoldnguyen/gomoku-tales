@@ -5,15 +5,30 @@
 // the cell numbering: the scene is played through the local game's own
 // clicks.
 
+import { X } from '../logic/board.js';
 import { WIND_RABBIT } from '../logic/characters.js';
 import { normalizeQuality } from '../render3d/quality.js';
-import { LOBBY, WAITING_SCREEN } from './app.js';
-import { FLOW_EVENTS, SCREENS, flowReducer, initialFlow } from './flow.js';
+import { GAME_OVER, LOBBY, WAITING_SCREEN } from './app.js';
+import { FLOW_EVENTS, MODES, SCREENS, flowReducer, initialFlow } from './flow.js';
+import { gameOverViewModel, rematchViewModel } from './game-over.js';
 import { parseHudParam } from './hud-collapse.js';
 import { waitingViewModel } from './room-screens.js';
 import { SHOT_FIELD } from './shot-position.js';
+import { STRINGS } from './strings.js';
 
-export const SHOT_SCENES = Object.freeze(['field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting']);
+export const SHOT_SCENES = Object.freeze([
+  'field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting', 'gameover', 'gameover-pending',
+]);
+
+// The game over scenes (docs/flow-design.md section 7): the field scene
+// with the game over card on top, Wind Rabbit (X) wins and this window is
+// the online viewer playing it. The value is the Rematch state: mine is
+// true once this window asked.
+const GAME_OVER_SCENES = Object.freeze({
+  gameover: { mine: false, theirs: false, gone: false },
+  'gameover-pending': { mine: true, theirs: false, gone: false },
+});
+export const SHOT_GAME_OVER = Object.freeze({ winner: X, you: X, reason: 'five' });
 
 // The room of the waiting and starting scenes: a fixed code, this window
 // the host playing Wind Rabbit.
@@ -57,6 +72,31 @@ export function shotRoomView(scene) {
   };
 }
 
+// What the game over card (screens.js) shows in the gameover and
+// gameover-pending scenes, in the shape of the app's getView() (app.js).
+// null for other scenes.
+export function shotGameOverView(scene) {
+  if (!Object.hasOwn(GAME_OVER_SCENES, scene)) return null;
+  const flow = [FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.ROOM_CREATED, FLOW_EVENTS.OPPONENT_JOINED, FLOW_EVENTS.START,
+    FLOW_EVENTS.GAME_OVER].reduce(flowReducer, initialFlow());
+  return {
+    screen: GAME_OVER,
+    flow,
+    waiting: null,
+    code: SHOT_ROOM.code,
+    character: SHOT_ROOM.character,
+    joining: false,
+    joiningCode: null,
+    joinError: null,
+    outcome: null,
+    gameOver: {
+      ...gameOverViewModel({ mode: MODES.ONLINE, ...SHOT_GAME_OVER }),
+      rematch: rematchViewModel({ mode: MODES.ONLINE, ...GAME_OVER_SCENES[scene] }),
+      backToMenu: STRINGS.gameOverBackToMenu,
+    },
+  };
+}
+
 // A still stand-in for the app (app.js) that the lobby and room screens
 // (screens.js) draw from in shot mode: always the same view, never a change,
 // and no actions.
@@ -88,11 +128,11 @@ export function parseShotParams(search) {
 }
 
 // Plays the scene on a fresh local game (src/ui/local-game.js) through its
-// clicks. Returns the growth to show: { growing: [{ x, y, player, ageMs }],
+// clicks (the game over scenes play the field scene). Returns the growth to show: { growing: [{ x, y, player, ageMs }],
 // last: { x, y, player, ageMs } or null }. Throws if a click is refused,
 // so a position that breaks the rules can never be shown.
 export function setUpShotScene(game, scene) {
-  if (scene !== 'field') return { growing: [], last: null };
+  if (scene !== 'field' && !Object.hasOwn(GAME_OVER_SCENES, scene)) return { growing: [], last: null };
   const { actions, growing, lastMoveAgeMs, selectedSkill } = SHOT_FIELD;
   let last = null;
   for (const action of actions) {

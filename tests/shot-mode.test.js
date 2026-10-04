@@ -73,7 +73,9 @@ test('parseShotParams: no shot parameter means normal play', () => {
 });
 
 test('parseShotParams reads the scene and the quality', () => {
-  assert.deepEqual(SHOT_SCENES, ['field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting']);
+  assert.deepEqual(SHOT_SCENES, [
+    'field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting', 'gameover', 'gameover-pending',
+  ]);
   assert.deepEqual(parseShotParams('?shot=field&quality=high'), { scene: 'field', quality: 'high', hud: null });
   assert.deepEqual(parseShotParams('?shot=empty&quality=low'), { scene: 'empty', quality: 'low', hud: null });
   assert.deepEqual(parseShotParams(new URLSearchParams('shot=EMPTY&quality=Medium')), { scene: 'empty', quality: 'medium', hud: null });

@@ -35,6 +35,11 @@ export function createOnlineGame(room) {
       pendingEvents.push(...event.events);
     } else if (event.type === 'rejected') {
       message = event.error;
+    } else if (event.type === 'newGame') {
+      // A rematch: nothing of the old game is kept.
+      targeting = null;
+      message = null;
+      pendingEvents = [];
     }
   });
 

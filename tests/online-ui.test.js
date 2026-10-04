@@ -307,15 +307,16 @@ test('a full game between two windows with all four skills ends on the Game over
   assert.equal(host.app.getView().outcome.title, 'You lose.');
   assert.equal(host.app.getView().outcome.detail, 'Wind Rabbit made five in a row.');
 
-  // Back to Lobby leaves the room; the other window stays on Game over.
-  guest.app.backToLobby();
-  assert.equal(guest.app.getScreen(), LOBBY);
+  // Back to Menu leaves the room; the other window stays on Game over.
+  guest.app.backToMenu();
+  assert.equal(guest.app.getScreen(), MENU);
   assert.equal(guest.app.getGame(), null);
   assert.equal(guest.transports[0].closed, true);
   clock.advance(LEAVE_COUNTDOWN_S * 1000 + PEER_TIMEOUT_MS);
   assert.equal(host.app.getScreen(), GAME_OVER);
   assert.equal(host.app.getView().outcome.title, 'You lose.', 'leaving after the end does not change the result');
-  host.app.backToLobby();
+  assert.equal(host.app.getView().gameOver.rematch.hint, 'Opponent left');
+  host.app.backToMenu();
   assert.equal(clock.pending, 0, 'every timer stopped');
 });
 

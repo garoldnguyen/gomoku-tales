@@ -70,9 +70,14 @@ DEFAULT_CONFIG = {
 
 # Flow screens (docs/flow-design.md section 7): the scenes of the flow set, drawn at these window shapes.
 # In these scenes every visible button must be at least MIN_BUTTON_SIDE px on both sides.
-FLOW_SCENES = ("menu", "howto", "settings", "lobby", "waiting", "starting")
+FLOW_SCENES = ("menu", "howto", "settings", "lobby", "waiting", "starting", "gameover", "gameover-pending")
 FLOW_SHAPES = ("fhd", "hd")
 MIN_BUTTON_SIDE = 44
+# The game over card (docs/flow-design.md section 3.7): in these scenes the box GAMEOVER_CARD must be
+# there and at most GAMEOVER_MAX_HEIGHT_SHARE of the window height, so the finished board stays visible.
+GAMEOVER_SCENES = ("gameover", "gameover-pending")
+GAMEOVER_CARD = "gameover-card"
+GAMEOVER_MAX_HEIGHT_SHARE = 0.24
 
 EDGE_BAND_PX = 4
 NEAR_BLACK = 16
@@ -209,6 +214,14 @@ def smallest_button(buttons):
     return best
 
 
+def card_share(boxes, height):
+    """Height of the game over card box as a share of the window height, or None without the box."""
+    for b in boxes or []:
+        if b["name"] == GAMEOVER_CARD:
+            return b["h"] / height
+    return None
+
+
 def judge(m, cfg):
     """Turns raw measurements of one shot into (problems, warnings). Both are lists of plain sentences."""
     problems = []
@@ -243,6 +256,12 @@ def judge(m, cfg):
     side, name = smallest_button(m.get("buttons"))
     if m.get("scene") in FLOW_SCENES and side is not None and side < MIN_BUTTON_SIDE - 0.5:
         problems.append("button %s is %.1f px on its smallest side (at least %d)" % (name, side, MIN_BUTTON_SIDE))
+    if m.get("scene") in GAMEOVER_SCENES and m.get("error") is None:
+        share = card_share(boxes, h)
+        if share is None:
+            problems.append("the game over card (box %s) is not shown" % GAMEOVER_CARD)
+        elif share > GAMEOVER_MAX_HEIGHT_SHARE + 0.5 / h:
+            problems.append("the game over card is %.1f percent of the window height (at most %d)" % (share * 100, GAMEOVER_MAX_HEIGHT_SHARE * 100))
 
     window_notes = []
     for side, share in (m.get("edges") or {}).items():
@@ -545,6 +564,9 @@ def take_shot(browser, analyzer, shot, base, cfg, out_dir):
     m["overlaps"] = [list(pair) for pair in find_overlaps(boxes)]
     m["outside"] = find_outside(boxes, width, height)
     m["minButtonSide"], m["minButtonName"] = smallest_button(m.get("buttons"))
+    if shot["scene"] in GAMEOVER_SCENES:
+        share = card_share(boxes, height)
+        m["cardShare"] = None if share is None else round(share, 4)
     return m
 
 
@@ -684,8 +706,10 @@ def main(argv=None):
     print("Boxes and buttons (overlapping pairs, boxes outside the window, smallest button side in px):")
     for r in results:
         side = r.get("minButtonSide")
-        print("  %-34s overlaps %d, outside %d, smallest button %s" % (
-            r["file"], len(r.get("overlaps", [])), len(r.get("outside", [])), "-" if side is None else "%.1f" % side))
+        card = r.get("cardShare")
+        print("  %-34s overlaps %d, outside %d, smallest button %s%s" % (
+            r["file"], len(r.get("overlaps", [])), len(r.get("outside", [])), "-" if side is None else "%.1f" % side,
+            "" if card is None else ", card %.1f percent of the height" % (card * 100)))
     print()
     if n_problems == 0:
         print("SHOTS OK: %d shot(s), %d warning(s). Report: %s/report.json" % (len(results), n_warnings, rel))

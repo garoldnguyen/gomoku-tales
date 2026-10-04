@@ -99,6 +99,7 @@ export const STRINGS = Object.freeze({
   gameOverYouWin: 'You win',
   gameOverYouLose: 'You lose',
   gameOverWins: 'wins', // after the winning character's name in a local game
+  gameOverWon: 'won', // after the winning character's name online
   gameOverDraw: 'Draw',
   gameOverBoardFull: 'The board is full',
   gameOverOpponentLeft: 'Opponent left',

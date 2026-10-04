@@ -58,12 +58,12 @@ class ParseTests(unittest.TestCase):
 class SetTests(unittest.TestCase):
     def test_sets_have_expected_sizes(self):
         sizes = {k: len(v) for k, v in shots.named_sets().items()}
-        self.assertEqual(sizes, {"quick": 1, "levels": 3, "shapes": 5, "hud": 5, "full": 7, "flow": 12})
+        self.assertEqual(sizes, {"quick": 1, "levels": 3, "shapes": 5, "hud": 5, "full": 7, "flow": 16})
 
     def test_flow_set_has_its_scenes_at_fhd_and_hd(self):
         planned = shots.plan_shots(set_name="flow", scene="field")
         pairs = {(s["scene"], s["shape"]) for s in planned}
-        self.assertEqual(pairs, {(scene, shape) for scene in ("menu", "howto", "settings", "lobby", "waiting", "starting") for shape in ("fhd", "hd")})
+        self.assertEqual(pairs, {(scene, shape) for scene in ("menu", "howto", "settings", "lobby", "waiting", "starting", "gameover", "gameover-pending") for shape in ("fhd", "hd")})
         self.assertEqual((shots.SHAPES["fhd"], shots.SHAPES["hd"]), ((1920, 1080), (1280, 720)))
 
     def test_every_set_plans_with_unique_names(self):
@@ -155,9 +155,25 @@ class JudgeTests(unittest.TestCase):
         big = [{"name": "menu-howto", "x": 0, "y": 0, "w": 240, "h": 44}]
         self.assertEqual(shots.judge(measurement(scene="menu", buttons=big), CFG)[0], [])
 
+    def test_game_over_card_height_limit(self):
+        def card(h):
+            return [{"name": "gameover-card", "x": 400, "y": 96, "w": 480, "h": h}]
+        self.assertEqual(shots.judge(measurement(scene="gameover", hudBoxes=card(172)), CFG)[0], [])
+        self.assertEqual(len(shots.judge(measurement(scene="gameover-pending", hudBoxes=card(180)), CFG)[0]), 1)
+        self.assertEqual(len(shots.judge(measurement(scene="gameover", hudBoxes=[]), CFG)[0]), 1, "the card must be there")
+        self.assertEqual(shots.judge(measurement(scene="field", hudBoxes=[]), CFG)[0], [])
+        self.assertAlmostEqual(shots.card_share(card(180), 720), 0.25)
+
     def test_stable_limit(self):
         self.assertEqual(shots.judge(measurement(stableDiff=0.005), CFG)[0], [])
         self.assertEqual(len(shots.judge(measurement(stableDiff=0.2), CFG)[0]), 1)
+
+
+def scratch_dir():
+    # A temp folder inside the repo's shots/ folder, so tests also run where the system temp folder is read-only.
+    base = Path(__file__).resolve().parent.parent / "shots" / "tmp-tests"
+    base.mkdir(parents=True, exist_ok=True)
+    return tempfile.TemporaryDirectory(dir=base)
 
 
 class ConfigTests(unittest.TestCase):
@@ -171,13 +187,13 @@ class ConfigTests(unittest.TestCase):
         self.assertIn("{port}", " ".join(cfg["serve"]))
 
     def test_user_values_win_and_notes_are_ignored(self):
-        with tempfile.TemporaryDirectory() as d:
+        with scratch_dir() as d:
             p = Path(d) / "c.json"
             p.write_text(json.dumps({"_note": "x", "entry": "/game.html"}))
             self.assertEqual(shots.load_config(p)["entry"], "/game.html")
 
     def test_unknown_key_is_an_error(self):
-        with tempfile.TemporaryDirectory() as d:
+        with scratch_dir() as d:
             p = Path(d) / "c.json"
             p.write_text(json.dumps({"entri": "/x"}))
             with self.assertRaises(ValueError):

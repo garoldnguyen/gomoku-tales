@@ -10,13 +10,20 @@
 // The host owns the start (net/room.js): after a join both windows are in
 // phase starting (both on the waiting room, with both cards filled) until
 // the host's start event, which both get at the same moment.
+//
+// Play on this computer (and the ?local=1 page) runs a local game
+// (local-game.js) through the same Game and Game over screens. The game
+// over card (game-over.js, docs/flow-design.md section 3.7) offers Rematch
+// (online the host decides, net/room.js; local at once) and Back to Menu.
 
 import { GAME_OVER_DELAY_MS } from '../config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
 import { systemClock } from '../net/clock.js';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../net/room-code.js';
-import { FULL, NO_ROOM, PLAYING, STARTING, createGuestRoom, createHostRoom } from '../net/room.js';
-import { FLOW_EVENTS, NOTICE_HOST_LEFT, ROLES, SCREENS, flowReducer, initialFlow } from './flow.js';
+import { FULL, GUEST, HOST, NO_ROOM, OVER, PLAYING, STARTING, createGuestRoom, createHostRoom } from '../net/room.js';
+import { FLOW_EVENTS, MODES, NOTICE_HOST_LEFT, ROLES, SCREENS, flowReducer, initialFlow } from './flow.js';
+import { gameOverViewModel, rematchViewModel } from './game-over.js';
+import { createLocalGame } from './local-game.js';
 import { MENU_EVENTS } from './menu.js';
 import { characterName, createOnlineGame } from './online-game.js';
 import { waitingViewModel } from './room-screens.js';
@@ -38,21 +45,32 @@ export const BAD_CODE_ERROR = STRINGS.joinErrorBadCode;
 //   clock               time and timers (net/clock.js)
 //   random              the host's Tornado Zone random function
 //   makeCode()          a new room code
+//   local               true: start on the game in local mode (?local=1)
+//   localRandom         the local game's Tornado Zone random function
 export function createApp(options) {
   const {
     openTransport,
     clock = systemClock,
     random = Math.random,
     makeCode = () => generateRoomCode(),
+    local = false,
+    localRandom = Math.random,
   } = options;
 
-  let flow = initialFlow();
+  let flow = initialFlow({ local });
   let lobbyPanel = LOBBY; // LOBBY, CREATE or JOIN while the flow is on the lobby
   let room = null;
   let game = null; // online game controller while a game runs
   let joinError = null;
   let joiningCode = null; // code of the room being joined, while waiting for an answer
   let gameOverTimer = null;
+  // The rematch state of the game over card: mine (this window asked),
+  // theirs (the other player asked) and gone (the other player left, or
+  // the game ended by forfeit), from onRematchStatus and onPeerGone.
+  let rematch = { mine: false, theirs: false, gone: false };
+  // Counts the games shown (a start, a rematch, a local restart), so the
+  // page clears the old game's visuals (src/main.js).
+  let gameNumber = 0;
   const listeners = new Set();
   let roomUnsubscribe = null;
 
@@ -80,10 +98,14 @@ export function createApp(options) {
     }
   };
 
-  const closeRoom = () => {
+  const clearGameOverTimer = () => {
     if (gameOverTimer !== null) clock.clearTimeout(gameOverTimer);
     gameOverTimer = null;
-    game?.dispose();
+  };
+
+  const closeRoom = () => {
+    clearGameOverTimer();
+    game?.dispose?.();
     game = null;
     roomUnsubscribe?.();
     roomUnsubscribe = null;
@@ -128,11 +150,47 @@ export function createApp(options) {
     send(flow.screen === SCREENS.WAITING ? FLOW_EVENTS.OPPONENT_JOINED : FLOW_EVENTS.JOINED);
   };
 
+  // A new game is shown: no rematch asked yet, and the page clears the
+  // old game's visuals.
+  const freshGame = () => {
+    clearGameOverTimer();
+    rematch = { mine: false, theirs: false, gone: false };
+    gameNumber += 1;
+  };
+
+  // The rematch flags of a status from the room ({ host, guest, gone }),
+  // seen from this window's side.
+  const takeRematchStatus = (status) => {
+    if (!room || !status) return;
+    const mySide = room.role === HOST ? HOST : GUEST;
+    const theirSide = mySide === HOST ? GUEST : HOST;
+    rematch = {
+      mine: rematch.mine || status[mySide] === true,
+      theirs: status[theirSide] === true,
+      gone: rematch.gone || status.gone === true,
+    };
+  };
+
+  // The host started a rematch (new-game): back to the game with a fresh
+  // board. The game controller keeps following the same room.
+  const rematchStarted = () => {
+    freshGame();
+    send(FLOW_EVENTS.REMATCH_STARTED);
+  };
+
+  // Play on this computer: a local game, checked for its end after every
+  // applied action.
+  const startLocal = () => {
+    game = createLocalGame({ random: localRandom, onApplied: () => checkGameOver() });
+    freshGame();
+  };
+
   // The host started the game: both windows enter it.
   const startGame = () => {
     if (flow.screen !== SCREENS.STARTING) return;
     joiningCode = null;
     game = createOnlineGame(room);
+    freshGame();
     lobbyPanel = LOBBY;
     send(FLOW_EVENTS.START);
     checkGameOver(); // a guest's start recovered late may come after the game ended
@@ -170,6 +228,9 @@ export function createApp(options) {
         closeRoom();
         changed();
         break;
+      case 'newGame':
+        rematchStarted();
+        break;
       case 'state':
       case 'result':
       case 'peer':
@@ -178,12 +239,26 @@ export function createApp(options) {
     }
   };
 
+  // The rematch status changed (phase over), or the peer went missing:
+  // in phase over that is gone for good (docs/flow-design.md section 6),
+  // with no countdown.
+  const onRematchStatus = (status) => {
+    takeRematchStatus(status);
+    if (flow.screen === SCREENS.GAMEOVER) changed();
+  };
+  const onPeerGone = (event) => {
+    if (event.phase !== OVER) return;
+    rematch = { ...rematch, gone: true };
+    if (flow.screen === SCREENS.GAMEOVER) changed();
+  };
+
   // Starts listening to a new room. A transport may answer before the
   // room is returned (the fake one delivers at once), so a phase reached
   // meanwhile is handled as if its event had just arrived.
   const openRoom = (made) => {
     room = made;
-    roomUnsubscribe = room.onEvent(onRoomEvent);
+    const unsubscribers = [room.onEvent(onRoomEvent), room.onRematchStatus(onRematchStatus), room.onPeerGone(onPeerGone)];
+    roomUnsubscribe = () => unsubscribers.forEach((off) => off());
     if (room.phase === STARTING || room.phase === PLAYING) onRoomEvent({ type: 'joined' });
     if (room.phase === PLAYING) onRoomEvent({ type: 'start', round: room.round });
     else if (room.phase === FULL) onRoomEvent({ type: 'full' });
@@ -193,9 +268,47 @@ export function createApp(options) {
   const menuEvent = (type) => {
     if (!MENU_EVENTS.includes(type)) return false;
     const before = flow;
-    send(type);
+    if (type === FLOW_EVENTS.PLAY_LOCAL && flow.screen === SCREENS.MENU) {
+      flow = flowReducer(flow, type);
+      if (flow !== before) startLocal();
+      changed();
+    } else {
+      send(type);
+    }
     return flow !== before;
   };
+
+  // The game over card for the outcome of the game shown, or null.
+  const gameOverView = () => {
+    const outcome = game?.getOutcome() ?? null;
+    if (!outcome) return null;
+    const mode = flow.mode === MODES.LOCAL ? MODES.LOCAL : MODES.ONLINE;
+    const you = mode === MODES.ONLINE ? room?.getView().you ?? null : null;
+    return {
+      ...gameOverViewModel({ mode, winner: outcome.winner, reason: outcome.reason, you }),
+      rematch: rematchViewModel({ mode, ...rematch }),
+      backToMenu: STRINGS.gameOverBackToMenu,
+    };
+  };
+
+  const pressRematch = () => {
+    if (flow.screen !== SCREENS.GAMEOVER || !game) return false;
+    if (flow.mode === MODES.LOCAL) {
+      game.rematchLocal();
+      rematchStarted();
+      return true;
+    }
+    if (rematchViewModel({ mode: MODES.ONLINE, ...rematch }).disabled) return false;
+    rematch = { ...rematch, mine: true };
+    const before = gameNumber;
+    const taken = room?.requestRematch() ?? false;
+    if (gameNumber !== before) return taken; // both asked: the new game began
+    if (!taken) rematch = { ...rematch, mine: false };
+    changed();
+    return taken;
+  };
+
+  if (local) startLocal();
 
   return {
     // Calls listener() whenever getView() changes (not on every game move;
@@ -236,7 +349,45 @@ export function createApp(options) {
         joiningCode,
         joinError,
         outcome: screen === GAME_OVER && game ? game.getOutcome() : null,
+        // The game over card (game-over.js) on the Game over screen only,
+        // so it never shows during a new game.
+        gameOver: screen === GAME_OVER ? gameOverView() : null,
       };
+    },
+
+    // Counts the games shown; it changes on every start, rematch and
+    // local restart (the page then clears the old board's visuals).
+    getGameNumber() {
+      return gameNumber;
+    },
+
+    // Rematch on the game over card: online it asks the room (the host
+    // decides, and a rematch starts when both asked); local starts the new
+    // game at once. Returns true if the press was taken.
+    rematch: pressRematch,
+
+    // R in local mode: a new game at once, from the game or the game over
+    // card.
+    restartLocal() {
+      if (flow.mode !== MODES.LOCAL || !game) return false;
+      if (flow.screen === SCREENS.GAMEOVER) return pressRematch();
+      game.rematchLocal();
+      freshGame();
+      changed();
+      return true;
+    },
+
+    // Back to Menu on the game over card (the event LEAVE): online it
+    // closes the room, which sends leave, stops the heartbeat, the
+    // countdown and every other timer, and closes the transport; local it
+    // drops the local game. Then the menu.
+    backToMenu() {
+      if (flow.screen !== SCREENS.GAMEOVER) return false;
+      closeRoom();
+      joinError = null;
+      lobbyPanel = LOBBY;
+      send(FLOW_EVENTS.LEAVE);
+      return true;
     },
 
     // A menu button, or Close and Escape on a menu overlay: one of
@@ -323,16 +474,16 @@ export function createApp(options) {
       return true;
     },
 
-    // Back from Create, Join or Game over to the Lobby. Leaves the room if
-    // there is one. The waiting room has Leave (leaveRoom) instead.
+    // Back from Create or Join to the Lobby. Leaves the room if there is
+    // one. The waiting room has Leave (leaveRoom) and Game over Back to
+    // Menu (backToMenu) instead.
     backToLobby() {
       const screen = screenNow();
-      if (screen === MENU || screen === LOBBY || screen === GAME || screen === WAITING_SCREEN) return;
+      if (screen !== CREATE && screen !== JOIN) return;
       closeRoom();
       joinError = null;
       lobbyPanel = LOBBY;
-      if (flow.screen === SCREENS.LOBBY) changed();
-      else send(FLOW_EVENTS.LEAVE, FLOW_EVENTS.PLAY_ONLINE);
+      changed();
     },
 
     // Leaves the room without changing screens. Call it when the page closes.
