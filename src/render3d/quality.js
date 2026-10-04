@@ -1,5 +1,6 @@
 // Quality levels for the farmland scene: ONE feature table, exactly as
-// docs/art-direction-v3.md section 5 lists it, plus the pure logic that
+// docs/art-direction-v3.md section 5 lists it with the rows that
+// docs/art-direction-v3-1.md section 7 adds, plus the pure logic that
 // picks, saves and steps down a level. Every render3d module reads its
 // switches from QUALITY_LEVELS (through qualityFeatures); nothing else tests
 // a level name. Each level only adds to the one below it, except the board
@@ -19,7 +20,10 @@ export const QUALITY_LEVELS = deepFreeze({
     ground: 'mown', // flat mown meadow: two greens in 3-cell stripes, nothing else
     scenery: false, // trees, bushes, hay, fence, path, stepping stones (the curb always shows)
     meadowFlowers: 'off',
-    farHills: 'off',
+    skyHaze: true, // the sky gradient runs to the haze colour at the horizon
+    groundFog: true, // the soft ground edge
+    ridges: false, // the two soft ridges behind the far edge
+    floorShade: false, // the forest floor shade
     sky: 'gradient',
     shadows: 'none',
     postEffects: { bloom: false, depthOfField: false, warmGrade: false, vignette: false },
@@ -38,7 +42,10 @@ export const QUALITY_LEVELS = deepFreeze({
     ground: 'painted', // painted mottled meadow, grass tufts
     scenery: true,
     meadowFlowers: 'still',
-    farHills: 'on',
+    skyHaze: true,
+    groundFog: true,
+    ridges: true,
+    floorShade: false,
     sky: 'still-clouds', // gradient plus 4 still painted clouds
     shadows: 'blob', // soft blob shadow under every plant, rock, post, tree, bush, bale
     postEffects: { bloom: false, depthOfField: false, warmGrade: false, vignette: false }, // no blur at all
@@ -57,7 +64,10 @@ export const QUALITY_LEVELS = deepFreeze({
     ground: 'painted-ripples', // painted meadow plus slow lighter wind ripples
     scenery: true,
     meadowFlowers: 'sway', // swaying, dandelion puffs lift off
-    farHills: 'haze',
+    skyHaze: true,
+    groundFog: true,
+    ridges: true,
+    floorShade: true,
     sky: 'drifting-clouds', // 8 drifting clouds in 2 layers, wisps, sun rays
     shadows: 'sun', // long sun shadows plus slow cloud shadows
     postEffects: { bloom: true, depthOfField: true, warmGrade: true, vignette: true },

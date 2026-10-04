@@ -6,9 +6,10 @@
 
 import {
   CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CLOUD_LAYERS, DRIFT_CLOUD_BOTTOMS, PX_WORLD, SKY_HORIZON_FRACTION,
-  SKY_STOPS, STILL_CLOUDS, SUN_RAY_ALPHA, SUN_RAY_COUNT, SUN_RAY_LOW, SUN_RAY_PERIOD_MS, WISP_COUNT, WISP_HEIGHTS,
+  STILL_CLOUDS, SUN_RAY_ALPHA, SUN_RAY_COUNT, SUN_RAY_LOW, SUN_RAY_PERIOD_MS, WISP_COUNT, WISP_HEIGHTS,
   WISP_PX,
 } from '../config.js';
+import { SKY_HAZE_STOPS } from './haze.js';
 import { seededRandom } from './seeded-random.js';
 import { WIND_GROUND } from './wind.js';
 
@@ -27,11 +28,13 @@ export function skyPixelDiscarded(opacity, cutoff = SKY_ALPHA_CUTOFF) {
   return opacity < cutoff;
 }
 
-// The gradient stops on the whole view, top 0 to bottom 1: SKY_STOPS
-// squeezed from the top down to the horizon, the horizon colour below it.
+// The gradient stops on the whole view, top 0 to bottom 1: SKY_HAZE_STOPS
+// (haze.js, the same on every level) squeezed from the top down to the
+// horizon, a fraction of the view from the top (horizonScreenFraction), and
+// the haze colour below it.
 export function skyGradientStops(horizon = SKY_HORIZON_FRACTION) {
-  const stops = SKY_STOPS.map(([at, color]) => [at * horizon, color]);
-  if (horizon < 1) stops.push([1, SKY_STOPS[SKY_STOPS.length - 1][1]]);
+  const stops = SKY_HAZE_STOPS.map(([at, color]) => [at * horizon, color]);
+  if (horizon < 1) stops.push([1, SKY_HAZE_STOPS[SKY_HAZE_STOPS.length - 1][1]]);
   return stops;
 }
 

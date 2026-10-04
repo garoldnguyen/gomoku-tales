@@ -1,5 +1,5 @@
 // The meadow around the farm field (docs/art-direction-v3.md section 6),
-// drawn from the pure plan of meadow.js: the ground, the far hills, trees,
+// drawn from the pure plan of meadow.js: the ground, trees,
 // bushes, hay bales, grass tufts and the 13 flower kinds. Every kind is one
 // instanced mesh of upright billboards (one draw call each) whose instances
 // pick their look (sheet frame) in the shader. Per quality row
@@ -10,7 +10,10 @@
 //   scenery        trees, bushes and hay bales
 //   meadowFlowers  'off', 'still' or 'sway' (a vertex shader lean, and
 //                  dandelion puffs letting seed flecks go)
-//   farHills       'off', 'on' or 'haze'
+//   groundFog      the soft ground edge: the ground mixes toward the fog
+//                  colour near the far edge (haze.js groundFogAmount)
+//   floorShade     the forest floor shade behind the far rows (haze.js
+//                  floorShadeAmount)
 //   shadows        'blob' soft blob shadows under every tree, bush, bale
 //                  and flower patch; 'sun' the long sun shadows of every
 //                  tree, bush, bale and flower instead (sheared
@@ -25,17 +28,18 @@ import {
 } from '../config.js';
 import { artMeta, artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
-import { heightAtDepression } from './camera.js';
 import {
-  dandelionPuffs, FAR_HILLS, hazeMix, HILL_DEPTH, HILL_FOOT_HAZE, hillLift, meadowInstanceGroups, meadowShadowSpots, mergeMeadowPlans,
-  planMeadow, planMeadowStrips,
+  FLOOR_SHADE_COLOR, FLOOR_SHADE_MAX, FLOOR_SHADE_Z, GROUND_EDGE_FEATHER_Z, GROUND_FOG_COLOR, GROUND_FOG_END_Z, GROUND_FOG_MAX,
+} from './haze.js';
+import {
+  dandelionPuffs, meadowInstanceGroups, meadowShadowSpots, mergeMeadowPlans, planMeadow, planMeadowStrips,
 } from './meadow.js';
 import { effectRandom, seededRandom } from './seeded-random.js';
 import { anchorForward, anchorShift, faceYaw, SPRITE_ALPHA_TEST } from './sprite-frames.js';
 import {
   blobShadowMaterial, pixelTexture, PLANT_SWAY, SHADOW_DEPTH, sunShadowGeometry, sunShadowMaterial, uprightPlaneGeometry,
 } from './sprites.js';
-import { farEdgeWave } from './horizon.js';
+import { FAR_EDGE_Z, farEdgeWave } from './horizon.js';
 import { GROUND_Y, TERRAIN_GRID } from './terrain.js';
 import { bitKinds, metaAnchor } from './v3-meta.js';
 import {
@@ -49,13 +53,18 @@ const COLORS = {
   stripes: ['#5fb247', '#4fa13f'], // Low: two mown greens
   paint: ['#4a9a40', '#58aa45', '#66b94b', '#74c255'], // dark to light
 };
-// The far hills themselves (FAR_HILLS, colours and sums of sines) are in meadow.js.
-const HILL_SPAN = 130; // x from -HILL_SPAN to HILL_SPAN
-const HILL_COLUMNS = 160;
 const GROUND_EDGE_STEP = 0.5; // world units between the ground's columns, for the wavy far edge
 // The ground and the field share the plane y = 0: the ground is drawn a
 // little deeper so the field always wins.
 const BEHIND_FIELD = { polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 };
+// The ground stays in the opaque list (drawn before the sprites and decals
+// on it) but blends by its alpha, which only drops at the feathered far
+// edge, over the sky and the ridges drawn before it.
+const EDGE_BLENDING = {
+  blending: THREE.CustomBlending,
+  blendSrc: THREE.SrcAlphaFactor,
+  blendDst: THREE.OneMinusSrcAlphaFactor,
+};
 const RIPPLE_SPEED = 0.55; // radians of the ripple wave per second
 const RIPPLE_WAVE = 0.85; // radians per world unit along the wind
 const PATCH_SHADOW_OPACITY = 0.55; // a patch shadow is fainter than a sprite's
@@ -63,11 +72,10 @@ const FLECK_RISE = 0.35; // world units per second a seed fleck rises
 const FLECK_BOB = 0.12; // world units of up and down while it drifts
 const PUFF_TOP = 0.8; // the seed head is this far up the dandelion
 
-// Builds the meadow into `scene`. `haze` is the sky colour at the horizon.
-// On High it also drives PLANT_SWAY, the sway of the resting X and O
+// Builds the meadow into `scene`. On High it also drives PLANT_SWAY, the sway of the resting X and O
 // plants on the board (half the meadow's amplitude, same wind and gusts).
 // Returns { setFeatures(features), update(timeMs, dtMs) }.
-export function createMeadow(scene, cameraPosition, { haze }) {
+export function createMeadow(scene, cameraPosition) {
   // The central meadow and the two side strips a window wider than 21:9
   // shows (docs/art-direction-v3-1.md section 3.3). Every kind in it is
   // hidden on Low by the switches below (flowers, scenery, tufts), so the
@@ -75,8 +83,6 @@ export function createMeadow(scene, cameraPosition, { haze }) {
   const plan = mergeMeadowPlans(planMeadow(MEADOW_SEED), planMeadowStrips(MEADOW_SEED));
   const ground = createGround();
   scene.add(ground.mesh);
-  const hills = createFarHills(cameraPosition, haze);
-  scene.add(hills.group);
 
   // Shared sway state: every swaying material reads these uniforms.
   const sway = { uSwayAngle: { value: 0 }, uSwayPx: { value: 0 } };
@@ -123,6 +129,7 @@ export function createMeadow(scene, cameraPosition, { haze }) {
   return {
     setFeatures(features) {
       ground.setStyle(features.ground);
+      ground.setHaze(features.groundFog, features.floorShade);
       rippling = features.ground === 'painted-ripples';
       tufts.visible = features.ground !== 'mown';
       scenery.visible = features.scenery;
@@ -134,7 +141,6 @@ export function createMeadow(scene, cameraPosition, { haze }) {
       }
       flecks.mesh.visible = swaying;
       if (!swaying) flecks.clear();
-      hills.setStyle(features.farHills);
       const blob = features.shadows === 'blob';
       const sun = features.shadows === 'sun';
       sceneryShadows.visible = blob;
@@ -171,33 +177,41 @@ function createGround() {
     .translate((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
   const position = geometry.attributes.position;
   const uv = geometry.attributes.uv;
+  const edgeZ = new Float32Array(position.count); // the far edge's z in each vertex's column
   for (let i = 0; i < position.count; i++) {
     const x = position.getX(i);
     position.setY(i, GROUND_Y); // exactly flat, without the rounding of the turn above
     // The far row follows the wavy far edge; the other edges stay straight.
-    if (Math.abs(position.getZ(i) - minZ) < 1e-6) position.setZ(i, minZ + farEdgeWave(x));
+    edgeZ[i] = minZ + farEdgeWave(x);
+    if (Math.abs(position.getZ(i) - minZ) < 1e-6) position.setZ(i, edgeZ[i]);
     uv.setXY(i, x, position.getZ(i)); // world units; each texture scales them with repeat
   }
+  geometry.setAttribute('aEdgeZ', new THREE.BufferAttribute(edgeZ, 1));
 
   const stripes = repeating(stripeCanvas());
   // Two texels per period: stripes GROUND_STRIPE_CELLS wide whose edges lie
   // on cell edges of the field.
   stripes.repeat.set(1, 1 / (2 * GROUND_STRIPE_CELLS));
   stripes.offset.set(0, 0.25);
-  const mown = new THREE.MeshLambertMaterial({ map: stripes, ...BEHIND_FIELD });
+  const haze = {
+    uGroundFog: { value: 0 },
+    uFloorShade: { value: 0 },
+    uGroundFogColor: { value: new THREE.Color(GROUND_FOG_COLOR) },
+    uFloorShadeColor: { value: new THREE.Color(FLOOR_SHADE_COLOR) },
+  };
+  const mown = new THREE.MeshLambertMaterial({ map: stripes, ...BEHIND_FIELD, ...EDGE_BLENDING });
+  mown.onBeforeCompile = (shader) => withGroundHaze(shader, haze);
+  mown.customProgramCacheKey = () => 'meadow-ground-mown';
 
   const paint = repeating(paintCanvas());
   paint.repeat.set(1 / PAINT_TILE_CELLS, 1 / PAINT_TILE_CELLS);
-  const painted = new THREE.MeshLambertMaterial({ map: paint, ...BEHIND_FIELD });
+  const painted = new THREE.MeshLambertMaterial({ map: paint, ...BEHIND_FIELD, ...EDGE_BLENDING });
   const ripple = { uRipple: { value: 0 }, uRipplePhase: { value: 0 }, uWind: { value: new THREE.Vector2(WIND_GROUND.x, WIND_GROUND.z) } };
   painted.onBeforeCompile = (shader) => {
+    withGroundHaze(shader, haze);
     Object.assign(shader.uniforms, ripple);
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec2 vGroundXZ;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundXZ = position.xz;');
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>
-varying vec2 vGroundXZ;
 uniform float uRipple;
 uniform float uRipplePhase;
 uniform vec2 uWind;`)
@@ -221,10 +235,48 @@ if (uRipple > 0.0) {
       mesh.material = style === 'mown' ? mown : painted;
       ripple.uRipple.value = style === 'painted-ripples' ? 1 : 0;
     },
+    // The soft ground edge and the forest floor shade on or off.
+    setHaze(groundFog, floorShade) {
+      haze.uGroundFog.value = groundFog ? 1 : 0;
+      haze.uFloorShade.value = floorShade ? 1 : 0;
+    },
     setRipple(timeMs) {
       ripple.uRipplePhase.value = ((timeMs / 1000) * RIPPLE_SPEED) % (Math.PI * 2);
     },
   };
+}
+
+// The ground's own haze (docs/art-direction-v3-1.md sections 5.4 and 5.5),
+// the GLSL of groundFogAmount and floorShadeAmount in haze.js: after the
+// lighting, the ground mixes toward the forest floor shade colour (High),
+// then toward the fog colour near the far edge, and its alpha feathers
+// over the last GROUND_EDGE_FEATHER_Z before the edge (groundEdgeAlpha).
+// Only the ground, never the sprites. The ground mesh sits at the origin,
+// so position.xz is its world x and z.
+function withGroundHaze(shader, haze) {
+  Object.assign(shader.uniforms, haze);
+  const f = (value) => value.toFixed(5);
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nattribute float aEdgeZ;\nvarying vec2 vGroundXZ;\nvarying float vEdge;')
+    .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGroundXZ = position.xz;\nvEdge = position.z - aEdgeZ;');
+  shader.fragmentShader = shader.fragmentShader
+    .replace('#include <common>', `#include <common>
+varying vec2 vGroundXZ;
+varying float vEdge;
+uniform float uGroundFog;
+uniform float uFloorShade;
+uniform vec3 uGroundFogColor;
+uniform vec3 uFloorShadeColor;`)
+    .replace('#include <opaque_fragment>', `{
+  float z = vGroundXZ.y;
+  float shade = uFloorShade * ${f(FLOOR_SHADE_MAX)} * smoothstep(${f(FAR_EDGE_Z)}, ${f(FLOOR_SHADE_Z.in)}, z)
+    * (1.0 - smoothstep(${f(FLOOR_SHADE_Z.out)}, ${f(FLOOR_SHADE_Z.end)}, z));
+  outgoingLight = mix(outgoingLight, uFloorShadeColor, shade);
+  float fog = uGroundFog * ${f(GROUND_FOG_MAX)} * (1.0 - smoothstep(${f(FAR_EDGE_Z)}, ${f(GROUND_FOG_END_Z)}, z));
+  outgoingLight = mix(outgoingLight, uGroundFogColor, fog);
+  diffuseColor.a *= smoothstep(0.0, ${f(GROUND_EDGE_FEATHER_Z)}, vEdge);
+}
+#include <opaque_fragment>`);
 }
 
 function repeating(canvas) {
@@ -302,56 +354,6 @@ function paintCanvas() {
 
 function smooth(t) {
   return t * t * (3 - 2 * t);
-}
-
-// Two far hill silhouettes behind the far edge, far and near, each a strip
-// whose top edge is a sum of sines (its crest 15 to 19 percent down the
-// view, its foot hidden by the meadow), coloured flat with some haze ('on') or with more haze
-// toward the foot ('haze', High).
-function createFarHills(cameraPosition, haze) {
-  const group = new THREE.Group();
-  const styles = [];
-  for (const hill of FAR_HILLS) {
-    const positions = new Float32Array((HILL_COLUMNS + 1) * 2 * 3);
-    for (let c = 0; c <= HILL_COLUMNS; c++) {
-      const x = -HILL_SPAN + (2 * HILL_SPAN * c) / HILL_COLUMNS;
-      // Measured straight ahead (the camera's own x), so a level line of the
-      // hill stays one screen row from edge to edge; the sines add the crest.
-      const top = heightAtDepression(cameraPosition, cameraPosition.x, hill.z, hill.depressionDeg - hillLift(hill, x));
-      positions.set([x, top, hill.z, x, top - HILL_DEPTH, hill.z], c * 6);
-    }
-    const index = [];
-    for (let c = 0; c < HILL_COLUMNS; c++) {
-      const a = c * 2;
-      index.push(a, a + 1, a + 2, a + 2, a + 1, a + 3);
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setIndex(index);
-    const base = new THREE.Color().setRGB(...hazeMix(hill.color, haze, hill.haze), THREE.SRGBColorSpace);
-    const foot = new THREE.Color().setRGB(...hazeMix(hill.color, haze, 1 - (1 - hill.haze) * (1 - HILL_FOOT_HAZE)), THREE.SRGBColorSpace);
-    const flat = new Float32Array(positions.length);
-    const hazy = new Float32Array(positions.length);
-    for (let v = 0; v < positions.length / 3; v++) {
-      base.toArray(flat, v * 3);
-      (v % 2 ? foot : base).toArray(hazy, v * 3);
-    }
-    const color = new THREE.BufferAttribute(flat, 3);
-    geometry.setAttribute('color', color);
-    const mesh = new THREE.Mesh(geometry, new THREE.MeshBasicMaterial({ vertexColors: true, fog: false }));
-    group.add(mesh);
-    styles.push({ color, flat, hazy });
-  }
-  return {
-    group,
-    setStyle(style) {
-      group.visible = style !== 'off';
-      for (const { color, flat, hazy } of styles) {
-        color.array.set(style === 'haze' ? hazy : flat);
-        color.needsUpdate = true;
-      }
-    },
-  };
 }
 
 // One instanced mesh of upright billboards of sheet `name`, one per item

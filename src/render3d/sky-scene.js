@@ -1,6 +1,9 @@
 // The sky and the wind over the farm (docs/art-direction-v3.md section 7),
 // drawn from the pure plans of sky.js and petals.js. Per quality row
 // (src/render3d/quality.js):
+//   skyHaze  the gradient (sky.js, docs/art-direction-v3-1.md section 5)
+//            runs from the top of the view to the horizon, then the haze
+//            colour
 //   sky   'gradient'         the plain gradient only
 //         'still-clouds'     plus 4 still painted clouds from clouds.png
 //         'drifting-clouds'  plus 8 clouds in two layers drifting straight to
@@ -16,7 +19,10 @@
 // world. Nothing here allocates per frame.
 
 import * as THREE from 'three';
-import { BLOOM_PETAL_LUMINANCE, PETAL_TRAIL_MS, PX_WORLD, SUN_RAY_ANGLES_DEG, SUN_RAY_COUNT, SUN_RAY_DEPTH, SUN_RAY_LENGTH, WIND_LANES, WISP_ALPHA } from '../config.js';
+import {
+  BLOOM_PETAL_LUMINANCE, PETAL_TRAIL_MS, PX_WORLD, SKY_HORIZON_FRACTION, SUN_RAY_ANGLES_DEG, SUN_RAY_COUNT, SUN_RAY_DEPTH,
+  SUN_RAY_LENGTH, WIND_LANES, WISP_ALPHA,
+} from '../config.js';
 import { artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
 import { LANE_NAMES, petalAt, petalPoint, planPetals, trailAt } from './petals.js';
@@ -37,9 +43,11 @@ const SKY_RENDER_ORDER = -10; // drifting clouds and wisps draw before the field
 
 // Builds the sky into `scene` for the fixed `camera` (its rotation never
 // changes) at plain position `cameraPosition`. Returns { setFeatures(features),
-// update(timeMs) }. `sunRays` false leaves the sun rays out (?rays=off).
+// setHorizon(fraction), update(timeMs) }. `sunRays` false leaves the sun
+// rays out (?rays=off).
 export function createSky(scene, camera, cameraPosition, { sunRays = true } = {}) {
-  scene.background = skyTexture();
+  const gradient = createSkyGradient();
+  scene.background = gradient.texture;
 
   // Clouds, wisps and rays in camera space.
   const view = new THREE.Group();
@@ -125,10 +133,17 @@ export function createSky(scene, camera, cameraPosition, { sunRays = true } = {}
 
   return {
     setFeatures(features) {
+      gradient.setHaze(features.skyHaze);
       still.visible = features.sky === 'still-clouds';
       drifting.visible = features.sky === 'drifting-clouds';
       petals.group.visible = features.wind;
       moving = features.backgroundMotion;
+    },
+    // The horizon (the projected far edge) moved to `fraction` of the view
+    // from the top: the gradient stretches down to it. Called on a resize,
+    // never per frame.
+    setHorizon(fraction) {
+      gradient.setHorizon(fraction);
     },
     update(timeMs) {
       if (moving) place(timeMs);
@@ -136,17 +151,42 @@ export function createSky(scene, camera, cameraPosition, { sunRays = true } = {}
   };
 }
 
-// The gradient of sky.js down the whole view, drawn behind everything.
-function skyTexture() {
+// The plain gradient of sky.js (no dithering), drawn behind everything as
+// the scene background. With the sky haze on (the skyHaze switch of the
+// quality table) it runs from the top of the view to the horizon and is
+// the haze colour below it; off, it spans the whole view. One canvas and
+// one texture, repainted in place when the horizon or the switch changes.
+function createSkyGradient() {
   const canvas = document.createElement('canvas');
   canvas.width = 4;
   canvas.height = SKY_TEXTURE_ROWS;
   const ctx = canvas.getContext('2d');
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  for (const [at, color] of skyGradientStops()) gradient.addColorStop(at, color);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  return pixelTexture(canvas);
+  const texture = pixelTexture(canvas);
+  let horizon = SKY_HORIZON_FRACTION;
+  let haze = true;
+  let painted = null; // the horizon of the gradient on the canvas
+  const paint = () => {
+    const to = haze ? horizon : 1;
+    if (painted === to) return;
+    painted = to;
+    const fill = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    for (const [at, color] of skyGradientStops(to)) fill.addColorStop(at, color);
+    ctx.fillStyle = fill;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    texture.needsUpdate = true;
+  };
+  paint();
+  return {
+    texture,
+    setHorizon(fraction) {
+      horizon = Math.min(Math.max(fraction, 0), 1);
+      paint();
+    },
+    setHaze(on) {
+      haze = on;
+      paint();
+    },
+  };
 }
 
 // A plane one art pixel per unit showing cloud shape `frame`, its flat

@@ -181,11 +181,10 @@ export const DANDELION_FLECK_POOL = 24; // most seed flecks in the air at once
 
 // Sky, clouds and wind petals (docs/art-direction-v3.md section 7). Screen
 // spots are fractions of the view: x from the left, y from the top.
-// The sky gradient from the top of the view down to the horizon, which is
-// the meadow's far edge (src/render3d/horizon.js farEdgeZ), 21 percent of
-// the height down (SKY_HORIZON_FRACTION); the far hills cover the lower
-// part of it on Medium and High, their crests 15 to 19 percent down.
-export const SKY_STOPS = [[0, '#4a90e2'], [0.45, '#7fbdf0'], [0.8, '#cfe8f8'], [1, '#f4f0d8']];
+// The horizon, the meadow's far edge (src/render3d/horizon.js farEdgeZ),
+// lies 21 percent of the height down at 16:9 (SKY_HORIZON_FRACTION). The
+// sky gradient's stops are SKY_HAZE_STOPS in src/render3d/haze.js
+// (docs/art-direction-v3-1.md section 5); it follows the live horizon.
 export const SKY_HORIZON_FRACTION = 0.21;
 // The lowest the far hills' crests reach on screen: every cloud stays above it.
 export const SKY_STRIP_FRACTION = 0.15;

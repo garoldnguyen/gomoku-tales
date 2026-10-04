@@ -41,7 +41,9 @@ const ROCK_SHADOW_RADIUS = PIECE_SHADOW_RADIUS * 1.2;
 
 // The switches the scenery around the board reads (breeze-hill.js and
 // the meadow, meadow-scene.js).
-const SCENERY_FEATURES = new Set(['ground', 'scenery', 'meadowFlowers', 'farHills', 'shadows', 'sky', 'wind', 'backgroundMotion']);
+const SCENERY_FEATURES = new Set([
+  'ground', 'scenery', 'meadowFlowers', 'skyHaze', 'groundFog', 'ridges', 'floorShade', 'shadows', 'sky', 'wind', 'backgroundMotion',
+]);
 // The switches the farmland board reads (farm-field.js).
 const FARM_FEATURES = new Set(['boardTexture', 'scenery']);
 
@@ -185,6 +187,9 @@ export function createWorld(canvas, {
     camera.near = clip.near;
     camera.far = clip.far;
     camera.updateProjectionMatrix();
+    // The horizon and the ridges follow the shape; the buffer height as
+    // renderer.setSize just set it.
+    scenery.setView(next.aspect, Math.max(1, Math.floor(next.height * next.pixelRatio)));
     postProcessing.resize();
   }
 

@@ -29,7 +29,7 @@ const { low, medium, high } = QUALITY_LEVELS;
 
 // Every feature the doc lists, as a key of the table.
 const FEATURES = [
-  'pixelRatioCap', 'boardTexture', 'ground', 'scenery', 'meadowFlowers', 'farHills', 'sky', 'shadows',
+  'pixelRatioCap', 'boardTexture', 'ground', 'scenery', 'meadowFlowers', 'skyHaze', 'groundFog', 'ridges', 'floorShade', 'sky', 'shadows',
   'postEffects', 'wind', 'growthExtras', 'skillEffects', 'particleCap', 'hudFrost', 'backgroundMotion',
 ];
 
@@ -39,7 +39,6 @@ const FEATURES = [
 const STEPS = {
   ground: ['mown', 'painted', 'painted-ripples'],
   meadowFlowers: ['off', 'still', 'sway'],
-  farHills: ['off', 'on', 'haze'],
   sky: ['gradient', 'still-clouds', 'drifting-clouds'],
   shadows: ['none', 'blob', 'sun'],
   skillEffects: ['simple', 'particles', 'full'],

@@ -226,17 +226,18 @@ test('(9) two far hills from sums of sines, far #8fcf8a and near #6fba6a, hazed 
   assert.deepEqual(hazeMix('#8fcf8a', sky, 1).map((v) => Math.round(v * 255)), [0xe2, 0xf1, 0xec]);
   const half = hazeMix('#6fba6a', sky, 0.5);
   assert.ok(Math.abs(half[0] - (0x6f + 0xe2) / 2 / 255) < 1e-12);
+  // v3.1 (docs/art-direction-v3-1.md section 5.6): the flat hill band is no
+  // longer drawn; the two soft ridges of ridges-scene.js replace it.
   const scene = source('../src/render3d/meadow-scene.js');
-  assert.match(scene, /for \(const hill of FAR_HILLS\)/);
-  assert.match(scene, /hillLift\(hill, x\)/);
-  assert.match(scene, /hazeMix\(hill\.color, haze, hill\.haze\)/);
+  assert.doesNotMatch(scene, /FAR_HILLS|createFarHills/);
+  assert.match(source('../src/render3d/ridges-scene.js'), /RIDGES\.map\(layerGlsl\)/);
 });
 
 test('(10) Low shows no scenery or flowers; Medium adds blob shadows under trees, bushes, bales, posts and patches', () => {
   const { low, medium } = QUALITY_LEVELS;
   assert.equal(low.scenery, false);
   assert.equal(low.meadowFlowers, 'off');
-  assert.equal(low.farHills, 'off');
+  assert.equal(low.ridges, false); // v3.1: the ridges replace the far hills
   assert.equal(low.ground, 'mown'); // no grass tufts either
   assert.equal(low.shadows, 'none');
   assert.equal(medium.scenery, true);

@@ -27,8 +27,10 @@ const along = (p) => p.x * WIND_GROUND.x + p.z * WIND_GROUND.z;
 
 test('sky: the gradient of section 7 from the top of the view down to the horizon', () => {
   const h = SKY_HORIZON_FRACTION;
+  // The stops of docs/art-direction-v3-1.md section 5.1 (v3.1 replaced the
+  // v3 stops #cfe8f8 and #f4f0d8): the horizon colour is the haze colour.
   assert.deepEqual(skyGradientStops(), [
-    [0, '#4a90e2'], [0.45 * h, '#7fbdf0'], [0.8 * h, '#cfe8f8'], [h, '#f4f0d8'], [1, '#f4f0d8'],
+    [0, '#4a90e2'], [0.45 * h, '#7fbdf0'], [0.8 * h, '#c9e2ec'], [h, '#eaf2e4'], [1, '#eaf2e4'],
   ]);
   assert.deepEqual(skyGradientStops(1).map(([at]) => at), [0, 0.45, 0.8, 1]);
 });
