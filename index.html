@@ -112,26 +112,36 @@
         <button type="button" class="secondary back-button" data-action="backToLobby" data-hud-box="join-back"></button>
       </section>
 
-      <section class="card room-card" data-screen="waiting" data-hud-box="waiting-panel">
+      <!-- The room's character select (docs/flow-design.md section 3.5, look of docs/reference/v5/character-select-desktop.html):
+           the code, the three character cards of this window's seat, then Leave, both seats and Ready. -->
+      <section class="card room-card select-card" data-screen="waiting" data-hud-box="waiting-panel">
         <h2 id="waiting-title"></h2>
         <div class="code-row">
           <output class="code" id="room-code" data-hud-box="waiting-code"></output>
           <button type="button" id="copy-code" data-hud-box="waiting-copy"></button>
+          <p class="status" id="copy-status" aria-live="polite"></p>
         </div>
-        <p class="status" id="copy-status" aria-live="polite"></p>
         <p class="note" id="waiting-hint"></p>
-        <p class="note select-lead" id="waiting-lead"></p>
-        <div class="seats" id="waiting-cards"></div>
+        <p class="select-lead" id="waiting-lead"></p>
+        <div class="characters" id="waiting-characters"></div>
         <p class="status starting" id="waiting-starting" aria-live="polite"></p>
-        <button type="button" class="secondary" id="waiting-leave" data-hud-box="waiting-leave"></button>
+        <div class="select-actions">
+          <button type="button" class="secondary select-back" id="waiting-leave" data-hud-box="waiting-leave"></button>
+          <div class="seats" id="waiting-cards"></div>
+          <button type="button" class="select-ready" id="waiting-ready"></button>
+        </div>
       </section>
 
       <!-- The character select of Play on this computer (docs/flow-design.md section 3.6): Player 1 and Player 2 on the game screen. -->
-      <section class="card room-card" data-screen="select" data-hud-box="select-panel">
+      <section class="card room-card select-card" data-screen="select" data-hud-box="select-panel">
         <h2 id="select-title"></h2>
-        <p class="note select-lead" id="select-lead"></p>
-        <div class="seats" id="select-cards"></div>
-        <button type="button" class="secondary" id="select-back" data-action="leaveRoom" data-hud-box="select-back"></button>
+        <p class="select-lead" id="select-lead"></p>
+        <div class="characters" id="select-characters"></div>
+        <div class="select-actions">
+          <button type="button" class="secondary select-back" id="select-back" data-action="leaveRoom" data-hud-box="select-back"></button>
+          <div class="seats" id="select-cards"></div>
+          <button type="button" class="select-ready" id="select-ready"></button>
+        </div>
       </section>
 
       <!-- Game over card (docs/flow-design.md section 3.7): top centre, the finished board stays visible. -->

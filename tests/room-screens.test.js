@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { COPY_FEEDBACK_MS, JOIN_TIMEOUT_MS, ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH } from '../src/config.js';
+import { COOLDOWN_LONG, COOLDOWN_SHORT, COPY_FEEDBACK_MS, JOIN_TIMEOUT_MS, ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH } from '../src/config.js';
 import { EMPTY, O, X } from '../src/logic/board.js';
 import { CHARACTERS, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
 import { createSeats, pickCharacter, setReady } from '../src/logic/seats.js';
@@ -18,8 +18,8 @@ import { FLOW_EVENTS, LOCAL_SEATS, ROLES, SCREENS, flowReducer, initialFlow } fr
 import { PORTRAIT_ART } from '../src/ui/hud-view.js';
 import { isTypingTarget, shortcutKeyHandler } from '../src/ui/input.js';
 import {
-  SELECT_CHARACTERS, characterSelectViewModel, copyFeedbackText, copyRoomCode, joinViewModel, lobbyViewModel, localSelectViewModel,
-  waitingViewModel,
+  CHARACTER_LOOKS, SELECT_CHARACTERS, characterSelectViewModel, copyFeedbackText, copyRoomCode, joinViewModel, lobbyViewModel, localSelectViewModel,
+  restText, waitingViewModel,
 } from '../src/ui/room-screens.js';
 import { SHOT_ROOM, SHOT_SCENES, shotFlow, shotRoomView } from '../src/ui/shot-mode.js';
 import { STRINGS } from '../src/ui/strings.js';
@@ -434,4 +434,128 @@ test('room.css: the room code at least 40 px, the pulse 0.6 to 1 over 1.6 s and 
   assert.match(reduced, /\.seat\.is-placeholder\s*\{\s*animation:\s*none/);
   // Buttons keep the 44 px floor of screens.css.
   assert.match(read('src/ui/screens.css'), /#screens button \{[^}]*min-height:\s*44px/);
+});
+
+// --- the character select look (Game v5 part 3, docs/reference/v5) ---
+
+test('characterSelectViewModel characters: three cards with emblem, seal, tagline and skill rest turns from COOLDOWN_SHORT and COOLDOWN_LONG', () => {
+  const labels = { [HOST]: 'A', [GUEST]: 'B' };
+  const vm = characterSelectViewModel({ seats: createSeats(ROOM_SEATS), labels, editable: [HOST], you: HOST });
+  assert.equal(vm.active, HOST);
+  assert.equal(vm.characters.length, 3);
+  assert.deepEqual(vm.characters.map((card) => card.character), [WIND_RABBIT, EARTH_BEAR, JADE_SERPENT]);
+  assert.deepEqual(vm.characters.map((card) => card.seal), ['GH', 'MB', 'JS']);
+  assert.deepEqual(vm.characters.map((card) => card.emblem), ['cross', 'bloom', 'leaf']);
+  assert.deepEqual(vm.characters.map((card) => card.colour), ['blue', 'red', 'jade']);
+  assert.deepEqual(vm.characters.map((card) => card.box), ['pick-host-wind-rabbit', 'pick-host-earth-bear', 'pick-host-jade-serpent']);
+  for (const card of vm.characters) {
+    assert.equal(card.name, CHARACTERS[card.character].name);
+    assert.equal(card.tagline, CHARACTER_LOOKS[card.character].tagline);
+    assert.ok(card.tagline.length > 0);
+    assert.match(card.seal, /^[A-Z]{2}$/, 'Latin initials, no Chinese characters');
+    assert.deepEqual(card.skills.map((skill) => skill.rest), [COOLDOWN_SHORT, COOLDOWN_LONG]);
+    assert.deepEqual(card.skills.map((skill) => skill.restText), [`${COOLDOWN_SHORT} turns`, `${COOLDOWN_LONG} turns`]);
+    assert.deepEqual(card.skills.map((skill) => skill.id), CHARACTERS[card.character].skills);
+    assert.equal(card.selected, false);
+    assert.equal(card.taken, false);
+    assert.equal(card.disabled, false);
+  }
+  assert.equal(restText(COOLDOWN_LONG), `${COOLDOWN_LONG} turns`);
+  assert.deepEqual(vm.readyButton, { seat: HOST, label: 'Ready', disabled: true, box: 'ready-host' }, 'Ready is disabled until a pick');
+});
+
+test('characterSelectViewModel characters: the taken state, Ready enabled only after a pick and locked once Ready', () => {
+  const labels = { [HOST]: 'A', [GUEST]: 'B' };
+  const view = (seats) => characterSelectViewModel({ seats, labels, editable: [GUEST], you: GUEST });
+  const taken = view(roomSeats([HOST, EARTH_BEAR]));
+  assert.deepEqual(taken.characters.map((card) => card.taken), [false, true, false]);
+  assert.deepEqual(taken.characters.map((card) => card.disabled), [false, true, false]);
+  assert.equal(taken.characters[1].takenText, 'Taken');
+  assert.equal(taken.characters[0].takenText, null);
+  assert.equal(taken.readyButton.disabled, true);
+  const picked = view(roomSeats([HOST, EARTH_BEAR], [GUEST, JADE_SERPENT]));
+  assert.equal(picked.characters[2].selected, true);
+  assert.equal(picked.readyButton.disabled, false, 'Ready after a pick');
+  assert.equal(picked.readyButton.box, 'ready-guest');
+  const ready = view(roomSeats([HOST, EARTH_BEAR], [GUEST, JADE_SERPENT], [GUEST, 'ready']));
+  assert.equal(ready.readyButton.disabled, true);
+  assert.ok(ready.characters.every((card) => card.disabled), 'the pick is locked once Ready');
+  assert.equal(ready.characters[2].selected, true);
+});
+
+test('the local select: by default the cards pick for Player 1, then for Player 2 once Player 1 is Ready', () => {
+  const [one, two] = LOCAL_SEATS;
+  let flow = flowReducer(initialFlow(), FLOW_EVENTS.PLAY_LOCAL);
+  let vm = localSelectViewModel(flow);
+  assert.equal(vm.readyButton.seat, one);
+  assert.deepEqual(vm.cards.map((card) => card.active), [true, false]);
+  flow = flowReducer(flow, { type: FLOW_EVENTS.PICK, seat: one, character: WIND_RABBIT });
+  assert.equal(localSelectViewModel(flow).readyButton.disabled, false);
+  flow = flowReducer(flow, { type: FLOW_EVENTS.READY, seat: one });
+  vm = localSelectViewModel(flow);
+  assert.equal(vm.readyButton.seat, two);
+  assert.equal(vm.readyButton.disabled, true);
+  assert.equal(vm.characters[0].taken, true, 'Player 1 took Wind Rabbit');
+  assert.equal(vm.characters[0].box, `pick-${two}-wind-rabbit`);
+  assert.deepEqual(vm.cards.map((card) => card.active), [false, true]);
+});
+
+test('the local select: either seat may pick first, by a press on its seat card', () => {
+  const [one, two] = LOCAL_SEATS;
+  let flow = flowReducer(initialFlow(), FLOW_EVENTS.PLAY_LOCAL);
+  let vm = localSelectViewModel(flow);
+  assert.deepEqual(vm.cards.map((card) => card.choosable), [false, true], 'Player 2 can take the cards');
+  vm = localSelectViewModel(flow, { seat: two });
+  assert.equal(vm.readyButton.seat, two);
+  assert.deepEqual(vm.cards.map((card) => card.active), [false, true]);
+  assert.deepEqual(vm.cards.map((card) => card.choosable), [true, false]);
+  assert.equal(vm.characters[1].box, `pick-${two}-earth-bear`);
+  flow = flowReducer(flow, { type: FLOW_EVENTS.PICK, seat: two, character: EARTH_BEAR });
+  flow = flowReducer(flow, { type: FLOW_EVENTS.READY, seat: two });
+  vm = localSelectViewModel(flow, { seat: two });
+  assert.equal(vm.readyButton.seat, one, 'a Ready seat hands the cards to the other');
+  assert.equal(vm.characters[1].taken, true);
+  assert.deepEqual(vm.cards.map((card) => card.choosable), [false, false], 'a Ready seat is not choosable');
+});
+
+test('characterSelectViewModel online: one editable seat, no choosable seat card', () => {
+  const vm = characterSelectViewModel({ seats: createSeats(ROOM_SEATS), labels: { [HOST]: 'Host', [GUEST]: 'Guest' }, editable: [GUEST], you: GUEST, prefer: HOST });
+  assert.equal(vm.active, GUEST);
+  assert.ok(vm.seats.every((card) => !card.choosable));
+});
+
+test('the local app: chooseSeat lets Player 2 pick and get Ready first with the shared cards', () => {
+  const app = createApp({ openTransport: () => assert.fail('no network'), clock: createFakeClock(), local: true });
+  const [one, two] = LOCAL_SEATS;
+  assert.equal(app.getView().select.readyButton.seat, one);
+  assert.equal(app.chooseSeat(two), true);
+  const vm = app.getView().select;
+  assert.equal(vm.readyButton.seat, two);
+  assert.equal(app.pick(JADE_SERPENT, vm.readyButton.seat), true);
+  assert.equal(app.ready(two), true);
+  assert.equal(app.chooseSeat(two), false, 'a Ready seat cannot be chosen');
+  assert.equal(app.getView().select.readyButton.seat, one);
+  assert.equal(app.pick(WIND_RABBIT, one), true);
+  assert.equal(app.ready(one), true);
+  assert.equal(app.getScreen(), GAME);
+  assert.deepEqual(app.getGame().getState().characters, { [X]: JADE_SERPENT, [O]: WIND_RABBIT });
+});
+
+test('the select shot scene: the local character select, Player 1 Ready on Wind Rabbit, Player 2 to pick', () => {
+  assert.ok(SHOT_SCENES.includes('select'));
+  const view = shotRoomView('select');
+  assert.equal(view.screen, SELECT);
+  assert.equal(view.waiting, null);
+  assert.equal(view.select.readyButton.seat, LOCAL_SEATS[1]);
+  assert.equal(view.select.characters[0].taken, true);
+});
+
+test('index.html: the character select panels have the character cards, the seats and a Ready button', () => {
+  const html = read('index.html');
+  for (const id of ['waiting-characters', 'waiting-cards', 'waiting-ready', 'select-characters', 'select-cards', 'select-ready']) {
+    assert.ok(html.includes(`id="${id}"`), id);
+  }
+  const css = read('src/ui/room.css');
+  assert.match(css, /#screens \.select-back \{[^}]*min-height:\s*44px/);
+  assert.match(css, /#screens \.select-ready \{[^}]*min-height:\s*max\(44px,/);
 });

@@ -11,7 +11,7 @@ import { blursMenus, browserStorage, cycleQuality, startQuality } from './render
 import { seededRandom } from './render3d/seeded-random.js';
 import { loadForestMeta, withForestMeta } from './render3d/forest-meta.js';
 import { loadV3Meta } from './render3d/v3-meta.js';
-import { GAME, GAME_OVER, MENU, createApp } from './ui/app.js';
+import { GAME, GAME_OVER, MENU, SELECT, WAITING_SCREEN, createApp } from './ui/app.js';
 import { MODES, SCREENS } from './ui/flow.js';
 import {
   fullscreenActive, fullscreenSupported, fullscreenViewModel, isFullscreenKey, onFullscreenChange, toggleFullscreen,
@@ -211,6 +211,10 @@ function createMenuLayer(onEvent) {
   if (canFullscreen) onFullscreenChange(document, () => menuFlow && showMenu(menuFlow));
 }
 // True while the menu screen is shown; redraws it when the level changed.
+// The character select screens (the room's and the local one) fill the
+// window with their own title, so the canvas title stays off under them.
+const PICKING_SCREENS = Object.freeze([WAITING_SCREEN, SELECT]);
+
 function menuShown() {
   if (menuFlow?.screen !== SCREENS.MENU) return false;
   if ((renderer.quality ?? null) !== menuQuality) showMenu(menuFlow);
@@ -381,8 +385,8 @@ function startAppMode({ local = false } = {}) {
       }
     } else {
       pointerCanvas.style.cursor = 'default';
-      // The DOM menu has its own title.
-      renderer.drawMenuScreen(ctx, time, !menuShown());
+      // The DOM menu and the character select have their own title.
+      renderer.drawMenuScreen(ctx, time, !menuShown() && !PICKING_SCREENS.includes(screen));
       hud?.show(false);
     }
     // The Game over screen keeps the final board and the poses in view,
@@ -453,7 +457,7 @@ async function startShotMode({ scene }) {
       drawn = 0;
     }
     if (flow) {
-      renderer.drawMenuScreen(ctx, SHOT_TIME_MS, roomView !== null);
+      renderer.drawMenuScreen(ctx, SHOT_TIME_MS, roomView !== null && !PICKING_SCREENS.includes(roomView.screen));
     } else {
       const view = game.getView();
       renderer.drawGameScreen(ctx, frameViewOf(view, SHOT_TIME_MS, effects, null));

@@ -10,16 +10,16 @@ import { WIND_RABBIT } from '../logic/characters.js';
 import { createSeats, pickCharacter } from '../logic/seats.js';
 import { HOST, ROOM_SEATS } from '../net/room.js';
 import { normalizeQuality } from '../render3d/quality.js';
-import { GAME_OVER, LOBBY, WAITING_SCREEN } from './app.js';
-import { FLOW_EVENTS, MODES, SCREENS, flowReducer, initialFlow } from './flow.js';
+import { GAME_OVER, LOBBY, SELECT, WAITING_SCREEN } from './app.js';
+import { FLOW_EVENTS, LOCAL_SEATS, MODES, SCREENS, flowReducer, initialFlow, isSelecting } from './flow.js';
 import { gameOverViewModel, rematchViewModel } from './game-over.js';
 import { parseHudParam } from './hud-collapse.js';
-import { waitingViewModel } from './room-screens.js';
+import { localSelectViewModel, waitingViewModel } from './room-screens.js';
 import { SHOT_FIELD } from './shot-position.js';
 import { STRINGS } from './strings.js';
 
 export const SHOT_SCENES = Object.freeze([
-  'field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting', 'gameover', 'gameover-pending',
+  'field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting', 'select', 'gameover', 'gameover-pending',
 ]);
 
 // The game over scenes (docs/flow-design.md section 7): the field scene
@@ -41,6 +41,15 @@ export const SHOT_ROOM = Object.freeze({
   seats: pickCharacter(createSeats(ROOM_SEATS), HOST, WIND_RABBIT).seats,
 });
 
+// The local character select of the select scene: Player 1 picked Wind
+// Rabbit and is Ready, so the cards pick for Player 2 and Wind Rabbit is
+// Taken.
+const SHOT_SELECT_EVENTS = Object.freeze([
+  FLOW_EVENTS.PLAY_LOCAL,
+  { type: FLOW_EVENTS.PICK, seat: LOCAL_SEATS[0], character: WIND_RABBIT },
+  { type: FLOW_EVENTS.READY, seat: LOCAL_SEATS[0] },
+]);
+
 // The flow screens of shot mode (docs/flow-design.md section 7): the scene
 // name and the flow events that lead to it from the first state. They show
 // their own screen over the empty scene, with no HUD.
@@ -51,6 +60,7 @@ const FLOW_SCENES = Object.freeze({
   lobby: [FLOW_EVENTS.PLAY_ONLINE],
   waiting: [FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.ROOM_CREATED],
   starting: [FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.ROOM_CREATED, FLOW_EVENTS.OPPONENT_JOINED],
+  select: SHOT_SELECT_EVENTS,
 });
 
 // The flow state (flow.js) a shot scene shows, or null for a game scene.
@@ -59,18 +69,20 @@ export function shotFlow(scene) {
   return FLOW_SCENES[scene].reduce(flowReducer, initialFlow());
 }
 
-// What the lobby and room screens (screens.js) show in the lobby, waiting
-// and starting scenes, in the shape of the app's getView() (app.js): the
-// lobby panel, or the waiting room of SHOT_ROOM. null for other scenes.
+// What the lobby and room screens (screens.js) show in the lobby, waiting,
+// starting and select scenes, in the shape of the app's getView() (app.js):
+// the lobby panel, the waiting room of SHOT_ROOM or the local character
+// select. null for other scenes.
 export function shotRoomView(scene) {
   const flow = shotFlow(scene);
   if (!flow || flow.screen === SCREENS.MENU) return null;
   const inRoom = flow.screen === SCREENS.WAITING || flow.screen === SCREENS.STARTING;
+  const selecting = isSelecting(flow);
   return {
-    screen: inRoom ? WAITING_SCREEN : LOBBY,
+    screen: inRoom ? WAITING_SCREEN : selecting ? SELECT : LOBBY,
     flow,
     waiting: inRoom ? waitingViewModel(flow, SHOT_ROOM) : null,
-    select: null,
+    select: selecting ? localSelectViewModel(flow) : null,
     code: inRoom ? SHOT_ROOM.code : null,
     character: inRoom ? SHOT_ROOM.character : null,
     joining: false,

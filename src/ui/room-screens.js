@@ -5,16 +5,32 @@
 
 import { ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH } from '../config.js';
 import { O, X } from '../logic/board.js';
-import { CHARACTERS } from '../logic/characters.js';
+import { CHARACTERS, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
 import { createSeats, otherSeat, seatStone } from '../logic/seats.js';
+import { cooldownTurns } from '../logic/skills.js';
 import { GUEST, HOST, ROOM_SEATS } from '../net/room.js';
 import { normalizeRoomCode } from '../net/room-code.js';
 import { LOCAL_SEATS, ROLES, SCREENS, isSelecting } from './flow.js';
 import { PORTRAIT_ART } from './hud-view.js';
+import { SKILL_INFO } from './skill-info.js';
 import { STRINGS } from './strings.js';
 
 // The characters of the character select, in table order.
 export const SELECT_CHARACTERS = Object.freeze(Object.keys(CHARACTERS));
+
+// How each character looks on the character select (placeholder art until
+// the owner's portraits come): the card colour (a glass token of room.css),
+// the emblem (the blue four-petal cross, the red round bloom, the jade
+// circle with a leaf), the seal initials and the tagline of strings.js.
+export const CHARACTER_LOOKS = Object.freeze({
+  [WIND_RABBIT]: Object.freeze({ colour: 'blue', emblem: 'cross', seal: 'GH', tagline: STRINGS.selectTaglineWindRabbit }),
+  [EARTH_BEAR]: Object.freeze({ colour: 'red', emblem: 'bloom', seal: 'MB', tagline: STRINGS.selectTaglineEarthBear }),
+  [JADE_SERPENT]: Object.freeze({ colour: 'jade', emblem: 'leaf', seal: 'JS', tagline: STRINGS.selectTaglineJadeSerpent }),
+});
+
+// The rest turns text of a skill row, from COOLDOWN_SHORT or COOLDOWN_LONG
+// (logic/skills.js cooldownTurns).
+export const restText = (turns) => STRINGS.selectRestTurns.replace('{turns}', String(turns));
 
 // windRabbit -> wind-rabbit, for data-hud-box names.
 const slug = (id) => id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
@@ -55,9 +71,49 @@ export function joinViewModel({ text = '', joining = false, error = null } = {})
 // (disabled when the other seat took it, or once the seat is Ready) and a
 // Ready button (enabled only after a pick, until Ready). The stone shows
 // once the seat picked: the first pick plays X and moves first.
-export function characterSelectViewModel({ seats, labels, editable = [], you = null, absent = [] }) {
+//
+// The three character cards and the one Ready button of the screen act for
+// the active seat: online this window's own seat; on this computer the
+// seat the players chose (prefer, by a press on its seat card) while it is
+// not Ready, else the first seat that is not Ready yet. So either local
+// seat may pick first. A local seat card that is not active and not Ready
+// is choosable: pressing it makes that seat the active one. Each card
+// has the emblem, the seal, the tagline and one row per skill with its
+// rest turns; a card taken by the other seat is disabled and says Taken.
+export function characterSelectViewModel({ seats, labels, editable = [], you = null, absent = [], prefer = null }) {
+  const open = editable.filter((seat) => !absent.includes(seat));
+  const preferred = open.includes(prefer) && !seats.ready[prefer] ? prefer : null;
+  const active = preferred ?? open.find((seat) => !seats.ready[seat]) ?? open.at(-1) ?? null;
+  const activePick = active ? seats.picks[active] : null;
+  const activeReady = active ? seats.ready[active] : false;
+  const activeOther = active ? seats.picks[otherSeat(seats, active)] : null;
   return {
     lead: STRINGS.selectLead,
+    active,
+    characters: SELECT_CHARACTERS.map((id) => {
+      const look = CHARACTER_LOOKS[id];
+      const taken = active !== null && activeOther === id;
+      return {
+        character: id,
+        box: active ? `pick-${active}-${slug(id)}` : `pick-${slug(id)}`,
+        name: CHARACTERS[id].name,
+        tagline: look.tagline,
+        colour: look.colour,
+        emblem: look.emblem,
+        seal: look.seal,
+        skills: CHARACTERS[id].skills.map((skillId) => {
+          const rest = cooldownTurns(skillId);
+          return { id: skillId, name: SKILL_INFO[skillId].title, rest, restText: restText(rest) };
+        }),
+        selected: active !== null && activePick === id,
+        taken,
+        takenText: taken ? STRINGS.selectTaken : null,
+        disabled: active === null || activeReady || taken,
+      };
+    }),
+    readyButton: active
+      ? { seat: active, label: STRINGS.selectReady, disabled: activeReady || activePick === null, box: `ready-${active}` }
+      : null,
     seats: seats.names.map((seat) => {
       const pick = seats.picks[seat];
       const ready = seats.ready[seat];
@@ -70,6 +126,8 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
         box: `card-${seat}`,
         label: labels[seat],
         you: seat === you,
+        active: seat === active,
+        choosable: open.length > 1 && open.includes(seat) && seat !== active && !ready,
         youText: seat === you ? STRINGS.waitingYou : null,
         placeholder: empty,
         placeholderText: empty ? STRINGS.waitingPlaceholder : null,
@@ -129,6 +187,8 @@ export function waitingViewModel(flow, room) {
     startingText: starting && seats.ready[you] ? STRINGS.selectWaitingOther : null,
     lead: select.lead,
     cards: select.seats,
+    characters: select.characters,
+    readyButton: select.readyButton,
     copy: { label: STRINGS.waitingCopy, enabled: true, box: 'waiting-copy' },
     leave: { label: STRINGS.waitingLeave, enabled: true, box: 'waiting-leave' },
   };
@@ -136,19 +196,23 @@ export function waitingViewModel(flow, room) {
 
 // The character select on the game screen of Play on this computer, while
 // the flow is selecting (flow.js isSelecting): Player 1 and Player 2 both
-// pick on this window. null otherwise.
-export function localSelectViewModel(flow) {
+// pick on this window; seat is the seat the players chose to act for
+// (characterSelectViewModel prefer). null otherwise.
+export function localSelectViewModel(flow, { seat = null } = {}) {
   if (!isSelecting(flow)) return null;
   const [one, two] = LOCAL_SEATS;
   const select = characterSelectViewModel({
     seats: flow.seats,
     labels: { [one]: STRINGS.selectPlayer1, [two]: STRINGS.selectPlayer2 },
     editable: LOCAL_SEATS,
+    prefer: seat,
   });
   return {
     title: STRINGS.selectLocalTitle,
     lead: select.lead,
     cards: select.seats,
+    characters: select.characters,
+    readyButton: select.readyButton,
     back: { label: STRINGS.back, box: 'select-back' },
   };
 }

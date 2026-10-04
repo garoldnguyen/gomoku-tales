@@ -25,7 +25,7 @@ import { bothReady, seatSides } from '../logic/seats.js';
 import { systemClock } from '../net/clock.js';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../net/room-code.js';
 import { FULL, GUEST, HOST, NO_ROOM, OVER, PLAYING, STARTING, createGuestRoom, createHostRoom } from '../net/room.js';
-import { FLOW_EVENTS, MODES, NOTICE_HOST_LEFT, ROLES, SCREENS, flowReducer, initialFlow, isSelecting } from './flow.js';
+import { FLOW_EVENTS, LOCAL_SEATS, MODES, NOTICE_HOST_LEFT, ROLES, SCREENS, flowReducer, initialFlow, isSelecting } from './flow.js';
 import { gameOverViewModel, rematchViewModel } from './game-over.js';
 import { createLocalGame } from './local-game.js';
 import { MENU_EVENTS } from './menu.js';
@@ -68,6 +68,7 @@ export function createApp(options) {
   let joinError = null;
   let joiningCode = null; // code of the room being joined, while waiting for an answer
   let gameOverTimer = null;
+  let localSeat = null; // the local seat that acts on the character select (chooseSeat)
   // The rematch state of the game over card: mine (this window asked),
   // theirs (the other player asked) and gone (the other player left, or
   // the game ended by forfeit), from onRematchStatus and onPeerGone.
@@ -186,6 +187,7 @@ export function createApp(options) {
   // sides of the pick order, checked for its end after every applied
   // action.
   const startLocal = () => {
+    localSeat = null;
     game = createLocalGame({ random: localRandom, characters: seatSides(flow.seats), onApplied: () => checkGameOver() });
     freshGame();
   };
@@ -196,6 +198,7 @@ export function createApp(options) {
     const before = flow;
     flow = flowReducer(flow, event);
     if (flow === before) return false;
+    localSeat = event.seat;
     if (flow.seats && bothReady(flow.seats)) startLocal();
     changed();
     return true;
@@ -355,7 +358,7 @@ export function createApp(options) {
         waiting: roomView ? waitingViewModel(flow, roomView) : null,
         // The local character select (room-screens.js) on the game screen
         // of Play on this computer until both seats are Ready.
-        select: localSelectViewModel(flow),
+        select: localSelectViewModel(flow, { seat: localSeat }),
         code: roomView?.code ?? null,
         character: roomView?.character ?? null,
         characterName: roomView?.character ? characterName(roomView.character) : null,
@@ -429,6 +432,16 @@ export function createApp(options) {
       return room.ready().ok;
     },
 
+    // A press on a local seat card of the character select: that seat
+    // (one of LOCAL_SEATS) now picks with the character cards and Ready,
+    // so either seat may pick first. Returns true when it was taken.
+    chooseSeat(seat) {
+      if (screenNow() !== SELECT || !LOCAL_SEATS.includes(seat) || flow.seats?.ready[seat]) return false;
+      localSeat = seat;
+      changed();
+      return true;
+    },
+
     // Play Online on the menu: the lobby.
     playOnline() {
       return menuEvent(FLOW_EVENTS.PLAY_ONLINE);
@@ -497,6 +510,7 @@ export function createApp(options) {
     leaveRoom() {
       if (flow.screen !== SCREENS.WAITING && flow.screen !== SCREENS.STARTING && !isSelecting(flow)) return false;
       closeRoom();
+      localSeat = null;
       joinError = null;
       lobbyPanel = LOBBY;
       send(FLOW_EVENTS.LEAVE);

@@ -112,6 +112,10 @@ export const STRINGS = Object.freeze({
   selectChoosing: 'Choosing',
   selectTaken: 'Taken',
   selectWaitingOther: 'Waiting for the other player',
+  selectRestTurns: '{turns} turns', // a skill's rest turns, {turns} is COOLDOWN_SHORT or COOLDOWN_LONG
+  selectTaglineWindRabbit: 'Fast and hard to read.',
+  selectTaglineEarthBear: 'Slow and steady.',
+  selectTaglineJadeSerpent: 'Patient, then sudden.',
 
   // Game over (section 3.7).
   gameOverYouWin: 'You win',

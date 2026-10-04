@@ -16,6 +16,11 @@
   --red-tile: rgba(255, 75, 92, 0.24);
   --red-ink: #ffd0d5;
   --ready: #8fe3a8;
+  --blue: #3b8cff;
+  --red: #ff4b5c;
+  --gold: #ffe14d;
+  --gold-tile: rgba(255, 225, 77, 0.24);
+  --gold-ink: #ffec99;
 }
 
 /* --- lobby --- */
@@ -57,149 +62,13 @@
   color: var(--ink-3);
 }
 
-#screens .seats {
-  display: flex;
-  gap: calc(var(--u) * 14);
-  margin: calc(var(--u) * 4) 0;
-}
-
-#screens .seat {
-  --team-tile: var(--blue-tile);
-  --team-ink: var(--blue-ink);
-  display: flex;
-  align-items: center;
-  gap: calc(var(--u) * 12);
-  width: calc(var(--u) * 210);
-  min-height: calc(var(--u) * 72);
-  padding: calc(var(--u) * 10) calc(var(--u) * 12);
-  box-sizing: border-box;
-  text-align: left;
-  background: var(--row);
-  border: 1px solid var(--hair);
-  border-radius: calc(var(--u) * 16);
-}
-
-#screens .seat.team-red {
-  --team-tile: var(--red-tile);
-  --team-ink: var(--red-ink);
-}
-
-/* The other player's seat before they join: dimmed, dashed, a slow pulse. */
-#screens .seat.is-placeholder {
-  justify-content: center;
-  background: transparent;
-  border-style: dashed;
-  border-color: var(--line);
-  opacity: 0.6;
-  animation: seat-pulse 1.6s ease-in-out infinite alternate;
-}
-
-@keyframes seat-pulse {
-  from { opacity: 0.6; }
-  to { opacity: 1; }
-}
-
-#screens .seat-waiting {
-  font-weight: 600;
-  color: var(--ink-2);
-}
-
-#screens .seat .portrait {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  width: calc(var(--u) * 48);
-  height: calc(var(--u) * 48);
-  border-radius: calc(var(--u) * 12);
-  background: var(--team-tile);
-}
-
-#screens .seat .portrait img {
-  width: calc(var(--u) * 44);
-  height: calc(var(--u) * 44);
-  image-rendering: pixelated;
-}
-
-/* a missing portrait shows the first letter instead (the art only warns) */
-#screens .seat .initial {
-  display: none;
-  font-size: calc(var(--u) * 18);
-  font-weight: 700;
-  color: var(--team-ink);
-}
-
-#screens .seat .no-art img {
-  display: none;
-}
-
-#screens .seat .no-art .initial {
-  display: block;
-}
-
-#screens .seat-text {
-  display: flex;
-  flex-direction: column;
-  gap: calc(var(--u) * 4);
-  min-width: 0;
-}
-
-#screens .seat-head {
-  display: flex;
-  align-items: baseline;
-  gap: calc(var(--u) * 8);
-}
-
-#screens .seat-name {
-  font-size: calc(var(--u) * 15);
-  font-weight: 700;
-}
-
-#screens .seat .stone {
-  padding: 0 calc(var(--u) * 7);
-  border-radius: 999px;
-  font-size: calc(var(--u) * 12);
-  font-weight: 700;
-  color: var(--team-ink);
-  background: var(--team-tile);
-}
-
-#screens .seat-tags {
-  display: flex;
-  align-items: center;
-  gap: calc(var(--u) * 8);
-  font-size: calc(var(--u) * 12);
-}
-
-#screens .seat .you {
-  padding: 0 calc(var(--u) * 7);
-  border-radius: 999px;
-  font-weight: 700;
-  color: var(--ink-dark);
-  background: var(--ink);
-}
-
-#screens .seat-note {
-  color: var(--ink-3);
-}
-
 #screens .starting {
   font-weight: 600;
   color: var(--ready);
 }
 
 #screens .starting:empty {
-  visibility: hidden;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  #screens .seat.is-placeholder {
-    animation: none;
-  }
-
-  #screens .waiting::after {
-    animation: none;
-  }
+  display: none;
 }
 
 /* --- game over card (section 3.7) --- */
@@ -261,36 +130,335 @@
   color: var(--ink-3);
 }
 
-/* --- character select (sections 3.5 and 3.6) --- */
 
-/* A seat of the character select: the label, the pick and its stone on
-   top, then one button per character and Ready for the seats this window
-   picks for. */
-#screens .seat:not(.is-placeholder) {
-  flex-direction: column;
-  align-items: stretch;
-  gap: calc(var(--u) * 8);
-  width: calc(var(--u) * 250);
+/* --- character select (sections 3.5 and 3.6, docs/reference/v5) --- */
+
+/* The room and the local select fill the window with their own title (the
+   canvas title is off under them): the panel holds the room code, the
+   three character cards of the active seat, then Back or Leave, the two
+   seats and Ready in one row. Placeholder art: the emblems are the blue
+   four-petal cross, the red round bloom and the jade circle with a leaf. */
+#screens.picking {
+  padding: calc(var(--u) * 12);
 }
 
-#screens .seat.is-placeholder {
-  width: calc(var(--u) * 250);
+#screens .card.select-card {
+  box-sizing: border-box;
+  width: min(calc(var(--u) * 780), calc(100vw - 24px));
+  max-width: none;
+  gap: calc(var(--u) * 10);
+  padding: calc(var(--u) * 20) calc(var(--u) * 24);
 }
 
-#screens .seat-top {
-  display: flex;
-  align-items: center;
-  gap: calc(var(--u) * 12);
-  min-height: calc(var(--u) * 48);
+#screens .select-card h2 {
+  font-size: calc(var(--u) * 28);
+  font-weight: 800;
 }
 
-#screens .seat-label {
-  font-size: calc(var(--u) * 13);
-  font-weight: 700;
+/* Copied or Press Ctrl+C beside the code, so the row stays centred. */
+#screens .select-card .code-row {
+  position: relative;
+}
+
+#screens .select-card .code-row .status {
+  position: absolute;
+  left: 100%;
+  margin-left: calc(var(--u) * 12);
+  white-space: nowrap;
+}
+
+#screens .select-lead {
+  font-size: calc(var(--u) * 14);
   color: var(--ink-2);
 }
 
+#screens .characters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(var(--u) * 14);
+  width: 100%;
+}
+
+/* A character card: the card colour drives the emblem, the seal and the
+   tile behind the emblem. */
+#screens .character {
+  --c: var(--blue);
+  --c-tile: var(--blue-tile);
+  --c-ink: var(--blue-ink);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(var(--u) * 8);
+  min-width: 0;
+  padding: calc(var(--u) * 10);
+  text-align: left;
+  font-weight: 500;
+  background: var(--row);
+  border: 2px solid var(--hair);
+  border-radius: calc(var(--u) * 16);
+}
+
+#screens .character.colour-red {
+  --c: var(--red);
+  --c-tile: var(--red-tile);
+  --c-ink: var(--red-ink);
+}
+
+#screens .character.colour-jade {
+  --c: var(--ready);
+  --c-tile: color-mix(in srgb, var(--ready) 22%, transparent);
+  --c-ink: color-mix(in srgb, var(--ready) 35%, var(--ink));
+}
+
+#screens .character[aria-pressed="true"] {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 1px var(--gold);
+}
+
+/* Once Ready every card is disabled: the pick stays bright. */
+#screens .character[aria-pressed="true"]:disabled {
+  opacity: 1;
+}
+
+#screens .emblem-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(var(--u) * 76);
+  border-radius: calc(var(--u) * 12);
+  background: var(--c-tile);
+}
+
+#screens .emblem {
+  width: calc(var(--u) * 58);
+  height: calc(var(--u) * 58);
+}
+
+#screens .emblem .petal {
+  fill: var(--c);
+}
+
+#screens .emblem .core {
+  fill: var(--c-ink);
+}
+
+/* The seal: a small rounded square with the initials in the card colour. */
+#screens .seal {
+  position: absolute;
+  top: calc(var(--u) * 7);
+  right: calc(var(--u) * 7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: calc(var(--u) * 24);
+  height: calc(var(--u) * 24);
+  padding: 0 calc(var(--u) * 3);
+  font-size: calc(var(--u) * 10);
+  font-weight: 800;
+  letter-spacing: calc(var(--u) * 0.5);
+  color: var(--c);
+  border: 2px solid var(--c);
+  border-radius: calc(var(--u) * 6);
+}
+
+#screens .character-body {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--u) * 5);
+  min-width: 0;
+}
+
+#screens .character-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: calc(var(--u) * 6);
+}
+
+#screens .character-name {
+  font-size: calc(var(--u) * 17);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+#screens .character .taken {
+  padding: 0 calc(var(--u) * 7);
+  font-size: calc(var(--u) * 11);
+  font-weight: 700;
+  color: var(--ink-2);
+  background: var(--row);
+  border-radius: 999px;
+}
+
+#screens .tagline {
+  font-size: calc(var(--u) * 12);
+  font-style: italic;
+  color: var(--ink-3);
+}
+
+#screens .skill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--u) * 6);
+  padding: calc(var(--u) * 5) calc(var(--u) * 8);
+  border-radius: calc(var(--u) * 9);
+  background: var(--row);
+}
+
+#screens .skill-name {
+  font-size: calc(var(--u) * 13);
+  font-weight: 700;
+}
+
+#screens .rest {
+  padding: calc(var(--u) * 1) calc(var(--u) * 7);
+  font-size: calc(var(--u) * 11);
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--gold-ink);
+  background: var(--gold-tile);
+  border-radius: calc(var(--u) * 7);
+}
+
+/* Back or Leave, the two seats, Ready. */
+#screens .select-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(var(--u) * 12);
+  width: 100%;
+}
+
+#screens .select-back {
+  flex-shrink: 0;
+  min-width: calc(var(--u) * 110);
+  min-height: 44px;
+}
+
+#screens .select-ready {
+  flex-shrink: 0;
+  min-width: calc(var(--u) * 150);
+  min-height: max(44px, calc(var(--u) * 40));
+  font-size: calc(var(--u) * 17);
+  font-weight: 800;
+  color: var(--ink-dark);
+  background: var(--gold);
+  border: 0;
+}
+
+#screens .select-ready:hover:not(:disabled) {
+  background: var(--gold);
+  filter: brightness(1.06);
+}
+
+#screens .select-ready:disabled {
+  opacity: 1;
+  color: var(--ink-3);
+  background: var(--row);
+}
+
+/* A seat: the stone of the pick order, the label, the pick (or Choosing)
+   and Ready. The active seat (the one the cards pick for) is outlined. */
+#screens .seats {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: center;
+  gap: calc(var(--u) * 10);
+  min-width: 0;
+}
+
+#screens .seat {
+  --team-tile: var(--row);
+  --team-ink: var(--ink-2);
+  display: flex;
+  flex: 0 1 calc(var(--u) * 200);
+  align-items: center;
+  gap: calc(var(--u) * 8);
+  min-width: 0;
+  min-height: calc(var(--u) * 40);
+  padding: calc(var(--u) * 4) calc(var(--u) * 10) calc(var(--u) * 4) calc(var(--u) * 6);
+  box-sizing: border-box;
+  text-align: left;
+  background: var(--row);
+  border: 1px solid var(--hair);
+  border-radius: calc(var(--u) * 14);
+}
+
+#screens .seat.team-blue {
+  --team-tile: var(--blue-tile);
+  --team-ink: var(--blue-ink);
+}
+
+#screens .seat.team-red {
+  --team-tile: var(--red-tile);
+  --team-ink: var(--red-ink);
+}
+
+#screens .seat.is-active {
+  border-color: var(--ink-3);
+}
+
+/* A local seat that is not picking yet: press it to pick for that seat. */
+#screens .seat.is-choosable {
+  min-height: max(44px, calc(var(--u) * 40));
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+#screens .seat.is-choosable:hover,
+#screens .seat.is-choosable:focus-visible {
+  border-color: var(--ink-3);
+}
+
+#screens .seat .stone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: calc(var(--u) * 26);
+  height: calc(var(--u) * 26);
+  border-radius: 50%;
+  font-size: calc(var(--u) * 13);
+  font-weight: 800;
+  color: var(--team-ink);
+  background: var(--team-tile);
+}
+
+#screens .seat .stone:empty {
+  background: transparent;
+  border: 1px dashed var(--line);
+}
+
+#screens .seat-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  line-height: 1.15;
+}
+
+#screens .seat-label {
+  font-size: calc(var(--u) * 11);
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+#screens .seat-name {
+  overflow: hidden;
+  font-size: calc(var(--u) * 13);
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 #screens .seat-status {
+  flex-shrink: 0;
+  font-size: calc(var(--u) * 11);
   color: var(--ink-3);
 }
 
@@ -299,32 +467,131 @@
   color: var(--ready);
 }
 
-/* The three characters in one row, so the room fits 1280 by 720. */
-#screens .seat-choices {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: calc(var(--u) * 6);
-}
-
-#screens .seat-choices .choice {
+/* The other player's seat before they join: dimmed, dashed, a slow pulse. */
+#screens .seat.is-placeholder {
   justify-content: center;
-  gap: 0;
-  min-width: 0;
-  min-height: 44px;
-  padding: calc(var(--u) * 4);
-  font-size: calc(var(--u) * 12);
-  line-height: 1.15;
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--line);
+  opacity: 0.6;
+  animation: seat-pulse 1.6s ease-in-out infinite alternate;
 }
 
-#screens .seat-choices .choice[aria-pressed="true"] {
-  border-color: var(--team-ink);
-  background: var(--team-tile);
+@keyframes seat-pulse {
+  from { opacity: 0.6; }
+  to { opacity: 1; }
 }
 
-#screens .seat-ready {
-  min-height: 44px;
-}
-
-#screens .select-lead {
+#screens .seat-waiting {
+  font-size: calc(var(--u) * 13);
+  font-weight: 600;
   color: var(--ink-2);
+}
+
+/* Phones (docs/reference/v5/character-select-phone.html): pixel sizes, the
+   cards stacked with the emblem on the left, then the seats, Ready across
+   the panel and Back or Leave under it. */
+@media (max-width: 600px) {
+  #screens.picking {
+    --u: 1px;
+    padding: 12px;
+  }
+
+  #screens .card.select-card {
+    width: 100%;
+    gap: 12px;
+    padding: 20px 14px;
+  }
+
+  #screens .select-card h2 {
+    font-size: 24px;
+  }
+
+  #screens .select-card .code-row .status {
+    left: auto;
+    right: 0;
+    top: 100%;
+    margin-left: 0;
+  }
+
+  #screens .characters {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  #screens .character {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+
+  #screens .emblem-tile {
+    flex-shrink: 0;
+    width: 72px;
+    height: 72px;
+  }
+
+  #screens .emblem {
+    width: 44px;
+    height: 44px;
+  }
+
+  #screens .seal {
+    top: 3px;
+    right: 3px;
+    min-width: 20px;
+    height: 20px;
+    font-size: 9px;
+    border-width: 1.5px;
+  }
+
+  #screens .character-body {
+    flex: 1 1 auto;
+    gap: 2px;
+  }
+
+  #screens .skill-row {
+    justify-content: flex-start;
+    padding: 0;
+    background: none;
+  }
+
+  #screens .skill-row .skill-name {
+    font-weight: 600;
+    color: var(--ink-2);
+  }
+
+  #screens .select-actions {
+    flex-wrap: wrap;
+  }
+
+  /* Narrow seats show their state only once Ready. */
+  #screens .seat:not(.is-ready) .seat-status {
+    display: none;
+  }
+
+  #screens .select-actions .seats {
+    order: 0;
+    flex: 1 1 100%;
+  }
+
+  #screens .select-ready {
+    order: 1;
+    flex: 1 1 100%;
+  }
+
+  #screens .select-back {
+    order: 2;
+    flex: 1 1 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #screens .seat.is-placeholder {
+    animation: none;
+  }
+
+  #screens .waiting::after {
+    animation: none;
+  }
 }

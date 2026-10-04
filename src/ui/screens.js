@@ -27,8 +27,6 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   const overMenu = $('over-menu');
   let shown = null;
   let copyTimer = null;
-  let assets = null;
-  const images = [];
 
   // The fixed text.
   const lobby = lobbyViewModel();
@@ -101,14 +99,6 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     }
   });
 
-  // An art image (asset store name) with a letter shown while it is missing.
-  const showArt = () => {
-    for (const { holder, img, name } of images) {
-      const image = assets?.get(name) ?? null;
-      if (image?.src && img.getAttribute('src') !== image.src) img.src = image.src;
-      holder.classList.toggle('no-art', !image?.src);
-    }
-  };
   const el = (tag, className, parent) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -116,86 +106,123 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     return node;
   };
 
-  // The two seats of a character select (room-screens.js
-  // characterSelectViewModel cards) in a container, rebuilt when they
-  // change: the seat's label, its pick with the stone, its state, and for
-  // the seats this window picks for one button per character and Ready.
-  const seatViews = new Map(); // container -> { key, images }
-  const showSeats = (container, list) => {
+  // The emblems of the character cards (room-screens.js CHARACTER_LOOKS),
+  // drawn in a 100 by 100 box: the blue four-petal cross, the red round
+  // bloom and the jade circle with a leaf. Their colours come from room.css.
+  const SVG = 'http://www.w3.org/2000/svg';
+  const EMBLEMS = {
+    cross: [['circle', 'petal', { cx: 50, cy: 28, r: 16 }], ['circle', 'petal', { cx: 50, cy: 72, r: 16 }],
+      ['circle', 'petal', { cx: 28, cy: 50, r: 16 }], ['circle', 'petal', { cx: 72, cy: 50, r: 16 }],
+      ['circle', 'core', { cx: 50, cy: 50, r: 9 }]],
+    bloom: [['circle', 'petal', { cx: 50, cy: 50, r: 34 }], ['circle', 'core', { cx: 50, cy: 50, r: 13 }]],
+    leaf: [['circle', 'petal', { cx: 50, cy: 50, r: 36 }],
+      ['path', 'core', { d: 'M50 22 C 70 34, 70 66, 50 78 C 34 66, 34 34, 50 22 Z' }]],
+  };
+  const emblem = (name, parent) => {
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('viewBox', '0 0 100 100');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.classList.add('emblem');
+    for (const [tag, className, attrs] of EMBLEMS[name]) {
+      const shape = document.createElementNS(SVG, tag);
+      shape.classList.add(className);
+      for (const [key, value] of Object.entries(attrs)) shape.setAttribute(key, String(value));
+      svg.append(shape);
+    }
+    parent.append(svg);
+  };
+
+  // Rebuilds a container only when its list changed. The button that had
+  // focus keeps it after the rebuild (or, now disabled, the container's
+  // first enabled button).
+  const built = new Map(); // container -> key
+  const rebuild = (container, list, build) => {
     const key = JSON.stringify(list);
-    const shownSeats = seatViews.get(container);
-    if (shownSeats?.key === key) return;
-    if (shownSeats) for (const entry of shownSeats.images) images.splice(images.indexOf(entry), 1);
-    const own = [];
-    seatViews.set(container, { key, images: own });
-    // The button that had focus keeps it after the rebuild (or, now
-    // disabled, its seat's next enabled button).
+    if (built.get(container) === key) return;
+    built.set(container, key);
     const focused = container.contains(document.activeElement) ? document.activeElement : null;
     const focusBox = focused?.dataset.hudBox ?? null;
-    const focusSeat = focused?.closest('[data-seat]')?.dataset.seat ?? null;
     container.replaceChildren();
-    for (const card of list) {
-      const node = el('div', `seat${card.team ? ` team-${card.team}` : ''}`, container);
-      node.dataset.hudBox = card.box;
-      node.dataset.seat = card.seat;
-      if (card.character) node.dataset.character = card.character;
-      node.classList.toggle('is-placeholder', card.placeholder);
-      node.classList.toggle('is-ready', card.ready);
-      if (card.placeholder) {
-        el('span', 'seat-waiting', node).textContent = card.placeholderText;
-        continue;
-      }
-      const top = el('div', 'seat-top', node);
-      if (card.portrait) {
-        const portrait = el('div', 'portrait', top);
-        const img = el('img', null, portrait);
-        img.alt = '';
-        img.draggable = false;
-        el('span', 'initial', portrait).textContent = card.name.charAt(0);
-        const entry = { holder: portrait, img, name: card.portrait };
-        images.push(entry);
-        own.push(entry);
-      }
-      const text = el('div', 'seat-text', top);
-      const head = el('div', 'seat-head', text);
-      el('span', 'seat-label', head).textContent = card.label;
-      if (card.stone) el('span', 'stone', head).textContent = card.stone;
-      if (card.name) el('span', 'seat-name', text).textContent = card.name;
-      const tags = el('div', 'seat-tags', text);
-      if (card.note) el('span', 'seat-note', tags).textContent = card.note;
-      el('span', 'seat-status', tags).textContent = card.statusText;
-      if (card.choices.length > 0) {
-        const choices = el('div', 'seat-choices', node);
-        for (const choice of card.choices) {
-          const button = el('button', 'choice', choices);
-          button.type = 'button';
-          button.dataset.hudBox = choice.box;
-          button.dataset.character = choice.character;
-          button.disabled = choice.disabled;
-          button.setAttribute('aria-pressed', String(choice.selected));
-          el('span', null, button).textContent = choice.name;
-          if (choice.takenText) el('small', null, button).textContent = choice.takenText;
-          button.addEventListener('click', () => act('pick', choice.character, card.seat));
-        }
-      }
-      if (card.readyButton) {
-        const ready = el('button', 'seat-ready', node);
-        ready.type = 'button';
-        ready.dataset.hudBox = card.readyButton.box;
-        ready.disabled = card.readyButton.disabled;
-        ready.textContent = card.readyButton.label;
-        ready.addEventListener('click', () => act('ready', card.seat));
-      }
-    }
+    for (const item of list) build(item, container);
     if (focusBox) {
       const again = container.querySelector(`[data-hud-box="${focusBox}"]`);
-      const next = again && !again.disabled ? again : container.querySelector(`[data-seat="${focusSeat}"] button:not(:disabled)`);
-      next?.focus();
+      (again && !again.disabled ? again : container.querySelector('button:not(:disabled)'))?.focus();
     }
-    showArt();
   };
+
+  // The two seats of a character select (room-screens.js
+  // characterSelectViewModel seats): the seat's label, its pick with the
+  // stone of the pick order and its state (Choosing or Ready), or the
+  // dimmed Waiting placeholder of an empty seat. A choosable local seat is
+  // a button that makes it the seat the character cards and Ready act for.
+  const showSeats = (container, list) => rebuild(container, list, (card, parent) => {
+    const node = el(card.choosable ? 'button' : 'div', `seat${card.team ? ` team-${card.team}` : ''}`, parent);
+    if (card.choosable) {
+      node.type = 'button';
+      node.classList.add('is-choosable');
+      node.addEventListener('click', () => act('chooseSeat', card.seat));
+    }
+    node.dataset.hudBox = card.box;
+    node.dataset.seat = card.seat;
+    if (card.character) node.dataset.character = card.character;
+    node.classList.toggle('is-placeholder', card.placeholder);
+    node.classList.toggle('is-ready', card.ready);
+    node.classList.toggle('is-active', card.active);
+    if (card.placeholder) {
+      el('span', 'seat-waiting', node).textContent = card.placeholderText;
+      return;
+    }
+    el('span', 'stone', node).textContent = card.stone ?? '';
+    const text = el('span', 'seat-text', node);
+    el('span', 'seat-label', text).textContent = card.label;
+    el('span', 'seat-name', text).textContent = card.name ?? card.statusText;
+    if (card.name) el('span', 'seat-status', node).textContent = card.statusText;
+  });
+
+  // The three character cards of the active seat (characterSelectViewModel
+  // characters): emblem with the seal, name, tagline and one row per skill
+  // with its rest turns. A card is a button that picks the character.
+  const showCharacters = (container, list, seat) => rebuild(container, list, (card, parent) => {
+    const button = el('button', `character colour-${card.colour}`, parent);
+    button.type = 'button';
+    button.dataset.hudBox = card.box;
+    button.dataset.character = card.character;
+    button.disabled = card.disabled;
+    button.setAttribute('aria-pressed', String(card.selected));
+    const tile = el('span', 'emblem-tile', button);
+    emblem(card.emblem, tile);
+    el('span', 'seal', tile).textContent = card.seal;
+    const body = el('span', 'character-body', button);
+    const head = el('span', 'character-head', body);
+    el('span', 'character-name', head).textContent = card.name;
+    if (card.takenText) el('span', 'taken', head).textContent = card.takenText;
+    el('span', 'tagline', body).textContent = card.tagline;
+    for (const skill of card.skills) {
+      const row = el('span', 'skill-row', body);
+      el('span', 'skill-name', row).textContent = skill.name;
+      el('span', 'rest', row).textContent = skill.restText;
+    }
+    button.addEventListener('click', () => act('pick', card.character, seat));
+  });
+
+  // The Ready button of the active seat (characterSelectViewModel readyButton).
+  const showReady = (button, ready) => {
+    button.hidden = ready === null;
+    if (!ready) return;
+    button.textContent = ready.label;
+    button.disabled = ready.disabled;
+    button.dataset.hudBox = ready.box;
+    button.dataset.seat = ready.seat;
+  };
+  const waitingReady = $('waiting-ready');
+  const selectReady = $('select-ready');
+  for (const button of [waitingReady, selectReady]) {
+    button.addEventListener('click', () => act('ready', button.dataset.seat));
+  }
   const waitingCards = $('waiting-cards');
   const selectCards = $('select-cards');
+  const waitingCharacters = $('waiting-characters');
+  const selectCharacters = $('select-characters');
   $('select-back').textContent = STRINGS.back;
 
   const update = () => {
@@ -205,6 +232,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
 
     root.hidden = view.screen === GAME;
     root.classList.toggle('over', view.screen === GAME_OVER);
+    root.classList.toggle('picking', view.screen === WAITING_SCREEN || view.screen === SELECT);
     for (const section of sections) section.hidden = section.dataset.screen !== view.screen;
 
     if (view.screen === JOIN) {
@@ -221,12 +249,16 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
       $('waiting-starting').textContent = vm.startingText ?? '';
       leave.disabled = !vm.leave.enabled;
       showSeats(waitingCards, vm.cards);
+      showCharacters(waitingCharacters, vm.characters, vm.readyButton?.seat);
+      showReady(waitingReady, vm.readyButton);
       if (entering) clearCopy();
     } else if (view.screen === SELECT && view.select) {
       const vm = view.select;
       $('select-title').textContent = vm.title;
       $('select-lead').textContent = vm.lead;
       showSeats(selectCards, vm.cards);
+      showCharacters(selectCharacters, vm.characters, vm.readyButton?.seat);
+      showReady(selectReady, vm.readyButton);
     } else if (view.screen === GAME_OVER && view.gameOver) {
       // The game over card (game-over.js): headline, subline, Rematch with
       // its state and hint, and Back to Menu (always enabled).
@@ -249,11 +281,9 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   update();
 
   return {
-    // The asset store (render/assets.js) for the portraits.
-    setAssets(store) {
-      assets = store;
-      showArt();
-    },
+    // The asset store (render/assets.js). The character select draws
+    // placeholder emblems until the owner's art comes, so it keeps none.
+    setAssets() {},
   };
 }
 

@@ -21,7 +21,7 @@ Tick each line when it holds.
 
 Both commands need the shots tool setup of docs/shots.md section 1. Exit code 0 means all good, 1 problems found, 2 the tool could not run.
 
-- `bash tools/shots.sh flow` (the same as `--set flow`): pictures of the menu, howto, settings, lobby, waiting, starting, gameover and gameover-pending scenes at 1920x1080 and 1280x720 (Medium). Read `shots/report.json`: per picture the box overlaps, the boxes outside the window, the smallest button side (at least 44 px) and the console errors must pass; the game over card is at most 24 percent of the window height.
+- `bash tools/shots.sh flow` (the same as `--set flow`): pictures of the menu, howto, settings, lobby, waiting, starting, select, gameover and gameover-pending scenes at 1920x1080 and 1280x720 (Medium). Read `shots/report.json`: per picture the box overlaps, the boxes outside the window, the smallest button side (at least 44 px) and the console errors must pass; the game over card is at most 24 percent of the window height.
 - `bash tools/shots.sh e2e`: `tools/flow_e2e.py` walks checklist items 1, 2 (up to the game), 5, 6, 7 and 8 in two pages of one browser at Low and 1280x720, and writes `shots/e2e.json` (each step with name, ok and milliseconds, and the console errors of both pages, which must be 0). Pictures of both pages in the game: `shots/e2e-host.png` and `shots/e2e-guest.png`.
 
 The automatic checks do not replace items 3, 4, 9 and 10, which need a person.
