@@ -43,6 +43,7 @@ const ROCK_SHADOW_RADIUS = PIECE_SHADOW_RADIUS * 1.2;
 // the meadow, meadow-scene.js).
 const SCENERY_FEATURES = new Set([
   'ground', 'scenery', 'meadowFlowers', 'skyHaze', 'groundFog', 'ridges', 'floorShade', 'shadows', 'sky', 'wind', 'backgroundMotion',
+  'forestWall', 'treeRows', 'undergrowth', 'forestLogs',
 ]);
 // The switches the farmland board reads (farm-field.js).
 const FARM_FEATURES = new Set(['boardTexture', 'scenery']);

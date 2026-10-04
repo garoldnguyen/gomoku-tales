@@ -4,7 +4,8 @@
 // bales, grass tufts and flowers), the sky, clouds and wind petals
 // (sky-scene.js, section 7), the two soft ridges (ridges-scene.js,
 // docs/art-direction-v3-1.md section 5.6), the cloud shadows on High
-// (cloud-shadows.js) and light fog in the haze colour (haze.js).
+// (cloud-shadows.js), the forest behind the far edge (forest-scene.js,
+// docs/art-direction-v3-1.md section 6) and light fog in the haze colour (haze.js).
 //
 // The meadow is flat. The camera looks steeply down, so the ground ends at a
 // far edge placed on purpose 21 percent down the view (horizon.js
@@ -13,6 +14,7 @@
 import * as THREE from 'three';
 import { FOG_FAR, FOG_NEAR } from '../config.js';
 import { createCloudShadows } from './cloud-shadows.js';
+import { createForest } from './forest-scene.js';
 import { HAZE_COLOR, hazeViewInto } from './haze.js';
 import { createMeadow } from './meadow-scene.js';
 import { createRidges } from './ridges-scene.js';
@@ -27,6 +29,7 @@ import { createSky } from './sky-scene.js';
 export function buildBreezeHill(scene, cameraPosition, camera, { sunRays = true } = {}) {
   scene.fog = new THREE.Fog(HAZE_COLOR, FOG_NEAR, FOG_FAR);
   const meadow = createMeadow(scene, cameraPosition);
+  const forest = createForest(scene, cameraPosition);
   const sky = createSky(scene, camera, cameraPosition, { sunRays });
   const ridges = createRidges(scene);
   const cloudShadows = createCloudShadows(scene);
@@ -39,6 +42,7 @@ export function buildBreezeHill(scene, cameraPosition, camera, { sunRays = true 
     },
     setFeatures(features) {
       meadow.setFeatures(features);
+      forest.setFeatures(features);
       sky.setFeatures(features);
       ridges.setFeatures(features);
       cloudShadows.setFeatures(features);

@@ -10,6 +10,7 @@
 import { loadAssets, USES_3D } from '../render/assets.js';
 import { createPieceSprite, createWorld, placeOnCell } from './world.js';
 import { pointerToNdc } from './picking.js';
+import { loadForestMeta, withForestMeta } from './forest-meta.js';
 import { loadV3Meta } from './v3-meta.js';
 
 // Sample pieces on the board: { x, y } are logic cells (src/logic).
@@ -24,7 +25,10 @@ const hud = document.getElementById('hud');
 
 // Art files from assets/manifest.json; missing ones are placeholders.
 const warn = (message) => console.warn(message);
-const [assets, meta] = await Promise.all([loadAssets({ warn, uses: USES_3D }), loadV3Meta({ warn })]);
+const [assets, v3Meta, forestMeta] = await Promise.all([
+  loadAssets({ warn, uses: USES_3D }), loadV3Meta({ warn }), loadForestMeta({ warn }),
+]);
+const meta = withForestMeta(v3Meta, forestMeta);
 
 let world;
 try {

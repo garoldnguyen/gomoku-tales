@@ -463,7 +463,7 @@ export function meadowItems(plan) {
 }
 
 // Blob shadow radius (world units) of each kind of scenery.
-const SHADOW_RADIUS = { tree: 0.6, bush: 0.38, bale: 0.42 };
+export const SHADOW_RADIUS = Object.freeze({ tree: 0.6, bush: 0.38, bale: 0.42 });
 const PATCH_SHADOW_REACH = 1.1; // a patch shadow reaches a little past its plants
 
 // Where the soft blob shadows of a plan lie, as { x, z, r } spots: one

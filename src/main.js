@@ -8,6 +8,7 @@ import { drawGameScreen, drawMenuScreen, setAssets } from './render/game-rendere
 import { createResumeWatch } from './render3d/frame-gap.js';
 import { blursMenus, browserStorage, cycleQuality, startQuality } from './render3d/quality.js';
 import { seededRandom } from './render3d/seeded-random.js';
+import { loadForestMeta, withForestMeta } from './render3d/forest-meta.js';
 import { loadV3Meta } from './render3d/v3-meta.js';
 import { GAME, GAME_OVER, createApp } from './ui/app.js';
 import { createHud } from './ui/hud.js';
@@ -46,7 +47,9 @@ if (shot) {
 const warn = (message) => console.warn(message);
 const assetsLoaded = loadAssets({ warn, uses: wants2d ? null : USES_3D });
 assetsLoaded.then(setAssets);
-const metaLoaded = loadV3Meta({ warn });
+// The v3 tuning data with the forest's (assets/forest-meta.json) added.
+const metaLoaded = Promise.all([loadV3Meta({ warn }), loadForestMeta({ warn })])
+  .then(([v3Meta, forestMeta]) => withForestMeta(v3Meta, forestMeta));
 
 // The 2D renderer. The 3D one (src/render3d/world-renderer.js) has the same
 // interface and draws the world on the WebGL canvas under this one.

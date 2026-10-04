@@ -34,6 +34,8 @@ import {
 import {
   dandelionPuffs, meadowInstanceGroups, meadowShadowSpots, mergeMeadowPlans, planMeadow, planMeadowStrips,
 } from './meadow.js';
+import { drawsForest, skipForestZone } from './forest.js';
+import { QUALITY_LEVELS, QUALITY_ORDER } from './quality.js';
 import { effectRandom, seededRandom } from './seeded-random.js';
 import { anchorForward, anchorShift, faceYaw, SPRITE_ALPHA_TEST } from './sprite-frames.js';
 import {
@@ -65,6 +67,8 @@ const EDGE_BLENDING = {
   blendSrc: THREE.SrcAlphaFactor,
   blendDst: THREE.OneMinusSrcAlphaFactor,
 };
+// A quality row that draws the forest, for the forest zone above.
+const FOREST_LEVEL = QUALITY_ORDER.map((level) => QUALITY_LEVELS[level]).find(drawsForest);
 const RIPPLE_SPEED = 0.55; // radians of the ripple wave per second
 const RIPPLE_WAVE = 0.85; // radians per world unit along the wind
 const PATCH_SHADOW_OPACITY = 0.55; // a patch shadow is fainter than a sprite's
@@ -80,7 +84,12 @@ export function createMeadow(scene, cameraPosition) {
   // shows (docs/art-direction-v3-1.md section 3.3). Every kind in it is
   // hidden on Low by the switches below (flowers, scenery, tufts), so the
   // strips show on Medium and High only.
-  const plan = mergeMeadowPlans(planMeadow(MEADOW_SEED), planMeadowStrips(MEADOW_SEED));
+  // The forest zone (docs/art-direction-v3-1.md section 6.7): the levels
+  // that draw the forest skip every meadow item whose base is inside it.
+  // The meadow is built once with the forest's plan: the one level without
+  // the forest (Low) hides every item of the plan (its tuft, scenery and
+  // flower switches are off), so this is the only plan any level draws.
+  const plan = skipForestZone(mergeMeadowPlans(planMeadow(MEADOW_SEED), planMeadowStrips(MEADOW_SEED)), FOREST_LEVEL);
   const ground = createGround();
   scene.add(ground.mesh);
 
@@ -377,6 +386,36 @@ function billboards(name, items, cameraPosition, sway) {
   const tint = new THREE.Color();
   const material = meadowMaterial(artSource(name), frames, sway);
   const mesh = new THREE.InstancedMesh(geometry, material, items.length);
+  placeUprightInstances(mesh, name, items, cameraPosition);
+  items.forEach((item, i) => {
+    const yaw = faceYaw({ x: item.x, z: item.z }, cameraPosition);
+    mirrors[i] = item.mirror ? 1 : 0;
+    if (tinted) mesh.setColorAt(i, tint.setScalar(item.brightness ?? 1));
+    looks[i] = Math.min(Math.max(item.look ?? 0, 0), frames - 1);
+    phases[i] = swayPhase(item.x, item.z);
+    // Which way downwind lies along the plane's own width: +1 or -1, so
+    // the lean stays whole art pixels.
+    windSide[i] = swayLeanSide(Math.cos(yaw), Math.sin(yaw));
+  });
+  geometry.setAttribute('aLook', new THREE.InstancedBufferAttribute(looks, 1));
+  geometry.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases, 1));
+  geometry.setAttribute('aWindSide', new THREE.InstancedBufferAttribute(windSide, 1));
+  geometry.setAttribute('aMirror', new THREE.InstancedBufferAttribute(mirrors, 1));
+  mesh.computeBoundingSphere();
+  return mesh;
+}
+
+// The sprite placement path of every upright billboard of the meadow and
+// the forest (forest-scene.js): writes the instance matrix of each item
+// { x, z, scale?, mirror? } of the instanced `mesh` of sheet `name`, so
+// it stands on the ground at (x, z) with the sheet's anchor pixel
+// (v3-meta.json, forest-meta.json) on it, turned to face the fixed camera
+// at `cameraPosition`, or facing straight down +z when `faceCamera` is
+// false (the seamless forest wall strips). A mirrored frame has its anchor
+// pixel on the other side. Built once, never per frame.
+export function placeUprightInstances(mesh, name, items, cameraPosition, { faceCamera = true } = {}) {
+  const { width, height } = placeholderShape(name);
+  const anchor = metaAnchor(artMeta(), name);
   const { side, lift } = anchorShift(width, height, anchor, PX_WORLD, SPRITE_STRETCH_Y);
   const matrix = new THREE.Matrix4();
   const rotation = new THREE.Quaternion();
@@ -386,32 +425,18 @@ function billboards(name, items, cameraPosition, sway) {
   items.forEach((item, i) => {
     const y = GROUND_Y;
     const ground = { x: item.x, y, z: item.z };
-    const yaw = faceYaw(ground, cameraPosition);
+    const yaw = faceCamera ? faceYaw(ground, cameraPosition) : 0;
     const s = item.scale ?? 1;
     const forward = anchorForward(lift * s, ground, cameraPosition);
     const cos = Math.cos(yaw);
     const sin = Math.sin(yaw);
-    // A mirrored frame has its anchor pixel on the other side.
     const shift = (item.mirror ? -side : side) * s;
     position.set(item.x + shift * cos + forward * sin, y, item.z + forward * cos - shift * sin);
-    mirrors[i] = item.mirror ? 1 : 0;
-    if (tinted) mesh.setColorAt(i, tint.setScalar(item.brightness ?? 1));
     rotation.setFromAxisAngle(up, yaw);
     matrix.compose(position, rotation, scale.set(s, s, s));
     mesh.setMatrixAt(i, matrix);
-    looks[i] = Math.min(Math.max(item.look ?? 0, 0), frames - 1);
-    phases[i] = swayPhase(item.x, item.z);
-    // Which way downwind lies along the plane's own width: +1 or -1, so
-    // the lean stays whole art pixels.
-    windSide[i] = swayLeanSide(cos, sin);
   });
-  geometry.setAttribute('aLook', new THREE.InstancedBufferAttribute(looks, 1));
-  geometry.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases, 1));
-  geometry.setAttribute('aWindSide', new THREE.InstancedBufferAttribute(windSide, 1));
-  geometry.setAttribute('aMirror', new THREE.InstancedBufferAttribute(mirrors, 1));
   mesh.instanceMatrix.needsUpdate = true;
-  mesh.computeBoundingSphere();
-  return mesh;
 }
 
 // An upright plane like uprightPlaneGeometry, but one quad per art pixel
@@ -473,7 +498,7 @@ if (uSwayPx > 0.0) {
 
 // One mesh of soft blob shadows { x, z, r }: flat quads lying
 // MEADOW_SHADOW_LIFT (0) above the flat ground, drawn over it by polygon offset. Built once, one draw call.
-function blobShadows(spots, opacity) {
+export function blobShadows(spots, opacity) {
   const material = blobShadowMaterial().clone();
   material.opacity *= opacity; // drawn over the ground by its polygon offset (ON_SURFACE)
   const positions = new Float32Array(spots.length * 12);
@@ -503,7 +528,7 @@ function blobShadows(spots, opacity) {
 // silhouettes (sunShadowGeometry in sprites.js), each with its root under
 // the item's anchor pixel, showing the item's frame (look) and mirroring,
 // with the billboards' own texture. Built once, one draw call.
-function sunShadows(mesh, name, items) {
+export function sunShadows(mesh, name, items) {
   const { width, height, frames } = placeholderShape(name);
   const anchor = metaAnchor(artMeta(), name);
   const { side } = anchorShift(width, height, anchor, PX_WORLD, SPRITE_STRETCH_Y);

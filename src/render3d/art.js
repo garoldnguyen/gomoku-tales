@@ -65,7 +65,10 @@ export function combinedSheet(names) {
 
 function loadedArt(name) {
   const entry = store.entry(name);
-  if (!entry) return null;
+  if (!entry) {
+    warn(`"${name}" is not loaded; using the placeholder`);
+    return null;
+  }
   const problem = artProblem(name, entry);
   if (problem) {
     warn(`${problem}; using the placeholder`);

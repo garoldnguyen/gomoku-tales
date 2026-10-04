@@ -288,14 +288,32 @@ function gpuResources(scene) {
   return found;
 }
 
-test('switching quality at runtime keeps the game and makes, replaces or leaks no GPU resource', async () => {
+// Every instanced mesh in `scene`.
+function instancedMeshes(scene) {
+  const found = new Set();
+  scene.traverse((object) => { if (object.isInstancedMesh) found.add(object); });
+  return found;
+}
+
+// The kind of a probed resource, for madeSince and the id probe.
+function resourceKind(resource) {
+  if (resource.isTexture) return 'texture';
+  if (resource.isMaterial) return 'material';
+  return 'geometry';
+}
+
+// Section 8 of docs/art-direction-v3-1.md: a quality switch rebuilds only the
+// forest (and disposes what it replaced); everything else is made once.
+test('switching quality at runtime keeps the game, rebuilds only the forest and leaks no GPU resource', async () => {
   const disposed = new Set();
+  const disposedMeshes = new Set();
   const restore = [];
-  for (const Kind of [THREE.Texture, THREE.Material, THREE.BufferGeometry, THREE.RenderTarget]) {
+  for (const Kind of [THREE.Texture, THREE.Material, THREE.BufferGeometry, THREE.RenderTarget, THREE.InstancedMesh]) {
     const dispose = Kind.prototype.dispose;
+    const into = Kind === THREE.InstancedMesh ? disposedMeshes : disposed;
     restore.push(() => { Kind.prototype.dispose = dispose; });
     Kind.prototype.dispose = function trackedDispose() {
-      disposed.add(this);
+      into.add(this);
       return dispose.call(this);
     };
   }
@@ -309,6 +327,7 @@ test('switching quality at runtime keeps the game and makes, replaces or leaks n
     }
     const stateBefore = JSON.stringify(game.getState());
     const inUse = gpuResources(gl.scene);
+    const meshesBefore = instancedMeshes(gl.scene);
     const probe = madeSince();
 
     for (let round = 0; round < 10; round++) {
@@ -323,16 +342,36 @@ test('switching quality at runtime keeps the game and makes, replaces or leaks n
     renderer.setQuality('high');
     frame({ x: 3, y: 3 });
 
-    assert.deepEqual(madeSince(probe), { texture: 0, material: 0, geometry: 0 }, 'a quality switch makes no texture, render target, material or geometry');
+    const made = madeSince(probe);
     const nowInUse = gpuResources(gl.scene);
+    const forestNow = gpuResources(gl.scene.getObjectByName('forest'));
+    const isNew = (resource) => resource.id > probe[resourceKind(resource)];
     for (const resource of nowInUse) {
-      assert.ok(inUse.has(resource), `${resource.type ?? resource.constructor.name} is new after the switches`);
-      assert.ok(!disposed.has(resource), `${resource.type ?? resource.constructor.name} is disposed but still in use`);
+      const name = resource.type ?? resource.constructor.name;
+      if (isNew(resource)) assert.ok(forestNow.has(resource), `${name} is new after the switches but not part of the forest`);
+      else assert.ok(inUse.has(resource), `${name} is new after the switches`);
+      assert.ok(!disposed.has(resource), `${name} is disposed but still in use`);
     }
     for (const resource of inUse) {
-      // Anything a switch replaced must have been disposed (none is replaced).
+      // Anything a switch replaced must have been disposed (only the forest is replaced).
       if (!nowInUse.has(resource)) assert.ok(disposed.has(resource), `${resource.type} was replaced without dispose()`);
     }
+    // An instanced mesh owns its instance buffers: a replaced one must be
+    // disposed too, and none still in the scene may be.
+    const meshesNow = instancedMeshes(gl.scene);
+    let replacedMeshes = 0;
+    for (const mesh of meshesBefore) {
+      if (meshesNow.has(mesh)) continue;
+      replacedMeshes++;
+      assert.ok(disposedMeshes.has(mesh), `instanced mesh ${mesh.name || mesh.id} was replaced without dispose()`);
+    }
+    assert.ok(replacedMeshes > 0, 'the forest replaces its instanced meshes on a quality switch');
+    for (const mesh of meshesNow) assert.ok(!disposedMeshes.has(mesh), 'an instanced mesh in the scene is disposed');
+    // Everything made by the switches is the forest's, in use now or disposed: no leak.
+    const accounted = { texture: 0, material: 0, geometry: 0 };
+    for (const resource of new Set([...disposed, ...forestNow])) if (isNew(resource)) accounted[resourceKind(resource)]++;
+    assert.deepEqual(made, accounted, 'every texture, material and geometry a switch makes is the forest\'s and is in use or disposed');
+    assert.ok(made.geometry > 0, 'the forest is rebuilt on a quality switch');
     assert.equal(JSON.stringify(game.getState()), stateBefore, 'the game goes on as it was');
     assert.equal(game.getState().board[7][7], X);
   } finally {

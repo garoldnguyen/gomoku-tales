@@ -24,6 +24,10 @@ export const QUALITY_LEVELS = deepFreeze({
     groundFog: true, // the soft ground edge
     ridges: false, // the two soft ridges behind the far edge
     floorShade: false, // the forest floor shade
+    forestWall: false, // the far canopy wall (docs/art-direction-v3-1.md section 6)
+    treeRows: 0, // forest tree rows; their steps are FOREST_ROWS in forest.js
+    undergrowth: 0, // forest undergrowth per world unit
+    forestLogs: 0, // logs and stumps among the undergrowth
     sky: 'gradient',
     shadows: 'none',
     postEffects: { bloom: false, depthOfField: false, warmGrade: false, vignette: false },
@@ -46,6 +50,10 @@ export const QUALITY_LEVELS = deepFreeze({
     groundFog: true,
     ridges: true,
     floorShade: false,
+    forestWall: true,
+    treeRows: 2, // rows 1 and 3
+    undergrowth: 2.1,
+    forestLogs: 1,
     sky: 'still-clouds', // gradient plus 4 still painted clouds
     shadows: 'blob', // soft blob shadow under every plant, rock, post, tree, bush, bale
     postEffects: { bloom: false, depthOfField: false, warmGrade: false, vignette: false }, // no blur at all
@@ -68,6 +76,10 @@ export const QUALITY_LEVELS = deepFreeze({
     groundFog: true,
     ridges: true,
     floorShade: true,
+    forestWall: true,
+    treeRows: 3, // rows 1, 2 and 3
+    undergrowth: 3.2,
+    forestLogs: 3,
     sky: 'drifting-clouds', // 8 drifting clouds in 2 layers, wisps, sun rays
     shadows: 'sun', // long sun shadows plus slow cloud shadows
     postEffects: { bloom: true, depthOfField: true, warmGrade: true, vignette: true },

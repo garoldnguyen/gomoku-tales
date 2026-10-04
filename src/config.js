@@ -133,6 +133,10 @@ export const MEADOW_TREE_SCALE = 1;
 export const MEADOW_TREE_BRIGHTNESS = 0.06;
 export const MEADOW_BUSHES = [8, 10];
 export const MEADOW_BALES = 3;
+// The forest behind the far edge (docs/art-direction-v3-1.md section 6):
+// planForest gives the same forest every game. Its other numbers are in
+// src/render3d/forest.js.
+export const FOREST_SEED = 20261002;
 export const MEADOW_TUFTS = [120, 160]; // grass tufts in all, edges of patches included
 export const GROUND_STRIPE_CELLS = 3; // Low: mown stripes this many cells wide
 // Blob shadows in the meadow lie flat this far above the flat ground.
