@@ -323,14 +323,14 @@ function startAppMode({ local = false } = {}) {
     onHover: (point) => {
       const game = playing();
       if (!game) return;
-      const hit = point ? renderer.hitTest(point.px, point.py) : null;
+      const hit = point ? renderer.hitTest(point.px, point.py, game.getView().state.characters) : null;
       game.setHover(hit?.cell ?? null);
       game.setHoverSkill(hit?.skill ?? null);
     },
     onClick: ({ px, py }) => {
       const game = playing();
       if (!game) return;
-      const hit = renderer.hitTest(px, py);
+      const hit = renderer.hitTest(px, py, game.getView().state.characters);
       if (hit?.skill) game.clickSkill(hit.skill.player, hit.skill.skillId);
       else if (hit?.cell) game.click(hit.cell);
     },

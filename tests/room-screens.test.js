@@ -5,19 +5,21 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { COPY_FEEDBACK_MS, JOIN_TIMEOUT_MS, ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH, WAITING_START_DELAY_MS } from '../src/config.js';
-import { O, X } from '../src/logic/board.js';
-import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../src/logic/characters.js';
+import { COPY_FEEDBACK_MS, JOIN_TIMEOUT_MS, ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH } from '../src/config.js';
+import { EMPTY, O, X } from '../src/logic/board.js';
+import { CHARACTERS, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
+import { createSeats, pickCharacter, setReady } from '../src/logic/seats.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { ROOM_CODE_ALPHABET, isValidRoomCode, normalizeRoomCode } from '../src/net/room-code.js';
-import { CLOSED, NO_ROOM, createGuestRoom } from '../src/net/room.js';
-import { JOIN, LOBBY, MENU, WAITING_SCREEN, createApp } from '../src/ui/app.js';
-import { FLOW_EVENTS, ROLES, SCREENS, flowReducer, initialFlow } from '../src/ui/flow.js';
+import { CLOSED, GUEST, HOST, NO_ROOM, ROOM_SEATS, createGuestRoom } from '../src/net/room.js';
+import { GAME, JOIN, LOBBY, MENU, SELECT, WAITING_SCREEN, createApp } from '../src/ui/app.js';
+import { FLOW_EVENTS, LOCAL_SEATS, ROLES, SCREENS, flowReducer, initialFlow } from '../src/ui/flow.js';
 import { PORTRAIT_ART } from '../src/ui/hud-view.js';
 import { isTypingTarget, shortcutKeyHandler } from '../src/ui/input.js';
 import {
-  WAITING_CARD_ORDER, copyFeedbackText, copyRoomCode, joinViewModel, lobbyViewModel, waitingViewModel,
+  SELECT_CHARACTERS, characterSelectViewModel, copyFeedbackText, copyRoomCode, joinViewModel, lobbyViewModel, localSelectViewModel,
+  waitingViewModel,
 } from '../src/ui/room-screens.js';
 import { SHOT_ROOM, SHOT_SCENES, shotFlow, shotRoomView } from '../src/ui/shot-mode.js';
 import { STRINGS } from '../src/ui/strings.js';
@@ -103,7 +105,7 @@ test('the lobby Back button (event BACK) returns to the menu; Back on Join Room 
   assert.equal(app.getScreen(), LOBBY);
   app.back();
   assert.equal(app.getScreen(), MENU);
-  assert.deepEqual({ ...app.getFlow() }, { screen: 'menu', overlay: 'none', mode: null, role: null, notice: null });
+  assert.deepEqual({ ...app.getFlow() }, { screen: 'menu', overlay: 'none', mode: null, role: null, notice: null, seats: null });
 });
 
 test('join errors come from strings.js and clear when the player types', () => {
@@ -125,8 +127,7 @@ test('the host-left notice of the flow state shows as the join error', () => {
   const { window, clock } = makeWorld();
   const host = window();
   const guest = window();
-  host.app.openCreate();
-  host.app.createRoom(WIND_RABBIT);
+  host.app.createRoom();
   guest.app.openJoin();
   guest.app.joinRoom('ABCD5');
   assert.equal(guest.app.getScreen(), WAITING_SCREEN);
@@ -136,15 +137,14 @@ test('the host-left notice of the flow state shows as the join error', () => {
   assert.equal(guest.app.getView().joinError, STRINGS.noticeHostLeft);
   guest.app.clearJoinError();
   assert.equal(guest.app.getView().joinError, null);
-  clock.advance(WAITING_START_DELAY_MS);
+  clock.advance(60000);
   guest.app.close();
 });
 
 test('Leave in the waiting room closes the transport, stops every timer and the code can no longer be joined', () => {
   const { network, clock, window } = makeWorld();
   const host = window();
-  host.app.openCreate();
-  host.app.createRoom(WIND_RABBIT);
+  host.app.createRoom();
   assert.equal(host.app.leaveRoom(), true);
   assert.equal(host.app.getScreen(), MENU);
   assert.equal(host.app.getFlow().screen, SCREENS.MENU);
@@ -166,80 +166,169 @@ test('Leave in the waiting room closes the transport, stops every timer and the 
   assert.equal(guest.phase, CLOSED);
 });
 
-test('Leave is off while the room is starting; both players enter the game only on the host start', () => {
-  const { window, clock } = makeWorld();
+test('Leave stays on while the room is starting; both players enter the game only on the host start', () => {
+  const { window } = makeWorld();
   const host = window();
   const guest = window();
-  host.app.openCreate();
-  host.app.createRoom(WIND_RABBIT);
+  host.app.createRoom();
   guest.app.openJoin();
   guest.app.joinRoom('ABCD5');
   for (const win of [host, guest]) {
     assert.equal(win.app.getScreen(), WAITING_SCREEN);
-    assert.equal(win.app.getView().waiting.leave.enabled, false);
-    assert.equal(win.app.leaveRoom(), false);
+    assert.equal(win.app.getView().waiting.leave.enabled, true);
   }
-  clock.advance(WAITING_START_DELAY_MS - 1);
-  assert.equal(guest.app.getFlow().screen, SCREENS.STARTING);
-  clock.advance(1);
+  assert.equal(guest.app.pick(WIND_RABBIT), true);
+  assert.equal(host.app.pick(WIND_RABBIT), false, 'taken by the guest');
+  assert.equal(host.app.pick(EARTH_BEAR), true);
+  assert.equal(guest.app.ready(), true);
+  assert.equal(guest.app.getFlow().screen, SCREENS.STARTING, 'the guest waits for the host');
+  assert.equal(guest.app.getView().waiting.startingText, STRINGS.selectWaitingOther);
+  assert.equal(host.app.ready(), true);
   assert.equal(host.app.getFlow().screen, SCREENS.GAME);
   assert.equal(guest.app.getFlow().screen, SCREENS.GAME);
+  assert.equal(guest.app.getGame().getView().you, 'X', 'the first pick plays X');
   host.app.close();
   guest.app.close();
 });
 
-// --- waitingViewModel ---
+// --- waitingViewModel and the character select ---
 
 const flowOf = (...events) => events.reduce(flowReducer, initialFlow());
 const hostWaiting = flowOf(FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.ROOM_CREATED);
 const hostStarting = flowReducer(hostWaiting, FLOW_EVENTS.OPPONENT_JOINED);
 const guestStarting = flowOf(FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.JOINED);
+const roomSeats = (...steps) => steps.reduce((seats, [seat, character]) => (
+  character === 'ready' ? setReady(seats, seat).seats : pickCharacter(seats, seat, character).seats
+), createSeats(ROOM_SEATS));
 
-test('waitingViewModel in phase waiting: title, code, hint, the other card a Waiting placeholder, Leave enabled', () => {
-  const vm = waitingViewModel(hostWaiting, { code: 'ABCD5', character: WIND_RABBIT });
+test('waitingViewModel in phase waiting: title, code, hint, the guest seat a Waiting placeholder, Leave enabled', () => {
+  const seats = roomSeats([HOST, WIND_RABBIT]);
+  const vm = waitingViewModel(hostWaiting, { code: 'ABCD5', seats, seat: HOST });
   assert.equal(vm.title, 'Waiting for opponent');
   assert.equal(vm.code, 'ABCD5');
   assert.equal(vm.hint, STRINGS.waitingHint);
+  assert.equal(vm.lead, 'The first to pick plays X and moves first.');
   assert.equal(vm.starting, false);
   assert.equal(vm.startingText, null);
-  assert.deepEqual(vm.cards.map((card) => card.character), [WIND_RABBIT, EARTH_BEAR]);
-  assert.deepEqual(vm.cards.map((card) => card.stone), [X, O]);
-  const [rabbit, bear] = vm.cards;
-  assert.equal(rabbit.you, true);
-  assert.equal(rabbit.youText, 'You');
-  assert.equal(rabbit.placeholder, false);
-  assert.equal(rabbit.box, 'card-host');
-  assert.equal(rabbit.portrait, PORTRAIT_ART[X]);
-  assert.equal(bear.placeholder, true);
-  assert.equal(bear.placeholderText, 'Waiting');
-  assert.equal(bear.you, false);
-  assert.equal(bear.box, 'card-guest');
+  const [mine, other] = vm.cards;
+  assert.equal(mine.box, 'card-host');
+  assert.equal(mine.you, true);
+  assert.equal(mine.youText, 'You');
+  assert.equal(mine.character, WIND_RABBIT);
+  assert.equal(mine.stone, X);
+  assert.equal(mine.portrait, PORTRAIT_ART[X]);
+  assert.equal(mine.choices.length, SELECT_CHARACTERS.length, 'the host may pick before the guest comes');
+  assert.equal(other.box, 'card-guest');
+  assert.equal(other.placeholder, true);
+  assert.equal(other.placeholderText, 'Waiting');
+  assert.deepEqual(other.choices, []);
+  assert.equal(other.readyButton, null);
   assert.equal(vm.leave.enabled, true);
   assert.equal(vm.copy.enabled, true);
   assert.equal(vm.leave.label, 'Leave');
 });
 
-test('waitingViewModel in phase starting: Opponent joined, both cards filled, Leave disabled, Starting shows', () => {
-  const vm = waitingViewModel(hostStarting, { code: 'ABCD5', character: EARTH_BEAR });
-  assert.equal(vm.title, 'Opponent joined');
+test('waitingViewModel in phase starting: both seats, only the own seat can pick, a taken character is disabled', () => {
+  const seats = roomSeats([GUEST, EARTH_BEAR]);
+  const vm = waitingViewModel(hostStarting, { code: 'ABCD5', seats, seat: HOST });
+  assert.equal(vm.title, 'Pick your character');
   assert.equal(vm.starting, true);
-  assert.equal(vm.startingText, 'Starting');
-  assert.equal(vm.leave.enabled, false);
+  assert.equal(vm.leave.enabled, true, 'no start on a timer, so Leave is always there');
   assert.ok(vm.cards.every((card) => !card.placeholder));
-  assert.deepEqual(vm.cards.map((card) => card.name), WAITING_CARD_ORDER.map((id) => CHARACTERS[id].name));
-  assert.deepEqual(vm.cards.map((card) => card.you), [false, true]);
-  assert.deepEqual(vm.cards.map((card) => card.box), ['card-guest', 'card-host']);
+  const [mine, other] = vm.cards;
+  assert.deepEqual(mine.choices.map((choice) => choice.character), [WIND_RABBIT, EARTH_BEAR, JADE_SERPENT]);
+  assert.deepEqual(mine.choices.map((choice) => choice.disabled), [false, true, false]);
+  assert.equal(mine.choices[1].taken, true);
+  assert.equal(mine.choices[1].takenText, 'Taken');
+  assert.equal(mine.readyButton.disabled, true, 'Ready needs a pick');
+  assert.equal(mine.stone, null);
+  assert.equal(other.stone, X, 'the guest picked first');
+  assert.equal(other.name, CHARACTERS[EARTH_BEAR].name);
+  assert.deepEqual(other.choices, [], 'the other seat is not this window\'s');
+  const picked = waitingViewModel(hostStarting, { code: 'ABCD5', seats: roomSeats([GUEST, EARTH_BEAR], [HOST, JADE_SERPENT]), seat: HOST });
+  assert.equal(picked.cards[0].readyButton.disabled, false);
+  assert.equal(picked.cards[0].stone, O);
+  const ready = waitingViewModel(hostStarting, { code: 'ABCD5', seats: roomSeats([GUEST, EARTH_BEAR], [HOST, JADE_SERPENT], [HOST, 'ready']), seat: HOST });
+  assert.equal(ready.cards[0].readyButton.disabled, true);
+  assert.ok(ready.cards[0].choices.every((choice) => choice.disabled), 'the pick is locked once Ready');
+  assert.equal(ready.startingText, STRINGS.selectWaitingOther);
 });
 
-test('the joiner sees the same room in phase starting, with its own card tagged You', () => {
+test('the joiner sees the same room in phase starting, with its own seat tagged You', () => {
   assert.equal(guestStarting.role, ROLES.GUEST);
-  const guest = waitingViewModel(guestStarting, { code: 'ABCD5', character: EARTH_BEAR });
-  const host = waitingViewModel(hostStarting, { code: 'ABCD5', character: WIND_RABBIT });
+  const seats = roomSeats([HOST, WIND_RABBIT]);
+  const guest = waitingViewModel(guestStarting, { code: 'ABCD5', seats, seat: GUEST });
+  const host = waitingViewModel(hostStarting, { code: 'ABCD5', seats, seat: HOST });
   assert.equal(guest.title, host.title);
   assert.equal(guest.code, host.code);
   assert.deepEqual(guest.cards.map((card) => card.box), host.cards.map((card) => card.box));
   assert.deepEqual(guest.cards.map((card) => card.you), [false, true]);
-  assert.equal(waitingViewModel(initialFlow(), { code: 'ABCD5', character: WIND_RABBIT }), null);
+  assert.deepEqual(guest.cards[1].choices.map((choice) => choice.disabled), [true, false, false]);
+  assert.equal(waitingViewModel(initialFlow(), { code: 'ABCD5', seats, seat: HOST }), null);
+});
+
+test('characterSelectViewModel: three characters, Ready enabled only after a pick', () => {
+  assert.deepEqual([...SELECT_CHARACTERS], [WIND_RABBIT, EARTH_BEAR, JADE_SERPENT]);
+  const labels = { [HOST]: 'A', [GUEST]: 'B' };
+  const empty = characterSelectViewModel({ seats: createSeats(ROOM_SEATS), labels, editable: [HOST, GUEST] });
+  for (const card of empty.seats) {
+    assert.equal(card.choices.length, 3);
+    assert.ok(card.choices.every((choice) => !choice.disabled && !choice.selected));
+    assert.equal(card.readyButton.disabled, true);
+    assert.equal(card.statusText, 'Choosing');
+  }
+  const vm = characterSelectViewModel({ seats: roomSeats([HOST, JADE_SERPENT]), labels, editable: [HOST, GUEST] });
+  assert.equal(vm.seats[0].readyButton.disabled, false);
+  assert.equal(vm.seats[0].choices[2].selected, true);
+  assert.equal(vm.seats[1].choices[2].disabled, true);
+  assert.equal(vm.seats[1].readyButton.disabled, true);
+  assert.equal(vm.seats[0].choices[0].box, 'pick-host-wind-rabbit');
+  assert.equal(vm.seats[0].readyButton.box, 'ready-host');
+});
+
+test('localSelectViewModel: Player 1 and Player 2 both pick on the game screen of Play on this computer', () => {
+  const flow = flowReducer(initialFlow(), FLOW_EVENTS.PLAY_LOCAL);
+  const vm = localSelectViewModel(flow);
+  assert.equal(vm.title, 'Pick your characters');
+  assert.deepEqual(vm.cards.map((card) => card.label), ['Player 1', 'Player 2']);
+  assert.deepEqual(vm.cards.map((card) => card.seat), [...LOCAL_SEATS]);
+  assert.ok(vm.cards.every((card) => card.choices.length === 3 && card.readyButton));
+  assert.equal(vm.back.box, 'select-back');
+  assert.equal(localSelectViewModel(initialFlow()), null);
+});
+
+test('the local app: a character picked in one seat is disabled for the other, the first pick gets X, and the game starts when both are Ready', () => {
+  const app = createApp({ openTransport: () => assert.fail('no network'), clock: createFakeClock(), local: true });
+  assert.equal(app.getScreen(), SELECT);
+  const [one, two] = LOCAL_SEATS;
+  assert.equal(app.pick(JADE_SERPENT, two), true, 'Player 2 picks first');
+  assert.equal(app.pick(JADE_SERPENT, one), false, 'taken by Player 2');
+  assert.equal(app.getView().select.cards[0].choices[2].disabled, true);
+  assert.equal(app.ready(one), false, 'Ready needs a pick');
+  assert.equal(app.pick(WIND_RABBIT, one), true);
+  assert.equal(app.ready(two), true);
+  assert.equal(app.getGame(), null);
+  assert.equal(app.getScreen(), SELECT);
+  assert.equal(app.ready(one), true);
+  assert.equal(app.getScreen(), GAME);
+  const state = app.getGame().getState();
+  assert.deepEqual(state.characters, { [X]: JADE_SERPENT, [O]: WIND_RABBIT });
+  assert.equal(state.currentPlayer, X, 'the first pick moves first');
+  assert.equal(app.getView().select, null);
+  assert.equal(app.pick(EARTH_BEAR, one), false, 'no pick during the game');
+  // Rematch keeps the same characters and sides.
+  app.getGame().click({ x: 0, y: 0 });
+  assert.equal(app.restartLocal(), true);
+  assert.deepEqual(app.getGame().getState().characters, { [X]: JADE_SERPENT, [O]: WIND_RABBIT });
+  assert.equal(app.getGame().getState().board[0][0], EMPTY, 'a clean board');
+});
+
+test('Back on the local character select returns to the menu', () => {
+  const app = createApp({ openTransport: () => assert.fail('no network'), clock: createFakeClock(), local: true });
+  app.pick(WIND_RABBIT, LOCAL_SEATS[0]);
+  assert.equal(app.leaveRoom(), true);
+  assert.equal(app.getScreen(), MENU);
+  assert.equal(app.getFlow().seats, null);
 });
 
 // --- Copy ---
@@ -278,7 +367,9 @@ test('the lobby, waiting and starting shot scenes: fixed code ABCD5, role host, 
   for (const scene of ['lobby', 'waiting', 'starting']) assert.ok(SHOT_SCENES.includes(scene), scene);
   assert.equal(shotFlow('lobby').screen, SCREENS.LOBBY);
   assert.equal(shotRoomView('lobby').screen, LOBBY);
-  assert.deepEqual({ ...SHOT_ROOM }, { code: 'ABCD5', character: WIND_RABBIT });
+  assert.equal(SHOT_ROOM.code, 'ABCD5');
+  assert.equal(SHOT_ROOM.seat, HOST);
+  assert.equal(SHOT_ROOM.seats.picks[HOST], WIND_RABBIT);
   const waiting = shotRoomView('waiting');
   assert.equal(waiting.screen, WAITING_SCREEN);
   assert.equal(waiting.flow.role, ROLES.HOST);
@@ -286,7 +377,8 @@ test('the lobby, waiting and starting shot scenes: fixed code ABCD5, role host, 
   assert.equal(waiting.waiting.code, 'ABCD5');
   const starting = shotRoomView('starting');
   assert.equal(starting.flow.screen, SCREENS.STARTING);
-  assert.equal(starting.waiting.leave.enabled, false);
+  assert.equal(starting.waiting.leave.enabled, true);
+  assert.equal(starting.waiting.title, 'Pick your character');
   assert.equal(shotRoomView('menu'), null);
   assert.equal(shotRoomView('field'), null);
 });
@@ -294,7 +386,7 @@ test('the lobby, waiting and starting shot scenes: fixed code ABCD5, role host, 
 test('index.html names a data-hud-box for every lobby and waiting room button and card', () => {
   const html = read('index.html');
   for (const name of ['lobby-panel', 'lobby-create', 'lobby-join', 'lobby-back', 'join-code', 'join-submit', 'join-back',
-    'create-back', 'waiting-panel', 'waiting-code', 'waiting-copy', 'waiting-leave']) {
+    'waiting-panel', 'waiting-code', 'waiting-copy', 'waiting-leave', 'select-panel', 'select-back']) {
     assert.ok(html.includes(`data-hud-box="${name}"`), name);
   }
   assert.match(html, /id="join-error"[^>]*aria-live="polite"/);

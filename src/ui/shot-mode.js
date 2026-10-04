@@ -7,6 +7,8 @@
 
 import { X } from '../logic/board.js';
 import { WIND_RABBIT } from '../logic/characters.js';
+import { createSeats, pickCharacter } from '../logic/seats.js';
+import { HOST, ROOM_SEATS } from '../net/room.js';
 import { normalizeQuality } from '../render3d/quality.js';
 import { GAME_OVER, LOBBY, WAITING_SCREEN } from './app.js';
 import { FLOW_EVENTS, MODES, SCREENS, flowReducer, initialFlow } from './flow.js';
@@ -31,8 +33,13 @@ const GAME_OVER_SCENES = Object.freeze({
 export const SHOT_GAME_OVER = Object.freeze({ winner: X, you: X, reason: 'five' });
 
 // The room of the waiting and starting scenes: a fixed code, this window
-// the host playing Wind Rabbit.
-export const SHOT_ROOM = Object.freeze({ code: 'ABCD5', character: WIND_RABBIT });
+// the host, who picked Wind Rabbit (the other seat has no pick yet).
+export const SHOT_ROOM = Object.freeze({
+  code: 'ABCD5',
+  character: WIND_RABBIT,
+  seat: HOST,
+  seats: pickCharacter(createSeats(ROOM_SEATS), HOST, WIND_RABBIT).seats,
+});
 
 // The flow screens of shot mode (docs/flow-design.md section 7): the scene
 // name and the flow events that lead to it from the first state. They show
@@ -63,6 +70,7 @@ export function shotRoomView(scene) {
     screen: inRoom ? WAITING_SCREEN : LOBBY,
     flow,
     waiting: inRoom ? waitingViewModel(flow, SHOT_ROOM) : null,
+    select: null,
     code: inRoom ? SHOT_ROOM.code : null,
     character: inRoom ? SHOT_ROOM.character : null,
     joining: false,

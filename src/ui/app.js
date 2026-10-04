@@ -1,40 +1,44 @@
-// Screen flow for online play (docs/design.md section 3): Lobby, Create
-// Room (pick a character), Join Room (enter a code), Waiting, Game and
+// Screen flow for online play (docs/design.md section 3): Lobby, Join Room
+// (enter a code), the room (Waiting, with the character select), Game and
 // Game over. Pure (no DOM): the page gives it a way to open a transport for
 // a room code and a clock, the DOM screens call its actions and read
 // getView(), and the canvas draws the game screen from getGame(). Which
-// screen is shown is decided by flowReducer (flow.js); Create Room and Join
-// Room are two panels of its lobby screen. The app starts on the main menu
-// (menu.js); the lobby's Back and the waiting room's Leave return to it.
+// screen is shown is decided by flowReducer (flow.js); Join Room is a panel
+// of its lobby screen, and Create Room opens the room at once. The app
+// starts on the main menu (menu.js); the lobby's Back and the room's Leave
+// return to it.
 //
-// The host owns the start (net/room.js): after a join both windows are in
-// phase starting (both on the waiting room, with both cards filled) until
-// the host's start event, which both get at the same moment.
+// The host owns the start (net/room.js): in the room each player picks a
+// character and presses Ready (pick, ready); the guest's go to the host,
+// which decides. When both are Ready the host starts the game and both
+// windows get the start event at the same moment.
 //
-// Play on this computer (and the ?local=1 page) runs a local game
-// (local-game.js) through the same Game and Game over screens. The game
+// Play on this computer (and the ?local=1 page) opens the game screen on
+// the character select of Player 1 and Player 2 (flow.js PICK and READY);
+// when both are Ready a local game (local-game.js) of those sides runs
+// through the same Game and Game over screens. The game
 // over card (game-over.js, docs/flow-design.md section 3.7) offers Rematch
 // (online the host decides, net/room.js; local at once) and Back to Menu.
 
 import { GAME_OVER_DELAY_MS } from '../config.js';
-import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
+import { bothReady, seatSides } from '../logic/seats.js';
 import { systemClock } from '../net/clock.js';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../net/room-code.js';
 import { FULL, GUEST, HOST, NO_ROOM, OVER, PLAYING, STARTING, createGuestRoom, createHostRoom } from '../net/room.js';
-import { FLOW_EVENTS, MODES, NOTICE_HOST_LEFT, ROLES, SCREENS, flowReducer, initialFlow } from './flow.js';
+import { FLOW_EVENTS, MODES, NOTICE_HOST_LEFT, ROLES, SCREENS, flowReducer, initialFlow, isSelecting } from './flow.js';
 import { gameOverViewModel, rematchViewModel } from './game-over.js';
 import { createLocalGame } from './local-game.js';
 import { MENU_EVENTS } from './menu.js';
 import { characterName, createOnlineGame } from './online-game.js';
-import { waitingViewModel } from './room-screens.js';
+import { localSelectViewModel, waitingViewModel } from './room-screens.js';
 import { STRINGS, withCode } from './strings.js';
 
 // Screens.
 export const MENU = 'menu';
 export const LOBBY = 'lobby';
-export const CREATE = 'create';
 export const JOIN = 'join';
 export const WAITING_SCREEN = 'waiting';
+export const SELECT = 'select'; // the local character select on the game screen
 export const GAME = 'game';
 export const GAME_OVER = 'gameOver';
 
@@ -45,7 +49,7 @@ export const BAD_CODE_ERROR = STRINGS.joinErrorBadCode;
 //   clock               time and timers (net/clock.js)
 //   random              the host's Tornado Zone random function
 //   makeCode()          a new room code
-//   local               true: start on the game in local mode (?local=1)
+//   local               true: start on the game in local mode (?local=1), on the character select
 //   localRandom         the local game's Tornado Zone random function
 export function createApp(options) {
   const {
@@ -58,7 +62,7 @@ export function createApp(options) {
   } = options;
 
   let flow = initialFlow({ local });
-  let lobbyPanel = LOBBY; // LOBBY, CREATE or JOIN while the flow is on the lobby
+  let lobbyPanel = LOBBY; // LOBBY or JOIN while the flow is on the lobby
   let room = null;
   let game = null; // online game controller while a game runs
   let joinError = null;
@@ -92,7 +96,7 @@ export function createApp(options) {
       case SCREENS.LOBBY: return lobbyPanel;
       case SCREENS.WAITING: return WAITING_SCREEN;
       case SCREENS.STARTING: return WAITING_SCREEN;
-      case SCREENS.GAME: return GAME;
+      case SCREENS.GAME: return isSelecting(flow) ? SELECT : GAME;
       case SCREENS.GAMEOVER: return GAME_OVER;
       default: return LOBBY;
     }
@@ -178,11 +182,23 @@ export function createApp(options) {
     send(FLOW_EVENTS.REMATCH_STARTED);
   };
 
-  // Play on this computer: a local game, checked for its end after every
-  // applied action.
+  // Play on this computer, once both seats are Ready: a local game of the
+  // sides of the pick order, checked for its end after every applied
+  // action.
   const startLocal = () => {
-    game = createLocalGame({ random: localRandom, onApplied: () => checkGameOver() });
+    game = createLocalGame({ random: localRandom, characters: seatSides(flow.seats), onApplied: () => checkGameOver() });
     freshGame();
+  };
+
+  // A local pick or Ready (flow.js PICK and READY). When it made both
+  // seats Ready the local game starts.
+  const localSeatEvent = (event) => {
+    const before = flow;
+    flow = flowReducer(flow, event);
+    if (flow === before) return false;
+    if (flow.seats && bothReady(flow.seats)) startLocal();
+    changed();
+    return true;
   };
 
   // The host started the game: both windows enter it.
@@ -211,6 +227,9 @@ export function createApp(options) {
     switch (event.type) {
       case 'joined':
         seated();
+        break;
+      case 'seats':
+        changed();
         break;
       case 'start':
         startGame();
@@ -268,13 +287,7 @@ export function createApp(options) {
   const menuEvent = (type) => {
     if (!MENU_EVENTS.includes(type)) return false;
     const before = flow;
-    if (type === FLOW_EVENTS.PLAY_LOCAL && flow.screen === SCREENS.MENU) {
-      flow = flowReducer(flow, type);
-      if (flow !== before) startLocal();
-      changed();
-    } else {
-      send(type);
-    }
+    send(type);
     return flow !== before;
   };
 
@@ -285,7 +298,7 @@ export function createApp(options) {
     const mode = flow.mode === MODES.LOCAL ? MODES.LOCAL : MODES.ONLINE;
     const you = mode === MODES.ONLINE ? room?.getView().you ?? null : null;
     return {
-      ...gameOverViewModel({ mode, winner: outcome.winner, reason: outcome.reason, you }),
+      ...gameOverViewModel({ mode, winner: outcome.winner, reason: outcome.reason, you, sides: game.getView().state.characters }),
       rematch: rematchViewModel({ mode, ...rematch }),
       backToMenu: STRINGS.gameOverBackToMenu,
     };
@@ -307,8 +320,6 @@ export function createApp(options) {
     changed();
     return taken;
   };
-
-  if (local) startLocal();
 
   return {
     // Calls listener() whenever getView() changes (not on every game move;
@@ -342,6 +353,9 @@ export function createApp(options) {
         flow,
         // The waiting room (room-screens.js) in phases waiting and starting.
         waiting: roomView ? waitingViewModel(flow, roomView) : null,
+        // The local character select (room-screens.js) on the game screen
+        // of Play on this computer until both seats are Ready.
+        select: localSelectViewModel(flow),
         code: roomView?.code ?? null,
         character: roomView?.character ?? null,
         characterName: roomView?.character ? characterName(roomView.character) : null,
@@ -392,19 +406,32 @@ export function createApp(options) {
 
     // A menu button, or Close and Escape on a menu overlay: one of
     // MENU_EVENTS (menu.js), sent to the flow. Returns true when the flow
-    // changed. PLAY_LOCAL ends in the game screen in local mode, which the
-    // page runs itself (src/main.js), like ?local=1.
+    // changed. PLAY_LOCAL opens the game screen in local mode on the
+    // character select, like ?local=1.
     menuEvent,
+
+    // The character select: seat picks character. Online it is this
+    // window's seat in the room (the host decides; seat is not used);
+    // local it is one of LOCAL_SEATS (flow.js). Returns true when it was
+    // taken (online: sent).
+    pick(character, seat) {
+      if (screenNow() === SELECT) return localSeatEvent({ type: FLOW_EVENTS.PICK, seat, character });
+      if (screenNow() !== WAITING_SCREEN || !room) return false;
+      return room.pick(character).ok;
+    },
+
+    // Ready on the character select, for seat (local) or this window's
+    // seat (online). Local: the game starts when both seats are Ready.
+    // Online: the host starts it when both are Ready.
+    ready(seat) {
+      if (screenNow() === SELECT) return localSeatEvent({ type: FLOW_EVENTS.READY, seat });
+      if (screenNow() !== WAITING_SCREEN || !room) return false;
+      return room.ready().ok;
+    },
 
     // Play Online on the menu: the lobby.
     playOnline() {
       return menuEvent(FLOW_EVENTS.PLAY_ONLINE);
-    },
-
-    openCreate() {
-      if (screenNow() !== LOBBY) return;
-      lobbyPanel = CREATE;
-      changed();
     },
 
     openJoin() {
@@ -414,14 +441,15 @@ export function createApp(options) {
       changed();
     },
 
-    // Creates a room as its host playing `character`, then waits for the
+    // Create Room on the lobby: creates a room as its host, with two empty
+    // seats, and opens it (the character select) while it waits for the
     // opponent.
-    createRoom(character) {
-      if (screenNow() !== CREATE || !Object.hasOwn(CHARACTERS, character)) return false;
+    createRoom() {
+      if (screenNow() !== LOBBY) return false;
       const code = makeCode();
       lobbyPanel = LOBBY;
       flow = flowReducer(flow, FLOW_EVENTS.ROOM_CREATED);
-      openRoom(createHostRoom({ transport: openTransport(code), code, character, clock, random }));
+      openRoom(createHostRoom({ transport: openTransport(code), code, clock, random }));
       changed();
       return true;
     },
@@ -450,23 +478,24 @@ export function createApp(options) {
       changed();
     },
 
-    // Back on the lobby (the button or Escape): the menu. On Create Room
-    // or Join Room (when no join is pending) it is the lobby's own panel.
+    // Back on the lobby (the button or Escape): the menu. On Join Room
+    // (when no join is pending) it is the lobby's own panel.
     back() {
       const screen = screenNow();
       if (screen === LOBBY) send(FLOW_EVENTS.BACK);
-      else if ((screen === CREATE || screen === JOIN) && joiningCode === null) {
+      else if (screen === JOIN && joiningCode === null) {
         joinError = null;
         lobbyPanel = LOBBY;
         changed();
       }
     },
 
-    // Leave in the waiting room (phase waiting only; it is off while the
-    // game is starting): closes the room, which stops its timers and its
-    // transport, so the code can no longer be joined, then the menu.
+    // Leave in the room (phases waiting and starting, before the game) or
+    // Back on the local character select: closes the room, which tells the
+    // other player and stops its timers and its transport, so the code can
+    // no longer be joined, then the menu.
     leaveRoom() {
-      if (flow.screen !== SCREENS.WAITING) return false;
+      if (flow.screen !== SCREENS.WAITING && flow.screen !== SCREENS.STARTING && !isSelecting(flow)) return false;
       closeRoom();
       joinError = null;
       lobbyPanel = LOBBY;
@@ -474,12 +503,12 @@ export function createApp(options) {
       return true;
     },
 
-    // Back from Create or Join to the Lobby. Leaves the room if there is
-    // one. The waiting room has Leave (leaveRoom) and Game over Back to
-    // Menu (backToMenu) instead.
+    // Back from Join to the Lobby. Leaves the room if there is one. The
+    // room has Leave (leaveRoom) and Game over Back to Menu (backToMenu)
+    // instead.
     backToLobby() {
       const screen = screenNow();
-      if (screen !== CREATE && screen !== JOIN) return;
+      if (screen !== JOIN) return;
       closeRoom();
       joinError = null;
       lobbyPanel = LOBBY;
@@ -493,4 +522,3 @@ export function createApp(options) {
   };
 }
 
-export const CHARACTER_CHOICES = [WIND_RABBIT, EARTH_BEAR];

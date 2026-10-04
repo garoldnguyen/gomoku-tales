@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, FPS_SAMPLE_MS, INTERNAL_HEIGHT, INTERNAL_WIDTH,
-  QUALITY_STALL_MS, RESUME_GAP_MS, WAITING_START_DELAY_MS,
+  QUALITY_STALL_MS, RESUME_GAP_MS,
 } from '../src/config.js';
 import { X, O } from '../src/logic/board.js';
 import { WIND_RABBIT, characterForStone } from '../src/logic/characters.js';
@@ -19,6 +19,7 @@ import { blursMenus, QUALITY_LEVELS } from '../src/render3d/quality.js';
 import { sameViewSize, viewSize } from '../src/render3d/view-size.js';
 import { GAME, createApp } from '../src/ui/app.js';
 import { isQualityKey, isTextEntry } from '../src/ui/input.js';
+import { pickAndReady } from './room-start.js';
 
 // The app starts on the main menu; Play Online opens the lobby.
 const onLobby = (app) => {
@@ -54,11 +55,10 @@ function twoWindows() {
   const open = () => onLobby(createApp({ openTransport: () => network.connect(), clock, random: () => 0, makeCode: () => 'AB2C9' }));
   const host = open();
   const guest = open();
-  host.openCreate();
-  host.createRoom(WIND_RABBIT);
+  host.createRoom();
   guest.openJoin();
   guest.joinRoom('AB2C9');
-  clock.advance(WAITING_START_DELAY_MS); // the host starts the game
+  pickAndReady(host, guest, WIND_RABBIT); // both Ready: the host starts the game
   const pointer = (app) => ({
     click(px, py) {
       const hit = worldHitTest(px, py);

@@ -100,7 +100,6 @@ def open_game(context, base, errors, label):
 def run_steps(context, base, numbers, steps, errors):
     peer_timeout = numbers["PEER_TIMEOUT_MS"]
     countdown_s = numbers["LEAVE_COUNTDOWN_S"]
-    start_delay = numbers["WAITING_START_DELAY_MS"]
     join_timeout = numbers["JOIN_TIMEOUT_MS"]
     code_length = int(numbers["ROOM_CODE_LENGTH"])
     pages = {}
@@ -127,8 +126,8 @@ def run_steps(context, base, numbers, steps, errors):
         click_box(a, "menu-play-online")
         wait_screen(a, "lobby", CLICK_TIMEOUT_MS)
         click_box(a, "lobby-create")
-        click_box(a, "create-wind-rabbit")
         wait_screen(a, "waiting", CLICK_TIMEOUT_MS)
+        click_box(a, "pick-host-wind-rabbit")
         code = a.locator("#room-code").get_attribute("data-room-code") or ""
         check(len(code) == code_length, "room code %r is not %d characters" % (code, code_length))
         shared["code"] = code
@@ -148,14 +147,19 @@ def run_steps(context, base, numbers, steps, errors):
         check(value == code, "the code box shows %r after typing %r" % (value, typed))
         click_box(b, "join-submit")
         starting_ms = wait_screen(a, "starting", 2000)
-        limit = start_delay + 1500
+        wait_screen(b, "starting", CLICK_TIMEOUT_MS)
+        # The character select: B picks the other character, both press Ready; the host starts the game.
+        click_box(b, "pick-guest-earth-bear")
+        click_box(b, "ready-guest")
+        click_box(a, "ready-host")
+        limit = 1500
         t = time.time()
         wait_screen(a, "game", limit)
         wait_screen(b, "game", max(1, limit - (time.time() - t) * 1000))
         game_ms = (time.time() - t) * 1000
         a.screenshot(path=str(OUT_DIR / "e2e-host.png"))
         b.screenshot(path=str(OUT_DIR / "e2e-guest.png"))
-        return "typed %r; starting after %d ms, both in game %d ms later" % (typed, starting_ms, game_ms)
+        return "typed %r; starting after %d ms, both in game %d ms after both Ready" % (typed, starting_ms, game_ms)
 
     def step5():
         a = pages["a"]

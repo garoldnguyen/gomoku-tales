@@ -77,7 +77,6 @@ export const STRINGS = Object.freeze({
   lobbyLead: 'Five in a row, with wind and earth skills.',
   lobbySameBrowserHint: 'Online play works between two windows of this browser on this computer.',
   lobbyCreate: 'Create Room',
-  lobbyCreateLead: 'Pick your character. Your opponent gets the other one.',
   lobbyJoin: 'Join Room',
   lobbyCodeLabel: 'Room code',
   lobbyJoinButton: 'Join',
@@ -91,16 +90,28 @@ export const STRINGS = Object.freeze({
 
   // Waiting room (section 3.5), phases waiting and starting.
   waitingTitle: 'Waiting for opponent',
-  startingTitle: 'Opponent joined',
+  startingTitle: 'Pick your character',
   waitingHint: 'Open a second window of this browser and join with this code.',
   waitingPlaceholder: 'Waiting',
   waitingYou: 'You',
-  waitingStarting: 'Starting',
   waitingCopy: 'Copy',
   waitingCopied: 'Copied',
   waitingPressCtrlC: 'Press Ctrl+C',
   waitingLeave: 'Leave',
   waitingMovesFirst: 'Moves first',
+  waitingOpponent: 'Opponent',
+
+  // Character select (sections 3.5 and 3.6): the room's seats online, and
+  // Player 1 and Player 2 on the game screen of Play on this computer.
+  selectLocalTitle: 'Pick your characters',
+  selectLead: 'The first to pick plays X and moves first.',
+  selectPlayer1: 'Player 1',
+  selectPlayer2: 'Player 2',
+  selectReady: 'Ready',
+  selectIsReady: 'Ready',
+  selectChoosing: 'Choosing',
+  selectTaken: 'Taken',
+  selectWaitingOther: 'Waiting for the other player',
 
   // Game over (section 3.7).
   gameOverYouWin: 'You win',

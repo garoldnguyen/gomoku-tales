@@ -8,7 +8,7 @@ import { CHARACTERS, characterForStone } from '../logic/characters.js';
 import { isGameOver } from '../logic/game.js';
 import { COUNTDOWN } from '../net/presence.js';
 import { describeEvents, panelView, skillLockReason } from './local-game.js';
-import { startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
+import { needsTarget, startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
 
 // takeEvents' answer when nothing happened, shared so the render loop makes
 // no new list on an ordinary frame.
@@ -112,7 +112,8 @@ export function createOnlineGame(room) {
     },
 
     // A skill button click: starts that skill's target flow, or cancels it
-    // if it is already running. Returns true if a flow started.
+    // if it is already running. A skill with no target (Hiss) is used at
+    // once. Returns true if a flow started or the skill was used.
     clickSkill(player, skillId) {
       if (targeting && targeting.skill === skillId) {
         targeting = null;
@@ -128,6 +129,7 @@ export function createOnlineGame(room) {
         message = reason;
         return false;
       }
+      if (!needsTarget(skillId)) return send(() => room.useSkill(skillId, null));
       targeting = startTargeting(skillId);
       message = null;
       return true;
@@ -208,7 +210,7 @@ export function gameOutcome(state, you, result = null) {
       title: youWin ? 'Opponent left, you win!' : 'You left, you lose.',
       detail: youWin
         ? 'Your opponent left the game.'
-        : `You lost the link to the room, so ${nameOf(result.winner)} wins.`,
+        : `You lost the link to the room, so ${nameOf(result.winner, state)} wins.`,
     };
   }
   if (state.winner) {
@@ -218,7 +220,7 @@ export function gameOutcome(state, you, result = null) {
       reason: 'five',
       youWin,
       title: youWin ? 'You win!' : 'You lose.',
-      detail: `${nameOf(state.winner)} made five in a row.`,
+      detail: `${nameOf(state.winner, state)} made five in a row.`,
     };
   }
   if (state.draw) {
@@ -227,8 +229,9 @@ export function gameOutcome(state, you, result = null) {
   return null;
 }
 
-function nameOf(stone) {
-  return characterForStone(stone)?.name ?? stone;
+// The name of the character playing stone in this game.
+function nameOf(stone, state) {
+  return characterForStone(stone, state?.characters ?? undefined)?.name ?? stone;
 }
 
 export function characterName(characterId) {

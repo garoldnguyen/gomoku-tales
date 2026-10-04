@@ -94,8 +94,11 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     const img = el('img', null, holder);
     img.alt = '';
     img.draggable = false;
-    el('span', 'initial', holder).textContent = letter;
-    images.push({ holder, img, name });
+    const initial = el('span', 'initial', holder);
+    initial.textContent = letter;
+    const entry = { holder, img, name, initial };
+    images.push(entry);
+    return entry;
   };
   const showArt = () => {
     for (const { holder, img, name } of images) {
@@ -132,9 +135,11 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   const popHint = el('div', 'tip-hint', popup);
 
   // A skill button: a row of the expanded card or a button of the pill.
-  // Both run onSkill, unless a long press just showed the tooltip.
+  // Both run onSkill, unless a long press just showed the tooltip. slot.id
+  // is the skill of the row: the character of a side comes from the pick
+  // order, so render() changes it when the game's characters change.
   let skipClick = null;
-  const skillButton = (className, parent, player, skillId, c, s) => {
+  const skillButton = (className, parent, player, slot, c, s) => {
     const button = el('button', className, parent);
     button.type = 'button';
     button.addEventListener('click', () => {
@@ -143,8 +148,8 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
         return;
       }
       hideTip();
-      onSkill(player, skillId);
-      openPopup(button, player, skillId, c);
+      onSkill(player, slot.id);
+      openPopup(button, player, slot.id, c);
     });
     attachTip(button, c, s);
     return button;
@@ -180,11 +185,11 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     el('div', 'label', body).textContent = 'SKILLS';
     const list = el('div', 'skills', body);
     const skills = character.skills.map((skillId, s) => {
-      const letters = getSkill(skillId).name.split(' ').map((word) => word[0]).join('');
-      const button = skillButton('skill', list, player, skillId, c, s);
+      const slot = { id: skillId };
+      const button = skillButton('skill', list, player, slot, c, s);
       button.dataset.hudBox = `skill-${skillId}`;
       const ico = el('span', 'ico', button);
-      artImage(ico, SKILL_ICON_ART[skillId], letters);
+      const icon = artImage(ico, SKILL_ICON_ART[skillId], skillLetters(skillId));
       const ring = el('span', 'ring', ico);
       const count = el('span', 'count', ico);
       const t = el('span', 't', button);
@@ -192,10 +197,10 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       const state = el('span', 'state', t);
 
       // The pill's button for the same skill.
-      const pill = skillButton('pskill', pillSkills, player, skillId, c, s);
+      const pill = skillButton('pskill', pillSkills, player, slot, c, s);
       pill.dataset.hudBox = `pill-skill-${skillId}`;
       const pico = el('span', 'ico', pill);
-      artImage(pico, SKILL_ICON_ART[skillId], letters);
+      const picon = artImage(pico, SKILL_ICON_ART[skillId], skillLetters(skillId));
       const svg = document.createElementNS(SVG, 'svg');
       svg.setAttribute('class', 'pring');
       svg.setAttribute('viewBox', '0 0 72 72');
@@ -216,7 +221,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       el('span', 'ready-dot', pill);
 
       return {
-        button, ico, ring, count, title, state, pill, arc, pcount, look: null, progress: null, view: null,
+        slot, icon, picon, button, ico, ring, count, title, state, pill, arc, pcount, look: null, progress: null, view: null,
       };
     });
     return { card, team, text, pillSkills, chevron, body, name, meta, chip, skills, folded: false, collapsed: false };
@@ -455,6 +460,19 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     if (popupOwner && !popup.contains(event.target) && !popupOwner.button.contains(event.target)) hidePopup();
   }, true);
 
+  // A skill row now shows another skill (the characters of a new game).
+  const setSkill = (row, skillId) => {
+    row.slot.id = skillId;
+    row.button.dataset.hudBox = `skill-${skillId}`;
+    row.pill.dataset.hudBox = `pill-skill-${skillId}`;
+    for (const icon of [row.icon, row.picon]) {
+      icon.name = SKILL_ICON_ART[skillId];
+      icon.initial.textContent = skillLetters(skillId);
+      icon.img.removeAttribute('src');
+    }
+    showArt();
+  };
+
   const setQuality = (level) => {
     if (root.dataset.quality !== level) root.dataset.quality = level;
   };
@@ -484,9 +502,11 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
           dom.collapsed = card.collapsed;
           if (fold()) layout();
         }
+        setAttr(dom.card, 'aria-label', card.name);
         card.skills.forEach((skill, s) => {
           const row = dom.skills[s];
           row.view = skill;
+          if (row.slot.id !== skill.id) setSkill(row, skill.id);
           if (row.look !== skill.look) {
             for (const button of [row.button, row.pill]) {
               if (row.look && LOOK_CLASSES[row.look]) button.classList.remove(LOOK_CLASSES[row.look]);
@@ -566,4 +586,9 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       showArt();
     },
   };
+}
+
+// The letters shown while a skill icon is missing: Wind Dash gives WD.
+function skillLetters(skillId) {
+  return getSkill(skillId).name.split(' ').map((word) => word[0]).join('');
 }

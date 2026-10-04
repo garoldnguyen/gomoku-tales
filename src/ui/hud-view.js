@@ -91,7 +91,7 @@ function turnView(state, { over, winner, toMove, leaving, peerCountdown, targeti
       player: winner ?? null,
       team: winner ? 'gold' : 'none',
       who: 'Round over',
-      hint: status ?? (winner ? `${nameOf(winner)} wins!` : 'Draw!'),
+      hint: status ?? (winner ? `${nameOf(state, winner)} wins!` : 'Draw!'),
       countdown: null,
     };
   }
@@ -109,7 +109,7 @@ function turnView(state, { over, winner, toMove, leaving, peerCountdown, targeti
   if (targeting && mine) hint = targetPrompt(targeting);
   else if (mine) hint = PLANT_HINT;
   else hint = status ?? "Opponent's turn";
-  return { player: toMove, team: teamOf(toMove), who: `${nameOf(toMove)}'s turn`, hint, countdown: null };
+  return { player: toMove, team: teamOf(toMove), who: `${nameOf(state, toMove)}'s turn`, hint, countdown: null };
 }
 
 function cardView(state, player, { over, winner, toMove, localPlayer, targeting, collapsed }) {
@@ -215,8 +215,10 @@ function countStones(board, player) {
   return count;
 }
 
-function nameOf(player) {
-  return characterForStone(player)?.name ?? String(player);
+// The name of the character playing player in this game (the sides come
+// from the pick order).
+function nameOf(state, player) {
+  return characterForStone(player, state?.characters ?? undefined)?.name ?? String(player);
 }
 
 function teamOf(player) {

@@ -1,5 +1,5 @@
-// DOM side of the lobby, room and game over screens (docs/flow-design.md
-// sections 3.4, 3.5 and 3.7). The markup lives in index.html; this fills in its text from
+// DOM side of the lobby, room, local character select and game over screens
+// (docs/flow-design.md sections 3.4 to 3.7). The markup lives in index.html; this fills in its text from
 // strings.js, draws the view models of room-screens.js, wires the buttons
 // to the screen flow in app.js and shows the right screen whenever the app
 // changes. The Game screen itself is drawn on the canvas, so the overlay
@@ -9,8 +9,7 @@
 // getView, getScreen and onChange (its actions may be missing).
 
 import { COPY_FEEDBACK_MS } from '../config.js';
-import { CHARACTERS, stoneForCharacter } from '../logic/characters.js';
-import { CHARACTER_CHOICES, GAME, GAME_OVER, JOIN, WAITING_SCREEN } from './app.js';
+import { GAME, GAME_OVER, JOIN, SELECT, WAITING_SCREEN } from './app.js';
 import { copyFeedbackText, copyRoomCode, joinViewModel, lobbyViewModel } from './room-screens.js';
 import { STRINGS } from './strings.js';
 
@@ -38,34 +37,11 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   $('lobby-join').textContent = lobby.join.label;
   $('lobby-hint').textContent = lobby.hint ?? '';
   $('lobby-back').textContent = lobby.back.label;
-  $('create-title').textContent = STRINGS.lobbyCreate;
-  $('create-lead').textContent = STRINGS.lobbyCreateLead;
   $('join-title').textContent = STRINGS.lobbyJoin;
   $('join-label').textContent = STRINGS.lobbyCodeLabel;
   for (const back of root.querySelectorAll('.back-button')) back.textContent = STRINGS.back;
   $('copy-code').textContent = STRINGS.waitingCopy;
   leave.textContent = STRINGS.waitingLeave;
-
-  // Character choice buttons for Create Room.
-  const choices = $('character-choices');
-  for (const id of CHARACTER_CHOICES) {
-    const character = CHARACTERS[id];
-    const stone = stoneForCharacter(id);
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'choice';
-    button.dataset.character = id;
-    button.dataset.hudBox = `create-${id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`; // create-wind-rabbit
-    const disc = document.createElement('span');
-    disc.className = `disc ${stone.toLowerCase()}`;
-    const name = document.createElement('span');
-    name.textContent = character.name;
-    const note = document.createElement('small');
-    note.textContent = `${stone} stones${stone === 'X' ? ', moves first' : ''}`;
-    button.append(disc, name, note);
-    button.addEventListener('click', () => act('createRoom', id));
-    choices.append(button);
-  }
 
   for (const button of root.querySelectorAll('[data-action]')) {
     button.addEventListener('click', () => act(button.dataset.action));
@@ -114,12 +90,12 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   leave.addEventListener('click', () => act('leaveRoom'));
 
   // Escape: Back on the lobby and its panels, Leave in the waiting room
-  // (only while Leave is enabled).
+  // (only while Leave is enabled) and Back on the local character select.
   window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape' || root.hidden) return;
     const screen = app.getScreen();
-    if (screen === WAITING_SCREEN) {
-      if (!leave.disabled) act('leaveRoom');
+    if (screen === WAITING_SCREEN || screen === SELECT) {
+      if (screen === SELECT || !leave.disabled) act('leaveRoom');
     } else if (screen !== GAME_OVER && screen !== GAME) {
       act('back');
     }
@@ -140,40 +116,87 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     return node;
   };
 
-  // The two character cards of the waiting room, rebuilt when they change.
-  const cards = $('waiting-cards');
-  let cardsKey = null;
-  const showCards = (list) => {
+  // The two seats of a character select (room-screens.js
+  // characterSelectViewModel cards) in a container, rebuilt when they
+  // change: the seat's label, its pick with the stone, its state, and for
+  // the seats this window picks for one button per character and Ready.
+  const seatViews = new Map(); // container -> { key, images }
+  const showSeats = (container, list) => {
     const key = JSON.stringify(list);
-    if (key === cardsKey) return;
-    cardsKey = key;
-    cards.replaceChildren();
-    images.length = 0;
+    const shownSeats = seatViews.get(container);
+    if (shownSeats?.key === key) return;
+    if (shownSeats) for (const entry of shownSeats.images) images.splice(images.indexOf(entry), 1);
+    const own = [];
+    seatViews.set(container, { key, images: own });
+    // The button that had focus keeps it after the rebuild (or, now
+    // disabled, its seat's next enabled button).
+    const focused = container.contains(document.activeElement) ? document.activeElement : null;
+    const focusBox = focused?.dataset.hudBox ?? null;
+    const focusSeat = focused?.closest('[data-seat]')?.dataset.seat ?? null;
+    container.replaceChildren();
     for (const card of list) {
-      const node = el('div', `seat team-${card.team}`, cards);
+      const node = el('div', `seat${card.team ? ` team-${card.team}` : ''}`, container);
       node.dataset.hudBox = card.box;
-      node.dataset.character = card.character;
+      node.dataset.seat = card.seat;
+      if (card.character) node.dataset.character = card.character;
       node.classList.toggle('is-placeholder', card.placeholder);
+      node.classList.toggle('is-ready', card.ready);
       if (card.placeholder) {
         el('span', 'seat-waiting', node).textContent = card.placeholderText;
         continue;
       }
-      const portrait = el('div', 'portrait', node);
-      const img = el('img', null, portrait);
-      img.alt = '';
-      img.draggable = false;
-      el('span', 'initial', portrait).textContent = card.name.charAt(0);
-      images.push({ holder: portrait, img, name: card.portrait });
-      const text = el('div', 'seat-text', node);
+      const top = el('div', 'seat-top', node);
+      if (card.portrait) {
+        const portrait = el('div', 'portrait', top);
+        const img = el('img', null, portrait);
+        img.alt = '';
+        img.draggable = false;
+        el('span', 'initial', portrait).textContent = card.name.charAt(0);
+        const entry = { holder: portrait, img, name: card.portrait };
+        images.push(entry);
+        own.push(entry);
+      }
+      const text = el('div', 'seat-text', top);
       const head = el('div', 'seat-head', text);
-      el('span', 'seat-name', head).textContent = card.name;
-      el('span', 'stone', head).textContent = card.stone;
+      el('span', 'seat-label', head).textContent = card.label;
+      if (card.stone) el('span', 'stone', head).textContent = card.stone;
+      if (card.name) el('span', 'seat-name', text).textContent = card.name;
       const tags = el('div', 'seat-tags', text);
-      if (card.youText) el('span', 'you', tags).textContent = card.youText;
       if (card.note) el('span', 'seat-note', tags).textContent = card.note;
+      el('span', 'seat-status', tags).textContent = card.statusText;
+      if (card.choices.length > 0) {
+        const choices = el('div', 'seat-choices', node);
+        for (const choice of card.choices) {
+          const button = el('button', 'choice', choices);
+          button.type = 'button';
+          button.dataset.hudBox = choice.box;
+          button.dataset.character = choice.character;
+          button.disabled = choice.disabled;
+          button.setAttribute('aria-pressed', String(choice.selected));
+          el('span', null, button).textContent = choice.name;
+          if (choice.takenText) el('small', null, button).textContent = choice.takenText;
+          button.addEventListener('click', () => act('pick', choice.character, card.seat));
+        }
+      }
+      if (card.readyButton) {
+        const ready = el('button', 'seat-ready', node);
+        ready.type = 'button';
+        ready.dataset.hudBox = card.readyButton.box;
+        ready.disabled = card.readyButton.disabled;
+        ready.textContent = card.readyButton.label;
+        ready.addEventListener('click', () => act('ready', card.seat));
+      }
+    }
+    if (focusBox) {
+      const again = container.querySelector(`[data-hud-box="${focusBox}"]`);
+      const next = again && !again.disabled ? again : container.querySelector(`[data-seat="${focusSeat}"] button:not(:disabled)`);
+      next?.focus();
     }
     showArt();
   };
+  const waitingCards = $('waiting-cards');
+  const selectCards = $('select-cards');
+  $('select-back').textContent = STRINGS.back;
 
   const update = () => {
     const view = app.getView();
@@ -194,10 +217,16 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
       roomCode.textContent = vm.code;
       roomCode.dataset.roomCode = vm.code;
       $('waiting-hint').textContent = vm.hint;
+      $('waiting-lead').textContent = vm.lead;
       $('waiting-starting').textContent = vm.startingText ?? '';
       leave.disabled = !vm.leave.enabled;
-      showCards(vm.cards);
+      showSeats(waitingCards, vm.cards);
       if (entering) clearCopy();
+    } else if (view.screen === SELECT && view.select) {
+      const vm = view.select;
+      $('select-title').textContent = vm.title;
+      $('select-lead').textContent = vm.lead;
+      showSeats(selectCards, vm.cards);
     } else if (view.screen === GAME_OVER && view.gameOver) {
       // The game over card (game-over.js): headline, subline, Rematch with
       // its state and hint, and Back to Menu (always enabled).

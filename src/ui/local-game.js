@@ -5,7 +5,8 @@ import { X, O, isEmptyCell } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
 import { canUseSkill, characterOf, isGameOver, newGame, placeStone, skillCooldown, useSkill } from '../logic/game.js';
 import { getSkill } from '../logic/skills.js';
-import { startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
+import { isSkillLocked } from '../logic/jade-serpent-skills.js';
+import { needsTarget, startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
 
 // takeEvents' answer when nothing happened, shared so the render loop makes
 // no new list on an ordinary frame.
@@ -17,10 +18,11 @@ const DRAWN = Object.freeze({ winner: null, reason: 'draw' });
 
 // options.random is passed to placeStone for the Tornado Zone throw;
 // options.onApplied() is called after every applied action (the app checks
-// whether the game ended).
+// whether the game ended); options.characters are the sides of the
+// character select ({ X, O }, the first pick plays X; default DEFAULT_SIDES).
 export function createLocalGame(options = {}) {
-  const { random = Math.random, onApplied = () => {} } = options;
-  let state = newGame();
+  const { random = Math.random, onApplied = () => {}, characters } = options;
+  let state = newGame(characters ? { characters } : {});
   let hover = null; // board cell under the pointer
   let hoverSkill = null; // { player, skillId } of the button under the pointer
   let targeting = null; // skill target flow in progress, see targeting.js
@@ -48,10 +50,10 @@ export function createLocalGame(options = {}) {
     return true;
   };
 
-  // A rematch in one window: a new game at once, no messages and nobody to
-  // wait for.
+  // A rematch in one window: a new game at once with the same characters on
+  // the same sides, no messages and nobody to wait for.
   const rematchLocal = () => {
-    state = newGame();
+    state = newGame({ characters: state.characters });
     targeting = null;
     message = null;
     pendingEvents = [];
@@ -103,7 +105,8 @@ export function createLocalGame(options = {}) {
     },
 
     // A skill button click: starts that skill's target flow, or cancels it
-    // if it is already running. Returns true if a flow started.
+    // if it is already running. A skill with no target (Hiss) is used at
+    // once. Returns true if a flow started or the skill was used.
     clickSkill(player, skillId) {
       if (targeting && targeting.skill === skillId) {
         targeting = null;
@@ -115,6 +118,7 @@ export function createLocalGame(options = {}) {
         message = reason;
         return false;
       }
+      if (!needsTarget(skillId)) return apply(useSkill(state, { player, skill: skillId }));
       targeting = startTargeting(skillId);
       message = null;
       return true;
@@ -161,11 +165,12 @@ export function createLocalGame(options = {}) {
 // Why the player cannot start the skill now, or null if they can.
 export function skillLockReason(state, player, skillId) {
   if (isGameOver(state)) return 'The game is over.';
-  if (player !== state.currentPlayer) return `It is ${playerLabel(state.currentPlayer)}'s turn.`;
+  if (player !== state.currentPlayer) return `It is ${playerLabel(state.currentPlayer, state)}'s turn.`;
   if (canUseSkill(state, player, skillId)) return null;
   const skill = getSkill(skillId);
   const left = skillCooldown(state, player, skillId);
   if (skill && left > 0) return `${skill.name} is locked for ${left} more ${left === 1 ? 'turn' : 'turns'}.`;
+  if (isSkillLocked(state, player)) return 'Hiss: you cannot use a skill this turn.';
   return 'That skill cannot be used now.';
 }
 
@@ -195,14 +200,15 @@ export function panelView(state, player, { you = false, targeting = null, hoverS
   };
 }
 
-export function playerLabel(player) {
-  return characterForStone(player).name;
+// The name of the character playing player (in state's sides when given).
+export function playerLabel(player, state = null) {
+  return (state ? characterOf(state, player) : characterForStone(player)).name;
 }
 
 export function statusText(state) {
-  if (state.winner) return `${playerLabel(state.winner)} wins! Press R to restart.`;
+  if (state.winner) return `${playerLabel(state.winner, state)} wins! Press R to restart.`;
   if (state.draw) return 'Draw! Press R to restart.';
-  return `${playerLabel(state.currentPlayer)} to move`;
+  return `${playerLabel(state.currentPlayer, state)} to move`;
 }
 
 // Short messages for the events of one action, joined into one line, or
@@ -232,6 +238,10 @@ function describeEvent(event) {
       return 'A rock crumbled.';
     case 'stoneConverted':
       return 'Stone Conversion! The stone changed sides.';
+    case 'hissCast':
+      return 'Hiss! No skills on the next turn.';
+    case 'plantRemoved':
+      return 'Venom! The plant withered.';
     default:
       return null;
   }

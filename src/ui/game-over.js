@@ -32,10 +32,11 @@ function rematchView(state, label, disabled, hint) {
 // window's stone online. Online: the winner reads You win with the winning
 // character plus won, the loser You lose; a forfeit win reads You win with
 // Opponent left. Local: the winning character plus wins. A draw: Draw, The
-// board is full. Returns { headline, subline }.
-export function gameOverViewModel({ mode, winner = null, reason = null, you = null } = {}) {
+// board is full. sides are the game's { X, O } characters (the pick
+// order; default Wind Rabbit X, Earth Bear O). Returns { headline, subline }.
+export function gameOverViewModel({ mode, winner = null, reason = null, you = null, sides = undefined } = {}) {
   if (reason === 'draw' || !winner) return { headline: STRINGS.gameOverDraw, subline: STRINGS.gameOverBoardFull };
-  const name = characterForStone(winner)?.name ?? winner;
+  const name = characterForStone(winner, sides ?? undefined)?.name ?? winner;
   if (mode === MODES.LOCAL) return { headline: `${name} ${STRINGS.gameOverWins}`, subline: '' };
   if (winner !== you) return { headline: STRINGS.gameOverYouLose, subline: `${name} ${STRINGS.gameOverWon}` };
   if (reason === 'opponentLeft') return { headline: STRINGS.gameOverYouWin, subline: STRINGS.gameOverOpponentLeft };

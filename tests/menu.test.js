@@ -9,7 +9,7 @@ import { CHARACTERS, EARTH_BEAR, WIND_RABBIT, stoneForCharacter } from '../src/l
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { QUALITY_LEVELS } from '../src/render3d/quality.js';
-import { GAME, LOBBY, MENU, createApp } from '../src/ui/app.js';
+import { GAME, LOBBY, MENU, SELECT, createApp } from '../src/ui/app.js';
 import { FLOW_EVENTS, OVERLAYS, SCREENS, flowReducer, initialFlow } from '../src/ui/flow.js';
 import {
   MENU_BUTTONS, MENU_EVENTS, OVERLAY_OPENER, howToViewModel, menuViewModel, qualityLevelNames, rulesLines, settingsViewModel,
@@ -69,7 +69,9 @@ test('the app starts on the menu; Play on this computer is the local game, menu 
   assert.equal(app.menuEvent(FLOW_EVENTS.CLOSE_OVERLAY), true);
   assert.equal(app.menuEvent(FLOW_EVENTS.PLAY_LOCAL), true);
   assert.equal(app.getFlow().mode, 'local');
-  assert.equal(app.getScreen(), GAME);
+  assert.equal(app.getFlow().screen, SCREENS.GAME);
+  assert.equal(app.getScreen(), SELECT, 'the game screen opens on the character select');
+  assert.equal(app.getGame(), null);
   const other = createApp({ openTransport: () => network.connect(), clock: createFakeClock() });
   assert.equal(other.playOnline(), true);
   assert.equal(other.getScreen(), LOBBY);
@@ -78,7 +80,9 @@ test('the app starts on the menu; Play on this computer is the local game, menu 
 });
 
 test('?local=1 still starts in the local game; the menu, howto and settings shot scenes show their own screen', () => {
-  assert.deepEqual({ ...initialFlow({ local: true }) }, { screen: 'game', overlay: 'none', mode: 'local', role: null, notice: null });
+  const { seats, ...rest } = initialFlow({ local: true });
+  assert.deepEqual(rest, { screen: 'game', overlay: 'none', mode: 'local', role: null, notice: null });
+  assert.deepEqual([...seats.order], [], 'on the character select, nobody picked yet');
   for (const scene of ['menu', 'howto', 'settings']) {
     assert.ok(SHOT_SCENES.includes(scene), scene);
     assert.equal(parseShotParams(`?shot=${scene}`).scene, scene);

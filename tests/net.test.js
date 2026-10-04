@@ -1,8 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS, ROOM_CODE_LENGTH, WAITING_START_DELAY_MS } from '../src/config.js';
+import { HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS, ROOM_CODE_LENGTH } from '../src/config.js';
 import { X, O, EMPTY } from '../src/logic/board.js';
-import { EARTH_BEAR, WIND_RABBIT } from '../src/logic/characters.js';
+import { EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
+import { SEAT_REJECT } from '../src/logic/seats.js';
 import { TORNADO_ZONE } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
@@ -10,6 +11,7 @@ import { COUNTDOWN, CONNECTED, GONE, checkPresence, createPresence, markHeard, m
 import { ROOM_CODE_ALPHABET, generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../src/net/room-code.js';
 import { CLOSED, FULL, JOINING, NOT_STARTED, NO_ROOM, OVER, PLAYING, STARTING, WAITING, createGuestRoom, createHostRoom } from '../src/net/room.js';
 import { channelName, createBroadcastTransport } from '../src/net/transport.js';
+import { pickAndReady } from './room-start.js';
 
 // --- Room codes ---
 
@@ -176,13 +178,14 @@ function pick({ status, secondsLeft }) {
 
 // Host and guest on one fake network and one fake clock. Events of each
 // side are collected in hostEvents and guestEvents. With start (the
-// default) the clock runs through the host's start delay, so the game is
-// playing; the heartbeat and silence timing then count from that moment.
+// default) the host picks character, the guest the other one (Wind Rabbit
+// first, so it plays X) and both press Ready, so the game is playing; the
+// heartbeat and silence timing then count from that moment.
 function setup({ character = WIND_RABBIT, random, join = true, start = true } = {}) {
   const network = createFakeNetwork();
   const clock = createFakeClock();
   const hostTransport = network.connect();
-  const host = createHostRoom({ transport: hostTransport, code: 'AB2C9', character, clock, random, id: 'host' });
+  const host = createHostRoom({ transport: hostTransport, code: 'AB2C9', clock, random, id: 'host' });
   const hostEvents = [];
   host.onEvent((e) => hostEvents.push(e));
   const ctx = { network, clock, host, hostTransport, hostEvents, guest: null, guestTransport: null, guestEvents: [] };
@@ -190,19 +193,20 @@ function setup({ character = WIND_RABBIT, random, join = true, start = true } = 
     ctx.guestTransport = network.connect();
     ctx.guest = createGuestRoom({ transport: ctx.guestTransport, code: 'AB2C9', clock, id: 'guest' });
     ctx.guest.onEvent((e) => ctx.guestEvents.push(e));
-    if (start) clock.advance(WAITING_START_DELAY_MS);
+    if (start) pickAndReady(ctx.host, ctx.guest, character);
   }
   return ctx;
 }
 
 const ofType = (events, type) => events.filter((e) => e.type === type);
 
-test('join handshake: the guest is welcomed with the other character and the current state', () => {
+test('join handshake: the guest is welcomed with the seats; after the picks and Ready both play the sides of the pick order', () => {
   const { host, guest, hostEvents, guestTransport } = setup({ character: EARTH_BEAR });
   assert.deepEqual(guestTransport.sent[0], { type: 'join', from: 'guest' });
   assert.equal(host.phase, PLAYING);
   assert.equal(guest.phase, PLAYING);
-  assert.deepEqual(hostEvents, [{ type: 'joined', character: WIND_RABBIT }, { type: 'start', round: 1 }]);
+  assert.deepEqual(ofType(hostEvents, 'joined'), [{ type: 'joined' }]);
+  assert.deepEqual(ofType(hostEvents, 'start'), [{ type: 'start', round: 1 }]);
   const hostView = host.getView();
   const guestView = guest.getView();
   assert.equal(hostView.character, EARTH_BEAR);
@@ -266,8 +270,8 @@ test('a lost welcome is recovered: the guest repeats its join until answered', (
   hostTransport.setMuted(false);
   clock.advance(HEARTBEAT_INTERVAL_MS - 500); // the repeated join is answered
   assert.equal(guest.phase, STARTING);
-  assert.deepEqual(ofType(guestEvents, 'joined'), [{ type: 'joined', character: WIND_RABBIT }]);
-  clock.advance(WAITING_START_DELAY_MS - HEARTBEAT_INTERVAL_MS);
+  assert.deepEqual(ofType(guestEvents, 'joined'), [{ type: 'joined' }]);
+  pickAndReady(host, guest, EARTH_BEAR);
   assert.equal(host.phase, PLAYING);
   assert.equal(guest.phase, PLAYING);
   assert.equal(ofType(guestEvents, 'noRoom').length, 0);
@@ -428,11 +432,12 @@ test('the host makes the Tornado Zone random choice and the guest gets the resul
 test('both sides send a ping every second and stay connected', () => {
   const { clock, host, guest, hostTransport, guestTransport, hostEvents, guestEvents } = setup();
   const pings = (transport) => transport.sent.filter((m) => m.type === 'ping').length;
-  const before = { host: pings(hostTransport), guest: pings(guestTransport) }; // sent during the start delay
+  const before = { host: pings(hostTransport), guest: pings(guestTransport) };
   clock.advance(HEARTBEAT_INTERVAL_MS * 30);
   assert.equal(pings(hostTransport) - before.host, 30);
   assert.equal(pings(guestTransport) - before.guest, 30);
-  assert.deepEqual(hostTransport.sent.find((m) => m.type === 'ping'), { type: 'ping', to: 'guest', seq: 0, handled: 0, from: 'host' });
+  // Both were Ready at once, so the first ping is of the game (the start counts as one state).
+  assert.deepEqual(hostTransport.sent.find((m) => m.type === 'ping'), { type: 'ping', to: 'guest', seq: 1, handled: 0, round: 1, from: 'host' });
   assert.deepEqual(guestTransport.sent.find((m) => m.type === 'ping'), { type: 'ping', to: 'host', from: 'guest' });
   assert.equal(ofType([...hostEvents, ...guestEvents], 'peer').length, 0);
   assert.equal(host.getView().peer.status, CONNECTED);
@@ -600,97 +605,290 @@ test('closing both sides stops every timer', () => {
 
 const sentOfType = (transport, type) => transport.sent.filter((m) => m.type === type);
 
-test('the host sends start with round 1 after WAITING_START_DELAY_MS, not before', () => {
-  assert.equal(WAITING_START_DELAY_MS, 1500);
-  const { clock, host, guest, hostTransport, hostEvents, guestEvents } = setup({ start: false });
+// --- The character select: picks, Ready and the host's start (docs/flow-design.md section 5) ---
+
+const seatsOf = (room) => room.getView().seats;
+
+test('the first pick gets X and the second gets O; X moves first', () => {
+  const { host, guest, hostTransport, guestEvents } = setup({ start: false });
+  assert.deepEqual(host.pick(EARTH_BEAR), { ok: true });
+  assert.deepEqual(guest.pick(JADE_SERPENT), { ok: true });
+  assert.deepEqual(seatsOf(guest).order, ['host', 'guest'], 'the guest sees the host seats');
+  assert.equal(host.ready().ok, true);
+  assert.equal(guest.ready().ok, true);
+  assert.equal(host.phase, PLAYING);
+  assert.equal(guest.phase, PLAYING);
+  assert.deepEqual(host.state.characters, { [X]: EARTH_BEAR, [O]: JADE_SERPENT });
+  assert.deepEqual(guest.state, host.state);
+  assert.equal(host.getView().you, X);
+  assert.equal(host.getView().character, EARTH_BEAR);
+  assert.equal(guest.getView().you, O);
+  assert.equal(guest.getView().character, JADE_SERPENT);
+  assert.equal(guest.getView().hostCharacter, EARTH_BEAR);
+  assert.equal(host.getView().yourTurn, true, 'the first pick moves first');
+  assert.equal(guest.getView().yourTurn, false);
+  const [start] = sentOfType(hostTransport, 'start');
+  assert.equal(start.round, 1);
+  assert.deepEqual(start.state, host.state);
+  assert.deepEqual(ofType(guestEvents, 'start'), [{ type: 'start', round: 1 }]);
+});
+
+test('a later pick keeps its place: changing the character before Ready does not change the order', () => {
+  const { host, guest } = setup({ start: false });
+  guest.pick(WIND_RABBIT); // the guest picks first
+  host.pick(EARTH_BEAR);
+  guest.pick(JADE_SERPENT); // a change, still the first pick
+  assert.deepEqual(seatsOf(host).order, ['guest', 'host']);
+  host.ready();
+  guest.ready();
+  assert.deepEqual(host.state.characters, { [X]: JADE_SERPENT, [O]: EARTH_BEAR });
+  assert.equal(guest.getView().you, X);
+});
+
+test('a taken character is rejected, on either side, and the seats stay as they were', () => {
+  const { host, guest, hostTransport, guestTransport, hostEvents, guestEvents } = setup({ start: false });
+  host.pick(WIND_RABBIT);
+  const sentBefore = guestTransport.sent.length;
+  assert.deepEqual(guest.pick(WIND_RABBIT), { ok: false, error: 'That character is taken.', reason: SEAT_REJECT.TAKEN });
+  assert.equal(guestTransport.sent.length, sentBefore, 'a pick known to be refused is not sent');
+  assert.equal(ofType(guestEvents, 'seats').at(-1).reason, SEAT_REJECT.TAKEN);
+  // A pick message that reaches the host anyway is refused by the host.
+  guestTransport.send({ type: 'pick', from: 'guest', to: 'host', character: WIND_RABBIT });
+  assert.equal(seatsOf(host).picks.guest, null);
+  const answer = sentOfType(hostTransport, 'seats').at(-1);
+  assert.equal(answer.reason, SEAT_REJECT.TAKEN);
+  assert.equal(answer.error, 'That character is taken.');
+  assert.equal(answer.seats.picks.guest, null);
+  assert.equal(ofType(guestEvents, 'seats').at(-1).reason, SEAT_REJECT.TAKEN);
+  // The host cannot take the guest's character either.
+  assert.equal(guest.pick(EARTH_BEAR).ok, true);
+  assert.deepEqual(host.pick(EARTH_BEAR), { ok: false, error: 'That character is taken.', reason: SEAT_REJECT.TAKEN });
+  assert.equal(ofType(hostEvents, 'seats').at(-1).reason, SEAT_REJECT.TAKEN);
+  assert.deepEqual({ ...seatsOf(host).picks }, { host: WIND_RABBIT, guest: EARTH_BEAR });
+  assert.deepEqual(seatsOf(guest), seatsOf(host));
+  // An unknown character is refused too.
+  assert.equal(host.pick('nobody').reason, SEAT_REJECT.UNKNOWN_CHARACTER);
+});
+
+test('start is sent only when both are Ready', () => {
+  const { clock, host, guest, hostTransport } = setup({ start: false });
+  assert.equal(host.ready().reason, SEAT_REJECT.NO_PICK, 'Ready needs a pick');
+  assert.equal(guest.ready().reason, SEAT_REJECT.NO_PICK);
+  host.pick(WIND_RABBIT);
+  host.ready();
+  assert.equal(host.pick(JADE_SERPENT).reason, SEAT_REJECT.READY, 'the pick is locked once Ready');
+  guest.pick(EARTH_BEAR);
+  clock.advance(60000);
+  assert.equal(sentOfType(hostTransport, 'start').length, 0, 'no start on a timer');
   assert.equal(host.phase, STARTING);
   assert.equal(guest.phase, STARTING);
-  assert.equal(sentOfType(hostTransport, 'welcome').length, 1, 'welcome as before');
-  clock.advance(WAITING_START_DELAY_MS - 1);
-  assert.equal(sentOfType(hostTransport, 'start').length, 0);
-  assert.equal(host.phase, STARTING);
-  assert.equal(guest.phase, STARTING);
-  clock.advance(1);
-  assert.deepEqual(sentOfType(hostTransport, 'start'), [{ type: 'start', to: 'guest', round: 1, from: 'host' }]);
+  assert.deepEqual({ ...seatsOf(guest).ready }, { host: true, guest: false });
+  guest.ready();
+  assert.equal(sentOfType(hostTransport, 'start').length, 1);
   assert.equal(host.phase, PLAYING);
   assert.equal(guest.phase, PLAYING);
   assert.equal(host.round, 1);
   assert.equal(guest.round, 1);
-  assert.deepEqual(ofType(hostEvents, 'start'), [{ type: 'start', round: 1 }]);
-  assert.deepEqual(ofType(guestEvents, 'start'), [{ type: 'start', round: 1 }], 'both windows get the same event');
   clock.advance(60000);
   assert.equal(sentOfType(hostTransport, 'start').length, 1, 'start is sent once');
+  assert.equal(host.pick(JADE_SERPENT).ok, false, 'no pick after the start');
 });
 
-test('the guest stays in starting until start arrives, with no timer of its own', () => {
-  const { clock, host, guest, hostTransport, guestEvents } = setup({ start: false });
-  hostTransport.setMuted(true); // the start never reaches the guest
-  clock.advance(WAITING_START_DELAY_MS * 10);
-  assert.equal(host.phase, PLAYING);
+test('only the host decides the start: a start from a stranger or without a game is ignored, and a host alone never starts', () => {
+  const { network, clock, host, guest, hostTransport } = setup({ start: false });
+  host.pick(WIND_RABBIT);
+  guest.pick(EARTH_BEAR);
+  hostTransport.send({ type: 'start', from: 'host', to: 'guest', round: 1 }); // no state, no seats
+  const stranger = network.connect();
+  stranger.send({ type: 'start', from: 'stranger', to: 'guest', round: 1, state: host.state, seats: seatsOf(host) });
   assert.equal(guest.phase, STARTING);
-  assert.equal(ofType(guestEvents, 'start').length, 0);
   assert.equal(guest.getView().yourTurn, false);
-  // A start from someone who is not the host, or with no round, is ignored.
-  hostTransport.setMuted(false);
-  hostTransport.send({ type: 'start', from: 'host', to: 'guest' });
-  hostTransport.send({ type: 'start', from: 'stranger', to: 'guest', round: 1 });
+  // The guest's own Ready only asks; it never starts the guest.
+  hostTransport.setMuted(true);
+  guest.ready();
+  host.ready();
+  assert.equal(host.phase, PLAYING);
+  assert.equal(guest.phase, STARTING, 'the start never reached the guest');
+  clock.advance(HEARTBEAT_INTERVAL_MS * 5);
   assert.equal(guest.phase, STARTING);
+
+  // A host alone: Ready with no guest starts nothing.
+  const lone = setup({ join: false });
+  lone.host.pick(WIND_RABBIT);
+  lone.host.ready();
+  lone.clock.advance(60000);
+  assert.equal(lone.host.phase, WAITING);
 });
 
 test('a lost start is sent again: the host ping carries the round and the guest asks again', () => {
   const { clock, host, guest, hostTransport, guestEvents } = setup({ start: false });
-  clock.advance(WAITING_START_DELAY_MS - 1);
+  host.pick(WIND_RABBIT);
+  guest.pick(EARTH_BEAR);
+  host.ready();
   hostTransport.setMuted(true); // the start message is lost
-  clock.advance(1);
+  guest.ready();
   hostTransport.setMuted(false);
   assert.equal(host.phase, PLAYING);
   assert.equal(guest.phase, STARTING, 'the guest never starts on its own');
   clock.advance(HEARTBEAT_INTERVAL_MS);
   assert.equal(guest.phase, PLAYING);
   assert.equal(guest.round, 1);
+  assert.deepEqual(guest.state, host.state);
+  assert.equal(guest.getView().you, O);
   assert.deepEqual(ofType(guestEvents, 'start'), [{ type: 'start', round: 1 }]);
 });
 
-test('a guest leave at 700 ms cancels the start; a second guest can join and is welcomed', () => {
+test('a lost pick or Ready is sent again with the next host ping', () => {
+  const { clock, host, guest, guestTransport } = setup({ start: false });
+  host.pick(WIND_RABBIT);
+  host.ready();
+  guestTransport.setMuted(true);
+  guest.pick(EARTH_BEAR);
+  guest.ready();
+  guestTransport.setMuted(false);
+  assert.equal(seatsOf(host).picks.guest, null);
+  clock.advance(HEARTBEAT_INTERVAL_MS);
+  assert.equal(seatsOf(host).picks.guest, EARTH_BEAR);
+  assert.equal(host.phase, PLAYING);
+  assert.equal(guest.phase, PLAYING);
+  assert.equal(guest.getView().you, O);
+});
+
+test('a pick and Ready sent again after a late host ping are taken as repeats, with no error', () => {
+  const { network, host, guest, hostTransport, guestEvents } = setup({ start: false });
+  host.pick(WIND_RABBIT);
+  // A host ping sent before the guest picked, still on its way.
+  const late = { type: 'ping', to: 'guest', seq: 0, handled: 0, seats: seatsOf(host), from: 'host' };
+  hostTransport.setMuted(true); // the host's answers are not yet there either
+  guest.pick(EARTH_BEAR);
+  guest.ready();
+  hostTransport.setMuted(false);
+  assert.equal(seatsOf(host).ready.guest, true);
+  network.connect().send(late);
+  assert.deepEqual(guestEvents.filter((e) => e.error), [], 'no refusal reaches the guest');
+  assert.equal(seatsOf(guest).picks.guest, EARTH_BEAR);
+  assert.equal(seatsOf(guest).ready.guest, true);
+  assert.equal(host.phase, STARTING);
+});
+
+// Delivers messages held back by a muted end (from its sent list), in
+// their send order, as if they had only been slow.
+const deliverLate = (network, messages) => {
+  const end = network.connect();
+  for (const message of messages) end.send(message);
+  end.close();
+};
+
+test('a refusal of an older pick does not undo the newer pick: the host ping does not bring the old one back', () => {
+  const { network, clock, host, guest, guestTransport, hostTransport, guestEvents } = setup({ start: false });
+  guest.pick(WIND_RABBIT);
+  const before = guestTransport.sent.length;
+  guestTransport.setMuted(true); // two picks on their way
+  guest.pick(EARTH_BEAR);
+  guest.pick(JADE_SERPENT);
+  guestTransport.setMuted(false);
+  host.pick(EARTH_BEAR); // the host takes Earth Bear before the guest's picks arrive
+  const answers = hostTransport.sent.length;
+  hostTransport.setMuted(true);
+  deliverLate(network, guestTransport.sent.slice(before));
+  hostTransport.setMuted(false);
+  const [refused, taken] = hostTransport.sent.slice(answers);
+  assert.equal(refused.reason, SEAT_REJECT.TAKEN);
+  assert.equal(taken.seats.picks.guest, JADE_SERPENT);
+  deliverLate(network, [refused, taken]);
+  assert.deepEqual(guestEvents.filter((e) => e.error), [], 'the old refusal is not shown');
+  const sent = guestTransport.sent.length;
+  clock.advance(HEARTBEAT_INTERVAL_MS);
+  assert.deepEqual(sentOfType({ sent: guestTransport.sent.slice(sent) }, 'pick'), [], 'no old pick is sent again');
+  assert.equal(seatsOf(host).picks.guest, JADE_SERPENT);
+  assert.deepEqual(seatsOf(guest), seatsOf(host));
+});
+
+test('a Ready counts only for the pick it was pressed for: a Ready that follows a refused pick is refused too', () => {
+  const { network, host, guest, guestTransport, guestEvents } = setup({ start: false });
+  guest.pick(WIND_RABBIT);
+  const before = guestTransport.sent.length;
+  guestTransport.setMuted(true);
+  guest.pick(EARTH_BEAR);
+  guest.ready(); // Ready for Earth Bear
+  guestTransport.setMuted(false);
+  host.pick(EARTH_BEAR); // the host takes it first
+  host.ready();
+  deliverLate(network, guestTransport.sent.slice(before));
+  assert.equal(host.phase, STARTING, 'no start with a character the guest never pressed Ready for');
+  assert.equal(seatsOf(host).picks.guest, WIND_RABBIT);
+  assert.equal(seatsOf(host).ready.guest, false);
+  assert.equal(guest.phase, STARTING);
+  assert.equal(ofType(guestEvents, 'seats').at(-1).reason, SEAT_REJECT.PICK_CHANGED);
+  assert.deepEqual(seatsOf(guest), seatsOf(host));
+  guest.ready(); // pressed again, now for Wind Rabbit
+  assert.equal(host.phase, PLAYING);
+  assert.equal(guest.getView().character, WIND_RABBIT);
+});
+
+test('a guest cannot change its pick once its Ready is sent, even before the host answers', () => {
+  const { host, guest, hostTransport } = setup({ start: false });
+  host.pick(WIND_RABBIT);
+  hostTransport.setMuted(true);
+  guest.pick(EARTH_BEAR);
+  guest.ready();
+  const sent = guest.pick(JADE_SERPENT);
+  assert.equal(sent.ok, false);
+  assert.equal(sent.reason, SEAT_REJECT.READY);
+  hostTransport.setMuted(false);
+  assert.equal(seatsOf(host).picks.guest, EARTH_BEAR);
+});
+
+test('a guest who leaves before both are Ready returns the seat to empty; a second guest can join and pick it', () => {
   const { network, clock, host, guest, hostTransport, hostEvents } = setup({ start: false });
+  guest.pick(WIND_RABBIT); // the guest picked first
+  host.pick(EARTH_BEAR);
+  host.ready();
   clock.advance(700);
   guest.close();
   assert.equal(host.phase, WAITING);
   assert.deepEqual(ofType(hostEvents, 'peerGone'), [{ type: 'peerGone', phase: STARTING }]);
+  const seats = seatsOf(host);
+  assert.deepEqual({ ...seats.picks }, { host: EARTH_BEAR, guest: null });
+  assert.deepEqual({ ...seats.ready }, { host: true, guest: false });
+  assert.deepEqual([...seats.order], ['host'], 'the host pick is now the first');
+  assert.deepEqual(ofType(hostEvents, 'seats').at(-1).seats, seats);
   assert.equal(host.getView().peer, null);
   const sentBefore = hostTransport.sent.length;
-  clock.advance(WAITING_START_DELAY_MS - 700);
-  assert.equal(hostTransport.sent.length, sentBefore, 'nothing is sent at 1500 ms');
   clock.advance(10000);
   assert.equal(hostTransport.sent.length, sentBefore, 'no heartbeat to a guest who left');
   assert.equal(ofType(hostEvents, 'peer').length, 0);
-  assert.equal(host.getView().result, null);
 
   const second = createGuestRoom({ transport: network.connect(), code: 'AB2C9', clock, id: 'second' });
   assert.equal(second.phase, STARTING);
   assert.equal(host.phase, STARTING);
   assert.deepEqual(sentOfType(hostTransport, 'welcome').map((m) => m.to), ['guest', 'second']);
-  clock.advance(WAITING_START_DELAY_MS);
+  assert.deepEqual(seatsOf(second), seats, 'the second guest finds the seat empty');
+  assert.equal(second.pick(WIND_RABBIT).ok, true, 'the character of the guest who left is free again');
+  second.ready();
   assert.deepEqual(sentOfType(hostTransport, 'start').map((m) => m.to), ['second']);
   assert.equal(second.phase, PLAYING);
-  assert.equal(host.phase, PLAYING);
+  assert.equal(host.getView().you, X, 'the host picked first now');
+  assert.equal(second.getView().you, O);
 });
 
-test('a silent guest during a long start delay sends the host back to waiting', () => {
+test('a silent guest during the character select sends the host back to waiting', () => {
   const network = createFakeNetwork();
   const clock = createFakeClock();
   const hostTransport = network.connect();
-  const host = createHostRoom({ transport: hostTransport, code: 'AB2C9', character: WIND_RABBIT, clock, id: 'host', startDelayMs: PEER_TIMEOUT_MS * 2 });
+  const host = createHostRoom({ transport: hostTransport, code: 'AB2C9', clock, id: 'host' });
   const events = [];
   host.onEvent((e) => events.push(e));
   const guestTransport = network.connect();
-  createGuestRoom({ transport: guestTransport, code: 'AB2C9', clock, id: 'guest' });
+  const guest = createGuestRoom({ transport: guestTransport, code: 'AB2C9', clock, id: 'guest' });
+  guest.pick(EARTH_BEAR);
   guestTransport.setMuted(true);
   clock.advance(PEER_TIMEOUT_MS - 1);
   assert.equal(host.phase, STARTING);
   clock.advance(1);
   assert.equal(host.phase, WAITING);
   assert.deepEqual(ofType(events, 'peerGone'), [{ type: 'peerGone', phase: STARTING }]);
+  assert.equal(seatsOf(host).picks.guest, null);
   clock.advance(PEER_TIMEOUT_MS * 2);
   assert.equal(sentOfType(hostTransport, 'start').length, 0);
 });
@@ -713,7 +911,7 @@ test('a third window joining during starting or playing is told full', () => {
   const join = (id) => createGuestRoom({ transport: network.connect(), code: 'AB2C9', clock, id });
   assert.equal(join('third').phase, FULL);
   assert.equal(host.phase, STARTING);
-  clock.advance(WAITING_START_DELAY_MS);
+  pickAndReady(host, guest);
   assert.equal(join('fourth').phase, FULL);
   assert.equal(host.phase, PLAYING);
   assert.equal(guest.phase, PLAYING);
@@ -721,10 +919,12 @@ test('a third window joining during starting or playing is told full', () => {
 
 test('a start recovered after a forfeit leaves the guest in phase over', () => {
   const { clock, host, guest, hostTransport, guestTransport, guestEvents } = setup({ start: false });
-  clock.advance(WAITING_START_DELAY_MS - 1);
+  host.pick(WIND_RABBIT);
+  guest.pick(EARTH_BEAR);
+  host.ready();
   hostTransport.setMuted(true); // the start is lost
+  guest.ready();
   guestTransport.setMuted(true); // and the guest's messages too, until the host wins by forfeit
-  clock.advance(1);
   hostTransport.setMuted(false);
   clock.advance(PEER_TIMEOUT_MS + LEAVE_COUNTDOWN_S * 1000);
   assert.equal(host.phase, OVER);
@@ -739,7 +939,9 @@ test('a start recovered after a forfeit leaves the guest in phase over', () => {
 
 test('an action in starting is rejected with not-started and changes nothing', () => {
   const { host, guest, hostTransport, guestTransport, hostEvents, guestEvents } = setup({ start: false });
-  const before = host.state;
+  host.pick(WIND_RABBIT);
+  guest.pick(EARTH_BEAR);
+  assert.equal(host.state, null, 'no game before the start');
   assert.deepEqual(host.place(7, 7), { ok: false, error: 'The game has not started yet.', reason: NOT_STARTED });
   assert.deepEqual(ofType(hostEvents, 'rejected'), [{ type: 'rejected', error: 'The game has not started yet.', reason: NOT_STARTED }]);
   assert.deepEqual(guest.place(7, 7), { ok: false, error: 'The game has not started yet.', reason: NOT_STARTED });
@@ -751,12 +953,15 @@ test('an action in starting is rejected with not-started and changes nothing', (
     { type: 'rejected', to: 'guest', error: 'The game has not started yet.', reason: NOT_STARTED, requestId: 1, seq: 0, handled: 0, from: 'host' },
   ]);
   assert.deepEqual(ofType(guestEvents, 'rejected').at(-1), { type: 'rejected', error: 'The game has not started yet.', reason: NOT_STARTED });
-  assert.equal(host.state, before, 'the state is unchanged');
-  assert.equal(host.state.board[7][7], EMPTY);
+  assert.equal(host.state, null, 'the state is unchanged');
   assert.equal(sentOfType(hostTransport, 'state').length, 0);
   assert.equal(ofType([...hostEvents, ...guestEvents], 'state').length, 0);
   assert.equal(host.getView().yourTurn, false);
   assert.equal(guest.getView().yourTurn, false);
+  // Both Ready: the game starts with an empty board.
+  host.ready();
+  guest.ready();
+  assert.equal(host.state.board[7][7], EMPTY);
 });
 
 test('no countdown in waiting: a host alone for a long time sees nothing', () => {

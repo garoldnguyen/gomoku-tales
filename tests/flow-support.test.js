@@ -10,12 +10,13 @@ import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { ROOM_PHASES } from '../src/net/phase.js';
-import { CREATE, GAME, GAME_OVER, LOBBY, MENU, WAITING_SCREEN, createApp } from '../src/ui/app.js';
+import { GAME, GAME_OVER, LOBBY, MENU, WAITING_SCREEN, createApp } from '../src/ui/app.js';
 import { isFullscreenKey } from '../src/ui/fullscreen.js';
 import { isCollapseKey } from '../src/ui/hud-collapse.js';
 import { attachGameInput, isQualityKey, isRestartKey, isTypingTarget, shortcutKeyHandler } from '../src/ui/input.js';
 import { SKILL_INFO } from '../src/ui/skill-info.js';
 import { STRINGS } from '../src/ui/strings.js';
+import { pickAndReady } from './room-start.js';
 
 // The app starts on the main menu; Play Online opens the lobby.
 const onLobby = (app) => {
@@ -138,8 +139,8 @@ test('strings.js: numbers and names in the rules come from the config, the chara
 
 // --- config and room phases ---
 
-test('config: the flow timings and the same browser flag', () => {
-  assert.equal(config.WAITING_START_DELAY_MS, 1500);
+test('config: the flow timings and the same browser flag; no automatic start delay any more', () => {
+  assert.equal('WAITING_START_DELAY_MS' in config, false, 'the game starts when both players are Ready');
   assert.equal(config.COPY_FEEDBACK_MS, 1500);
   assert.equal(config.JOIN_TIMEOUT_MS, 3000);
   assert.equal(config.ONLINE_SAME_BROWSER_ONLY, true);
@@ -164,17 +165,16 @@ test('the online app starts on the menu, Play Online opens the lobby, and it fol
   assert.equal(host.getScreen(), LOBBY);
   assert.equal(host.getFlow().screen, 'lobby');
   assert.equal(host.getFlow().mode, 'online');
-  host.openCreate();
-  assert.equal(host.getScreen(), CREATE);
-  assert.equal(host.getFlow().screen, 'lobby', 'Create Room is a panel of the lobby');
-  host.createRoom(WIND_RABBIT);
-  assert.equal(host.getScreen(), WAITING_SCREEN);
-  assert.deepEqual({ ...host.getFlow() }, { screen: 'waiting', overlay: 'none', mode: 'online', role: 'host', notice: null });
+  host.createRoom();
+  assert.equal(host.getScreen(), WAITING_SCREEN, 'Create Room opens the room at once');
+  assert.deepEqual({ ...host.getFlow() }, { screen: 'waiting', overlay: 'none', mode: 'online', role: 'host', notice: null, seats: null });
   guest.openJoin();
   guest.joinRoom('AB2C9');
   assert.equal(host.getFlow().screen, 'starting');
   assert.equal(guest.getFlow().screen, 'starting');
-  clock.advance(config.WAITING_START_DELAY_MS); // the host starts the game
+  clock.advance(60000);
+  assert.equal(host.getFlow().screen, 'starting', 'no automatic start');
+  pickAndReady(host, guest); // both Ready: the host starts the game
   assert.equal(host.getScreen(), GAME);
   assert.equal(guest.getScreen(), GAME);
   assert.equal(host.getFlow().role, 'host');
@@ -184,29 +184,34 @@ test('the online app starts on the menu, Play Online opens the lobby, and it fol
   guest.close();
 });
 
-test('the online app waits for the host start; a guest who leaves in starting sends the host back to Waiting', () => {
+test('the online app waits for the host start; a guest who leaves in starting sends the host back to Waiting with the seat empty', () => {
   const network = createFakeNetwork();
   const clock = createFakeClock();
   const make = () => onLobby(createApp({ openTransport: () => network.connect(), clock, makeCode: () => 'AB2C9' }));
   const host = make();
   const guest = make();
-  host.openCreate();
-  host.createRoom(WIND_RABBIT);
+  host.createRoom();
   guest.openJoin();
   guest.joinRoom('AB2C9');
+  host.pick(WIND_RABBIT);
+  host.ready();
+  guest.pick(EARTH_BEAR);
   clock.advance(700);
-  assert.equal(host.getScreen(), WAITING_SCREEN, 'the host keeps the Waiting screen during starting');
-  assert.equal(guest.getScreen(), WAITING_SCREEN, 'the guest sees the same waiting room during starting');
-  guest.close();
+  assert.equal(host.getScreen(), WAITING_SCREEN, 'the host keeps the room screen during starting');
+  assert.equal(guest.getScreen(), WAITING_SCREEN, 'the guest sees the same room during starting');
+  assert.deepEqual(guest.getView().waiting.cards.map((card) => card.character), [WIND_RABBIT, EARTH_BEAR]);
+  assert.equal(guest.leaveRoom(), true, 'Leave works while starting');
+  assert.equal(guest.getScreen(), MENU);
   assert.equal(host.getFlow().screen, 'waiting');
   assert.equal(host.getScreen(), WAITING_SCREEN);
-  clock.advance(config.WAITING_START_DELAY_MS);
-  assert.equal(host.getFlow().screen, 'waiting', 'the cancelled start never fires');
+  assert.deepEqual(host.getView().waiting.cards.map((card) => card.character), [WIND_RABBIT, null], 'the seat is empty again');
+  assert.equal(host.getView().waiting.cards[1].placeholder, true);
   const second = make();
   second.openJoin();
   second.joinRoom('AB2C9');
   assert.equal(host.getFlow().screen, 'starting');
-  clock.advance(config.WAITING_START_DELAY_MS);
+  assert.equal(second.pick(EARTH_BEAR), true);
+  assert.equal(second.ready(), true);
   assert.equal(host.getScreen(), GAME);
   assert.equal(second.getScreen(), GAME);
   host.close();
@@ -219,15 +224,16 @@ test('the online app: a host who leaves in starting sends the guest to the lobby
   const make = () => onLobby(createApp({ openTransport: () => network.connect(), clock, makeCode: () => 'AB2C9' }));
   const host = make();
   const guest = make();
-  host.openCreate();
-  host.createRoom(WIND_RABBIT);
+  host.createRoom();
   guest.openJoin();
   guest.joinRoom('AB2C9');
+  guest.pick(WIND_RABBIT);
+  guest.ready();
   clock.advance(500);
   host.close();
   assert.equal(guest.getFlow().screen, 'lobby');
   assert.notEqual(guest.getFlow().notice, null);
-  clock.advance(config.WAITING_START_DELAY_MS);
+  clock.advance(60000);
   assert.notEqual(guest.getScreen(), GAME);
   guest.close();
 });
@@ -239,14 +245,15 @@ test('the online app: a guest whose start is recovered after a forfeit reaches G
   const guestTransport = network.connect();
   const host = onLobby(createApp({ openTransport: () => hostTransport, clock, makeCode: () => 'AB2C9' }));
   const guest = onLobby(createApp({ openTransport: () => guestTransport, clock }));
-  host.openCreate();
-  host.createRoom(WIND_RABBIT);
+  host.createRoom();
   guest.openJoin();
   guest.joinRoom('AB2C9');
-  clock.advance(config.WAITING_START_DELAY_MS - 1);
+  host.pick(WIND_RABBIT);
+  guest.pick(EARTH_BEAR);
+  host.ready();
   hostTransport.setMuted(true); // the start is lost
+  guest.ready();
   guestTransport.setMuted(true);
-  clock.advance(1);
   hostTransport.setMuted(false);
   clock.advance(config.PEER_TIMEOUT_MS + config.LEAVE_COUNTDOWN_S * 1000);
   assert.equal(host.getScreen(), GAME_OVER);

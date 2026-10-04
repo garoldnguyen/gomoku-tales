@@ -5,9 +5,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { GAME_OVER_DELAY_MS, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS, WAITING_START_DELAY_MS } from '../src/config.js';
+import { GAME_OVER_DELAY_MS, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS } from '../src/config.js';
 import { EMPTY, O, X } from '../src/logic/board.js';
-import { WIND_RABBIT } from '../src/logic/characters.js';
+import { EARTH_BEAR, WIND_RABBIT } from '../src/logic/characters.js';
 import { newGame } from '../src/logic/game.js';
 import { WIND_DASH } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
@@ -19,6 +19,7 @@ import { hudViewModel } from '../src/ui/hud-view.js';
 import { watchNewGame } from '../src/ui/new-game-watch.js';
 import { SHOT_SCENES, shotGameOverView } from '../src/ui/shot-mode.js';
 import { STRINGS } from '../src/ui/strings.js';
+import { pickAndReady } from './room-start.js';
 
 // --- rematchViewModel ---
 
@@ -98,11 +99,10 @@ function startOnline() {
   };
   const host = window();
   const guest = window();
-  host.app.openCreate();
-  assert.equal(host.app.createRoom(WIND_RABBIT), true);
+  assert.equal(host.app.createRoom(), true);
   guest.app.openJoin();
   assert.equal(guest.app.joinRoom('AB2C9'), true);
-  clock.advance(WAITING_START_DELAY_MS);
+  pickAndReady(host.app, guest.app, WIND_RABBIT);
   assert.equal(host.app.getScreen(), GAME);
   assert.equal(guest.app.getScreen(), GAME);
   return { network, clock, host, guest };
@@ -272,9 +272,20 @@ test('network recovery: a rematch the host starts before it hears the guest gave
 
 // --- The app: local ---
 
+// The local character select: Player 1 picks Wind Rabbit first (X), Player
+// 2 Earth Bear (O), and both press Ready.
+function pickLocal(app) {
+  assert.equal(app.pick(WIND_RABBIT, 'player1'), true);
+  assert.equal(app.pick(EARTH_BEAR, 'player2'), true);
+  assert.equal(app.ready('player1'), true);
+  assert.equal(app.getGame(), null, 'no game before both are Ready');
+  assert.equal(app.ready('player2'), true);
+}
+
 test('local mode: game over card, Rematch starts a clean game at once, Back to Menu returns to the menu', () => {
   const clock = createFakeClock();
   const app = createApp({ openTransport: () => assert.fail('local mode opens no transport'), clock, local: true });
+  pickLocal(app);
   assert.equal(app.getScreen(), GAME);
   const game = app.getGame();
   assert.equal(game.clickSkill(X, WIND_DASH), true); // a skill of the old game
@@ -296,7 +307,7 @@ test('local mode: game over card, Rematch starts a clean game at once, Back to M
   assert.equal(app.getScreen(), GAME);
   assert.equal(app.getView().gameOver, null);
   assert.equal(app.getGameNumber(), number + 1);
-  assert.deepEqual(app.getGame().getState(), newGame());
+  assert.deepEqual(app.getGame().getState(), newGame(), 'the same characters on the same sides');
   assert.deepEqual(app.getGame().takeEvents(), []);
   clock.advance(GAME_OVER_DELAY_MS * 2);
   assert.equal(app.getScreen(), GAME, 'no stale game over timer');
@@ -316,6 +327,8 @@ test('local mode: game over card, Rematch starts a clean game at once, Back to M
 
 test('local mode: R (restartLocal) during a game starts a clean game and tells the page', () => {
   const app = createApp({ openTransport: () => null, clock: createFakeClock(), local: true });
+  assert.equal(app.restartLocal(), false, 'nothing to restart on the character select');
+  pickLocal(app);
   app.getGame().click({ x: 7, y: 7 });
   const number = app.getGameNumber();
   assert.equal(app.restartLocal(), true);

@@ -10,7 +10,7 @@ Tick each line when it holds.
 2. [ ] Play on this computer: the game starts. Play until someone wins. Press Rematch: a clean board appears at once, no old plants, rocks or banners. Press Back to Menu.
 3. [ ] How to Play: the skill numbers read 3, 6 and 4 turns, the four skill texts are there, nothing is cut off at the window size you use.
 4. [ ] Settings: switch Low, Medium, High. The page does not reload. The Fullscreen button works.
-5. [ ] Two windows of the same browser: window A creates a room as Wind Rabbit, window B joins with the code. A shows the opponent card, then both enter the game after about 1.5 seconds.
+5. [ ] Two windows of the same browser: window A creates a room and picks Wind Rabbit, window B joins with the code. In B Wind Rabbit is disabled (Taken); B picks Earth Bear. Both press Ready: both enter the game at once, A plays X.
 6. [ ] Type a code containing C, F, Z, H or V in the join box. Nothing else happens (no fullscreen, no HUD toggle).
 7. [ ] Wrong code: a clear message appears under the box, no pop-up.
 8. [ ] In an online game close window B. Window A shows the 10 second countdown, then the game over card. Rematch is disabled with Opponent left. Back to Menu works.

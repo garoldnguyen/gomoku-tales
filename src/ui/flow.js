@@ -2,12 +2,20 @@
 // decides it. A pure reducer over a small frozen state; no screen switches
 // itself. Pure (no DOM), so it runs under node --test.
 //
-// State: { screen, overlay, mode, role, notice }
+// State: { screen, overlay, mode, role, notice, seats }
 //   screen   menu, lobby, waiting, starting, game, gameover
 //   overlay  none, howto, settings (only on top of the menu)
 //   mode     null, online, local
 //   role     null, host, guest
 //   notice   null or host-left
+//   seats    local mode: the two seats of the character select
+//            (logic/seats.js, LOCAL_SEATS), else null. The game screen
+//            shows the character select until both seats are Ready
+//            (isSelecting); the events PICK and READY fill the seats. A
+//            rematch keeps them (same characters, same sides). Online the
+//            seats live in the room, where the host decides (net/room.js).
+
+import { bothReady, createSeats, pickCharacter, setReady } from '../logic/seats.js';
 
 export const SCREENS = Object.freeze({
   MENU: 'menu',
@@ -22,6 +30,9 @@ export const OVERLAYS = Object.freeze({ NONE: 'none', HOWTO: 'howto', SETTINGS: 
 export const MODES = Object.freeze({ ONLINE: 'online', LOCAL: 'local' });
 export const ROLES = Object.freeze({ HOST: 'host', GUEST: 'guest' });
 export const NOTICE_HOST_LEFT = 'host-left';
+
+// The seats of the local character select: Player 1 and Player 2.
+export const LOCAL_SEATS = Object.freeze(['player1', 'player2']);
 
 export const FLOW_EVENTS = Object.freeze({
   PLAY_ONLINE: 'PLAY_ONLINE',
@@ -38,15 +49,23 @@ export const FLOW_EVENTS = Object.freeze({
   LEAVE: 'LEAVE',
   GAME_OVER: 'GAME_OVER',
   REMATCH_STARTED: 'REMATCH_STARTED',
+  PICK: 'PICK', // { type, seat, character }: a local seat picks a character
+  READY: 'READY', // { type, seat }: a local seat presses Ready
 });
 
 // The first state: the menu, or with options.local true the game in local
-// mode (the ?local=1 page).
+// mode (the ?local=1 page), which opens on the character select.
 export function initialFlow(options = {}) {
   if (options.local) {
-    return Object.freeze({ screen: SCREENS.GAME, overlay: OVERLAYS.NONE, mode: MODES.LOCAL, role: null, notice: null });
+    return Object.freeze({ screen: SCREENS.GAME, overlay: OVERLAYS.NONE, mode: MODES.LOCAL, role: null, notice: null, seats: createSeats(LOCAL_SEATS) });
   }
-  return Object.freeze({ screen: SCREENS.MENU, overlay: OVERLAYS.NONE, mode: null, role: null, notice: null });
+  return Object.freeze({ screen: SCREENS.MENU, overlay: OVERLAYS.NONE, mode: null, role: null, notice: null, seats: null });
+}
+
+// True while the local game screen shows the character select: the seats
+// are there and not both Ready.
+export function isSelecting(flow) {
+  return flow.screen === SCREENS.GAME && flow.mode === MODES.LOCAL && flow.seats !== null && !bothReady(flow.seats);
 }
 
 // The next state for an event (a type string or { type }). Returns a new
@@ -63,7 +82,7 @@ export function flowReducer(flow, event) {
       if (onMenu) return next({ screen: SCREENS.LOBBY, mode: MODES.ONLINE, role: null, notice: null });
       break;
     case FLOW_EVENTS.PLAY_LOCAL:
-      if (onMenu) return next({ screen: SCREENS.GAME, mode: MODES.LOCAL });
+      if (onMenu) return next({ screen: SCREENS.GAME, mode: MODES.LOCAL, seats: createSeats(LOCAL_SEATS) });
       break;
     case FLOW_EVENTS.OPEN_HOWTO:
       if (onMenu) return next({ overlay: OVERLAYS.HOWTO });
@@ -97,18 +116,31 @@ export function flowReducer(flow, event) {
       }
       break;
     case FLOW_EVENTS.LEAVE:
-      if (screen === SCREENS.WAITING || screen === SCREENS.GAMEOVER) {
-        return next({ screen: SCREENS.MENU, mode: null, role: null });
+      if (screen === SCREENS.WAITING || screen === SCREENS.STARTING || screen === SCREENS.GAMEOVER || isSelecting(flow)) {
+        return next({ screen: SCREENS.MENU, mode: null, role: null, seats: null });
       }
       break;
     case FLOW_EVENTS.GAME_OVER:
-      if (screen === SCREENS.GAME) return next({ screen: SCREENS.GAMEOVER });
+      if (screen === SCREENS.GAME && !isSelecting(flow)) return next({ screen: SCREENS.GAMEOVER });
       break;
     case FLOW_EVENTS.REMATCH_STARTED:
       if (screen === SCREENS.GAMEOVER) return next({ screen: SCREENS.GAME });
       break;
+    case FLOW_EVENTS.PICK:
+      if (isSelecting(flow)) return seatsResult(flow, pickCharacter(flow.seats, event.seat, event.character));
+      break;
+    case FLOW_EVENTS.READY:
+      if (isSelecting(flow)) return seatsResult(flow, setReady(flow.seats, event.seat));
+      break;
   }
   return flow;
+}
+
+// The flow with the seats of an accepted pick or Ready; the same flow when
+// the seats refused it or nothing changed.
+function seatsResult(flow, result) {
+  if (!result.ok || result.seats === flow.seats) return flow;
+  return Object.freeze({ ...flow, seats: result.seats });
 }
 
 // The screen a flow shows.

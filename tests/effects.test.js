@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BANNER_MS, DUST_COUNT, DUST_MS, INTERNAL_WIDTH, SHAKE_MS, SHAKE_PX, SPARKLE_COUNT, SPARKLE_MS, WAITING_START_DELAY_MS, WIND_STREAK_COUNT } from '../src/config.js';
+import { BANNER_MS, DUST_COUNT, DUST_MS, INTERNAL_WIDTH, SHAKE_MS, SHAKE_PX, SPARKLE_COUNT, SPARKLE_MS, WIND_STREAK_COUNT } from '../src/config.js';
 import { X, O, ROCK } from '../src/logic/board.js';
 import { WIND_RABBIT } from '../src/logic/characters.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
@@ -11,6 +11,7 @@ import { createEffects, effectsForEvents, shakeOffset, windStreaks } from '../sr
 import { drawGameScreen } from '../src/render/game-renderer.js';
 import { createApp } from '../src/ui/app.js';
 import { createLocalGame } from '../src/ui/local-game.js';
+import { pickAndReady } from './room-start.js';
 
 // The app starts on the main menu; Play Online opens the lobby.
 const onLobby = (app) => {
@@ -213,11 +214,10 @@ test('both online windows get the same events for effects', () => {
   const open = () => onLobby(createApp({ openTransport: () => network.connect(), clock, random: () => 0, makeCode: () => 'AB2C9' }));
   const host = open();
   const guest = open();
-  host.openCreate();
-  host.createRoom(WIND_RABBIT);
+  host.createRoom();
   guest.openJoin();
   guest.joinRoom('AB2C9');
-  clock.advance(WAITING_START_DELAY_MS); // the host starts the game
+  pickAndReady(host, guest, WIND_RABBIT); // both Ready: the host starts the game
   host.getGame().takeEvents();
   guest.getGame().takeEvents();
 

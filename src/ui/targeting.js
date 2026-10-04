@@ -4,8 +4,16 @@
 // still validates the finished action; these checks only guide the clicks.
 
 import { X, O, isEmptyCell, inBounds } from '../logic/board.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../logic/skills.js';
+import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION, HISS, VENOM } from '../logic/skills.js';
 import { tornadoCells } from '../logic/wind-rabbit-skills.js';
+
+// Skills used at once on the button click, with no target flow.
+const NO_TARGET_SKILLS = new Set([HISS]);
+
+// True when the skill needs a board target before it can be used.
+export function needsTarget(skillId) {
+  return !NO_TARGET_SKILLS.has(skillId);
+}
 
 export function startTargeting(skillId) {
   return { skill: skillId, from: null };
@@ -22,6 +30,8 @@ export function targetPrompt(targeting) {
       return 'Terrain Creation: choose an empty cell';
     case STONE_CONVERSION:
       return "Stone Conversion: choose an opponent's stone";
+    case VENOM:
+      return "Venom: choose an opponent's stone";
     default:
       return 'Choose a target';
   }
@@ -57,6 +67,7 @@ export function targetClick(state, player, targeting, cell) {
       if (!isEmptyCell(board, x, y)) return { error: 'Choose an empty cell.' };
       return { target: { x, y } };
     case STONE_CONVERSION:
+    case VENOM:
       if (content !== opponentOf(player)) return { error: "Choose one of your opponent's stones." };
       return { target: { x, y } };
     default:
@@ -87,6 +98,7 @@ export function targetPreview(state, player, targeting, hover) {
     case TERRAIN_CREATION:
       return cell && isEmptyCell(board, cell.x, cell.y) ? { type: 'rock', x: cell.x, y: cell.y } : null;
     case STONE_CONVERSION:
+    case VENOM:
       return content === opponentOf(player) ? { type: 'select', x: cell.x, y: cell.y } : null;
     default:
       return null;

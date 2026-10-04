@@ -3,9 +3,9 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BOARD_SIZE, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS, WAITING_START_DELAY_MS } from '../src/config.js';
+import { BOARD_SIZE, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS } from '../src/config.js';
 import { X, O, EMPTY, ROCK } from '../src/logic/board.js';
-import { EARTH_BEAR, WIND_RABBIT } from '../src/logic/characters.js';
+import { EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
 import { createInitialState, newGame } from '../src/logic/game.js';
 import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
@@ -13,6 +13,7 @@ import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { COUNTDOWN, CONNECTED } from '../src/net/presence.js';
 import { OVER, PLAYING, createGuestRoom, createHostRoom } from '../src/net/room.js';
 import { createLocalGame } from '../src/ui/local-game.js';
+import { pickAndReady } from './room-start.js';
 
 // Host (Wind Rabbit, X, by default) and guest on one fake network and one
 // fake clock, with the game already started.
@@ -20,7 +21,7 @@ function setup({ character = WIND_RABBIT, random } = {}) {
   const network = createFakeNetwork();
   const clock = createFakeClock();
   const hostTransport = network.connect();
-  const host = createHostRoom({ transport: hostTransport, code: 'AB2C9', character, clock, random, id: 'host' });
+  const host = createHostRoom({ transport: hostTransport, code: 'AB2C9', clock, random, id: 'host' });
   const guestTransport = network.connect();
   const guest = createGuestRoom({ transport: guestTransport, code: 'AB2C9', clock, id: 'guest' });
   const ctx = { clock, host, guest, hostTransport, guestTransport, hostEvents: [], guestEvents: [], hostStatus: [], guestStatus: [] };
@@ -28,7 +29,7 @@ function setup({ character = WIND_RABBIT, random } = {}) {
   guest.onEvent((e) => ctx.guestEvents.push(e));
   host.onRematchStatus((s) => ctx.hostStatus.push(s));
   guest.onRematchStatus((s) => ctx.guestStatus.push(s));
-  clock.advance(WAITING_START_DELAY_MS);
+  pickAndReady(host, guest, character); // both Ready: the host starts the game
   return ctx;
 }
 
@@ -76,6 +77,36 @@ test('newGame equals the documented fresh state', () => {
   });
   assert.deepEqual(newGame(), createInitialState());
   assert.notEqual(newGame().board, newGame().board, 'every game gets its own board');
+});
+
+test('a rematch keeps the same characters and the same sides (sides by pick order)', () => {
+  const network = createFakeNetwork();
+  const clock = createFakeClock();
+  const host = createHostRoom({ transport: network.connect(), code: 'AB2C9', clock, id: 'host' });
+  const guest = createGuestRoom({ transport: network.connect(), code: 'AB2C9', clock, id: 'guest' });
+  guest.pick(JADE_SERPENT); // the guest picks first: X
+  host.pick(EARTH_BEAR);
+  guest.ready();
+  host.ready();
+  const sides = { [X]: JADE_SERPENT, [O]: EARTH_BEAR };
+  assert.deepEqual(host.state.characters, sides);
+  assert.equal(guest.getView().you, X);
+  // The guest (X) wins with five in row 0.
+  for (let i = 0; i < 4; i++) {
+    guest.place(i, 0);
+    host.place(i, 1);
+  }
+  guest.place(4, 0);
+  assert.equal(host.phase, OVER);
+  rematch({ host, guest });
+  assert.equal(host.round, 2);
+  assert.deepEqual(host.state, newGame({ characters: sides }));
+  assert.deepEqual(guest.state, host.state);
+  assert.equal(guest.getView().you, X, 'the guest keeps X');
+  assert.equal(host.getView().you, O, 'the host keeps O');
+  assert.equal(guest.getView().character, JADE_SERPENT);
+  assert.equal(host.getView().character, EARTH_BEAR);
+  assert.equal(guest.getView().yourTurn, true, 'X moves first again');
 });
 
 test('the guest asks first: the host sees guest true and host false, no new game', () => {

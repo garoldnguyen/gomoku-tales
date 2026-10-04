@@ -4,17 +4,20 @@
 // same screens. Text comes from strings.js, numbers from src/config.js.
 
 import { ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH } from '../config.js';
-import { X } from '../logic/board.js';
-import { CHARACTERS, EARTH_BEAR, WIND_RABBIT, stoneForCharacter } from '../logic/characters.js';
-import { otherCharacter } from '../net/room.js';
+import { O, X } from '../logic/board.js';
+import { CHARACTERS } from '../logic/characters.js';
+import { createSeats, otherSeat, seatStone } from '../logic/seats.js';
+import { GUEST, HOST, ROOM_SEATS } from '../net/room.js';
 import { normalizeRoomCode } from '../net/room-code.js';
-import { ROLES, SCREENS } from './flow.js';
+import { LOCAL_SEATS, ROLES, SCREENS, isSelecting } from './flow.js';
 import { PORTRAIT_ART } from './hud-view.js';
 import { STRINGS } from './strings.js';
 
-// The two waiting room cards, left to right: the same order as the game
-// HUD (Wind Rabbit with X on the left, Earth Bear with O on the right).
-export const WAITING_CARD_ORDER = Object.freeze([WIND_RABBIT, EARTH_BEAR]);
+// The characters of the character select, in table order.
+export const SELECT_CHARACTERS = Object.freeze(Object.keys(CHARACTERS));
+
+// windRabbit -> wind-rabbit, for data-hud-box names.
+const slug = (id) => id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
 // The lobby's own panel: the hint line shows only while online play is
 // limited to one browser (ONLINE_SAME_BROWSER_ONLY, or options.sameBrowserOnly).
@@ -44,43 +47,109 @@ export function joinViewModel({ text = '', joining = false, error = null } = {})
   };
 }
 
+// The character select of two seats (logic/seats.js), left to right in
+// the seats' own order. labels names each seat; editable lists the seats
+// this window may pick for (online its own, local both); you is this
+// window's seat online; absent lists seats nobody sits in yet (a dimmed
+// Waiting placeholder). An editable seat gets one choice per character
+// (disabled when the other seat took it, or once the seat is Ready) and a
+// Ready button (enabled only after a pick, until Ready). The stone shows
+// once the seat picked: the first pick plays X and moves first.
+export function characterSelectViewModel({ seats, labels, editable = [], you = null, absent = [] }) {
+  return {
+    lead: STRINGS.selectLead,
+    seats: seats.names.map((seat) => {
+      const pick = seats.picks[seat];
+      const ready = seats.ready[seat];
+      const empty = absent.includes(seat);
+      const mine = editable.includes(seat) && !empty;
+      const otherPick = seats.picks[otherSeat(seats, seat)];
+      const stone = seatStone(seats, seat);
+      return {
+        seat,
+        box: `card-${seat}`,
+        label: labels[seat],
+        you: seat === you,
+        youText: seat === you ? STRINGS.waitingYou : null,
+        placeholder: empty,
+        placeholderText: empty ? STRINGS.waitingPlaceholder : null,
+        character: pick,
+        name: pick ? CHARACTERS[pick].name : null,
+        stone,
+        team: stone === X ? 'blue' : stone === O ? 'red' : null,
+        portrait: stone ? PORTRAIT_ART[stone] : null,
+        note: stone === X ? STRINGS.waitingMovesFirst : null,
+        ready,
+        statusText: empty ? null : ready ? STRINGS.selectIsReady : STRINGS.selectChoosing,
+        choices: mine
+          ? SELECT_CHARACTERS.map((id) => {
+            const taken = otherPick === id;
+            return {
+              character: id,
+              name: CHARACTERS[id].name,
+              selected: pick === id,
+              taken,
+              takenText: taken ? STRINGS.selectTaken : null,
+              disabled: ready || taken,
+              box: `pick-${seat}-${slug(id)}`,
+            };
+          })
+          : [],
+        readyButton: mine ? { label: STRINGS.selectReady, disabled: ready || pick === null, box: `ready-${seat}` } : null,
+      };
+    }),
+  };
+}
+
 // The waiting room for a flow state (flow.js; screen waiting or starting)
-// and this window's room ({ code, character }: the room view, character
-// being this window's own). In phase waiting the other player's card is a
-// dimmed placeholder and Leave is enabled; in phase starting both cards
-// are filled, Leave is disabled and Starting shows. null off those screens.
+// and this window's room ({ code, seats, seat }: the room view). Two seats,
+// the host's on the left: this window picks a character for its own seat
+// and presses Ready; the other seat shows the other player's pick. In
+// phase waiting nobody sits in the guest seat yet (a dimmed placeholder).
+// Leave is always enabled. null off those screens.
 export function waitingViewModel(flow, room) {
   const starting = flow.screen === SCREENS.STARTING;
   if (!starting && flow.screen !== SCREENS.WAITING) return null;
-  const mine = room?.character ?? null;
-  const hostCharacter = flow.role === ROLES.GUEST && mine ? otherCharacter(mine) : mine;
+  const seats = room?.seats ?? createSeats(ROOM_SEATS);
+  const you = room?.seat ?? (flow.role === ROLES.GUEST ? GUEST : HOST);
+  const other = you === HOST ? GUEST : HOST;
+  const select = characterSelectViewModel({
+    seats,
+    labels: { [you]: STRINGS.waitingYou, [other]: STRINGS.waitingOpponent },
+    editable: [you],
+    you,
+    absent: starting ? [] : [GUEST],
+  });
   return {
     phase: flow.screen,
     title: starting ? STRINGS.startingTitle : STRINGS.waitingTitle,
     code: room?.code ?? '',
     hint: STRINGS.waitingHint,
     starting,
-    startingText: starting ? STRINGS.waitingStarting : null,
-    cards: WAITING_CARD_ORDER.map((id) => {
-      const character = CHARACTERS[id];
-      const stone = stoneForCharacter(id);
-      const you = id === mine;
-      return {
-        character: id,
-        name: character.name,
-        stone,
-        team: stone === X ? 'blue' : 'red',
-        portrait: PORTRAIT_ART[stone],
-        note: stone === X ? STRINGS.waitingMovesFirst : null,
-        you,
-        youText: you ? STRINGS.waitingYou : null,
-        placeholder: !you && !starting,
-        placeholderText: !you && !starting ? STRINGS.waitingPlaceholder : null,
-        box: id === hostCharacter ? 'card-host' : 'card-guest',
-      };
-    }),
+    startingText: starting && seats.ready[you] ? STRINGS.selectWaitingOther : null,
+    lead: select.lead,
+    cards: select.seats,
     copy: { label: STRINGS.waitingCopy, enabled: true, box: 'waiting-copy' },
-    leave: { label: STRINGS.waitingLeave, enabled: !starting, box: 'waiting-leave' },
+    leave: { label: STRINGS.waitingLeave, enabled: true, box: 'waiting-leave' },
+  };
+}
+
+// The character select on the game screen of Play on this computer, while
+// the flow is selecting (flow.js isSelecting): Player 1 and Player 2 both
+// pick on this window. null otherwise.
+export function localSelectViewModel(flow) {
+  if (!isSelecting(flow)) return null;
+  const [one, two] = LOCAL_SEATS;
+  const select = characterSelectViewModel({
+    seats: flow.seats,
+    labels: { [one]: STRINGS.selectPlayer1, [two]: STRINGS.selectPlayer2 },
+    editable: LOCAL_SEATS,
+  });
+  return {
+    title: STRINGS.selectLocalTitle,
+    lead: select.lead,
+    cards: select.seats,
+    back: { label: STRINGS.back, box: 'select-back' },
   };
 }
 

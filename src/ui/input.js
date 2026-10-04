@@ -58,18 +58,19 @@ export function shortcutKeyHandler(handler) {
 
 // What is under an internal point: { cell: { x, y } } for a board cell,
 // { skill: { player, skillId } } for a skill button, or null.
-export function hitTest(px, py) {
+export function hitTest(px, py, sides = undefined) {
   const cell = cellAtPoint(px, py);
   if (cell) return { cell };
-  return skillHitTest(px, py, HUD_2D);
+  return skillHitTest(px, py, HUD_2D, sides);
 }
 
 // The skill button of a HUD layout (render/layout.js) under an internal
-// point as { skill: { player, skillId } }, or null.
-export function skillHitTest(px, py, layout) {
+// point as { skill: { player, skillId } }, or null. sides are the game's
+// { X, O } characters (default Wind Rabbit X, Earth Bear O).
+export function skillHitTest(px, py, layout, sides = undefined) {
   const button = skillButtonAt(px, py, 2, layout);
   if (button) {
-    const skillId = characterForStone(button.player)?.skills[button.index];
+    const skillId = characterForStone(button.player, sides)?.skills[button.index];
     if (skillId) return { skill: { player: button.player, skillId } };
   }
   return null;

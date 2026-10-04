@@ -1,14 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GAME_OVER_DELAY_MS, HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS, WAITING_START_DELAY_MS } from '../src/config.js';
+import { GAME_OVER_DELAY_MS, HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS } from '../src/config.js';
 import { X, O, ROCK, EMPTY } from '../src/logic/board.js';
-import { EARTH_BEAR, WIND_RABBIT } from '../src/logic/characters.js';
+import { EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
 import { createInitialState } from '../src/logic/game.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../src/logic/skills.js';
+import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION, HISS, VENOM } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
-import { BAD_CODE_ERROR, CREATE, GAME, GAME_OVER, JOIN, LOBBY, MENU, WAITING_SCREEN, createApp } from '../src/ui/app.js';
+import { BAD_CODE_ERROR, GAME, GAME_OVER, JOIN, LOBBY, MENU, WAITING_SCREEN, createApp } from '../src/ui/app.js';
 import { gameOutcome, statusLine } from '../src/ui/online-game.js';
+import { pickAndReady } from './room-start.js';
 
 // Windows that share one fake network (one room) and one fake clock. Each
 // window records the transports it opened.
@@ -36,17 +37,17 @@ function makeWorld({ random = () => 0 } = {}) {
   return { network, clock, window };
 }
 
-// A host window that created a room with `character` and a guest window
-// that joined it, after the host's start delay (both are in the game).
+// A host window that created a room and a guest window that joined it;
+// the host picked `character`, the guest the other one, and both pressed
+// Ready (both are in the game).
 function startGame(character = WIND_RABBIT) {
   const world = makeWorld();
   const host = world.window();
   const guest = world.window();
-  host.app.openCreate();
-  assert.equal(host.app.createRoom(character), true);
+  assert.equal(host.app.createRoom(), true);
   guest.app.openJoin();
   assert.equal(guest.app.joinRoom('AB2C9'), true);
-  world.clock.advance(WAITING_START_DELAY_MS);
+  pickAndReady(host.app, guest.app, character);
   return { ...world, host, guest };
 }
 
@@ -54,32 +55,34 @@ const status = (win) => win.app.getGame().getView().status;
 
 // --- Lobby, Create Room, Waiting ---
 
-test('the lobby leads to Create Room, and picking a character opens the Waiting screen with the code', () => {
+test('Create Room on the lobby opens the room at once with the code and two empty seats; the pick is made inside', () => {
   const { window } = makeWorld();
   const host = window();
   assert.equal(host.app.getScreen(), LOBBY);
-  assert.equal(host.app.createRoom(WIND_RABBIT), false, 'a room is only made from the Create Room screen');
-  host.app.openCreate();
-  assert.equal(host.app.getScreen(), CREATE);
-  assert.equal(host.app.createRoom('nobody'), false);
-  assert.equal(host.app.createRoom(EARTH_BEAR), true);
+  assert.equal(host.app.createRoom(), true, 'no character is chosen in the lobby');
   assert.equal(host.app.getScreen(), WAITING_SCREEN);
-  const view = host.app.getView();
+  let view = host.app.getView();
   assert.equal(view.code, 'AB2C9');
+  assert.equal(view.character, null);
+  assert.deepEqual(view.waiting.cards.map((card) => card.character), [null, null], 'two empty seats');
+  assert.equal(host.app.pick('nobody'), false);
+  assert.equal(host.app.pick(EARTH_BEAR), true);
+  view = host.app.getView();
   assert.equal(view.character, EARTH_BEAR);
   assert.equal(view.characterName, 'Earth Bear');
+  assert.equal(view.waiting.cards[0].stone, X, 'the first pick plays X');
   assert.equal(host.transports.length, 1);
   assert.equal(host.app.getGame(), null);
+  assert.equal(host.app.createRoom(), false, 'a room is only made from the lobby');
 });
 
-test('Back from Create returns to the lobby, and Leave in the waiting room leaves the room for the menu', () => {
+test('Back from Join returns to the lobby, and Leave in the waiting room leaves the room for the menu', () => {
   const { window, clock } = makeWorld();
   const host = window();
-  host.app.openCreate();
+  host.app.openJoin();
   host.app.backToLobby();
   assert.equal(host.app.getScreen(), LOBBY);
-  host.app.openCreate();
-  host.app.createRoom(WIND_RABBIT);
+  host.app.createRoom();
   host.app.backToLobby();
   assert.equal(host.app.getScreen(), WAITING_SCREEN, 'the waiting room has Leave, not Back');
   assert.equal(host.app.leaveRoom(), true);
@@ -142,15 +145,14 @@ test('joining a full room shows an error and the two players keep playing', () =
   assert.equal(guest.app.getScreen(), GAME);
 });
 
-test('a typed code is cleaned up and the joiner gets the other character', () => {
-  const { window, clock } = makeWorld();
+test('a typed code is cleaned up, and the joiner who picks first plays X', () => {
+  const { window } = makeWorld();
   const host = window();
-  host.app.openCreate();
-  host.app.createRoom(EARTH_BEAR);
+  host.app.createRoom();
   const guest = window();
   guest.app.openJoin();
   assert.equal(guest.app.joinRoom(' ab2 c9 '), true);
-  clock.advance(WAITING_START_DELAY_MS);
+  pickAndReady(host.app, guest.app, EARTH_BEAR); // the guest picks Wind Rabbit first
   assert.equal(host.app.getScreen(), GAME);
   assert.equal(guest.app.getScreen(), GAME);
   assert.equal(guest.app.getView().character, WIND_RABBIT);
@@ -232,6 +234,32 @@ test('a lost guest action does not stall the game: it is sent again and the gues
   clock.advance(HEARTBEAT_INTERVAL_MS);
   assert.equal(guestGame.getView().state.board[5][5], X);
   assert.equal(status(guest), "Opponent's turn");
+});
+
+test('online: a guest playing Jade Serpent uses Hiss and Venom through the host', () => {
+  const world = makeWorld();
+  const host = world.window();
+  const guest = world.window();
+  host.app.createRoom();
+  guest.app.openJoin();
+  guest.app.joinRoom('AB2C9');
+  pickAndReady(host.app, guest.app, WIND_RABBIT, JADE_SERPENT, false); // the guest picks first: X
+  const serpent = guest.app.getGame();
+  const rabbit = host.app.getGame();
+  const state = () => host.app.getGame().getView().state;
+
+  assert.equal(serpent.click({ x: 7, y: 7 }), true); // X
+  assert.equal(rabbit.click({ x: 8, y: 8 }), true); // O
+  assert.equal(serpent.clickSkill(X, HISS), true);
+  assert.equal(serpent.getTargeting(), null);
+  assert.equal(state().skillLock?.player, O);
+  assert.equal(rabbit.clickSkill(O, WIND_DASH), false);
+  assert.equal(rabbit.getView().message, 'Hiss: you cannot use a skill this turn.');
+  assert.equal(rabbit.click({ x: 0, y: 0 }), true); // O
+  assert.equal(serpent.clickSkill(X, VENOM), true);
+  assert.equal(serpent.click({ x: 8, y: 8 }), true);
+  assert.equal(state().board[8][8], EMPTY);
+  assert.deepEqual(serpent.getView().state, rabbit.getView().state);
 });
 
 test('a full game between two windows with all four skills ends on the Game over screen', () => {

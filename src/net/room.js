@@ -13,8 +13,17 @@
 // the same channel may hear it too.
 //   join      guest -> host   ask for a seat; repeated every HEARTBEAT_INTERVAL_MS
 //                             until answered, and sent again later to resync
-//   welcome   host -> guest   { character, hostCharacter, state, seq, handled, result, round }
-//   start     host -> guest   { round } the start delay ended: the game begins
+//   welcome   host -> guest   { seats, state, seq, handled, result, round }; state is
+//                             null until the game started
+//   pick      guest -> host   { character, request } the guest's pick in the character
+//                             select; request counts the guest's picks and Readys up from 1
+//   ready     guest -> host   { character, request } the guest pressed Ready for the pick
+//                             character (refused if that is no longer its pick)
+//   seats     host -> guest   { seats, error?, reason?, answer? } the seats (logic/seats.js)
+//                             after every change, and as the answer to every pick and
+//                             ready (answer is its request, with the error when the host
+//                             refused it; the guest drops an error of an older request)
+//   start     host -> guest   { round, state, seq, seats } both seats are Ready: the game begins
 //   full      host -> other   the room already has two players
 //   action    guest -> host   { action, requestId }; requestId counts up from 1
 //   state     host -> guest   { state, events, seq, handled, round } after every applied action
@@ -35,7 +44,10 @@
 //                             the peer in over adds { gone }, so a
 //                             peer heard again after the connection
 //                             dropped learns that no rematch is left
-//                             (the ping counts as a leave)
+//                             (the ping counts as a leave). The host's
+//                             pings before the start carry { seats }, so
+//                             a guest whose pick or ready was lost sends
+//                             it again
 //   leave     both ways       sent when the page closes
 //   rematch   guest -> host   { round } asks for a rematch of the game of that round
 //   rematch-status host -> guest { round, host, guest, gone } after every change in
@@ -48,20 +60,27 @@
 // the host fills in the acting player from who sent it.
 //
 // Phases (docs/flow-design.md sections 5 and 6, ROOM_PHASES in phase.js) are
-// owned by the host. The room starts in waiting; a join is accepted only
-// then (any other window is told full) and the phase becomes starting. After
-// startDelayMs (WAITING_START_DELAY_MS) the host enters playing and sends
-// start with the round; the guest enters playing only when start arrives.
-// If the guest goes missing during starting the host cancels the start and
-// waits again. A win, a draw or a forfeit makes the phase over. Actions
-// before playing are rejected with reason NOT_STARTED and change nothing.
+// owned by the host. The room starts in waiting with two empty seats (HOST
+// and GUEST, logic/seats.js); a join is accepted only then (any other
+// window is told full) and the phase becomes starting. Each player picks a
+// character and presses Ready: the host through pick() and ready(), the
+// guest by sending pick and ready, which the host checks with the seat
+// rules (a character taken by the other seat is refused) and answers with
+// seats. The first pick plays X. When both seats are Ready the host makes
+// the game (newGame with the sides of the pick order), enters playing and
+// sends start with round 1; the guest enters playing only when start
+// arrives. If the guest goes missing during starting its seat is empty
+// again and the host waits for a new guest. A win, a draw or a forfeit
+// makes the phase over. Actions before playing are rejected with reason
+// NOT_STARTED and change nothing.
 //
 // Rematch (docs/flow-design.md section 5), decided by the host only. The
 // round is the game of the room: 1 for the first, plus 1 per rematch. A
 // rematch counts only in phase over with the current round, and never after
 // a forfeit or once the peer went missing in over (gone, for good in this
 // room); a repeat changes nothing. The host's own press is requestRematch().
-// When both asked, the host starts round plus 1 with newGame(), enters
+// When both asked, the host starts round plus 1 with newGame() for the same
+// characters on the same sides, enters
 // playing, sends new-game and restarts the heartbeat; the guest takes
 // new-game as it is, unless it lost the host in over. A guest whose
 // request is not yet shown in the host's status sends it again with every
@@ -88,8 +107,11 @@
 // it has not taken.
 //
 // Room events, passed to handlers given to onEvent:
-//   { type: 'joined', character }         host: the guest took a seat; guest: welcomed
+//   { type: 'joined' }                    host: the guest took a seat; guest: welcomed
 //                                         (both are now in phase starting)
+//   { type: 'seats', seats, error?, reason? }
+//                                         the seats changed; error when this window's
+//                                         pick or Ready was refused
 //   { type: 'start', round }              both: the host started the game (phase playing)
 //   { type: 'rematchStatus', round, host, guest, gone }
 //                                         the rematch flags changed in phase over; gone is
@@ -107,9 +129,9 @@
 //                                         'opponentLeft' }, or null when a guest's claim
 //                                         was dropped because the game ended by the rules
 
-import { HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS, WAITING_START_DELAY_MS } from '../config.js';
-import { CHARACTERS, EARTH_BEAR, WIND_RABBIT, stoneForCharacter } from '../logic/characters.js';
+import { HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS } from '../config.js';
 import { isGameOver, newGame, placeStone, useSkill } from '../logic/game.js';
+import { bothReady, clearSeat, createSeats, isSeats, pickCharacter, seatSides, seatStone, setReady } from '../logic/seats.js';
 import { systemClock } from './clock.js';
 import { ROOM_PHASES } from './phase.js';
 import { CONNECTED, GONE, checkPresence, countdownStart, createPresence, markHeard, markLeft } from './presence.js';
@@ -119,7 +141,7 @@ export const GUEST = 'guest';
 
 // Room phases: the four of ROOM_PHASES, and the guest's own before and after.
 export const WAITING = ROOM_PHASES.WAITING; // host: no guest yet
-export const STARTING = ROOM_PHASES.STARTING; // both seated, the host's start delay runs
+export const STARTING = ROOM_PHASES.STARTING; // both seated, picking characters until both are Ready
 export const PLAYING = ROOM_PHASES.PLAYING; // the game runs
 export const OVER = ROOM_PHASES.OVER; // the game ended (win, draw or forfeit)
 export const JOINING = 'joining'; // guest: join sent, no answer yet
@@ -131,41 +153,36 @@ export const CLOSED = 'closed'; // this window left
 export const NOT_STARTED = 'not-started';
 export const NOT_STARTED_ERROR = 'The game has not started yet.';
 
-export function otherCharacter(character) {
-  return character === WIND_RABBIT ? EARTH_BEAR : WIND_RABBIT;
-}
+// The two seats of a room (logic/seats.js).
+export const ROOM_SEATS = Object.freeze([HOST, GUEST]);
+
+// Errors of a pick or Ready outside the character select.
+const NOT_SELECTING_ERROR = 'The character select is over.';
 
 export function makePeerId() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-// Creates the room as its host. options.character is the character the
-// host picked; options.random is used for the Tornado Zone throw.
+// Creates the room as its host, with two empty seats. options.random is
+// used for the Tornado Zone throw.
 export function createHostRoom(options) {
   const {
     transport,
     code,
-    character,
     clock = systemClock,
     random = Math.random,
     id = makePeerId(),
-    startDelayMs = WAITING_START_DELAY_MS,
   } = options;
-  if (!Object.hasOwn(CHARACTERS, character)) throw new Error(`Unknown character: ${character}`);
-  const guestCharacter = otherCharacter(character);
-  const guestStone = stoneForCharacter(guestCharacter);
 
-  const room = createRoomCore({ role: HOST, transport, code, character, clock, id });
+  const room = createRoomCore({ role: HOST, transport, code, clock, id });
   room.phase = WAITING;
-  room.state = newGame();
-  let startTimer = null;
+  room.state = null; // made at the start from the picks
 
   const welcome = () => ({
     type: 'welcome',
     to: room.peerId,
-    character: guestCharacter,
-    hostCharacter: character,
+    seats: room.seats,
     state: room.state,
     seq: room.seq,
     handled: room.handled,
@@ -173,40 +190,67 @@ export function createHostRoom(options) {
     round: room.round,
   });
 
-  // An accepted join: seat the guest and start the start delay.
+  // An accepted join: seat the guest. The character select begins.
   const seat = (peerId) => {
     room.peerId = peerId;
     room.phase = STARTING;
     room.send(welcome());
     room.startLink();
-    startTimer = room.addTimer(clock.setTimeout(start, startDelayMs), 'timeout');
-    room.emit({ type: 'joined', character: guestCharacter });
+    room.emit({ type: 'joined' });
   };
 
-  // The start delay ended: the game begins on both sides at once.
+  const startMessage = () => ({ type: 'start', to: room.peerId, round: room.round, state: room.state, seq: room.seq, seats: room.seats });
+
+  // Both seats are Ready: the game of the picks begins on both sides at once.
   const start = () => {
-    room.removeTimer(startTimer);
-    startTimer = null;
     room.round = 1;
+    room.state = newGame({ characters: seatSides(room.seats) });
+    room.seq += 1;
+    room.takeSides();
     room.phase = PLAYING;
     room.resetRematch();
     room.restartLink();
-    room.send({ type: 'start', to: room.peerId, round: room.round });
+    room.send(startMessage());
     room.emit({ type: 'start', round: room.round });
   };
 
-  // The guest went missing during starting: cancel the start and wait for
-  // a new guest.
+  // The seats after a pick or Ready of side (HOST or GUEST): result is the
+  // answer of the seat rules. The guest is answered with the seats (and the
+  // error) even when nothing changed; every change is reported, and when
+  // both seats are Ready the game starts.
+  const takeSeats = (side, result, answer) => {
+    const changed = result.ok && result.seats !== room.seats;
+    if (changed) room.seats = result.seats;
+    const error = result.ok ? {} : { error: result.error, reason: result.reason };
+    const answered = side === GUEST ? { ...error, ...(Number.isInteger(answer) ? { answer } : {}) } : {};
+    if (room.peerId && (changed || side === GUEST)) room.send({ type: 'seats', to: room.peerId, seats: room.seats, ...answered });
+    if (changed) room.emit({ type: 'seats', seats: room.seats });
+    else if (!result.ok && side === HOST) room.emit({ type: 'seats', seats: room.seats, ...error });
+    if (changed && room.phase === STARTING && bothReady(room.seats)) start();
+    return result.ok ? { ok: true } : { ok: false, ...error };
+  };
+
+  // A pick or Ready of side, only before the game started. answer is the
+  // request of the guest's message.
+  const seatAction = (side, change, answer) => {
+    if (room.phase !== WAITING && room.phase !== STARTING) return { ok: false, error: NOT_SELECTING_ERROR };
+    return takeSeats(side, change(room.seats, side), answer);
+  };
+
+  // The guest went missing during starting: its seat is empty again and
+  // the host waits for a new guest.
   // A guest missing in over: no rematch any more in this room.
   room.lostPeer = (phase) => {
     if (phase === OVER) room.loseRematch();
     if (phase !== STARTING) return;
-    clock.clearTimeout(startTimer);
-    room.removeTimer(startTimer);
-    startTimer = null;
     room.stopLink();
     room.peerId = null;
     room.phase = WAITING;
+    const emptied = clearSeat(room.seats, GUEST);
+    if (emptied !== room.seats) {
+      room.seats = emptied;
+      room.emit({ type: 'seats', seats: room.seats });
+    }
   };
 
   // A rematch request of side (HOST or GUEST) for the game of round. Returns
@@ -223,7 +267,7 @@ export function createHostRoom(options) {
   // Both asked: the next round begins with a fresh game and a fresh link.
   const startNewGame = () => {
     room.round += 1;
-    room.state = newGame();
+    room.state = newGame({ characters: room.state.characters }); // same characters, same sides
     room.seq += 1;
     room.phase = PLAYING;
     room.resetRematch();
@@ -254,7 +298,7 @@ export function createHostRoom(options) {
         room.heard();
         room.send(welcome()); // the guest asked again; seat it again
         if (room.round > 1) room.send(newGameMessage()); // and the rematch it missed
-        else if (room.round > 0) room.send({ type: 'start', to: room.peerId, round: room.round }); // or the start
+        else if (room.round > 0) room.send(startMessage()); // or the start
       } else if (room.phase === WAITING) {
         seat(message.from);
       } else {
@@ -264,8 +308,18 @@ export function createHostRoom(options) {
     }
     if (message.from !== room.peerId) return;
     room.receiveCommon(message);
-    if (message.type === 'ping' && isClaim(message.result, guestStone) && !room.result && !isGameOver(room.state)) {
-      room.setResult({ winner: guestStone, reason: 'opponentLeft' });
+    if (message.type === 'ping' && isClaim(message.result, room.peerStone) && !room.result && !isGameOver(room.state)) {
+      room.setResult({ winner: room.peerStone, reason: 'opponentLeft' });
+    }
+    if (message.type === 'pick') {
+      seatAction(GUEST, (seats, side) => pickCharacter(seats, side, message.character), message.request);
+      return;
+    }
+    if (message.type === 'ready') {
+      // The Ready counts only for the pick it was pressed for.
+      const character = typeof message.character === 'string' ? message.character : undefined;
+      seatAction(GUEST, (seats, side) => setReady(seats, side, character), message.request);
+      return;
     }
     if (message.type === 'rematch') {
       rematchFrom(GUEST, message.round);
@@ -282,7 +336,7 @@ export function createHostRoom(options) {
         if (requestId <= room.handled) return; // a repeat of a request already answered
         room.handled = requestId;
       }
-      const result = apply(guestStone, message.action);
+      const result = apply(room.peerStone, message.action);
       if (!result.ok) {
         const { error, reason } = result;
         room.send({ type: 'rejected', to: room.peerId, error, ...(reason ? { reason } : {}), requestId, seq: room.seq, handled: room.handled });
@@ -297,6 +351,8 @@ export function createHostRoom(options) {
   };
 
   room.requestRematch = () => rematchFrom(HOST, room.round);
+  room.pick = (character) => seatAction(HOST, (seats, side) => pickCharacter(seats, side, character));
+  room.ready = () => seatAction(HOST, setReady);
 
   return room.api;
 }
@@ -305,13 +361,37 @@ export function createHostRoom(options) {
 // the join request, repeating it until the room answers with welcome or
 // full (a lost welcome is simply sent again); if nobody answers within
 // JOIN_TIMEOUT_MS the phase becomes NO_ROOM. After welcome the guest is in
-// phase starting until the host's start arrives.
+// phase starting (the character select) until the host's start arrives.
 export function createGuestRoom(options) {
   const { transport, code, clock = systemClock, id = makePeerId(), joinTimeoutMs = JOIN_TIMEOUT_MS } = options;
-  const room = createRoomCore({ role: GUEST, transport, code, character: null, clock, id });
+  const room = createRoomCore({ role: GUEST, transport, code, clock, id });
   room.phase = JOINING;
   let requestId = 0;
   let askedRematch = false; // this guest asked for a rematch of the current round
+  // This guest's own pick and Ready, sent again with a host ping until the
+  // host's seats show them (a refused pick is dropped).
+  let wanted = { character: null, ready: false };
+  let seatRequests = 0; // request of the last pick or Ready sent
+
+  // Takes the host's seats (from seats, welcome or a ping) before the
+  // start; reports them when they changed or carry an error. An error
+  // answers an older request than the last one sent is dropped: a newer
+  // pick or Ready is on its way, so wanted stays (else a host ping would
+  // send the old pick again over the newer one).
+  const takeSeats = (seats, error = null, answer = null) => {
+    if (room.phase !== STARTING || !isSeats(seats, ROOM_SEATS)) return;
+    if (error && Number.isInteger(answer) && answer !== seatRequests) error = null;
+    const changed = JSON.stringify(seats) !== JSON.stringify(room.seats);
+    if (changed) room.seats = seats;
+    if (error) wanted = { character: room.seats.picks[GUEST], ready: room.seats.ready[GUEST] };
+    if (changed || error) room.emit({ type: 'seats', seats: room.seats, ...(error ?? {}) });
+  };
+  // A pick or Ready sent again is a new request, so only its own answer
+  // (not the refusal of the copy before it) can drop what is wanted.
+  const sendWanted = () => {
+    if (wanted.character !== null && room.seats.picks[GUEST] !== wanted.character) room.send({ type: 'pick', to: room.peerId, character: wanted.character, request: ++seatRequests });
+    if (wanted.ready && !room.seats.ready[GUEST]) room.send({ type: 'ready', to: room.peerId, character: wanted.character, request: ++seatRequests });
+  };
 
   // A host missing in over: no rematch any more in this room.
   room.lostPeer = (phase) => {
@@ -341,16 +421,15 @@ export function createGuestRoom(options) {
   room.handle = (message) => {
     if (message.to !== id) return;
     if (room.phase === JOINING) {
-      if (message.type === 'welcome' && Object.hasOwn(CHARACTERS, message.character)) {
+      if (message.type === 'welcome' && isSeats(message.seats, ROOM_SEATS)) {
         stopJoining();
         room.peerId = message.from;
         room.phase = STARTING;
-        room.setCharacter(message.character);
-        room.hostCharacter = otherCharacter(message.character);
-        room.state = message.state;
-        room.seq = message.seq;
+        room.seats = message.seats;
+        room.state = message.state ?? null;
+        room.seq = Number.isInteger(message.seq) ? message.seq : 0;
         room.startLink();
-        room.emit({ type: 'joined', character: message.character });
+        room.emit({ type: 'joined' });
       } else if (message.type === 'full') {
         stopJoining();
         room.phase = FULL;
@@ -360,9 +439,18 @@ export function createGuestRoom(options) {
     }
     if (message.from !== room.peerId) return;
     room.receiveCommon(message);
+    if (message.type === 'seats') {
+      const error = typeof message.error === 'string' ? { error: message.error, reason: message.reason ?? null } : null;
+      takeSeats(message.seats, error, message.answer);
+      return;
+    }
     if (message.type === 'start') {
-      if (room.phase !== STARTING || !Number.isInteger(message.round)) return;
+      if (room.phase !== STARTING || !Number.isInteger(message.round) || !message.state || !isSeats(message.seats, ROOM_SEATS)) return;
       room.round = message.round;
+      room.seats = message.seats;
+      room.state = message.state;
+      if (Number.isInteger(message.seq)) room.seq = message.seq;
+      room.takeSides();
       room.phase = PLAYING;
       room.resetRematch();
       room.updateOver(); // a start recovered late: the game may have ended meanwhile (a forfeit)
@@ -388,6 +476,11 @@ export function createGuestRoom(options) {
       room.emit({ type: 'newGame', round: room.round, state: room.state });
       return;
     }
+    if (message.type === 'ping' && room.phase === STARTING && message.seats) {
+      takeSeats(message.seats);
+      sendWanted(); // a pick or ready (or its answer) was lost
+    }
+    if (message.type === 'welcome' && room.phase === STARTING) takeSeats(message.seats);
     if (message.type === 'ping' && room.phase === OVER) {
       takeRematchStatus(message.rematch);
       if (askedRematch && !room.rematch.guest && !room.rematchStatus().gone) sendRematch(); // the request or its status was lost
@@ -419,7 +512,8 @@ export function createGuestRoom(options) {
     // A result of a later round belongs to a game this side never took,
     // so it never replaces the outcome of this one.
     if ((message.type !== 'ping' && message.type !== 'welcome') || laterRound) return;
-    if (isClaim(message.result, stoneForCharacter(room.hostCharacter))) {
+    // Before the start the host's stone is known from the seats.
+    if (isClaim(message.result, room.peerStone ?? seatStone(room.seats, HOST))) {
       room.setResult({ winner: message.result.winner, reason: 'opponentLeft' }); // the host decides
     } else if (room.result && isGameOver(room.state)) {
       room.setResult(null); // the game had already ended by the rules before this side counted down
@@ -442,6 +536,38 @@ export function createGuestRoom(options) {
   };
 
   const sendRematch = () => room.send({ type: 'rematch', to: room.peerId, round: room.round });
+
+  // The seats as they will be once the host took this guest's pick and
+  // Ready that are sent but not yet shown in its seats.
+  const wantedSeats = () => {
+    const picked = wanted.character !== null ? pickCharacter(room.seats, GUEST, wanted.character) : { ok: false };
+    const seats = picked.ok ? picked.seats : room.seats;
+    const readied = wanted.ready ? setReady(seats, GUEST) : { ok: false };
+    return readied.ok ? readied.seats : seats;
+  };
+
+  // The guest's pick and Ready go to the host, which decides; the seat
+  // rules are checked here first (over the pick and Ready already sent)
+  // only so that a request known to be refused, such as a new pick after
+  // Ready, is not sent. Returns { ok: true } when sent, else { ok: false, error }.
+  const seatRequest = (check, message, want) => {
+    if (room.phase !== STARTING) return { ok: false, error: NOT_SELECTING_ERROR };
+    const result = check(wantedSeats());
+    if (!result.ok) {
+      room.emit({ type: 'seats', seats: room.seats, error: result.error, reason: result.reason });
+      return { ok: false, error: result.error, reason: result.reason };
+    }
+    wanted = { ...wanted, ...want };
+    seatRequests += 1;
+    room.send({ ...message, to: room.peerId, request: seatRequests });
+    return { ok: true };
+  };
+  room.pick = (character) => seatRequest((seats) => pickCharacter(seats, GUEST, character), { type: 'pick', character }, { character });
+  // Ready is for the pick as the guest sees it (its own last pick sent).
+  room.ready = () => {
+    const character = room.phase === STARTING ? wantedSeats().picks[GUEST] : null;
+    return seatRequest((seats) => setReady(seats, GUEST), { type: 'ready', character }, { character, ready: true });
+  };
 
   // Asks the host for a rematch; the host decides. Returns true if sent.
   room.requestRematch = () => {
@@ -487,7 +613,7 @@ function runAction(state, player, action, random) {
 
 // What host and guest share: sending, events, heartbeat and leave
 // detection, the view and closing.
-function createRoomCore({ role, transport, code, character, clock, id }) {
+function createRoomCore({ role, transport, code, clock, id }) {
   const handlers = new Set();
   const timers = []; // [{ id, kind }]
   let presence = null;
@@ -502,9 +628,11 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
     code,
     id,
     phase: null,
-    character: null,
-    stone: null,
-    hostCharacter: role === HOST ? character : null,
+    seats: createSeats(ROOM_SEATS), // the character select (host: its own; guest: as the host sent them)
+    character: null, // this window's character, from the start
+    stone: null, // this window's stone, from the start
+    hostCharacter: null,
+    peerStone: null, // the other window's stone, from the start
     peerId: null,
     state: null,
     seq: 0,
@@ -518,11 +646,17 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
     handle: () => {},
     act: () => ({ ok: false, error: 'You are not in a game.' }),
     requestRematch: () => false,
+    pick: () => ({ ok: false, error: NOT_SELECTING_ERROR }),
+    ready: () => ({ ok: false, error: NOT_SELECTING_ERROR }),
     lostPeer: () => {}, // (phase) the peer went missing outside phase playing
 
-    setCharacter(value) {
-      room.character = value;
-      room.stone = stoneForCharacter(value);
+    // The characters and stones of both windows from the seats, at the start.
+    takeSides() {
+      const other = role === HOST ? GUEST : HOST;
+      room.character = room.seats.picks[role];
+      room.stone = seatStone(room.seats, role);
+      room.hostCharacter = room.seats.picks[HOST];
+      room.peerStone = seatStone(room.seats, other);
     },
 
     send(message) {
@@ -650,6 +784,7 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
       ...(room.result ? { result: room.result } : {}),
       ...(room.rematchGone ? { gone: true } : {}),
       ...(role === HOST && room.phase === OVER ? { rematch: room.rematchStatus() } : {}),
+      ...(role === HOST && room.phase === STARTING ? { seats: room.seats } : {}),
     });
   };
 
@@ -704,8 +839,6 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
       else clock.clearInterval(timer.id);
     }
   };
-
-  if (character) room.setCharacter(character);
 
   unsubscribe = transport.onMessage((message) => {
     if (room.phase === CLOSED) return;
@@ -767,6 +900,17 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
       return room.requestRematch();
     },
 
+    // The character select: picks a character for this window's seat, or
+    // presses Ready. On the host it applies at once; on the guest it is sent
+    // to the host, which decides. Returns { ok: true } or { ok: false, error }.
+    pick(character) {
+      return room.pick(character);
+    },
+
+    ready() {
+      return room.ready();
+    },
+
     // Requests an action for this window's player (see the actions above).
     act(action) {
       return room.act(action);
@@ -780,19 +924,23 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
       return room.act({ kind: 'skill', skill, target });
     },
 
-    // Everything the screens need. peer is null until both players are in;
+    // Everything the screens need. seats is the character select and seat
+    // this window's seat name (HOST or GUEST); character and you are known
+    // from the start. peer is null until both players are in;
     // then { status, secondsLeft } as in presence.js, computed for now (a
     // countdown only in phase playing). waiting is true while a guest's
     // action request is not yet settled.
     getView() {
       const peer = peerView();
-      const canAct = actionBlocker(room) === null && room.state.currentPlayer === room.stone;
+      const canAct = actionBlocker(room) === null && room.state?.currentPlayer === room.stone;
       return {
         role: room.role,
         code: room.code,
         phase: room.phase,
         round: room.round,
-        character: room.character,
+        seats: room.seats,
+        seat: room.role,
+        character: room.character ?? room.seats.picks[room.role] ?? null,
         hostCharacter: room.hostCharacter,
         you: room.stone,
         state: room.state,

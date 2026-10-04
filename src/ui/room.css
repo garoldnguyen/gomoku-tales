@@ -39,7 +39,7 @@
 /* --- waiting room --- */
 
 #screens .room-card {
-  gap: calc(var(--u) * 10);
+  gap: calc(var(--u) * 6);
 }
 
 #screens .room-card .code {
@@ -259,4 +259,72 @@
   min-height: 1.3em;
   font-size: 13px;
   color: var(--ink-3);
+}
+
+/* --- character select (sections 3.5 and 3.6) --- */
+
+/* A seat of the character select: the label, the pick and its stone on
+   top, then one button per character and Ready for the seats this window
+   picks for. */
+#screens .seat:not(.is-placeholder) {
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(var(--u) * 8);
+  width: calc(var(--u) * 250);
+}
+
+#screens .seat.is-placeholder {
+  width: calc(var(--u) * 250);
+}
+
+#screens .seat-top {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 12);
+  min-height: calc(var(--u) * 48);
+}
+
+#screens .seat-label {
+  font-size: calc(var(--u) * 13);
+  font-weight: 700;
+  color: var(--ink-2);
+}
+
+#screens .seat-status {
+  color: var(--ink-3);
+}
+
+#screens .seat.is-ready .seat-status {
+  font-weight: 700;
+  color: var(--ready);
+}
+
+/* The three characters in one row, so the room fits 1280 by 720. */
+#screens .seat-choices {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: calc(var(--u) * 6);
+}
+
+#screens .seat-choices .choice {
+  justify-content: center;
+  gap: 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: calc(var(--u) * 4);
+  font-size: calc(var(--u) * 12);
+  line-height: 1.15;
+}
+
+#screens .seat-choices .choice[aria-pressed="true"] {
+  border-color: var(--team-ink);
+  background: var(--team-tile);
+}
+
+#screens .seat-ready {
+  min-height: 44px;
+}
+
+#screens .select-lead {
+  color: var(--ink-2);
 }

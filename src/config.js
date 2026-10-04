@@ -25,7 +25,6 @@ export const ONLINE_SAME_BROWSER_ONLY = true;
 
 // Screen timings not listed in docs/design.md section 10.
 export const GAME_OVER_DELAY_MS = 1500; // time to see the final board before the Game over screen
-export const WAITING_START_DELAY_MS = 1500; // second player joined: the host starts the game after this
 export const COPY_FEEDBACK_MS = 1500; // how long Copied shows after the room code was copied
 // The landing menu (src/ui/menu.css): the dark scrim over the 3D scene
 // blurs it this much on the levels with frosted glass (none on Low).
