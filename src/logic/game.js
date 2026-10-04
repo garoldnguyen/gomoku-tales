@@ -19,6 +19,17 @@ const SKILL_EFFECTS = {
   [STONE_CONVERSION]: stoneConversion,
 };
 
+// A fresh game (docs/flow-design.md section 5), shared by the online host,
+// local mode and every rematch: empty board, no rocks, no pending Wind
+// Dash, no Tornado Zone, every cooldown 0, Wind Rabbit (X) to move, no
+// winner. Characters are tied to their stones, so they keep their sides.
+// options.size is the board size; random choices are not made here, the
+// actions keep taking the injected random function.
+export function newGame(options = {}) {
+  const { size = BOARD_SIZE } = options;
+  return createInitialState(size);
+}
+
 export function createInitialState(size = BOARD_SIZE) {
   return {
     board: createBoard(size),

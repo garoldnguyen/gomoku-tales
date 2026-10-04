@@ -13,11 +13,11 @@
 // the same channel may hear it too.
 //   join      guest -> host   ask for a seat; repeated every HEARTBEAT_INTERVAL_MS
 //                             until answered, and sent again later to resync
-//   welcome   host -> guest   { character, hostCharacter, state, seq, handled, result }
+//   welcome   host -> guest   { character, hostCharacter, state, seq, handled, result, round }
 //   start     host -> guest   { round } the start delay ended: the game begins
 //   full      host -> other   the room already has two players
 //   action    guest -> host   { action, requestId }; requestId counts up from 1
-//   state     host -> guest   { state, events, seq, handled } after every applied action
+//   state     host -> guest   { state, events, seq, handled, round } after every applied action
 //   rejected  host -> guest   { error, reason?, requestId, seq, handled } for an invalid
 //                             action; reason is NOT_STARTED before phase playing
 //   ping      both ways       heartbeat, every HEARTBEAT_INTERVAL_MS; the
@@ -26,11 +26,19 @@
 //                             handled so the guest notices a lost action
 //                             request (or a lost answer to it), and round
 //                             so a guest still in starting notices a lost
-//                             start. Once
+//                             start and a guest still in over a lost
+//                             new-game (it then ignores boards of the
+//                             later round until new-game arrives). Once
 //                             a side has a result it adds { result }, and
 //                             keeps pinging so a peer that is still there
 //                             learns the outcome
 //   leave     both ways       sent when the page closes
+//   rematch   guest -> host   { round } asks for a rematch of the game of that round
+//   rematch-status host -> guest { round, host, guest, gone } after every change in
+//                             phase over; the host's pings in over carry it too as
+//                             { rematch }, so a lost one is recovered
+//   new-game  host -> guest   { round, state, seq, handled } both asked: the next game
+//                             begins with a fresh state
 //
 // Actions are { kind: 'place', x, y } or { kind: 'skill', skill, target };
 // the host fills in the acting player from who sent it.
@@ -43,6 +51,16 @@
 // If the guest goes missing during starting the host cancels the start and
 // waits again. A win, a draw or a forfeit makes the phase over. Actions
 // before playing are rejected with reason NOT_STARTED and change nothing.
+//
+// Rematch (docs/flow-design.md section 5), decided by the host only. The
+// round is the game of the room: 1 for the first, plus 1 per rematch. A
+// rematch counts only in phase over with the current round, and never after
+// a forfeit or once the peer went missing in over (gone, for good in this
+// room); a repeat changes nothing. The host's own press is requestRematch().
+// When both asked, the host starts round plus 1 with newGame(), enters
+// playing, sends new-game and restarts the heartbeat; the guest takes
+// new-game as it is. A guest whose request is not yet shown in the host's
+// status sends it again with every host ping it hears in over.
 //
 // Presence by phase: the heartbeat runs in every phase and restarts when the
 // game starts. The leave countdown and the forfeit run only in playing. In
@@ -67,6 +85,10 @@
 //   { type: 'joined', character }         host: the guest took a seat; guest: welcomed
 //                                         (both are now in phase starting)
 //   { type: 'start', round }              both: the host started the game (phase playing)
+//   { type: 'rematchStatus', round, host, guest, gone }
+//                                         the rematch flags changed in phase over; gone is
+//                                         true when no rematch is possible any more
+//   { type: 'newGame', round, state }     both: a rematch began (phase playing)
 //   { type: 'peerGone', phase }           the peer went missing outside phase playing; phase
 //                                         is where it happened. A host in starting is back in
 //                                         waiting when this arrives
@@ -81,7 +103,7 @@
 
 import { HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS, WAITING_START_DELAY_MS } from '../config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
-import { createInitialState, isGameOver, placeStone, useSkill } from '../logic/game.js';
+import { isGameOver, newGame, placeStone, useSkill } from '../logic/game.js';
 import { systemClock } from './clock.js';
 import { ROOM_PHASES } from './phase.js';
 import { CONNECTED, GONE, checkPresence, countdownStart, createPresence, markHeard, markLeft } from './presence.js';
@@ -130,7 +152,7 @@ export function createHostRoom(options) {
 
   const room = createRoomCore({ role: HOST, transport, code, character, clock, id });
   room.phase = WAITING;
-  room.state = createInitialState();
+  room.state = newGame();
   let startTimer = null;
 
   const welcome = () => ({
@@ -142,6 +164,7 @@ export function createHostRoom(options) {
     seq: room.seq,
     handled: room.handled,
     result: room.result,
+    round: room.round,
   });
 
   // An accepted join: seat the guest and start the start delay.
@@ -160,6 +183,7 @@ export function createHostRoom(options) {
     startTimer = null;
     room.round = 1;
     room.phase = PLAYING;
+    room.resetRematch();
     room.restartLink();
     room.send({ type: 'start', to: room.peerId, round: room.round });
     room.emit({ type: 'start', round: room.round });
@@ -167,7 +191,9 @@ export function createHostRoom(options) {
 
   // The guest went missing during starting: cancel the start and wait for
   // a new guest.
+  // A guest missing in over: no rematch any more in this room.
   room.lostPeer = (phase) => {
+    if (phase === OVER) room.loseRematch();
     if (phase !== STARTING) return;
     clock.clearTimeout(startTimer);
     room.removeTimer(startTimer);
@@ -176,6 +202,31 @@ export function createHostRoom(options) {
     room.peerId = null;
     room.phase = WAITING;
   };
+
+  // A rematch request of side (HOST or GUEST) for the game of round. Returns
+  // true if it set that side's flag.
+  const rematchFrom = (side, round) => {
+    if (room.phase !== OVER || round !== room.round) return false;
+    if (room.rematchStatus().gone || room.rematch[side]) return false;
+    room.rematch = { ...room.rematch, [side]: true };
+    room.refreshRematch();
+    if (room.rematch.host && room.rematch.guest) startNewGame();
+    return true;
+  };
+
+  // Both asked: the next round begins with a fresh game and a fresh link.
+  const startNewGame = () => {
+    room.round += 1;
+    room.state = newGame();
+    room.seq += 1;
+    room.phase = PLAYING;
+    room.resetRematch();
+    room.restartLink();
+    room.send(newGameMessage());
+    room.emit({ type: 'newGame', round: room.round, state: room.state });
+  };
+
+  const newGameMessage = () => ({ type: 'new-game', to: room.peerId, round: room.round, state: room.state, seq: room.seq, handled: room.handled });
 
   // Applies an action for player. Returns { ok: true } or { ok: false, error, reason? }.
   const apply = (player, action) => {
@@ -186,7 +237,7 @@ export function createHostRoom(options) {
     room.state = result.state;
     room.seq += 1;
     room.updateOver();
-    room.send({ type: 'state', to: room.peerId, state: room.state, events: result.events, seq: room.seq, handled: room.handled });
+    room.send({ type: 'state', to: room.peerId, state: room.state, events: result.events, seq: room.seq, handled: room.handled, round: room.round });
     room.emit({ type: 'state', state: room.state, events: result.events });
     return { ok: true };
   };
@@ -196,7 +247,8 @@ export function createHostRoom(options) {
       if (message.from === room.peerId) {
         room.heard();
         room.send(welcome()); // the guest asked again; seat it again
-        if (room.round > 0) room.send({ type: 'start', to: room.peerId, round: room.round }); // and the start it missed
+        if (room.round > 1) room.send(newGameMessage()); // and the rematch it missed
+        else if (room.round > 0) room.send({ type: 'start', to: room.peerId, round: room.round }); // or the start
       } else if (room.phase === WAITING) {
         seat(message.from);
       } else {
@@ -208,6 +260,10 @@ export function createHostRoom(options) {
     room.receiveCommon(message);
     if (message.type === 'ping' && isClaim(message.result, guestStone) && !room.result && !isGameOver(room.state)) {
       room.setResult({ winner: guestStone, reason: 'opponentLeft' });
+    }
+    if (message.type === 'rematch') {
+      rematchFrom(GUEST, message.round);
+      return;
     }
     if (message.type === 'action') {
       const requestId = Number.isInteger(message.requestId) ? message.requestId : null;
@@ -234,6 +290,8 @@ export function createHostRoom(options) {
     return result;
   };
 
+  room.requestRematch = () => rematchFrom(HOST, room.round);
+
   return room.api;
 }
 
@@ -247,6 +305,20 @@ export function createGuestRoom(options) {
   const room = createRoomCore({ role: GUEST, transport, code, character: null, clock, id });
   room.phase = JOINING;
   let requestId = 0;
+  let askedRematch = false; // this guest asked for a rematch of the current round
+
+  // A host missing in over: no rematch any more in this room.
+  room.lostPeer = (phase) => {
+    if (phase === OVER) room.loseRematch();
+  };
+
+  // Takes the host's rematch status for the current round.
+  const takeRematchStatus = (status) => {
+    if (room.phase !== OVER || !status || status.round !== room.round) return;
+    room.rematch = { host: status.host === true, guest: status.guest === true };
+    if (status.gone === true) room.rematchGone = true;
+    room.refreshRematch();
+  };
 
   const joinRetry = room.addTimer(clock.setInterval(() => room.send({ type: 'join' }), HEARTBEAT_INTERVAL_MS), 'interval');
   const joinTimer = room.addTimer(clock.setTimeout(() => {
@@ -286,13 +358,39 @@ export function createGuestRoom(options) {
       if (room.phase !== STARTING || !Number.isInteger(message.round)) return;
       room.round = message.round;
       room.phase = PLAYING;
+      room.resetRematch();
       room.updateOver(); // a start recovered late: the game may have ended meanwhile (a forfeit)
       room.restartLink();
       room.emit({ type: 'start', round: room.round });
       return;
     }
+    if (message.type === 'rematch-status') {
+      takeRematchStatus(message);
+      return;
+    }
+    if (message.type === 'new-game') {
+      if (room.phase !== OVER || !Number.isInteger(message.round) || message.round <= room.round || !message.state) return;
+      room.round = message.round;
+      room.state = message.state;
+      if (Number.isInteger(message.seq)) room.seq = message.seq;
+      room.pending = null;
+      room.result = null;
+      askedRematch = false;
+      room.phase = PLAYING;
+      room.resetRematch();
+      room.restartLink();
+      room.emit({ type: 'newGame', round: room.round, state: room.state });
+      return;
+    }
+    if (message.type === 'ping' && room.phase === OVER) {
+      takeRematchStatus(message.rematch);
+      if (askedRematch && !room.rematch.guest && !room.rematchStatus().gone) sendRematch(); // the request or its status was lost
+    }
+    // The host is already in a later round (its new-game was lost): only
+    // new-game may end this round, so a board of that round is not taken.
+    const laterRound = room.phase === OVER && message.round > room.round;
     let stateEvent = null;
-    if ((message.type === 'state' || message.type === 'welcome') && message.seq > room.seq) {
+    if ((message.type === 'state' || message.type === 'welcome') && message.seq > room.seq && !laterRound) {
       room.state = message.state;
       room.seq = message.seq;
       room.updateOver();
@@ -305,8 +403,8 @@ export function createGuestRoom(options) {
       room.emit(stateEvent);
     } else if (message.type === 'rejected') {
       room.emit({ type: 'rejected', error: message.error, ...(message.reason ? { reason: message.reason } : {}) });
-    } else if (message.type === 'ping' && (message.seq > room.seq || (room.phase === STARTING && message.round > 0))) {
-      room.send({ type: 'join' }); // a state or start message was lost; the host answers with a fresh welcome (and start)
+    } else if (message.type === 'ping' && (message.seq > room.seq || (room.phase === STARTING && message.round > 0) || laterRound)) {
+      room.send({ type: 'join' }); // a state, start or new-game message was lost; the host answers with a fresh welcome (and start or new-game)
     } else if (message.type === 'ping' && room.pending && !(message.handled >= room.pending.requestId)) {
       room.send({ type: 'action', to: room.peerId, ...room.pending }); // the request or its answer was lost
     }
@@ -333,6 +431,16 @@ export function createGuestRoom(options) {
     return { ok: true, requestId };
   };
 
+  const sendRematch = () => room.send({ type: 'rematch', to: room.peerId, round: room.round });
+
+  // Asks the host for a rematch; the host decides. Returns true if sent.
+  room.requestRematch = () => {
+    if (room.phase !== OVER || room.rematchStatus().gone) return false;
+    askedRematch = true;
+    sendRematch();
+    return true;
+  };
+
   room.send({ type: 'join' });
   return room.api;
 }
@@ -348,6 +456,10 @@ function actionBlocker(room) {
 }
 
 function withoutOk({ ok, ...rest }) {
+  return rest;
+}
+
+function withoutType({ type, ...rest }) {
   return rest;
 }
 
@@ -390,8 +502,12 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
     handled: 0, // host: requestId of the last guest action applied or rejected
     pending: null, // guest: { action, requestId } sent and not yet settled by the host
     result: null, // { winner, reason: 'opponentLeft' } when a player left mid-game
+    rematch: { host: false, guest: false }, // rematch flags of the current round (guest: as the host sent them)
+    rematchGone: false, // the peer went missing in over: no rematch in this room any more
+    lastRematch: null, // the rematch status last reported
     handle: () => {},
     act: () => ({ ok: false, error: 'You are not in a game.' }),
+    requestRematch: () => false,
     lostPeer: () => {}, // (phase) the peer went missing outside phase playing
 
     setCharacter(value) {
@@ -412,11 +528,49 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
       room.result = result;
       room.updateOver();
       room.emit({ type: 'result', result });
+      room.refreshRematch();
     },
 
-    // A running game that has ended (win, draw or forfeit) is over.
+    // A running game that has ended (win, draw or forfeit) is over, with
+    // both rematch flags cleared.
     updateOver() {
-      if (room.phase === PLAYING && (room.result || isGameOver(room.state))) room.phase = OVER;
+      if (room.phase !== PLAYING || !(room.result || isGameOver(room.state))) return;
+      room.phase = OVER;
+      room.rematch = { host: false, guest: false };
+      room.refreshRematch();
+    },
+
+    // The rematch status: a forfeit (a result) or a peer gone in over
+    // means no rematch.
+    rematchStatus() {
+      const { host, guest } = room.rematch;
+      return { round: room.round, host, guest, gone: room.rematchGone || room.result !== null };
+    },
+
+    // Reports the rematch status in phase over when it changed: an event,
+    // and the host sends it to the guest.
+    refreshRematch() {
+      if (room.phase !== OVER) return;
+      const status = room.rematchStatus();
+      const last = room.lastRematch;
+      if (last && last.round === status.round && last.host === status.host && last.guest === status.guest && last.gone === status.gone) return;
+      room.lastRematch = status;
+      if (role === HOST && room.peerId) room.send({ type: 'rematch-status', to: room.peerId, ...status });
+      room.emit({ type: 'rematchStatus', ...status });
+    },
+
+    // A new round: both flags cleared, nothing reported.
+    resetRematch() {
+      room.rematch = { host: false, guest: false };
+      room.lastRematch = room.rematchStatus();
+    },
+
+    // The peer went missing in over: the flags are cleared and rematch is
+    // off for good in this room.
+    loseRematch() {
+      room.rematch = { host: false, guest: false };
+      room.rematchGone = true;
+      room.refreshRematch();
     },
 
     addTimer(timerId, kind) {
@@ -483,6 +637,7 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
       ...(role === HOST ? { seq: room.seq, handled: room.handled } : {}),
       ...(role === HOST && room.round > 0 ? { round: room.round } : {}),
       ...(room.result ? { result: room.result } : {}),
+      ...(role === HOST && room.phase === OVER ? { rematch: room.rematchStatus() } : {}),
     });
   };
 
@@ -566,6 +721,12 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
       return room.round;
     },
 
+    // { round, host, guest, gone }: who asked for a rematch of this round,
+    // and whether a rematch is no longer possible.
+    get rematchStatus() {
+      return room.rematchStatus();
+    },
+
     onEvent(handler) {
       handlers.add(handler);
       return () => handlers.delete(handler);
@@ -577,6 +738,21 @@ function createRoomCore({ role, transport, code, character, clock, id }) {
       return room.api.onEvent((event) => {
         if (event.type === 'peerGone') handler(event);
       });
+    },
+
+    // Calls handler({ round, host, guest, gone }) whenever the rematch status
+    // changes in phase over; returns a function that removes it.
+    onRematchStatus(handler) {
+      return room.api.onEvent((event) => {
+        if (event.type === 'rematchStatus') handler(withoutType(event));
+      });
+    },
+
+    // Asks for a rematch of the game that just ended: on the host it sets
+    // the host's flag, on the guest it sends rematch. Returns true if the
+    // request was taken (the guest's is only sent; the host decides).
+    requestRematch() {
+      return room.requestRematch();
     },
 
     // Requests an action for this window's player (see the actions above).

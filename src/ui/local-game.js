@@ -3,7 +3,7 @@
 
 import { X, O, isEmptyCell } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
-import { createInitialState, canUseSkill, isGameOver, placeStone, skillCooldown, useSkill } from '../logic/game.js';
+import { canUseSkill, isGameOver, newGame, placeStone, skillCooldown, useSkill } from '../logic/game.js';
 import { getSkill } from '../logic/skills.js';
 import { startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
 
@@ -14,7 +14,7 @@ const NO_EVENTS = Object.freeze([]);
 // options.random is passed to placeStone for the Tornado Zone throw.
 export function createLocalGame(options = {}) {
   const { random = Math.random } = options;
-  let state = createInitialState();
+  let state = newGame();
   let hover = null; // board cell under the pointer
   let hoverSkill = null; // { player, skillId } of the button under the pointer
   let targeting = null; // skill target flow in progress, see targeting.js
@@ -39,6 +39,15 @@ export function createLocalGame(options = {}) {
     message = describeEvents(result.events);
     pendingEvents.push(...result.events);
     return true;
+  };
+
+  // A rematch in one window: a new game at once, no messages and nobody to
+  // wait for.
+  const rematchLocal = () => {
+    state = newGame();
+    targeting = null;
+    message = null;
+    pendingEvents = [];
   };
 
   return {
@@ -112,12 +121,8 @@ export function createLocalGame(options = {}) {
       return true;
     },
 
-    restart() {
-      state = createInitialState();
-      targeting = null;
-      message = null;
-      pendingEvents = [];
-    },
+    rematchLocal,
+    restart: rematchLocal,
 
     getView() {
       const player = state.currentPlayer;
