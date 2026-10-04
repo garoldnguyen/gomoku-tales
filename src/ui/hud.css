@@ -243,6 +243,22 @@
 .hud .tip-rule { height: 1px; background: var(--hair); }
 .hud .tip-hint { font-size: 12px; font-weight: 600; color: rgba(244, 247, 251, 0.7); }
 /* Full cards: the turn pill never reaches the quality switch (TURN_SIDE_ROOM in hud-layout.js). */
-.hud:not(.is-compact) .turn { max-width: calc(100vw - 608px); min-width: 0; }
+.hud:not(.is-compact) .turn { max-width: calc(100vw - 712px); min-width: 0; }
+.hud.no-fullscreen:not(.is-compact) .turn { max-width: calc(100vw - 608px); }
 .hud:not(.is-compact) .turn .who { white-space: nowrap; }
 .hud:not(.is-compact) .turn .hint { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Farmland v3.1 section 3.5: the Fullscreen button, a 44 px glass circle left
+   of the quality switch (topBarLayout() in hud-layout.js has the same
+   numbers). In the slim layout of narrow phones (.fs-below) it sits under
+   the switch, so the turn pill keeps its room. */
+.hud .top-tools { position: absolute; right: 40px; top: 28px; display: flex; flex-direction: row; align-items: center; gap: 8px; pointer-events: none; }
+.hud .top-tools .quality { position: static; }
+.hud .fullscreen { width: 44px; height: 44px; flex-shrink: 0; padding: 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+.hud .fullscreen .fs-exit, .hud .fullscreen[aria-pressed="true"] .fs-enter { display: none; }
+.hud .fullscreen[aria-pressed="true"] .fs-exit { display: block; }
+.hud.is-compact .top-tools { right: 12px; top: 12px; }
+.hud.is-compact .top-tools .quality { right: auto; top: auto; }
+.hud.is-compact .topbar { max-width: calc(100% - 268px); }
+.hud.is-compact.no-fullscreen .topbar, .hud.is-compact.fs-below .topbar { max-width: calc(100% - 216px); }
+.hud.is-compact.fs-below .top-tools { flex-direction: column-reverse; align-items: flex-end; }

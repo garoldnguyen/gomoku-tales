@@ -317,7 +317,7 @@ test('hud-layout: no overlaps and everything inside, collapsed and expanded', ()
   // The slim bars of a phone, whatever is saved.
   for (const collapsed of [ALL_EXPANDED, ALL_COLLAPSED]) {
     const boxes = checkBoxes(390, 844, collapsed);
-    assert.deepEqual(boxes.map((b) => b.name), ['turn', 'quality', 'card-x', 'card-o']);
+    assert.deepEqual(boxes.map((b) => b.name), ['turn', 'quality', 'fullscreen', 'card-x', 'card-o']);
   }
   // The other shapes of the screenshot check.
   for (const [w, h] of [[1680, 720], [1024, 768], [720, 1280]]) checkBoxes(w, h, ALL_COLLAPSED);
@@ -380,7 +380,7 @@ test('hud-layout: where no pill fits beside the board the cards stay full and ke
   assert.equal(small.layout.compact, false);
   assert.equal(small.foldable, false);
   assert.deepEqual(small.folded, { X: false, O: false });
-  assert.deepEqual(hudBoxes(900, 520, { collapsed: ALL_COLLAPSED }).map((b) => b.name), ['turn', 'quality', 'card-x', 'card-o']);
+  assert.deepEqual(hudBoxes(900, 520, { collapsed: ALL_COLLAPSED }).map((b) => b.name), ['turn', 'quality', 'fullscreen', 'card-x', 'card-o']);
   checkBoxes(900, 520, ALL_COLLAPSED);
   // Full size windows fold; the slim layouts never do.
   assert.equal(canFold(1920, 1080, hudLayout(1920, 1080)), true);

@@ -13,7 +13,7 @@
 import { X, O } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
 import { getSkill } from '../logic/skills.js';
-import { CARD_HEIGHT, chevronSize, hudFoldLayout, pillScale } from './hud-layout.js';
+import { CARD_HEIGHT, chevronSize, hudFoldLayout, pillScale, topBarLayout } from './hud-layout.js';
 import { PORTRAIT_ART, QUALITY_CHOICES, SKILL_ICON_ART } from './hud-view.js';
 import { TOOLTIP_LONG_PRESS_MS, TOOLTIP_SHOW_MS, tooltipPosition } from './tooltip-position.js';
 
@@ -29,8 +29,10 @@ const TOOLTIP_ID = 'hud-tooltip';
 //   onQuality(level)          a quality button was pressed
 //   onCancel()                a right click on the HUD
 //   onCollapse(player)        a card's chevron was pressed
+//   onFullscreen()            the Fullscreen button was pressed; it must
+//                             call the Fullscreen API at once (a user action)
 // assets: the asset store (render/assets.js) or null; setAssets() swaps it.
-export function createHud(root, { onSkill, onQuality, onCancel, onCollapse }, assets = null) {
+export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFullscreen }, assets = null) {
   root.classList.add('hud');
   const el = (tag, className, parent) => {
     const node = document.createElement(tag);
@@ -51,8 +53,21 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse }, as
   const turnWho = el('span', 'who', turn);
   const turnHint = el('span', 'hint', turn);
 
+  // The Fullscreen button and the quality switch, side by side at the top
+  // right (or the button under the switch, .fs-below). The button stays
+  // hidden until setFullscreen() says the browser has the Fullscreen API.
+  const tools = el('div', 'top-tools', root);
+  const fullscreen = el('button', 'fullscreen glass', tools);
+  fullscreen.type = 'button';
+  fullscreen.dataset.hudBox = 'fullscreen';
+  fullscreen.hidden = true;
+  fullscreen.setAttribute('aria-pressed', 'false');
+  fullscreen.innerHTML = '<svg class="fs-enter" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"></path></svg>'
+    + '<svg class="fs-exit" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5"></path></svg>';
+  fullscreen.addEventListener('click', () => onFullscreen?.());
+
   // Quality switch.
-  const quality = el('div', 'quality glass', root);
+  const quality = el('div', 'quality glass', tools);
   quality.setAttribute('role', 'group');
   quality.setAttribute('aria-label', 'Quality');
   quality.dataset.hudBox = 'quality';
@@ -225,6 +240,9 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse }, as
     }
     const collapsed = { [X]: cards[0].collapsed, [O]: cards[1].collapsed };
     const { layout: next, foldable: fits } = hudFoldLayout(window.innerWidth, window.innerHeight, { collapsed, cardHeight });
+    const top = topBarLayout(window.innerWidth, window.innerHeight, next, { fullscreen: !fullscreen.hidden });
+    root.classList.toggle('fs-below', top.fullscreenBelow);
+    root.classList.toggle('no-fullscreen', fullscreen.hidden);
     compact = next.compact;
     foldable = fits;
     root.classList.toggle('is-compact', next.compact);
@@ -450,6 +468,17 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse }, as
     // does nothing.
     canCollapse() {
       return !root.hidden && foldable;
+    },
+
+    // Shows the Fullscreen button from fullscreenViewModel() (fullscreen.js):
+    // hidden without the Fullscreen API, else its label and pressed state.
+    setFullscreen(vm) {
+      setAttr(fullscreen, 'aria-label', vm.ariaLabel);
+      setAttr(fullscreen, 'aria-pressed', String(vm.pressed));
+      if (fullscreen.hidden === vm.visible) {
+        fullscreen.hidden = !vm.visible;
+        layout();
+      }
     },
 
     // The loaded art; missing files keep their letters.

@@ -11,6 +11,9 @@ import { seededRandom } from './render3d/seeded-random.js';
 import { loadForestMeta, withForestMeta } from './render3d/forest-meta.js';
 import { loadV3Meta } from './render3d/v3-meta.js';
 import { GAME, GAME_OVER, createApp } from './ui/app.js';
+import {
+  fullscreenActive, fullscreenSupported, fullscreenViewModel, isFullscreenKey, onFullscreenChange, toggleFullscreen,
+} from './ui/fullscreen.js';
 import { createHud } from './ui/hud.js';
 import { isCollapseKey, startCollapsed, toggleAll, withCollapsed, writeCollapsed } from './ui/hud-collapse.js';
 import { hudViewModel } from './ui/hud-view.js';
@@ -86,6 +89,7 @@ const hud = renderer === RENDERER_2D ? null : createHud(document.getElementById(
   onQuality: (level) => setQuality(level),
   onCancel: () => hudHandlers.onCancel(),
   onCollapse: (player) => setCollapsed(withCollapsed(hudCollapsed, player, !hudCollapsed[player])),
+  onFullscreen: () => toggleFullscreen(document),
 });
 assetsLoaded.then((store) => hud?.setAssets(store));
 
@@ -105,6 +109,25 @@ if (hud && !shot) {
   window.addEventListener('keydown', (event) => {
     if (isCollapseKey(event) && hud.canCollapse()) setCollapsed(toggleAll(hudCollapsed));
   });
+}
+
+// The Fullscreen button (docs/art-direction-v3-1.md section 3.5): hidden
+// without the Fullscreen API; its label follows the real state, so it is
+// right after Escape or F11. The F key toggles it (not in shot mode).
+if (hud) {
+  const supported = fullscreenSupported(document);
+  const showFullscreen = () => hud.setFullscreen(fullscreenViewModel({ supported, active: fullscreenActive(document) }));
+  showFullscreen();
+  if (supported) {
+    onFullscreenChange(document, showFullscreen);
+    if (!shot) {
+      window.addEventListener('keydown', (event) => {
+        if (!isFullscreenKey(event)) return;
+        event.preventDefault();
+        toggleFullscreen(document);
+      });
+    }
+  }
 }
 
 if (shot) {

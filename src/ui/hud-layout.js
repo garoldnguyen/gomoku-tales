@@ -69,14 +69,27 @@ export const QUALITY_WIDTH = 252;
 export const QUALITY_HEIGHT = 56;
 export const TURN_HEIGHT = 50;
 export const TURN_WIDTH = 600;
-// Full cards: the turn pill keeps this much room free on each side for the quality switch.
-export const TURN_SIDE_ROOM = QUALITY_RIGHT + QUALITY_WIDTH + HUD_GAP;
+// The Fullscreen button (docs/art-direction-v3-1.md section 3.5): a 44 px
+// square left of the quality switch, TOOL_GAP px from it, centred on its
+// height. Hidden where the browser has no Fullscreen API.
+export const FULLSCREEN_SIZE = 44;
+export const TOOL_GAP = 8;
+const FULLSCREEN_ROOM = FULLSCREEN_SIZE + TOOL_GAP;
+// Full cards: the turn pill keeps this much room free on each side for the
+// quality switch and the Fullscreen button (hud.css .turn max-width).
+export const TURN_SIDE_ROOM = QUALITY_RIGHT + QUALITY_WIDTH + FULLSCREEN_ROOM + HUD_GAP;
 export const COMPACT_EDGE = 12;
 export const QUALITY_COMPACT_WIDTH = 180;
 export const QUALITY_COMPACT_HEIGHT = 54;
 // Slim layout: the turn pill sits at the top left and stops this far from
-// the right edge, left of the quality switch.
+// the right edge, left of the quality switch (and of the Fullscreen button
+// beside it, TURN_COMPACT_RIGHT_FS). Where that would leave the pill under
+// TURN_COMPACT_MIN px (narrow phones) the button goes under the quality
+// switch instead (fullscreenBelow), except beside the upright rail cards,
+// which start right under the switch.
 export const TURN_COMPACT_RIGHT = 216;
+export const TURN_COMPACT_RIGHT_FS = TURN_COMPACT_RIGHT + FULLSCREEN_ROOM;
+export const TURN_COMPACT_MIN = 160;
 // Its height with the hint on one line, and on two (narrow phones).
 export const TURN_COMPACT_HEIGHT = 56;
 export const TURN_COMPACT_HEIGHT_TALL = 88;
@@ -180,19 +193,57 @@ export function hudFoldLayout(viewW, viewH, { collapsed = {}, cardHeight = CARD_
   return { layout, foldable, folded };
 }
 
+// The top bar rectangles hud.css draws, in window pixels, for a layout of
+// hudLayout() (worked out here when not given): { turn, quality, fullscreen,
+// fullscreenBelow }, each box { name, x, y, w, h } (the names of their
+// data-hud-box attributes). fullscreen is null when the button is hidden
+// (no Fullscreen API); fullscreenBelow is true when it sits under the
+// quality switch (hud.css .fs-below). The turn pill's text decides its real
+// width; this is its widest.
+export function topBarLayout(viewW, viewH, layout = hudLayout(viewW, viewH), { fullscreen = true } = {}) {
+  const room = fullscreen ? FULLSCREEN_ROOM : 0;
+  if (!layout.compact) {
+    const quality = { name: 'quality', x: viewW - QUALITY_RIGHT - QUALITY_WIDTH, y: TOP_BAR_TOP, w: QUALITY_WIDTH, h: QUALITY_HEIGHT };
+    const turnW = Math.min(TURN_WIDTH, viewW - 2 * (TURN_SIDE_ROOM - FULLSCREEN_ROOM + room));
+    const turn = { name: 'turn', x: (viewW - turnW) / 2, y: TOP_BAR_TOP, w: turnW, h: TURN_HEIGHT };
+    const button = fullscreen ? {
+      name: 'fullscreen', x: quality.x - TOOL_GAP - FULLSCREEN_SIZE, y: TOP_BAR_TOP + (QUALITY_HEIGHT - FULLSCREEN_SIZE) / 2, w: FULLSCREEN_SIZE, h: FULLSCREEN_SIZE,
+    } : null;
+    return { turn, quality, fullscreen: button, fullscreenBelow: false };
+  }
+  const quality = {
+    name: 'quality', x: viewW - COMPACT_EDGE - QUALITY_COMPACT_WIDTH, y: COMPACT_EDGE, w: QUALITY_COMPACT_WIDTH, h: QUALITY_COMPACT_HEIGHT,
+  };
+  const below = fullscreen && !layout.rail && viewW - COMPACT_EDGE - TURN_COMPACT_RIGHT_FS < TURN_COMPACT_MIN;
+  const turnW = Math.min(TURN_WIDTH, viewW - COMPACT_EDGE - (below ? TURN_COMPACT_RIGHT : TURN_COMPACT_RIGHT + room));
+  const turnH = turnW >= TURN_COMPACT_ONE_LINE ? TURN_COMPACT_HEIGHT : TURN_COMPACT_HEIGHT_TALL;
+  const turn = { name: 'turn', x: COMPACT_EDGE, y: COMPACT_EDGE, w: turnW, h: turnH };
+  let button = null;
+  if (below) {
+    button = {
+      name: 'fullscreen', x: viewW - COMPACT_EDGE - FULLSCREEN_SIZE, y: quality.y + quality.h + TOOL_GAP, w: FULLSCREEN_SIZE, h: FULLSCREEN_SIZE,
+    };
+  } else if (fullscreen) {
+    button = {
+      name: 'fullscreen', x: quality.x - TOOL_GAP - FULLSCREEN_SIZE, y: COMPACT_EDGE + (QUALITY_COMPACT_HEIGHT - FULLSCREEN_SIZE) / 2, w: FULLSCREEN_SIZE, h: FULLSCREEN_SIZE,
+    };
+  }
+  return { turn, quality, fullscreen: button, fullscreenBelow: below };
+}
+
 // The HUD rectangles hud.css draws for a layout, as [{ name, x, y, w, h }]
 // in window pixels (the names of their data-hud-box attributes): the turn
-// pill, the quality switch and each team's card, or its pill when
+// pill, the quality switch, the Fullscreen button (unless `fullscreen` is
+// false: no Fullscreen API) and each team's card, or its pill when
 // collapsed[team] is true and the pills fit (canFold). The slim layouts have
 // no pills: there the cards stay bars whatever is saved. For tests and the
 // screenshot check.
-export function hudBoxes(viewW, viewH, { collapsed = {}, cardHeight = CARD_HEIGHT } = {}) {
+export function hudBoxes(viewW, viewH, { collapsed = {}, cardHeight = CARD_HEIGHT, fullscreen = true } = {}) {
   const { layout, folded: foldedTeams } = hudFoldLayout(viewW, viewH, { collapsed, cardHeight });
-  const boxes = [];
+  const top = topBarLayout(viewW, viewH, layout, { fullscreen });
+  const boxes = [top.turn, top.quality];
+  if (top.fullscreen) boxes.push(top.fullscreen);
   if (!layout.compact) {
-    const turnW = Math.min(TURN_WIDTH, viewW - 2 * TURN_SIDE_ROOM);
-    boxes.push({ name: 'turn', x: (viewW - turnW) / 2, y: TOP_BAR_TOP, w: turnW, h: TURN_HEIGHT });
-    boxes.push({ name: 'quality', x: viewW - QUALITY_RIGHT - QUALITY_WIDTH, y: TOP_BAR_TOP, w: QUALITY_WIDTH, h: QUALITY_HEIGHT });
     for (const [team, left] of [['x', true], ['o', false]]) {
       const folded = foldedTeams[team.toUpperCase()];
       const { w, h } = folded ? pillBox(layout.scale) : cardBox(layout.scale, cardHeight);
@@ -201,12 +252,6 @@ export function hudBoxes(viewW, viewH, { collapsed = {}, cardHeight = CARD_HEIGH
     }
     return boxes;
   }
-  const turnW = Math.min(TURN_WIDTH, viewW - COMPACT_EDGE - TURN_COMPACT_RIGHT);
-  const turnH = turnW >= TURN_COMPACT_ONE_LINE ? TURN_COMPACT_HEIGHT : TURN_COMPACT_HEIGHT_TALL;
-  boxes.push({ name: 'turn', x: COMPACT_EDGE, y: COMPACT_EDGE, w: turnW, h: turnH });
-  boxes.push({
-    name: 'quality', x: viewW - COMPACT_EDGE - QUALITY_COMPACT_WIDTH, y: COMPACT_EDGE, w: QUALITY_COMPACT_WIDTH, h: QUALITY_COMPACT_HEIGHT,
-  });
   if (layout.rail) {
     const h = layout.stacked ? RAIL_HEIGHT_STACKED : RAIL_HEIGHT_ROW;
     boxes.push({ name: 'card-x', x: COMPACT_EDGE, y: RAIL_TOP, w: layout.railWidth, h });
