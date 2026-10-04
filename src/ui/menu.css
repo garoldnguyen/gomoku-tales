@@ -18,6 +18,7 @@
   --row: rgba(255, 255, 255, 0.08);
   --row-hover: rgba(255, 255, 255, 0.16);
   --shadow: rgba(10, 20, 40, 0.3);
+  --scrim: rgba(10, 20, 40, 0.34);
   --blue: #3b8cff;
   --blue-tile: rgba(59, 140, 255, 0.26);
   --blue-ink: #cfe4ff;
@@ -26,6 +27,7 @@
   --red-ink: #ffd0d5;
   --ready: #8fe3a8;
   --blur: 18px;
+  --scrim-blur: 0px; /* MENU_SCRIM_BLUR_PX on the frosted levels, set by menu-dom.js */
 }
 
 #flow {
@@ -83,14 +85,33 @@
   outline-offset: 2px;
 }
 
-/* --- the menu: title and one centred column of buttons --- */
+/* --- the menu: a dark scrim over the scene, then one glass card with the
+   title, the place pill, four two line buttons and the hint bar. The px
+   sizes are MENU_LAYOUT of src/ui/menu.js (a test compares them). --- */
+
+#flow .scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  -webkit-backdrop-filter: blur(var(--scrim-blur));
+  backdrop-filter: blur(var(--scrim-blur));
+  pointer-events: none;
+}
+
+#flow.is-solid .scrim {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
 
 #flow .menu-card {
+  position: relative; /* above the scrim */
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 24px;
-  padding: 32px 40px 36px;
+  align-items: stretch;
+  gap: 20px;
+  width: 400px;
+  max-width: 100%;
+  padding: 28px 32px 20px;
   border-radius: 28px;
 }
 
@@ -98,26 +119,128 @@
   visibility: hidden; /* an overlay is open: the menu is neither seen nor focused */
 }
 
+#flow .menu-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
 #flow .menu-title {
   margin: 0;
   font-size: 44px;
-  font-weight: 700;
-  line-height: 1.1;
+  font-weight: 800;
+  line-height: 48px;
   letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+#flow .menu-place {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--hair);
+  border-radius: 999px;
+  background: var(--row);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
 }
 
 #flow .menu-buttons {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 14px;
+  gap: 10px;
 }
 
 #flow .menu-button {
-  width: 280px;
-  min-height: 52px;
-  padding: 10px 24px;
-  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  height: 64px;
+  min-height: 64px;
+  padding: 0 14px 0 12px;
+  border-radius: 20px;
+  text-align: left;
+}
+
+#flow .menu-button:focus,
+#flow .menu-button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+#flow .menu-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--row-hover);
+}
+
+#flow .menu-glyph,
+#flow .menu-chevron {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#flow .menu-glyph {
+  width: 22px;
+  height: 22px;
+}
+
+#flow .menu-chevron {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  color: var(--ink-3);
+}
+
+#flow .menu-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+#flow .menu-label {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 22px;
+}
+
+#flow .menu-hint {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+#flow .menu-keys {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  margin: 0;
+  border-top: 1px solid var(--hair);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-3);
 }
 
 /* --- How to Play and Settings panels --- */

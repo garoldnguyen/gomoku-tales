@@ -11,17 +11,81 @@ import { QUALITY_LEVELS } from '../render3d/quality.js';
 import { FLOW_EVENTS, OVERLAYS, SCREENS } from './flow.js';
 import { fullscreenViewModel } from './fullscreen.js';
 import { PORTRAIT_ART, SKILL_ICON_ART } from './hud-view.js';
+import { isTypingTarget } from './input.js';
 import { SKILL_INFO } from './skill-info.js';
 import { STRINGS, howToRules } from './strings.js';
 
-// The four menu buttons in their visual (and Tab) order. box is the
-// data-hud-box name of the screenshot self-check (docs/shots.md).
+// The four menu buttons in their visual (and Tab and arrow key) order, each
+// with its muted second line. box is the data-hud-box name of the
+// screenshot self-check (docs/shots.md).
 export const MENU_BUTTONS = Object.freeze([
-  Object.freeze({ id: 'play-online', label: STRINGS.menuPlayOnline, event: FLOW_EVENTS.PLAY_ONLINE, box: 'menu-play-online' }),
-  Object.freeze({ id: 'play-local', label: STRINGS.menuPlayLocal, event: FLOW_EVENTS.PLAY_LOCAL, box: 'menu-play-local' }),
-  Object.freeze({ id: 'howto', label: STRINGS.menuHowTo, event: FLOW_EVENTS.OPEN_HOWTO, box: 'menu-howto' }),
-  Object.freeze({ id: 'settings', label: STRINGS.menuSettings, event: FLOW_EVENTS.OPEN_SETTINGS, box: 'menu-settings' }),
+  Object.freeze({ id: 'play-online', label: STRINGS.menuPlayOnline, hint: STRINGS.menuPlayOnlineHint, event: FLOW_EVENTS.PLAY_ONLINE, box: 'menu-play-online' }),
+  Object.freeze({ id: 'play-local', label: STRINGS.menuPlayLocal, hint: STRINGS.menuPlayLocalHint, event: FLOW_EVENTS.PLAY_LOCAL, box: 'menu-play-local' }),
+  Object.freeze({ id: 'howto', label: STRINGS.menuHowTo, hint: STRINGS.menuHowToHint, event: FLOW_EVENTS.OPEN_HOWTO, box: 'menu-howto' }),
+  Object.freeze({ id: 'settings', label: STRINGS.menuSettings, hint: STRINGS.menuSettingsHint, event: FLOW_EVENTS.OPEN_SETTINGS, box: 'menu-settings' }),
 ]);
+
+// The menu card's sizes in CSS px, the same numbers src/ui/menu.css uses
+// (a test compares them). The card is one column: the head (title, then
+// the place pill), the buttons and the hint bar, `gap` apart.
+export const MENU_LAYOUT = Object.freeze({
+  flowPadding: 16, // #flow padding around the card
+  cardWidth: 400,
+  cardPadTop: 28,
+  cardPadBottom: 20,
+  cardPadX: 32,
+  cardBorder: 1, // the glass edge
+  gap: 20, // between the head, the buttons and the hint bar
+  titleHeight: 48, // line height of the title
+  headGap: 12, // title to pill
+  pillHeight: 30,
+  buttonHeight: 64,
+  buttonGap: 10,
+  hintHeight: 36,
+});
+
+// The card's size for `layout` and whether it fits a window of
+// width x height (config MENU_FIT_WIDTH by MENU_FIT_HEIGHT unless given)
+// inside the #flow padding, so the menu never scrolls there.
+export function menuLayout(layout = MENU_LAYOUT, width = CONFIG.MENU_FIT_WIDTH, height = CONFIG.MENU_FIT_HEIGHT) {
+  const count = MENU_BUTTONS.length;
+  const head = layout.titleHeight + layout.headGap + layout.pillHeight;
+  const buttons = count * layout.buttonHeight + (count - 1) * layout.buttonGap;
+  const cardHeight = 2 * layout.cardBorder + layout.cardPadTop + head + layout.gap + buttons + layout.gap
+    + layout.hintHeight + layout.cardPadBottom;
+  const buttonWidth = layout.cardWidth - 2 * (layout.cardPadX + layout.cardBorder);
+  const room = (side) => side - 2 * layout.flowPadding;
+  return {
+    cardWidth: layout.cardWidth,
+    cardHeight,
+    buttonWidth,
+    buttonHeight: layout.buttonHeight,
+    fits: layout.cardWidth <= room(width) && cardHeight <= room(height),
+    buttonsTallEnough: layout.buttonHeight >= CONFIG.MENU_MIN_BUTTON_PX,
+  };
+}
+
+// Up and Down move the focus between the `count` menu buttons and wrap
+// around at either end. current is the focused index, or -1 when no menu
+// button has the focus (Down then goes to the first, Up to the last). Any
+// other key keeps the index.
+export function stepMenuFocus(current, key, count = MENU_BUTTONS.length) {
+  if (count <= 0) return -1;
+  if (key === 'ArrowDown') return current < 0 ? 0 : (current + 1) % count;
+  if (key === 'ArrowUp') return current < 0 ? count - 1 : (current - 1 + count) % count;
+  return current;
+}
+
+// What a key press on the plain menu does: { move: index } for Up and
+// Down, { select: index } for Enter, or null. Ignores keys typed into a
+// text box (isTypingTarget), held modifiers and key repeats of Enter.
+export function menuKeyAction(event, current, count = MENU_BUTTONS.length) {
+  if (!event || isTypingTarget(event.target)) return null;
+  if (event.ctrlKey || event.metaKey || event.altKey) return null;
+  if (event.key === 'ArrowDown' || event.key === 'ArrowUp') return { move: stepMenuFocus(current, event.key, count) };
+  if (event.key === 'Enter' && !event.repeat) return { select: current < 0 ? 0 : current };
+  return null;
+}
 
 // The events the menu screen may send to the flow (the buttons above, and
 // Close or Escape on an overlay).
@@ -110,7 +174,9 @@ export function menuViewModel(flow, env = {}) {
   return {
     visible,
     title: STRINGS.gameTitle,
+    place: STRINGS.menuPlace,
     buttons: MENU_BUTTONS,
+    keysHint: STRINGS.menuKeysHint,
     overlay,
     howto: overlay === OVERLAYS.HOWTO ? howToViewModel(env.config) : null,
     settings: overlay === OVERLAYS.SETTINGS ? settingsViewModel(env) : null,

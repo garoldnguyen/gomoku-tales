@@ -27,6 +27,12 @@ export const ONLINE_SAME_BROWSER_ONLY = true;
 export const GAME_OVER_DELAY_MS = 1500; // time to see the final board before the Game over screen
 export const WAITING_START_DELAY_MS = 1500; // second player joined: the host starts the game after this
 export const COPY_FEEDBACK_MS = 1500; // how long Copied shows after the room code was copied
+// The landing menu (src/ui/menu.css): the dark scrim over the 3D scene
+// blurs it this much on the levels with frosted glass (none on Low).
+export const MENU_SCRIM_BLUR_PX = 6;
+export const MENU_FIT_WIDTH = 1280; // the menu fits this window without scrolling
+export const MENU_FIT_HEIGHT = 720;
+export const MENU_MIN_BUTTON_PX = 44; // no menu button is lower than this
 
 // Sprite sizes in px from docs/design.md section 7. They are drawn scaled
 // to these; the art files themselves must have the size listed in

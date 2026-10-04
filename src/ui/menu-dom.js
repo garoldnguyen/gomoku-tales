@@ -9,8 +9,21 @@
 //   onQuality(level)   a Graphics quality option was chosen
 //   onFullscreen()     the Fullscreen button was pressed
 
+import { MENU_SCRIM_BLUR_PX } from '../config.js';
 import { FLOW_EVENTS, OVERLAYS } from './flow.js';
-import { OVERLAY_OPENER } from './menu.js';
+import { OVERLAY_OPENER, menuKeyAction } from './menu.js';
+
+const SVG = 'http://www.w3.org/2000/svg';
+
+// The line icon of each menu button (24 by 24 view box, drawn with the
+// text colour) and the chevron on its right.
+const MENU_ICONS = {
+  'play-online': ['M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18', 'M3 12h18', 'M12 3c2.5 2.6 3.6 5.6 3.6 9s-1.1 6.4-3.6 9c-2.5-2.6-3.6-5.6-3.6-9s1.1-6.4 3.6-9'],
+  'play-local': ['M9 11a3 3 0 1 0 0-6a3 3 0 1 0 0 6', 'M3.5 19c.6-3 2.8-5 5.5-5s4.9 2 5.5 5', 'M16 11a2.5 2.5 0 1 0 0-5', 'M16.5 14c2.2.3 3.7 2.2 4 5'],
+  howto: ['M5 4.5h5.5a2.5 2.5 0 0 1 2.5 2.5v12.5a2 2 0 0 0-2-2H5z', 'M19 4.5h-5.5a2.5 2.5 0 0 0-2.5 2.5v12.5a2 2 0 0 1 2-2H19z'],
+  settings: ['M4 7h10', 'M18 7h2', 'M4 17h2', 'M10 17h10', 'M16 5v4', 'M8 15v4'],
+};
+const CHEVRON = ['M9 6l6 6l-6 6'];
 
 export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
   let assets = null;
@@ -46,14 +59,36 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
     }
   };
 
-  // The menu card: title and the four buttons in one column.
+  // An inline line icon of `paths` (24 by 24 view box).
+  const icon = (className, parent, paths) => {
+    const svg = document.createElementNS(SVG, 'svg');
+    svg.setAttribute('class', className);
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.setAttribute('focusable', 'false');
+    for (const d of paths) {
+      const path = document.createElementNS(SVG, 'path');
+      path.setAttribute('d', d);
+      svg.append(path);
+    }
+    parent.append(svg);
+    return svg;
+  };
+
+  // The dark scrim over the 3D scene (blurred on the frosted levels), then
+  // the menu card: title, place pill, the four buttons and the hint bar.
+  el('div', 'scrim', root);
   const menu = el('section', 'menu-card glass', root);
   menu.dataset.hudBox = 'menu-card';
   menu.setAttribute('aria-labelledby', 'menu-title');
-  const title = el('h1', 'menu-title', menu);
+  const head = el('header', 'menu-head', menu);
+  const title = el('h1', 'menu-title', head);
   title.id = 'menu-title';
+  const place = el('p', 'menu-place', head);
   const list = el('div', 'menu-buttons', menu);
+  const keysHint = el('p', 'menu-keys', menu);
   const menuButtons = new Map(); // button id -> element
+  const menuOrder = []; // the buttons in view model order, for the arrow keys
 
   // A panel with a heading and a Close button (How to Play, Settings).
   const panel = (name, labelText) => {
@@ -82,11 +117,20 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
 
   const buildMenu = (vm) => {
     title.textContent = vm.title;
+    place.textContent = vm.place;
+    keysHint.textContent = vm.keysHint;
     for (const item of vm.buttons) {
-      const node = button('menu-button', list, item.label, item.box);
+      const node = button('menu-button', list, '', item.box);
       node.dataset.menu = item.id;
+      const badge = el('span', 'menu-icon', node);
+      icon('menu-glyph', badge, MENU_ICONS[item.id] ?? []);
+      const text = el('span', 'menu-text', node);
+      el('span', 'menu-label', text).textContent = item.label;
+      el('span', 'menu-hint', text).textContent = item.hint;
+      icon('menu-chevron', node, CHEVRON);
       node.addEventListener('click', () => onEvent(item.event));
       menuButtons.set(item.id, node);
+      menuOrder.push(item);
     }
   };
 
@@ -152,11 +196,23 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
     return menuButtons.get(vm.focus) ?? null;
   };
 
-  // Escape closes an open overlay (focus then goes back to its opener).
+  // Escape closes an open overlay (focus then goes back to its opener). On
+  // the plain menu Up and Down move the focus between the buttons and Enter
+  // selects the focused one (menuKeyAction ignores typing targets).
   window.addEventListener('keydown', (event) => {
-    if (event.key !== 'Escape' || !shown?.visible || shown.overlay === OVERLAYS.NONE) return;
+    if (!shown?.visible) return;
+    if (shown.overlay !== OVERLAYS.NONE) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onEvent(FLOW_EVENTS.CLOSE_OVERLAY);
+      return;
+    }
+    const current = menuOrder.findIndex((item) => menuButtons.get(item.id) === document.activeElement);
+    const action = menuKeyAction(event, current, menuOrder.length);
+    if (!action) return;
     event.preventDefault();
-    onEvent(FLOW_EVENTS.CLOSE_OVERLAY);
+    if ('move' in action) menuButtons.get(menuOrder[action.move].id)?.focus();
+    else onEvent(menuOrder[action.select].event);
   });
 
   return {
@@ -204,10 +260,12 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
 
     // The glass frost of the quality level (hudFrost of the table in
     // src/render3d/quality.js, or null for the 2D renderer): solid with no
-    // blur at 0 px, frosted above, as in the HUD.
+    // blur at 0 px, frosted above, as in the HUD. The scrim blurs by
+    // MENU_SCRIM_BLUR_PX on the frosted levels and not at all on solid glass.
     setFrost(frost) {
       const blur = frost?.blurPx ?? 0;
       root.style.setProperty('--blur', `${blur}px`);
+      root.style.setProperty('--scrim-blur', `${blur > 0 ? MENU_SCRIM_BLUR_PX : 0}px`);
       root.classList.toggle('is-solid', blur <= 0);
     },
 

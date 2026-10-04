@@ -197,16 +197,18 @@ test('menu.css: no colour literal outside the token block, and every token colou
   }
 });
 
-test('menu.css: menu buttons at least 240 by 44 px, 12 px apart; panels 720 px wide, 80 percent high, 44 px Close', () => {
+test('menu.css: menu buttons at least 240 by 44 px, 10 px apart; panels 720 px wide, 80 percent high, 44 px Close', () => {
   const blocks = new Map(cssBlocks(read('src/ui/menu.css')).map(([selector, body]) => [selector, body]));
   const px = (selector, property) => {
     const match = blocks.get(selector)?.match(new RegExp(`(?:^|[;\\s])${property}:\\s*(\\d+)px`));
     return match ? Number(match[1]) : null;
   };
-  assert.ok(px('#flow .menu-button', 'width') >= 240);
+  // The card is 400 px wide, so the buttons (full card width less its
+  // padding) are 336 px (Design v4 part 2, tests/menu-landing.test.js).
+  assert.ok(px('#flow .menu-card', 'width') - 2 * 32 >= 240);
   assert.ok(px('#flow .menu-button', 'min-height') >= 44);
   assert.ok(px('#flow button', 'min-height') >= 44);
-  assert.ok(px('#flow .menu-buttons', 'gap') >= 12);
+  assert.ok(px('#flow .menu-buttons', 'gap') >= 10);
   assert.match(blocks.get('#flow .menu-buttons'), /flex-direction: column/);
   assert.match(blocks.get('#flow .panel'), /width: min\(720px/);
   assert.match(blocks.get('#flow .panel'), /max-height: 80vh/);
