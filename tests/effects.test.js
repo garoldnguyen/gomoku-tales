@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BANNER_MS, DUST_COUNT, DUST_MS, INTERNAL_WIDTH, SHAKE_MS, SHAKE_PX, SPARKLE_COUNT, SPARKLE_MS, WIND_STREAK_COUNT } from '../src/config.js';
+import { BANNER_MS, DUST_COUNT, DUST_MS, INTERNAL_WIDTH, SHAKE_MS, SHAKE_PX, SPARKLE_COUNT, SPARKLE_MS, WAITING_START_DELAY_MS, WIND_STREAK_COUNT } from '../src/config.js';
 import { X, O, ROCK } from '../src/logic/board.js';
 import { WIND_RABBIT } from '../src/logic/characters.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
@@ -211,6 +211,7 @@ test('both online windows get the same events for effects', () => {
   host.createRoom(WIND_RABBIT);
   guest.openJoin();
   guest.joinRoom('AB2C9');
+  clock.advance(WAITING_START_DELAY_MS); // the host starts the game
   host.getGame().takeEvents();
   guest.getGame().takeEvents();
 

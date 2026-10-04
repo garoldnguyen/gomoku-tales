@@ -7,14 +7,20 @@
 // Room are two panels of its lobby screen. Until the menu exists (Flow v1
 // step 4) the app starts on the lobby, and leaving a room goes through the
 // menu straight back to the lobby.
+//
+// The host owns the start (net/room.js): after a join both windows are in
+// phase starting (the host still on the Waiting screen, the guest still on
+// Join Room, looking for the room) until the host's start event, which both
+// get at the same moment.
 
 import { GAME_OVER_DELAY_MS } from '../config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
 import { systemClock } from '../net/clock.js';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../net/room-code.js';
-import { FULL, NO_ROOM, PLAYING, createGuestRoom, createHostRoom } from '../net/room.js';
+import { FULL, NO_ROOM, PLAYING, STARTING, createGuestRoom, createHostRoom } from '../net/room.js';
 import { FLOW_EVENTS, ROLES, SCREENS, flowReducer, initialFlow } from './flow.js';
 import { characterName, createOnlineGame } from './online-game.js';
+import { STRINGS } from './strings.js';
 
 // Screens.
 export const LOBBY = 'lobby';
@@ -59,8 +65,8 @@ export function createApp(options) {
   };
 
   // The screen of the old flow (the constants above) that the DOM screens
-  // and main.js know. starting is passed through at once today, so it shows
-  // the screen the player was on.
+  // and main.js know. starting shows the screen the player was on until
+  // the host starts the game.
   const screenNow = () => {
     switch (flow.screen) {
       case SCREENS.LOBBY: return lobbyPanel;
@@ -112,21 +118,45 @@ export function createApp(options) {
     }
   };
 
-  // The host was waiting and the guest was joining: both pass the starting
-  // screen at once (the host's start delay comes in Flow v1 step 2).
+  // The host was waiting and the guest was joining: both are now starting.
+  // The guest keeps its joining code until the start, so Join Room keeps
+  // showing that the room is being joined.
+  const seated = () => {
+    joinError = null;
+    send(flow.screen === SCREENS.WAITING ? FLOW_EVENTS.OPPONENT_JOINED : FLOW_EVENTS.JOINED);
+  };
+
+  // The host started the game: both windows enter it.
   const startGame = () => {
+    if (flow.screen !== SCREENS.STARTING) return;
+    joiningCode = null;
     game = createOnlineGame(room);
     lobbyPanel = LOBBY;
-    send(flow.screen === SCREENS.WAITING ? FLOW_EVENTS.OPPONENT_JOINED : FLOW_EVENTS.JOINED, FLOW_EVENTS.START);
-    checkGameOver(); // a guest may join a room whose game has already ended
+    send(FLOW_EVENTS.START);
+    checkGameOver(); // a guest's start recovered late may come after the game ended
+  };
+
+  // The opponent went missing before the game started: the host waits
+  // again (its room is back in waiting), the guest leaves for the lobby.
+  const peerGone = (event) => {
+    if (event.phase !== STARTING || flow.screen !== SCREENS.STARTING) return;
+    if (flow.role === ROLES.GUEST) {
+      closeRoom();
+      joinError = STRINGS.noticeHostLeft;
+    }
+    send(FLOW_EVENTS.OPPONENT_LEFT);
   };
 
   const onRoomEvent = (event) => {
     switch (event.type) {
       case 'joined':
-        joiningCode = null;
-        joinError = null;
+        seated();
+        break;
+      case 'start':
         startGame();
+        break;
+      case 'peerGone':
+        peerGone(event);
         break;
       case 'full':
         joinError = `Room ${joiningCode} is full.`;
@@ -152,7 +182,8 @@ export function createApp(options) {
   const openRoom = (made) => {
     room = made;
     roomUnsubscribe = room.onEvent(onRoomEvent);
-    if (room.phase === PLAYING) onRoomEvent({ type: 'joined' });
+    if (room.phase === STARTING || room.phase === PLAYING) onRoomEvent({ type: 'joined' });
+    if (room.phase === PLAYING) onRoomEvent({ type: 'start', round: room.round });
     else if (room.phase === FULL) onRoomEvent({ type: 'full' });
     else if (room.phase === NO_ROOM) onRoomEvent({ type: 'noRoom' });
   };
@@ -239,10 +270,10 @@ export function createApp(options) {
     },
 
     // Back from Create, Join, Waiting or Game over to the Lobby. Leaves
-    // the room if there is one.
+    // the room if there is one. Leave is off while the game is starting.
     backToLobby() {
       const screen = screenNow();
-      if (screen === LOBBY || screen === GAME) return;
+      if (screen === LOBBY || screen === GAME || flow.screen === SCREENS.STARTING) return;
       closeRoom();
       joinError = null;
       lobbyPanel = LOBBY;

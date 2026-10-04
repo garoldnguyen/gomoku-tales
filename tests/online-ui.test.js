@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { GAME_OVER_DELAY_MS, HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS } from '../src/config.js';
+import { GAME_OVER_DELAY_MS, HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS, WAITING_START_DELAY_MS } from '../src/config.js';
 import { X, O, ROCK, EMPTY } from '../src/logic/board.js';
 import { EARTH_BEAR, WIND_RABBIT } from '../src/logic/characters.js';
 import { createInitialState } from '../src/logic/game.js';
@@ -36,7 +36,7 @@ function makeWorld({ random = () => 0 } = {}) {
 }
 
 // A host window that created a room with `character` and a guest window
-// that joined it.
+// that joined it, after the host's start delay (both are in the game).
 function startGame(character = WIND_RABBIT) {
   const world = makeWorld();
   const host = world.window();
@@ -45,6 +45,7 @@ function startGame(character = WIND_RABBIT) {
   assert.equal(host.app.createRoom(character), true);
   guest.app.openJoin();
   assert.equal(guest.app.joinRoom('AB2C9'), true);
+  world.clock.advance(WAITING_START_DELAY_MS);
   return { ...world, host, guest };
 }
 
@@ -139,13 +140,14 @@ test('joining a full room shows an error and the two players keep playing', () =
 });
 
 test('a typed code is cleaned up and the joiner gets the other character', () => {
-  const { window } = makeWorld();
+  const { window, clock } = makeWorld();
   const host = window();
   host.app.openCreate();
   host.app.createRoom(EARTH_BEAR);
   const guest = window();
   guest.app.openJoin();
   assert.equal(guest.app.joinRoom(' ab2 c9 '), true);
+  clock.advance(WAITING_START_DELAY_MS);
   assert.equal(host.app.getScreen(), GAME);
   assert.equal(guest.app.getScreen(), GAME);
   assert.equal(guest.app.getView().character, WIND_RABBIT);

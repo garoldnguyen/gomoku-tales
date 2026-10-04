@@ -42,6 +42,9 @@ export const STRINGS = Object.freeze({
   settingsQualityHelpHigh: 'Everything: depth, moving clouds and wind.',
   settingsFullscreen: 'Fullscreen',
 
+  // Lobby notice (section 6): the host left while the room was starting.
+  noticeHostLeft: 'The host left the room.',
+
   // Game over (section 3.7).
   gameOverYouWin: 'You win',
   gameOverYouLose: 'You lose',

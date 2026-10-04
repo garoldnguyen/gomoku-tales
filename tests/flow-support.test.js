@@ -10,7 +10,7 @@ import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { ROOM_PHASES } from '../src/net/phase.js';
-import { CREATE, GAME, LOBBY, WAITING_SCREEN, createApp } from '../src/ui/app.js';
+import { CREATE, GAME, GAME_OVER, LOBBY, WAITING_SCREEN, createApp } from '../src/ui/app.js';
 import { isFullscreenKey } from '../src/ui/fullscreen.js';
 import { isCollapseKey } from '../src/ui/hud-collapse.js';
 import { attachGameInput, isQualityKey, isRestartKey, isTypingTarget, shortcutKeyHandler } from '../src/ui/input.js';
@@ -163,11 +163,90 @@ test('the online app starts on the lobby and follows the flow reducer into the g
   assert.deepEqual({ ...host.getFlow() }, { screen: 'waiting', overlay: 'none', mode: 'online', role: 'host', notice: null });
   guest.openJoin();
   guest.joinRoom('AB2C9');
+  assert.equal(host.getFlow().screen, 'starting');
+  assert.equal(guest.getFlow().screen, 'starting');
+  clock.advance(config.WAITING_START_DELAY_MS); // the host starts the game
   assert.equal(host.getScreen(), GAME);
   assert.equal(guest.getScreen(), GAME);
   assert.equal(host.getFlow().role, 'host');
   assert.equal(guest.getFlow().role, 'guest');
   assert.equal(guest.getFlow().screen, 'game');
+  host.close();
+  guest.close();
+});
+
+test('the online app waits for the host start; a guest who leaves in starting sends the host back to Waiting', () => {
+  const network = createFakeNetwork();
+  const clock = createFakeClock();
+  const make = () => createApp({ openTransport: () => network.connect(), clock, makeCode: () => 'AB2C9' });
+  const host = make();
+  const guest = make();
+  host.openCreate();
+  host.createRoom(WIND_RABBIT);
+  guest.openJoin();
+  const joinScreen = guest.getScreen();
+  guest.joinRoom('AB2C9');
+  clock.advance(700);
+  assert.equal(host.getScreen(), WAITING_SCREEN, 'the host keeps the Waiting screen during starting');
+  assert.equal(guest.getScreen(), joinScreen, 'the guest keeps Join Room during starting');
+  guest.close();
+  assert.equal(host.getFlow().screen, 'waiting');
+  assert.equal(host.getScreen(), WAITING_SCREEN);
+  clock.advance(config.WAITING_START_DELAY_MS);
+  assert.equal(host.getFlow().screen, 'waiting', 'the cancelled start never fires');
+  const second = make();
+  second.openJoin();
+  second.joinRoom('AB2C9');
+  assert.equal(host.getFlow().screen, 'starting');
+  clock.advance(config.WAITING_START_DELAY_MS);
+  assert.equal(host.getScreen(), GAME);
+  assert.equal(second.getScreen(), GAME);
+  host.close();
+  second.close();
+});
+
+test('the online app: a host who leaves in starting sends the guest to the lobby with a notice', () => {
+  const network = createFakeNetwork();
+  const clock = createFakeClock();
+  const make = () => createApp({ openTransport: () => network.connect(), clock, makeCode: () => 'AB2C9' });
+  const host = make();
+  const guest = make();
+  host.openCreate();
+  host.createRoom(WIND_RABBIT);
+  guest.openJoin();
+  guest.joinRoom('AB2C9');
+  clock.advance(500);
+  host.close();
+  assert.equal(guest.getFlow().screen, 'lobby');
+  assert.notEqual(guest.getFlow().notice, null);
+  clock.advance(config.WAITING_START_DELAY_MS);
+  assert.notEqual(guest.getScreen(), GAME);
+  guest.close();
+});
+
+test('the online app: a guest whose start is recovered after a forfeit reaches Game over', () => {
+  const network = createFakeNetwork();
+  const clock = createFakeClock();
+  const hostTransport = network.connect();
+  const guestTransport = network.connect();
+  const host = createApp({ openTransport: () => hostTransport, clock, makeCode: () => 'AB2C9' });
+  const guest = createApp({ openTransport: () => guestTransport, clock });
+  host.openCreate();
+  host.createRoom(WIND_RABBIT);
+  guest.openJoin();
+  guest.joinRoom('AB2C9');
+  clock.advance(config.WAITING_START_DELAY_MS - 1);
+  hostTransport.setMuted(true); // the start is lost
+  guestTransport.setMuted(true);
+  clock.advance(1);
+  hostTransport.setMuted(false);
+  clock.advance(config.PEER_TIMEOUT_MS + config.LEAVE_COUNTDOWN_S * 1000);
+  assert.equal(host.getScreen(), GAME_OVER);
+  assert.equal(guest.getFlow().screen, 'starting');
+  guestTransport.setMuted(false);
+  clock.advance(config.HEARTBEAT_INTERVAL_MS);
+  assert.equal(guest.getScreen(), GAME_OVER, 'the guest does not stay on the game screen');
+  assert.equal(guest.getView().outcome.youWin, false);
   host.close();
   guest.close();
 });

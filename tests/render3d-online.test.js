@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, FPS_SAMPLE_MS, INTERNAL_HEIGHT, INTERNAL_WIDTH,
-  QUALITY_STALL_MS, RESUME_GAP_MS,
+  QUALITY_STALL_MS, RESUME_GAP_MS, WAITING_START_DELAY_MS,
 } from '../src/config.js';
 import { X, O } from '../src/logic/board.js';
 import { WIND_RABBIT, characterForStone } from '../src/logic/characters.js';
@@ -52,6 +52,7 @@ function twoWindows() {
   host.createRoom(WIND_RABBIT);
   guest.openJoin();
   guest.joinRoom('AB2C9');
+  clock.advance(WAITING_START_DELAY_MS); // the host starts the game
   const pointer = (app) => ({
     click(px, py) {
       const hit = worldHitTest(px, py);
