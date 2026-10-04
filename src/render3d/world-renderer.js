@@ -2,8 +2,9 @@
 // It has the same interface as the 2D renderer that src/main.js uses:
 //   drawGameScreen(ctx, view)  draws the game view (see ui/local-game.js
 //                              and ui/online-game.js)
-//   drawMenuScreen(ctx, time)  the world with an empty board behind the
-//                              DOM lobby and room screens, and the title
+//   drawMenuScreen(ctx, time, title)  the world with an empty board
+//                              behind the DOM screens, and the title unless
+//                              title is false (the DOM menu has its own)
 //   hitTest(px, py)            the board cell under a point of the WebGL
 //                              canvas (its drawing buffer pixels)
 // The WebGL canvas shows the world (src/render3d/world.js) with the board's
@@ -128,7 +129,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       drawQuality(ctx);
     },
 
-    drawMenuScreen(ctx, time = performance.now()) {
+    drawMenuScreen(ctx, time = performance.now(), title = true) {
       pieces.sync(EMPTY_BOARD, time, effects);
       world.characters.setActive(null);
       decals.show(NO_DECALS, 0, time);
@@ -139,7 +140,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       world.render(time);
 
       ctx.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
-      drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 90, TITLE_STYLE);
+      if (title) drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 90, TITLE_STYLE);
       drawQuality(ctx);
     },
 

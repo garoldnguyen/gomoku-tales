@@ -16,6 +16,7 @@ bash tools/shots.sh --set levels                 Low, Medium and High at 1280x72
 bash tools/shots.sh --set shapes                 Medium at wide, hd, tablet, portrait and phone
 bash tools/shots.sh --set hud                    HUD states: fhd and small expanded or collapsed, phone
 bash tools/shots.sh --set full                   levels and shapes together (7 pictures)
+bash tools/shots.sh --set flow                   the menu, howto and settings scenes at fhd and hd (Medium, 6 pictures)
 bash tools/shots.sh --quality high --shape wide  one custom picture (comma lists make a product)
 bash tools/shots.sh --scene empty                another scene
 bash tools/shots.sh --param hud=collapsed        extra URL parameter, can be repeated
@@ -52,6 +53,7 @@ Numbers to quote in a summary:
 - `horizon.step`: the largest brightness jump between two neighbouring pixel rows in the middle columns, between 12 and 60 percent of the window height. A hard line between meadow and sky gives a big number (above 20), a smooth haze a small one (under 5). HUD boxes in the middle columns raise it, so compare the same shape before and after a change.
 - `hudBoxes`: name, x, y, w, h of every visible `data-hud-box` element, for size limits.
 - `shot.info`: free numbers the game puts in `window.__SHOT__.info`.
+- `overlaps` (pairs of box names), `outside` (box names that stick out of the window) and `minButtonSide` with `minButtonName`: the smallest side in px of every visible `button` element (`buttons` lists them). In the flow scenes (`menu`, `howto`, `settings`) a button under 44 px is a problem. The tool prints these three per picture at the end.
 
 ## 4. Page contract (shot mode)
 
@@ -59,12 +61,12 @@ Shot mode is what makes a picture repeatable. Without the `shot` URL parameter t
 
 URL: `<entry>?shot=<scene>&quality=<low|medium|high>` plus optional keys. The entry page and the server command are set in `tools/shots.config.json` (`serve` with `{port}` and `{python}`, `cwd`, `entry`).
 
-1. Scenes. `field` is a fixed mid game position of about 14 stones, written as ONE constant in one small module and legal under the game rules, that shows everything the game draws today (plants at several growth stages, a rock if the game has them, one selected skill, the last move marker, both HUD cards). `empty` is an empty board with the same HUD.
+1. Scenes. The set `flow` gives each item its own scene; the other sets use `--scene`. `field` is a fixed mid game position of about 14 stones, written as ONE constant in one small module and legal under the game rules, that shows everything the game draws today (plants at several growth stages, a rock if the game has them, one selected skill, the last move marker, both HUD cards). `empty` is an empty board with the same HUD. `menu`, `howto` and `settings` (docs/flow-design.md section 7) show the main menu, the How to Play panel and the Settings panel over the empty farm, with no HUD; their state comes from the flow reducer (`shotFlow` in `src/ui/shot-mode.js`). The first menu button (or the open panel's Close button) has the focus, so its focus ring shows.
 2. Quality. The `quality` parameter sets the level for this page, over any stored choice.
 3. Frozen. Every time driven thing (clouds, wind sway, idle animation, sprite frames, water, grain, shader time) uses one fixed time of 12.0 seconds. Every random source uses a fixed seed. No mouse hover, no tutorial or tip popup, no sound, no FPS counter or debug overlay, and no attempt to open a network connection (no websocket, no matchmaking).
 4. Window. The page sizes itself from the window (innerWidth and innerHeight). Playwright sets the viewport and asks for reduced motion, so the HUD transitions must be instant.
 5. State object. At start, before the first frame, the page sets `window.__SHOT__ = { scene, quality, renderer, ready: false, info: {} }`. `renderer` is `"3d"` or `"2d"`. `ready` becomes true when all assets are loaded and at least 3 frames were drawn at the final window size. `info` may hold any plain numbers.
-6. HUD boxes. Every HUD element that takes screen space and must not overlap another one has the attribute `data-hud-box="<name>"`: the cards, the collapsed pills, the turn pill, the quality switch, every top bar button, and a tooltip while it is shown. Nested boxes are fine.
+6. HUD boxes. Every HUD element that takes screen space and must not overlap another one has the attribute `data-hud-box="<name>"`: the cards, the collapsed pills, the turn pill, the quality switch, every top bar button, and a tooltip while it is shown. Nested boxes are fine. The menu layer names `menu-card`, `menu-play-online`, `menu-play-local`, `menu-howto`, `menu-settings`, `howto-panel`, `howto-close`, `settings-panel`, `settings-close`, `settings-quality-<level>` and `settings-fullscreen`; while a panel is open the menu card is hidden (visibility hidden), so it neither overlaps the panel nor takes the focus.
 7. `hud=expanded` or `hud=collapsed` (added by the collapsible HUD part): sets the card state of both teams and ignores the stored choice.
 
 ## 5. Self-check protocol (AGENTS.md rule 6)

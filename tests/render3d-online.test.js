@@ -20,6 +20,12 @@ import { sameViewSize, viewSize } from '../src/render3d/view-size.js';
 import { GAME, createApp } from '../src/ui/app.js';
 import { isQualityKey, isTextEntry } from '../src/ui/input.js';
 
+// The app starts on the main menu; Play Online opens the lobby.
+const onLobby = (app) => {
+  app.playOnline();
+  return app;
+};
+
 const TARGET = { x: 0, y: 0, z: 0 };
 const worldHitTest = createWorldHitTest({
   position: cameraPosition(CAMERA_PITCH_DEG, CAMERA_DISTANCE, TARGET),
@@ -45,7 +51,7 @@ for (let py = 0; py < INTERNAL_HEIGHT; py += 3) {
 function twoWindows() {
   const network = createFakeNetwork();
   const clock = createFakeClock();
-  const open = () => createApp({ openTransport: () => network.connect(), clock, random: () => 0, makeCode: () => 'AB2C9' });
+  const open = () => onLobby(createApp({ openTransport: () => network.connect(), clock, random: () => 0, makeCode: () => 'AB2C9' }));
   const host = open();
   const guest = open();
   host.openCreate();

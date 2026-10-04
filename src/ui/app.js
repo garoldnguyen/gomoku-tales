@@ -4,9 +4,9 @@
 // a room code and a clock, the DOM screens call its actions and read
 // getView(), and the canvas draws the game screen from getGame(). Which
 // screen is shown is decided by flowReducer (flow.js); Create Room and Join
-// Room are two panels of its lobby screen. Until the menu exists (Flow v1
-// step 4) the app starts on the lobby, and leaving a room goes through the
-// menu straight back to the lobby.
+// Room are two panels of its lobby screen. The app starts on the main menu
+// (menu.js); leaving a room still goes through the menu straight back to
+// the lobby until the lobby gets its own Back button (Flow v1 step 5).
 //
 // The host owns the start (net/room.js): after a join both windows are in
 // phase starting (the host still on the Waiting screen, the guest still on
@@ -19,10 +19,12 @@ import { systemClock } from '../net/clock.js';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../net/room-code.js';
 import { FULL, NO_ROOM, PLAYING, STARTING, createGuestRoom, createHostRoom } from '../net/room.js';
 import { FLOW_EVENTS, ROLES, SCREENS, flowReducer, initialFlow } from './flow.js';
+import { MENU_EVENTS } from './menu.js';
 import { characterName, createOnlineGame } from './online-game.js';
 import { STRINGS } from './strings.js';
 
 // Screens.
+export const MENU = 'menu';
 export const LOBBY = 'lobby';
 export const CREATE = 'create';
 export const JOIN = 'join';
@@ -45,7 +47,7 @@ export function createApp(options) {
     makeCode = () => generateRoomCode(),
   } = options;
 
-  let flow = initialFlow({ startScreen: SCREENS.LOBBY });
+  let flow = initialFlow();
   let lobbyPanel = LOBBY; // LOBBY, CREATE or JOIN while the flow is on the lobby
   let room = null;
   let game = null; // online game controller while a game runs
@@ -69,6 +71,7 @@ export function createApp(options) {
   // the host starts the game.
   const screenNow = () => {
     switch (flow.screen) {
+      case SCREENS.MENU: return MENU;
       case SCREENS.LOBBY: return lobbyPanel;
       case SCREENS.WAITING: return WAITING_SCREEN;
       case SCREENS.STARTING: return flow.role === ROLES.HOST ? WAITING_SCREEN : JOIN;
@@ -188,6 +191,13 @@ export function createApp(options) {
     else if (room.phase === NO_ROOM) onRoomEvent({ type: 'noRoom' });
   };
 
+  const menuEvent = (type) => {
+    if (!MENU_EVENTS.includes(type)) return false;
+    const before = flow;
+    send(type);
+    return flow !== before;
+  };
+
   return {
     // Calls listener() whenever getView() changes (not on every game move;
     // the canvas redraws the game every frame).
@@ -225,6 +235,17 @@ export function createApp(options) {
         joinError,
         outcome: screen === GAME_OVER && game ? game.getOutcome() : null,
       };
+    },
+
+    // A menu button, or Close and Escape on a menu overlay: one of
+    // MENU_EVENTS (menu.js), sent to the flow. Returns true when the flow
+    // changed. PLAY_LOCAL ends in the game screen in local mode, which the
+    // page runs itself (src/main.js), like ?local=1.
+    menuEvent,
+
+    // Play Online on the menu: the lobby.
+    playOnline() {
+      return menuEvent(FLOW_EVENTS.PLAY_ONLINE);
     },
 
     openCreate() {
@@ -273,7 +294,7 @@ export function createApp(options) {
     // the room if there is one. Leave is off while the game is starting.
     backToLobby() {
       const screen = screenNow();
-      if (screen === LOBBY || screen === GAME || flow.screen === SCREENS.STARTING) return;
+      if (screen === MENU || screen === LOBBY || screen === GAME || flow.screen === SCREENS.STARTING) return;
       closeRoom();
       joinError = null;
       lobbyPanel = LOBBY;

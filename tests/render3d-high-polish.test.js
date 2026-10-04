@@ -422,7 +422,7 @@ test('the render loop makes no Three.js object at any level once its pools are w
 // and name: the 3D frame path. The walk must reach exactly these, so a new
 // function on the frame path has to be added here (and is then checked).
 const FRAME_PATH = {
-  'main.js': ['frame', 'frameViewOf', 'showEvents', 'showHud'],
+  'main.js': ['frame', 'frameViewOf', 'menuShown', 'showEvents', 'showHud'],
   'render3d/art.js': ['artMeta'],
   'render3d/board-marks.js': ['addDecal', 'boardMarksInto', 'lastMoveOpacity', 'setGhost', 'winPulseOpacity'],
   'render3d/breeze-hill.js': ['update'],
@@ -481,6 +481,7 @@ const NOT_EACH_FRAME = {
   'render3d/world-renderer.js lowestText': 'one string per lowest FPS value, kept',
   'main.js roomHint': 'only when the room or seat changes',
   'main.js forgetGame': 'only when a game starts or is left (resets every effect)',
+  'main.js showMenu': 'only when the flow, the fullscreen state or the quality level changes',
   'render3d/world.js createPieceSprite': 'a piece sprite pool that grows on a miss (pop() ??)',
   'render3d/world.js createCellDecal': 'a decal mesh pool that grows on a miss',
   'render3d/world.js newZonePiece': 'one geometry per zone piece, built on a miss (??) and kept',

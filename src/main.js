@@ -10,7 +10,8 @@ import { blursMenus, browserStorage, cycleQuality, startQuality } from './render
 import { seededRandom } from './render3d/seeded-random.js';
 import { loadForestMeta, withForestMeta } from './render3d/forest-meta.js';
 import { loadV3Meta } from './render3d/v3-meta.js';
-import { GAME, GAME_OVER, createApp } from './ui/app.js';
+import { GAME, GAME_OVER, MENU, createApp } from './ui/app.js';
+import { MODES, SCREENS } from './ui/flow.js';
 import {
   fullscreenActive, fullscreenSupported, fullscreenViewModel, isFullscreenKey, onFullscreenChange, toggleFullscreen,
 } from './ui/fullscreen.js';
@@ -19,8 +20,10 @@ import { isCollapseKey, startCollapsed, toggleAll, withCollapsed, writeCollapsed
 import { hudViewModel } from './ui/hud-view.js';
 import { attachGameInput, hitTest, isQualityKey, shortcutKeyHandler } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
+import { menuViewModel } from './ui/menu.js';
+import { createMenu } from './ui/menu-dom.js';
 import { attachScreens } from './ui/screens.js';
-import { parseShotParams, setUpShotScene } from './ui/shot-mode.js';
+import { parseShotParams, setUpShotScene, shotFlow } from './ui/shot-mode.js';
 
 const canvas = document.getElementById('game');
 canvas.width = INTERNAL_WIDTH;
@@ -130,6 +133,15 @@ if (hud) {
   }
 }
 
+// The menu layer (see showMenu below). menuFlow is the flow state last
+// drawn, menuQuality the level it was drawn with (the automatic step down
+// changes the level without setQuality, so the frame loop checks it).
+let menu = null;
+let menuFlow = null;
+let menuQuality = null;
+const canFullscreen = fullscreenSupported(document);
+let qualityKeyAttached = false;
+
 if (shot) {
   startShotMode(shot);
 } else if (params.get('local') === '1') {
@@ -162,18 +174,50 @@ async function load3dRenderer() {
   }
 }
 
-// A quality level chosen by hand (the Q key or the HUD switch): the
-// renderer's setQuality, and the HUD glass follows it.
+// A quality level chosen by hand (the Q key, the HUD switch or Settings):
+// the renderer's setQuality (which applies it at once and saves it), and
+// the HUD glass and the menu follow it.
 function setQuality(level) {
   if (!renderer.setQuality) return;
   renderer.setQuality(level);
   hud?.setQuality(renderer.quality);
+  if (menuFlow) showMenu(menuFlow);
+}
+
+// The main menu, How to Play and Settings (src/ui/menu-dom.js), drawn from
+// menuViewModel for a flow state (src/ui/flow.js). There is none on the
+// ?local=1 page (the state is declared above the mode start).
+function showMenu(flow) {
+  menuFlow = flow;
+  menuQuality = renderer.quality ?? null;
+  menu.setFrost(renderer.features?.hudFrost ?? null);
+  menu.render(menuViewModel(flow, {
+    quality: renderer.setQuality ? renderer.quality : null,
+    fullscreen: { supported: canFullscreen, active: fullscreenActive(document) },
+  }));
+}
+function createMenuLayer(onEvent) {
+  menu = createMenu(document.getElementById('flow'), {
+    onEvent,
+    onQuality: (level) => setQuality(level),
+    onFullscreen: () => toggleFullscreen(document),
+  });
+  assetsLoaded.then((store) => menu.setAssets(store));
+  if (canFullscreen) onFullscreenChange(document, () => menuFlow && showMenu(menuFlow));
+}
+// True while the menu screen is shown; redraws it when the level changed.
+function menuShown() {
+  if (menuFlow?.screen !== SCREENS.MENU) return false;
+  if ((renderer.quality ?? null) !== menuQuality) showMenu(menuFlow);
+  return true;
 }
 
 // The Q key steps this window's 3D quality level (high, medium, low and
-// round again) through setQuality.
+// round again) through setQuality. Attached once per page
+// (qualityKeyAttached is declared above the mode start).
 function attachQualityKey() {
-  if (!renderer.setQuality) return;
+  if (!renderer.setQuality || qualityKeyAttached) return;
+  qualityKeyAttached = true;
   window.addEventListener('keydown', shortcutKeyHandler((event) => {
     if (!event.repeat && isQualityKey(event)) setQuality(cycleQuality(renderer.quality));
   }));
@@ -252,6 +296,19 @@ function showEvents(events, effects, time, resumed) {
 function startOnlineMode() {
   const app = createApp({ openTransport: (code) => createBroadcastTransport(code) });
   attachScreens(document.getElementById('screens'), app);
+  // The main menu is the first screen. Play on this computer leaves the
+  // online loop for the same local game as ?local=1.
+  let local = false;
+  createMenuLayer((type) => app.menuEvent(type));
+  app.onChange(() => {
+    showMenu(app.getFlow());
+    if (!local && app.getFlow().mode === MODES.LOCAL) {
+      local = true;
+      app.close();
+      startLocalMode();
+    }
+  });
+  showMenu(app.getFlow());
   // Tell the opponent at once when this window closes or reloads.
   window.addEventListener('pagehide', () => app.close());
 
@@ -292,6 +349,7 @@ function startOnlineMode() {
   };
 
   const frame = (time) => {
+    if (local) return; // the local game draws from now on
     const resumed = resumeWatch.tick(time);
     const screen = app.getScreen();
     const game = app.getGame();
@@ -320,11 +378,13 @@ function startOnlineMode() {
         shownGame = null;
       }
       pointerCanvas.style.cursor = 'default';
-      renderer.drawMenuScreen(ctx, time);
+      // The DOM menu has its own title.
+      renderer.drawMenuScreen(ctx, time, !menuShown());
       hud?.show(false);
     }
-    // The Game over screen keeps the final board and the poses in view.
-    const blur = screen !== GAME && screen !== GAME_OVER && blursMenus(renderer.features);
+    // The Game over screen keeps the final board and the poses in view,
+    // and the menu the empty farm.
+    const blur = screen !== GAME && screen !== GAME_OVER && screen !== MENU && blursMenus(renderer.features);
     if (blur !== blurred) {
       blurred = blur;
       stage.classList.toggle('backdrop-blur', blur);
@@ -388,11 +448,18 @@ function startLocalMode() {
 async function startShotMode({ scene }) {
   const game = createLocalGame({ random: seededRandom(SHOT_SEED) });
   const staged = setUpShotScene(game, scene);
+  // The menu, howto and settings scenes show the menu layer over the empty
+  // farm, with no HUD, like the menu screen of the game.
+  const flow = shotFlow(scene);
+  if (flow) {
+    createMenuLayer(() => {});
+    showMenu(flow);
+  }
   const effects = renderer === RENDERER_2D ? createEffects({ random: seededRandom(SHOT_EFFECTS_SEED) }) : null;
   const planted = ({ x, y, player }) => [{ type: 'stonePlaced', player, x, y }];
   for (const plant of staged.growing) showEvents(planted(plant), effects, SHOT_TIME_MS - plant.ageMs, false);
   if (staged.last) showEvents(planted(staged.last), effects, SHOT_TIME_MS - staged.last.ageMs, false);
-  hud?.show(true);
+  hud?.show(!flow);
 
   await assetsLoaded;
   await Promise.all(Array.from(document.images, (img) => (img.src ? img.decode().catch(() => {}) : null)));
@@ -412,9 +479,13 @@ async function startShotMode({ scene }) {
       height = window.innerHeight;
       drawn = 0;
     }
-    const view = game.getView();
-    renderer.drawGameScreen(ctx, frameViewOf(view, SHOT_TIME_MS, effects, null));
-    if (hud) showHud(game, view, null, null, null);
+    if (flow) {
+      renderer.drawMenuScreen(ctx, SHOT_TIME_MS, false);
+    } else {
+      const view = game.getView();
+      renderer.drawGameScreen(ctx, frameViewOf(view, SHOT_TIME_MS, effects, null));
+      if (hud) showHud(game, view, null, null, null);
+    }
     drawn++;
     state.ready = drawn >= SHOT_READY_FRAMES;
     requestAnimationFrame(frame);

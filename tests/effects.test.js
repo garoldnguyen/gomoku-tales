@@ -12,6 +12,12 @@ import { drawGameScreen } from '../src/render/game-renderer.js';
 import { createApp } from '../src/ui/app.js';
 import { createLocalGame } from '../src/ui/local-game.js';
 
+// The app starts on the main menu; Play Online opens the lobby.
+const onLobby = (app) => {
+  app.playOnline();
+  return app;
+};
+
 // A 2D context stand-in that records fillText and translate calls.
 function fakeContext() {
   const texts = [];
@@ -204,7 +210,7 @@ test('effects do not change the game state', () => {
 test('both online windows get the same events for effects', () => {
   const network = createFakeNetwork();
   const clock = createFakeClock();
-  const open = () => createApp({ openTransport: () => network.connect(), clock, random: () => 0, makeCode: () => 'AB2C9' });
+  const open = () => onLobby(createApp({ openTransport: () => network.connect(), clock, random: () => 0, makeCode: () => 'AB2C9' }));
   const host = open();
   const guest = open();
   host.openCreate();

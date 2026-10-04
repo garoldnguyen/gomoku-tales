@@ -58,7 +58,13 @@ class ParseTests(unittest.TestCase):
 class SetTests(unittest.TestCase):
     def test_sets_have_expected_sizes(self):
         sizes = {k: len(v) for k, v in shots.named_sets().items()}
-        self.assertEqual(sizes, {"quick": 1, "levels": 3, "shapes": 5, "hud": 5, "full": 7})
+        self.assertEqual(sizes, {"quick": 1, "levels": 3, "shapes": 5, "hud": 5, "full": 7, "flow": 6})
+
+    def test_flow_set_has_its_scenes_at_fhd_and_hd(self):
+        planned = shots.plan_shots(set_name="flow", scene="field")
+        pairs = {(s["scene"], s["shape"]) for s in planned}
+        self.assertEqual(pairs, {(scene, shape) for scene in ("menu", "howto", "settings") for shape in ("fhd", "hd")})
+        self.assertEqual((shots.SHAPES["fhd"], shots.SHAPES["hd"]), ((1920, 1080), (1280, 720)))
 
     def test_every_set_plans_with_unique_names(self):
         for name in shots.named_sets():
@@ -136,6 +142,18 @@ class JudgeTests(unittest.TestCase):
         ]
         p, _ = shots.judge(measurement(hudBoxes=boxes), CFG)
         self.assertEqual(len(p), 2)
+
+    def test_smallest_button(self):
+        buttons = [{"name": "a", "x": 0, "y": 0, "w": 240, "h": 52}, {"name": "b", "x": 0, "y": 0, "w": 96, "h": 40}]
+        self.assertEqual(shots.smallest_button(buttons), (40, "b"))
+        self.assertEqual(shots.smallest_button([]), (None, None))
+
+    def test_small_buttons_are_problems_in_flow_scenes_only(self):
+        small = [{"name": "menu-howto", "x": 0, "y": 0, "w": 240, "h": 40}]
+        self.assertEqual(len(shots.judge(measurement(scene="menu", buttons=small), CFG)[0]), 1)
+        self.assertEqual(shots.judge(measurement(scene="field", buttons=small), CFG)[0], [])
+        big = [{"name": "menu-howto", "x": 0, "y": 0, "w": 240, "h": 44}]
+        self.assertEqual(shots.judge(measurement(scene="menu", buttons=big), CFG)[0], [])
 
     def test_stable_limit(self):
         self.assertEqual(shots.judge(measurement(stableDiff=0.005), CFG)[0], [])

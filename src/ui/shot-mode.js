@@ -6,10 +6,26 @@
 // clicks.
 
 import { normalizeQuality } from '../render3d/quality.js';
+import { FLOW_EVENTS, flowReducer, initialFlow } from './flow.js';
 import { parseHudParam } from './hud-collapse.js';
 import { SHOT_FIELD } from './shot-position.js';
 
-export const SHOT_SCENES = Object.freeze(['field', 'empty']);
+export const SHOT_SCENES = Object.freeze(['field', 'empty', 'menu', 'howto', 'settings']);
+
+// The flow screens of shot mode (docs/flow-design.md section 7): the scene
+// name and the flow events that lead to it from the first state. They show
+// their own screen over the empty scene, with no HUD.
+const FLOW_SCENES = Object.freeze({
+  menu: [],
+  howto: [FLOW_EVENTS.OPEN_HOWTO],
+  settings: [FLOW_EVENTS.OPEN_SETTINGS],
+});
+
+// The flow state (flow.js) a shot scene shows, or null for a game scene.
+export function shotFlow(scene) {
+  if (!Object.hasOwn(FLOW_SCENES, scene)) return null;
+  return FLOW_SCENES[scene].reduce(flowReducer, initialFlow());
+}
 const DEFAULT_SCENE = 'field';
 
 // The shot and quality parameters of a URL search string (or

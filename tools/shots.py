@@ -68,6 +68,12 @@ DEFAULT_CONFIG = {
     "ignore_urls": ["/favicon.ico"],
 }
 
+# Flow screens (docs/flow-design.md section 7): the scenes of the flow set, drawn at these window shapes.
+# In these scenes every visible button must be at least MIN_BUTTON_SIDE px on both sides.
+FLOW_SCENES = ("menu", "howto", "settings")
+FLOW_SHAPES = ("fhd", "hd")
+MIN_BUTTON_SIDE = 44
+
 EDGE_BAND_PX = 4
 NEAR_BLACK = 16
 STABLE_WAIT_MS = 1200
@@ -115,7 +121,8 @@ def shot_query(shot):
 
 
 def named_sets():
-    """The ready made sets. Every item is (quality, shape, params)."""
+    """The ready made sets. Every item is (quality, shape, params) or (quality, shape, params, scene);
+    without a scene the item uses the scene of the command line."""
     levels = [(q, "hd", {}) for q in LEVELS]
     shapes = [("medium", s, {}) for s in ("wide", "hd", "tablet", "portrait", "phone")]
     hud = [
@@ -135,6 +142,7 @@ def named_sets():
         "shapes": shapes,
         "hud": hud,
         "full": full,
+        "flow": [("medium", shape, {}, scene) for scene in FLOW_SCENES for shape in FLOW_SHAPES],
     }
 
 
@@ -145,10 +153,11 @@ def plan_shots(set_name=None, qualities=None, shapes=None, scene="field", params
         sets = named_sets()
         if set_name not in sets:
             raise ValueError("unknown set: %s (use %s)" % (set_name, ", ".join(sets)))
-        for quality, shape, extra in sets[set_name]:
+        for item in sets[set_name]:
+            quality, shape, extra = item[:3]
             merged = dict(extra)
             merged.update(params or {})
-            shots.append(make_shot(quality, shape, scene, merged))
+            shots.append(make_shot(quality, shape, item[3] if len(item) > 3 else scene, merged))
     else:
         for quality, shape in itertools.product(qualities or ["high"], shapes or ["hd"]):
             shots.append(make_shot(quality, shape, scene, params))
@@ -190,6 +199,16 @@ def find_outside(boxes, width, height, tol=1.0):
     return out
 
 
+def smallest_button(buttons):
+    """(side, name) of the smallest side of the visible buttons, or (None, None) when there are none."""
+    best = (None, None)
+    for b in buttons or []:
+        side = min(b["w"], b["h"])
+        if best[0] is None or side < best[0]:
+            best = (side, b["name"])
+    return best
+
+
 def judge(m, cfg):
     """Turns raw measurements of one shot into (problems, warnings). Both are lists of plain sentences."""
     problems = []
@@ -221,6 +240,9 @@ def judge(m, cfg):
         problems.append("HUD boxes overlap: %s and %s" % (a, b))
     for name in find_outside(boxes, w, h):
         problems.append("HUD box sticks out of the window: " + name)
+    side, name = smallest_button(m.get("buttons"))
+    if m.get("scene") in FLOW_SCENES and side is not None and side < MIN_BUTTON_SIDE - 0.5:
+        problems.append("button %s is %.1f px on its smallest side (at least %d)" % (name, side, MIN_BUTTON_SIDE))
 
     window_notes = []
     for side, share in (m.get("edges") or {}).items():
@@ -275,6 +297,16 @@ JS_PAGE_INFO = """() => {
     boxes.push({ name: el.getAttribute('data-hud-box') || el.id || el.tagName.toLowerCase(),
                  x: round(r.x), y: round(r.y), w: round(r.width), h: round(r.height) });
   }
+  // Every visible button element, for the smallest button side.
+  const buttons = [];
+  for (const el of document.querySelectorAll('button')) {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.01) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width < 1 || r.height < 1) continue;
+    buttons.push({ name: el.getAttribute('data-hud-box') || (el.textContent || '').trim().slice(0, 30) || 'button',
+                   x: round(r.x), y: round(r.y), w: round(r.width), h: round(r.height) });
+  }
   let canvas = null, best = 0;
   for (const c of document.querySelectorAll('canvas')) {
     const r = c.getBoundingClientRect();
@@ -286,7 +318,7 @@ JS_PAGE_INFO = """() => {
   const de = document.documentElement;
   let shot = null;
   try { shot = window.__SHOT__ ? JSON.parse(JSON.stringify(window.__SHOT__)) : null; } catch (e) { shot = null; }
-  return { vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio, boxes, canvas,
+  return { vw: innerWidth, vh: innerHeight, dpr: devicePixelRatio, boxes, buttons, canvas,
            scroll: { w: de.scrollWidth, h: de.scrollHeight }, shot };
 }"""
 
@@ -487,6 +519,7 @@ def take_shot(browser, analyzer, shot, base, cfg, out_dir):
         m["canvas"] = info["canvas"]
         m["scroll"] = info["scroll"]
         m["hudBoxes"] = info["boxes"][:60]
+        m["buttons"] = info["buttons"][:60]
         m["shot"] = info["shot"]
         m["dpr"] = info["dpr"]
     else:
@@ -508,6 +541,10 @@ def take_shot(browser, analyzer, shot, base, cfg, out_dir):
         m["stableDiff"] = None if res["stableDiff"] is None else round(res["stableDiff"], 5)
         m["pixels"] = {"w": res["w"], "h": res["h"]}
     m["problems"], m["warnings"] = judge(m, cfg)
+    boxes = m.get("hudBoxes", [])
+    m["overlaps"] = [list(pair) for pair in find_overlaps(boxes)]
+    m["outside"] = find_outside(boxes, width, height)
+    m["minButtonSide"], m["minButtonName"] = smallest_button(m.get("buttons"))
     return m
 
 
@@ -541,7 +578,7 @@ def main(argv=None):
         description="Take pictures of the running game and measure them (docs/shots.md).",
         epilog="Sets: " + ", ".join(named_sets()) + ". Shapes: " + ", ".join("%s=%dx%d" % (k, v[0], v[1]) for k, v in SHAPES.items()),
     )
-    ap.add_argument("--set", dest="set_name", help="quick, levels, shapes, hud or full")
+    ap.add_argument("--set", dest="set_name", help="quick, levels, shapes, hud, full or flow")
     ap.add_argument("--quality", help="low, medium or high; a comma separated list is allowed")
     ap.add_argument("--shape", help="window shape; a comma separated list is allowed")
     ap.add_argument("--scene", default="field", help="scene name for the shot parameter (default field)")
@@ -643,6 +680,12 @@ def main(argv=None):
     for r in results:
         if "horizon" in r:
             print("  %-34s %6.2f at %.0f percent of the height" % (r["file"], r["horizon"]["step"], r["horizon"]["at"] * 100))
+    print()
+    print("Boxes and buttons (overlapping pairs, boxes outside the window, smallest button side in px):")
+    for r in results:
+        side = r.get("minButtonSide")
+        print("  %-34s overlaps %d, outside %d, smallest button %s" % (
+            r["file"], len(r.get("overlaps", [])), len(r.get("outside", [])), "-" if side is None else "%.1f" % side))
     print()
     if n_problems == 0:
         print("SHOTS OK: %d shot(s), %d warning(s). Report: %s/report.json" % (len(results), n_warnings, rel))

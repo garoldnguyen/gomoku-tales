@@ -10,12 +10,18 @@ import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { ROOM_PHASES } from '../src/net/phase.js';
-import { CREATE, GAME, GAME_OVER, LOBBY, WAITING_SCREEN, createApp } from '../src/ui/app.js';
+import { CREATE, GAME, GAME_OVER, LOBBY, MENU, WAITING_SCREEN, createApp } from '../src/ui/app.js';
 import { isFullscreenKey } from '../src/ui/fullscreen.js';
 import { isCollapseKey } from '../src/ui/hud-collapse.js';
 import { attachGameInput, isQualityKey, isRestartKey, isTypingTarget, shortcutKeyHandler } from '../src/ui/input.js';
 import { SKILL_INFO } from '../src/ui/skill-info.js';
 import { STRINGS } from '../src/ui/strings.js';
+
+// The app starts on the main menu; Play Online opens the lobby.
+const onLobby = (app) => {
+  app.playOnline();
+  return app;
+};
 
 // --- isTypingTarget and the shortcuts ---
 
@@ -146,13 +152,16 @@ test('ROOM_PHASES: a frozen object with waiting, starting, playing and over', ()
 
 // --- the app on the reducer ---
 
-test('the online app starts on the lobby and follows the flow reducer into the game', () => {
+test('the online app starts on the menu, Play Online opens the lobby, and it follows the flow reducer into the game', () => {
   const network = createFakeNetwork();
   const clock = createFakeClock();
-  const make = () => createApp({ openTransport: () => network.connect(), clock, makeCode: () => 'AB2C9' });
+  const make = () => onLobby(createApp({ openTransport: () => network.connect(), clock, makeCode: () => 'AB2C9' }));
+  const fresh = createApp({ openTransport: () => network.connect(), clock });
+  assert.equal(fresh.getFlow().screen, 'menu', 'the menu is the first screen');
+  assert.equal(fresh.getScreen(), MENU);
   const host = make();
   const guest = make();
-  assert.equal(host.getScreen(), LOBBY, 'no menu yet: the lobby is the first screen');
+  assert.equal(host.getScreen(), LOBBY);
   assert.equal(host.getFlow().screen, 'lobby');
   assert.equal(host.getFlow().mode, 'online');
   host.openCreate();
@@ -178,7 +187,7 @@ test('the online app starts on the lobby and follows the flow reducer into the g
 test('the online app waits for the host start; a guest who leaves in starting sends the host back to Waiting', () => {
   const network = createFakeNetwork();
   const clock = createFakeClock();
-  const make = () => createApp({ openTransport: () => network.connect(), clock, makeCode: () => 'AB2C9' });
+  const make = () => onLobby(createApp({ openTransport: () => network.connect(), clock, makeCode: () => 'AB2C9' }));
   const host = make();
   const guest = make();
   host.openCreate();
@@ -208,7 +217,7 @@ test('the online app waits for the host start; a guest who leaves in starting se
 test('the online app: a host who leaves in starting sends the guest to the lobby with a notice', () => {
   const network = createFakeNetwork();
   const clock = createFakeClock();
-  const make = () => createApp({ openTransport: () => network.connect(), clock, makeCode: () => 'AB2C9' });
+  const make = () => onLobby(createApp({ openTransport: () => network.connect(), clock, makeCode: () => 'AB2C9' }));
   const host = make();
   const guest = make();
   host.openCreate();
@@ -229,8 +238,8 @@ test('the online app: a guest whose start is recovered after a forfeit reaches G
   const clock = createFakeClock();
   const hostTransport = network.connect();
   const guestTransport = network.connect();
-  const host = createApp({ openTransport: () => hostTransport, clock, makeCode: () => 'AB2C9' });
-  const guest = createApp({ openTransport: () => guestTransport, clock });
+  const host = onLobby(createApp({ openTransport: () => hostTransport, clock, makeCode: () => 'AB2C9' }));
+  const guest = onLobby(createApp({ openTransport: () => guestTransport, clock }));
   host.openCreate();
   host.createRoom(WIND_RABBIT);
   guest.openJoin();

@@ -490,7 +490,7 @@ export function drawGameScreen(ctx, view) {
 }
 
 // Background and title behind the lobby and room screens (DOM overlays).
-export function drawMenuScreen(ctx, time = performance.now()) {
+export function drawMenuScreen(ctx, time = performance.now(), title = true) {
   drawBackground(ctx, time);
-  drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 90, { size: 48 });
+  if (title) drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 90, { size: 48 });
 }

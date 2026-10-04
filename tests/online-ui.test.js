@@ -28,6 +28,7 @@ function makeWorld({ random = () => 0 } = {}) {
       makeCode: () => 'AB2C9',
       ...options,
     });
+    app.playOnline(); // the app starts on the menu
     let changes = 0;
     app.onChange(() => changes++);
     return { app, transports, get changes() { return changes; } };

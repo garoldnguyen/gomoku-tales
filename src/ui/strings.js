@@ -13,6 +13,27 @@ const rabbit = CHARACTERS[WIND_RABBIT].name;
 const bear = CHARACTERS[EARTH_BEAR].name;
 const skill = (id) => SKILL_INFO[id].title;
 
+// The six rules lines of How to Play (section 3.2) with the numbers of
+// `config` (src/config.js or a test's own values). Each sentence was
+// checked against src/logic: a rock lasts ROCK_LIFETIME_TURNS turns of the
+// game, both players' turns counted (earth-bear-skills.js), so line 5 says
+// so, and line 6 takes WIN_LENGTH like line 3.
+export function howToRules({ COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS, WIN_LENGTH }) {
+  return [
+    `Two players take turns. ${rabbit} plants X and always goes first. ${bear} plants O.`,
+    'On your turn do one thing: plant on an empty plot, or use a skill. A skill takes your whole turn.',
+    `${WIN_LENGTH} or more of your plants in an unbroken row, across, down or diagonally, win the game.`,
+    `After you use a skill it rests for your next ${COOLDOWN_SHORT} turns (${skill(WIND_DASH)}, ${skill(TERRAIN_CREATION)}) or your next ${COOLDOWN_LONG} turns (${skill(TORNADO_ZONE)}, ${skill(STONE_CONVERSION)}).`,
+    `A rock blocks a plot for both players and crumbles after ${ROCK_LIFETIME_TURNS} turns, counting both players' turns.`,
+    `If the board fills up and nobody has ${WIN_LENGTH} in a row, the game is a draw.`,
+  ];
+}
+
+// howToRule1 to howToRule6 of STRINGS.
+function rulesEntries(lines) {
+  return Object.fromEntries(lines.map((line, i) => [`howToRule${i + 1}`, line]));
+}
+
 export const STRINGS = Object.freeze({
   // Menu (section 3.1).
   gameTitle: 'Gomoku Tales',
@@ -23,12 +44,7 @@ export const STRINGS = Object.freeze({
 
   // How to Play (section 3.2).
   howToTitle: 'How to Play',
-  howToRule1: `Two players take turns. ${rabbit} plants X and always goes first. ${bear} plants O.`,
-  howToRule2: 'On your turn do one thing: plant on an empty plot, or use a skill. A skill takes your whole turn.',
-  howToRule3: `${WIN_LENGTH} or more of your plants in an unbroken row, across, down or diagonally, win the game.`,
-  howToRule4: `After you use a skill it rests for your next ${COOLDOWN_SHORT} turns (${skill(WIND_DASH)}, ${skill(TERRAIN_CREATION)}) or your next ${COOLDOWN_LONG} turns (${skill(TORNADO_ZONE)}, ${skill(STONE_CONVERSION)}).`,
-  howToRule5: `A rock blocks a plot for both players and crumbles after ${ROCK_LIFETIME_TURNS} turns.`,
-  howToRule6: 'If the board fills up and nobody has five in a row, the game is a draw.',
+  ...rulesEntries(howToRules({ COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS, WIN_LENGTH })),
   howToSkillsTitle: 'Skills',
   howToCooldown: 'Rests',
   howToTurns: 'turns',
