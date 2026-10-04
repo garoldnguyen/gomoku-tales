@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Character select, desktop</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap">
+</helmet>
+<div style="position:relative; width:1280px; height:720px; overflow:hidden; background:#1b2a1e; color:#f4f7fb; font-family:Nunito, system-ui, sans-serif;">
+  <div style="position:absolute; left:0; top:0; right:0; bottom:0; background:rgba(8,12,20,0.5); backdrop-filter:blur(6px);"></div>
+
+  <div style="position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); width:1040px; box-sizing:border-box; padding:40px 44px 36px; border-radius:22px; border:3px solid rgba(255,255,255,0.22); background:rgba(14,20,34,0.86); box-shadow:0 10px 0 #0e1422; display:flex; flex-direction:column; align-items:center; gap:26px;">
+
+    <div style="text-align:center;">
+      <div style="font-size:44px; font-weight:800; text-shadow:0 4px 0 #0e1422;">Choose your character</div>
+      <div style="margin-top:10px; font-size:16px; color:rgba(244,247,251,0.7);">The first to pick plays X and moves first. The second plays O.</div>
+    </div>
+
+    <div style="display:flex; gap:26px; width:100%;">
+
+      <button type="button" style="appearance:none; box-sizing:border-box; flex:1 1 0; min-width:0; padding:18px; margin:0; border-radius:18px; border:3px solid #ffe14d; background:#141f36; color:#f4f7fb; font:inherit; text-align:left; display:flex; flex-direction:column; gap:14px; box-shadow:0 6px 0 #0e1422; cursor:pointer;">
+        <div style="height:170px; border-radius:14px; background:rgba(59,140,255,0.2); display:flex; align-items:center; justify-content:center;">
+          <svg width="112" height="112" viewBox="0 0 100 100" aria-hidden="true">
+            <g fill="#3b8cff"><circle cx="50" cy="28" r="16"/><circle cx="50" cy="72" r="16"/><circle cx="28" cy="50" r="16"/><circle cx="72" cy="50" r="16"/></g>
+            <circle cx="50" cy="50" r="9" fill="#cfe4ff"/>
+          </svg>
+        </div>
+        <div style="font-size:26px; font-weight:800;">Wind Rabbit</div>
+        <div style="font-size:14px; color:rgba(244,247,251,0.7); font-style:italic;">Fast and hard to read.</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-radius:12px; background:rgba(255,255,255,0.06);">
+          <div style="font-size:16px; font-weight:700;">Wind Dash</div>
+          <div style="padding:2px 9px; border-radius:8px; background:rgba(255,225,77,0.2); color:#ffec99; font-size:13px; font-weight:800;">3 turns</div>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-radius:12px; background:rgba(255,255,255,0.06);">
+          <div style="font-size:16px; font-weight:700;">Tornado Zone</div>
+          <div style="padding:2px 9px; border-radius:8px; background:rgba(255,225,77,0.2); color:#ffec99; font-size:13px; font-weight:800;">6 turns</div>
+        </div>
+      </button>
+
+      <button type="button" style="appearance:none; box-sizing:border-box; flex:1 1 0; min-width:0; padding:18px; margin:0; border-radius:18px; border:3px solid rgba(255,255,255,0.14); background:#141f36; color:#f4f7fb; font:inherit; text-align:left; display:flex; flex-direction:column; gap:14px; box-shadow:0 6px 0 #0e1422; cursor:pointer;">
+        <div style="height:170px; border-radius:14px; background:rgba(255,75,92,0.18); display:flex; align-items:center; justify-content:center;">
+          <svg width="112" height="112" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="34" fill="#ff4b5c"/>
+            <circle cx="50" cy="50" r="13" fill="#ffd0d5"/>
+          </svg>
+        </div>
+        <div style="font-size:26px; font-weight:800;">Earth Bear</div>
+        <div style="font-size:14px; color:rgba(244,247,251,0.7); font-style:italic;">Slow and steady.</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-radius:12px; background:rgba(255,255,255,0.06);">
+          <div style="font-size:16px; font-weight:700;">Terrain Creation</div>
+          <div style="padding:2px 9px; border-radius:8px; background:rgba(255,225,77,0.2); color:#ffec99; font-size:13px; font-weight:800;">3 turns</div>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-radius:12px; background:rgba(255,255,255,0.06);">
+          <div style="font-size:16px; font-weight:700;">Stone Conversion</div>
+          <div style="padding:2px 9px; border-radius:8px; background:rgba(255,225,77,0.2); color:#ffec99; font-size:13px; font-weight:800;">6 turns</div>
+        </div>
+      </button>
+
+      <button type="button" style="appearance:none; box-sizing:border-box; flex:1 1 0; min-width:0; padding:18px; margin:0; border-radius:18px; border:3px solid rgba(255,255,255,0.14); background:#141f36; color:#f4f7fb; font:inherit; text-align:left; display:flex; flex-direction:column; gap:14px; box-shadow:0 6px 0 #0e1422; cursor:pointer;">
+        <div style="height:170px; border-radius:14px; background:rgba(143,227,168,0.16); display:flex; align-items:center; justify-content:center;">
+          <svg width="112" height="112" viewBox="0 0 100 100" aria-hidden="true">
+            <circle cx="50" cy="50" r="36" fill="#8fe3a8"/>
+            <path d="M50 22 C 70 34, 70 66, 50 78 C 34 66, 34 34, 50 22 Z" fill="#cfeee0"/>
+          </svg>
+        </div>
+        <div style="font-size:26px; font-weight:800;">Jade Serpent</div>
+        <div style="font-size:14px; color:rgba(244,247,251,0.7); font-style:italic;">Patient, then sudden.</div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-radius:12px; background:rgba(255,255,255,0.06);">
+          <div style="font-size:16px; font-weight:700;">Hiss</div>
+          <div style="padding:2px 9px; border-radius:8px; background:rgba(255,225,77,0.2); color:#ffec99; font-size:13px; font-weight:800;">3 turns</div>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-radius:12px; background:rgba(255,255,255,0.06);">
+          <div style="font-size:16px; font-weight:700;">Venom</div>
+          <div style="padding:2px 9px; border-radius:8px; background:rgba(255,225,77,0.2); color:#ffec99; font-size:13px; font-weight:800;">6 turns</div>
+        </div>
+      </button>
+
+    </div>
+
+    <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+      <button type="button" style="appearance:none; border:0; background:none; padding:0; color:rgba(244,247,251,0.7); font:inherit; font-size:16px; font-weight:600; cursor:pointer;">Back</button>
+      <button type="button" style="appearance:none; height:54px; padding:0 40px; border-radius:14px; border:0; background:#ffe14d; color:#0e1422; font:inherit; font-size:19px; font-weight:800; box-shadow:0 6px 0 #b59a1f; cursor:pointer;">Ready</button>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":720}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
