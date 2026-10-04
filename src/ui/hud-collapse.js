@@ -4,7 +4,7 @@
 // expanded; the game works without storage.
 
 import { X, O } from '../logic/board.js';
-import { isTextEntry } from './input.js';
+import { isTypingTarget } from './input.js';
 
 export const COLLAPSE_STORAGE_KEYS = Object.freeze({ [X]: 'gomoku.hud.collapsed.x', [O]: 'gomoku.hud.collapsed.o' });
 
@@ -58,7 +58,7 @@ export function toggleAll(collapsed) {
 export function isCollapseKey(event) {
   return typeof event?.key === 'string' && event.key.toLowerCase() === COLLAPSE_KEY
     && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && !event.repeat
-    && !isTextEntry(event.target);
+    && !isTypingTarget(event.target);
 }
 
 // The hud shot parameter (docs/shots.md section 4): 'expanded' or

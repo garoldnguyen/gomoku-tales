@@ -17,7 +17,7 @@ import {
 import { createHud } from './ui/hud.js';
 import { isCollapseKey, startCollapsed, toggleAll, withCollapsed, writeCollapsed } from './ui/hud-collapse.js';
 import { hudViewModel } from './ui/hud-view.js';
-import { attachGameInput, hitTest, isQualityKey } from './ui/input.js';
+import { attachGameInput, hitTest, isQualityKey, shortcutKeyHandler } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
 import { attachScreens } from './ui/screens.js';
 import { parseShotParams, setUpShotScene } from './ui/shot-mode.js';
@@ -106,9 +106,9 @@ function setCollapsed(next) {
 // The C key folds or unfolds both cards; not in the slim layouts, where
 // the cards never fold, and not in shot mode (no input there).
 if (hud && !shot) {
-  window.addEventListener('keydown', (event) => {
+  window.addEventListener('keydown', shortcutKeyHandler((event) => {
     if (isCollapseKey(event) && hud.canCollapse()) setCollapsed(toggleAll(hudCollapsed));
-  });
+  }));
 }
 
 // The Fullscreen button (docs/art-direction-v3-1.md section 3.5): hidden
@@ -121,11 +121,11 @@ if (hud) {
   if (supported) {
     onFullscreenChange(document, showFullscreen);
     if (!shot) {
-      window.addEventListener('keydown', (event) => {
+      window.addEventListener('keydown', shortcutKeyHandler((event) => {
         if (!isFullscreenKey(event)) return;
         event.preventDefault();
         toggleFullscreen(document);
-      });
+      }));
     }
   }
 }
@@ -174,9 +174,9 @@ function setQuality(level) {
 // round again) through setQuality.
 function attachQualityKey() {
   if (!renderer.setQuality) return;
-  window.addEventListener('keydown', (event) => {
+  window.addEventListener('keydown', shortcutKeyHandler((event) => {
     if (!event.repeat && isQualityKey(event)) setQuality(cycleQuality(renderer.quality));
-  });
+  }));
 }
 
 // Shows a game on the HUD. localPlayer is this window's stone online, or

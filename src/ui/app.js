@@ -2,13 +2,18 @@
 // Room (pick a character), Join Room (enter a code), Waiting, Game and
 // Game over. Pure (no DOM): the page gives it a way to open a transport for
 // a room code and a clock, the DOM screens call its actions and read
-// getView(), and the canvas draws the game screen from getGame().
+// getView(), and the canvas draws the game screen from getGame(). Which
+// screen is shown is decided by flowReducer (flow.js); Create Room and Join
+// Room are two panels of its lobby screen. Until the menu exists (Flow v1
+// step 4) the app starts on the lobby, and leaving a room goes through the
+// menu straight back to the lobby.
 
 import { GAME_OVER_DELAY_MS } from '../config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
 import { systemClock } from '../net/clock.js';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../net/room-code.js';
 import { FULL, NO_ROOM, PLAYING, createGuestRoom, createHostRoom } from '../net/room.js';
+import { FLOW_EVENTS, ROLES, SCREENS, flowReducer, initialFlow } from './flow.js';
 import { characterName, createOnlineGame } from './online-game.js';
 
 // Screens.
@@ -34,7 +39,8 @@ export function createApp(options) {
     makeCode = () => generateRoomCode(),
   } = options;
 
-  let screen = LOBBY;
+  let flow = initialFlow({ startScreen: SCREENS.LOBBY });
+  let lobbyPanel = LOBBY; // LOBBY, CREATE or JOIN while the flow is on the lobby
   let room = null;
   let game = null; // online game controller while a game runs
   let joinError = null;
@@ -47,9 +53,23 @@ export function createApp(options) {
     for (const listener of [...listeners]) listener();
   };
 
-  const go = (next) => {
-    screen = next;
+  const send = (...events) => {
+    for (const event of events) flow = flowReducer(flow, event);
     changed();
+  };
+
+  // The screen of the old flow (the constants above) that the DOM screens
+  // and main.js know. starting is passed through at once today, so it shows
+  // the screen the player was on.
+  const screenNow = () => {
+    switch (flow.screen) {
+      case SCREENS.LOBBY: return lobbyPanel;
+      case SCREENS.WAITING: return WAITING_SCREEN;
+      case SCREENS.STARTING: return flow.role === ROLES.HOST ? WAITING_SCREEN : JOIN;
+      case SCREENS.GAME: return GAME;
+      case SCREENS.GAMEOVER: return GAME_OVER;
+      default: return LOBBY;
+    }
   };
 
   const closeRoom = () => {
@@ -72,6 +92,7 @@ export function createApp(options) {
   // screen is told to show the outcome again.
   const checkGameOver = () => {
     if (!game) return;
+    const screen = screenNow();
     if (screen === GAME_OVER) {
       changed();
       return;
@@ -82,18 +103,21 @@ export function createApp(options) {
     if (outcome.reason === 'opponentLeft') {
       if (gameOverTimer !== null) clock.clearTimeout(gameOverTimer);
       gameOverTimer = null;
-      go(GAME_OVER);
+      send(FLOW_EVENTS.GAME_OVER);
     } else if (gameOverTimer === null) {
       gameOverTimer = clock.setTimeout(() => {
         gameOverTimer = null;
-        if (screen === GAME) go(GAME_OVER);
+        if (flow.screen === SCREENS.GAME) send(FLOW_EVENTS.GAME_OVER);
       }, GAME_OVER_DELAY_MS);
     }
   };
 
+  // The host was waiting and the guest was joining: both pass the starting
+  // screen at once (the host's start delay comes in Flow v1 step 2).
   const startGame = () => {
     game = createOnlineGame(room);
-    go(GAME);
+    lobbyPanel = LOBBY;
+    send(flow.screen === SCREENS.WAITING ? FLOW_EVENTS.OPPONENT_JOINED : FLOW_EVENTS.JOINED, FLOW_EVENTS.START);
     checkGameOver(); // a guest may join a room whose game has already ended
   };
 
@@ -142,7 +166,12 @@ export function createApp(options) {
     },
 
     getScreen() {
-      return screen;
+      return screenNow();
+    },
+
+    // The flow state (flow.js) behind getScreen().
+    getFlow() {
+      return flow;
     },
 
     // The game screen controller (online-game.js) on the Game and Game over
@@ -154,6 +183,7 @@ export function createApp(options) {
     // What the DOM screens show.
     getView() {
       const roomView = room?.getView() ?? null;
+      const screen = screenNow();
       return {
         screen,
         code: roomView?.code ?? null,
@@ -167,30 +197,34 @@ export function createApp(options) {
     },
 
     openCreate() {
-      if (screen !== LOBBY) return;
-      go(CREATE);
+      if (screenNow() !== LOBBY) return;
+      lobbyPanel = CREATE;
+      changed();
     },
 
     openJoin() {
-      if (screen !== LOBBY) return;
+      if (screenNow() !== LOBBY) return;
       joinError = null;
-      go(JOIN);
+      lobbyPanel = JOIN;
+      changed();
     },
 
     // Creates a room as its host playing `character`, then waits for the
     // opponent.
     createRoom(character) {
-      if (screen !== CREATE || !Object.hasOwn(CHARACTERS, character)) return false;
+      if (screenNow() !== CREATE || !Object.hasOwn(CHARACTERS, character)) return false;
       const code = makeCode();
+      lobbyPanel = LOBBY;
+      flow = flowReducer(flow, FLOW_EVENTS.ROOM_CREATED);
       openRoom(createHostRoom({ transport: openTransport(code), code, character, clock, random }));
-      go(WAITING_SCREEN);
+      changed();
       return true;
     },
 
     // Joins the room with the typed code. Returns false and shows an error
     // if the code is not a valid room code.
     joinRoom(input) {
-      if (screen !== JOIN || joiningCode !== null) return false;
+      if (screenNow() !== JOIN || joiningCode !== null) return false;
       const code = normalizeRoomCode(input);
       if (!isValidRoomCode(code)) {
         joinError = code.length === 0 ? 'Enter a room code.' : BAD_CODE_ERROR;
@@ -207,10 +241,13 @@ export function createApp(options) {
     // Back from Create, Join, Waiting or Game over to the Lobby. Leaves
     // the room if there is one.
     backToLobby() {
+      const screen = screenNow();
       if (screen === LOBBY || screen === GAME) return;
       closeRoom();
       joinError = null;
-      go(LOBBY);
+      lobbyPanel = LOBBY;
+      if (flow.screen === SCREENS.LOBBY) changed();
+      else send(FLOW_EVENTS.LEAVE, FLOW_EVENTS.PLAY_ONLINE);
     },
 
     // Leaves the room without changing screens. Call it when the page closes.

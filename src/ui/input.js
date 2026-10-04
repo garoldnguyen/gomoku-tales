@@ -28,15 +28,32 @@ export function isCancelKey(event) {
 // in a text box, such as the room code on the Join Room screen.
 export function isQualityKey(event) {
   return (event.key === 'q' || event.key === 'Q') && !event.ctrlKey && !event.metaKey && !event.altKey
-    && !isTextEntry(event.target);
+    && !isTypingTarget(event.target);
 }
 
-// True for an element that takes typed text.
-export function isTextEntry(target) {
-  if (!target) return false;
-  if (target.isContentEditable) return true;
-  const tag = target.tagName;
+// True for an element that takes typed text: input, textarea, select and
+// contenteditable elements. Every global key shortcut returns early for an
+// event from such an element, because room codes hold letters like C, F,
+// Z, H and V (docs/flow-design.md section 8).
+export function isTypingTarget(element) {
+  if (!element) return false;
+  if (element.isContentEditable) return true;
+  const contentEditable = typeof element.contentEditable === 'string' ? element.contentEditable.toLowerCase() : '';
+  if (contentEditable === 'true' || contentEditable === 'plaintext-only') return true;
+  const tag = typeof element.tagName === 'string' ? element.tagName.toUpperCase() : '';
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+}
+
+// The older name of isTypingTarget.
+export const isTextEntry = isTypingTarget;
+
+// Wraps a global key shortcut handler so that it returns early for a key
+// typed into a text box.
+export function shortcutKeyHandler(handler) {
+  return (event) => {
+    if (isTypingTarget(event?.target)) return;
+    handler(event);
+  };
 }
 
 // What is under an internal point: { cell: { x, y } } for a board cell,
@@ -82,7 +99,7 @@ export function attachGameInput(canvas, { onHover, onClick, onCancel, onRestart 
     if (event.repeat) return;
     if (isCancelKey(event)) {
       onCancel();
-    } else if (onRestart && isRestartKey(event)) {
+    } else if (onRestart && isRestartKey(event) && !isTypingTarget(event.target)) {
       event.preventDefault();
       onRestart();
     }

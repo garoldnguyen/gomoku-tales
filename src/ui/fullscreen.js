@@ -5,7 +5,7 @@
 // fallback. Entering or leaving needs no scene code: the resize path
 // handles the new window size.
 
-import { isTextEntry } from './input.js';
+import { isTypingTarget } from './input.js';
 
 // The key that toggles full screen. F was free: the game's other keys are
 // R (restart), Q (quality), C (fold the HUD cards) and Escape (cancel).
@@ -30,7 +30,7 @@ export function fullscreenViewModel({ supported, active }) {
 export function isFullscreenKey(event) {
   return typeof event?.key === 'string' && event.key.toLowerCase() === FULLSCREEN_KEY
     && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && !event.repeat
-    && !isTextEntry(event.target);
+    && !isTypingTarget(event.target);
 }
 
 // True when the document can go full screen (false on iPhone Safari).

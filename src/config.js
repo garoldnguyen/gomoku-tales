@@ -19,9 +19,14 @@ export const ROOM_CODE_LENGTH = 5;
 // Networking timings not listed in docs/design.md section 10.
 export const PRESENCE_CHECK_INTERVAL_MS = 250; // how often the leave countdown is re-checked
 export const JOIN_TIMEOUT_MS = 3000; // no answer to "join" within this time means no such room
+// Online play works only between windows of the same browser on this
+// computer (BroadcastChannel). Becomes false when a WebSocket transport exists.
+export const ONLINE_SAME_BROWSER_ONLY = true;
 
 // Screen timings not listed in docs/design.md section 10.
 export const GAME_OVER_DELAY_MS = 1500; // time to see the final board before the Game over screen
+export const WAITING_START_DELAY_MS = 1500; // second player joined: the host starts the game after this
+export const COPY_FEEDBACK_MS = 1500; // how long Copied shows after the room code was copied
 
 // Sprite sizes in px from docs/design.md section 7. They are drawn scaled
 // to these; the art files themselves must have the size listed in
