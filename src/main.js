@@ -3,6 +3,7 @@ import { O, X } from './logic/board.js';
 import { CHARACTERS } from './logic/characters.js';
 import { createBroadcastTransport } from './net/transport.js';
 import { loadAssets, USES_3D } from './render/assets.js';
+import { loadCanvasFont } from './render/canvas-font.js';
 import { createEffects } from './render/effects.js';
 import { drawGameScreen, drawMenuScreen, setAssets } from './render/game-renderer.js';
 import { createResumeWatch } from './render3d/frame-gap.js';
@@ -56,6 +57,8 @@ if (shot) {
 const warn = (message) => console.warn(message);
 const assetsLoaded = loadAssets({ warn, uses: wants2d ? null : USES_3D });
 assetsLoaded.then(setAssets);
+// Canvas text (the Quality and FPS labels, the banners) waits for Nunito.
+const canvasFontLoaded = loadCanvasFont();
 // The v3 tuning data with the forest's (assets/forest-meta.json) added.
 const metaLoaded = Promise.all([loadV3Meta({ warn }), loadForestMeta({ warn })])
   .then(([v3Meta, forestMeta]) => withForestMeta(v3Meta, forestMeta));
@@ -80,6 +83,7 @@ document.addEventListener('visibilitychange', () => {
 // Shot mode neither reads nor saves the stored choice.
 const storage = shot ? null : browserStorage();
 const quality = startQuality(shot ? shot.quality : params.get('quality'), storage);
+await canvasFontLoaded;
 const renderer = wants2d ? RENDERER_2D : await load3dRenderer();
 if (shot) window.__SHOT__.renderer = renderer === RENDERER_2D ? '2d' : '3d';
 // The element that takes the pointer: the 2D canvas, or the full window

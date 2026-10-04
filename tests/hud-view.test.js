@@ -211,7 +211,7 @@ test('hud.css: fonts from assets/fonts, glass per quality, focus ring and 44 px 
   const cssUrl = new URL('../src/ui/hud.css', import.meta.url);
   const css = readFileSync(cssUrl, 'utf8');
   const fonts = [...css.matchAll(/url\("([^"]+)"\)/g)].map((m) => m[1]);
-  assert.equal(fonts.length, 4);
+  assert.equal(fonts.length, 5); // Nunito and the four DM Sans weights
   for (const font of fonts) {
     assert.ok(font.includes('assets/fonts/'), font);
     assert.ok(existsSync(new URL(font, cssUrl)), `${font} exists`);

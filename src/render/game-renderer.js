@@ -13,6 +13,7 @@ import {
 } from './layout.js';
 import { createAssetStore } from './assets.js';
 import { drawWindStreaks } from './effects.js';
+import { canvasFont } from './canvas-font.js';
 
 // Manifest names of the sprites drawn here.
 export const SPRITES = {
@@ -309,7 +310,7 @@ function drawWinLine(ctx, winLine) {
 const NO_STYLE = Object.freeze({});
 const fonts = new Map(); // size -> font string
 function newFont(size) {
-  const font = `bold ${size}px monospace`;
+  const font = canvasFont(size);
   fonts.set(size, font);
   return font;
 }
@@ -372,6 +373,9 @@ function drawSkillIcon(ctx, px, py, skillId) {
   });
 }
 
+const SKILL_NAME_FONT = canvasFont(13);
+const SKILL_STATE_FONT = canvasFont(11);
+
 function drawSkillButton(ctx, rect, skill, panelActive) {
   const { x, y, w, h } = rect;
   ctx.fillStyle = skill.selected ? COLORS.buttonSelected : COLORS.outline;
@@ -388,12 +392,12 @@ function drawSkillButton(ctx, rect, skill, panelActive) {
   const iconY = y + (h - SKILL_ICON_PX) / 2;
   drawSkillIcon(ctx, iconX, iconY, skill.id);
   const textX = iconX + SKILL_ICON_PX + 10;
-  ctx.font = 'bold 13px monospace';
+  ctx.font = SKILL_NAME_FONT;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = COLORS.buttonText;
   ctx.fillText(skill.name, textX, y + 22);
-  ctx.font = 'bold 11px monospace';
+  ctx.font = SKILL_STATE_FONT;
   const turns = skill.cooldown === 1 ? 'turn' : 'turns';
   ctx.fillText(skill.locked ? `Locked: ${skill.cooldown} ${turns}` : skill.selected ? 'Choosing...' : 'Ready', textX, y + 42);
 

@@ -1,6 +1,6 @@
 /* Lobby and room screens drawn as DOM over the canvas, in the quiet glass
    look of the HUD (src/ui/hud.css, docs/art-direction-v3.md section 8):
-   dark translucent cards with a hairline border, round corners, DM Sans and
+   dark translucent cards with a hairline border, round corners, Nunito and
    no wood. The cards need no backdrop blur, because on Medium and High the
    world behind the screens is already blurred (index.html .backdrop-blur),
    so they look the same on every quality level and the 2D renderer. Sizes
@@ -21,7 +21,7 @@
   justify-content: center;
   padding-top: calc(var(--u) * 70);
   box-sizing: border-box;
-  font: 500 calc(var(--u) * 15) / 1.35 "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 500 calc(var(--u) * 15) / 1.35 "Nunito", "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   z-index: 2; /* above the glass HUD (hud.css) */

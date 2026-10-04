@@ -11,6 +11,7 @@ import {
 import { X } from '../logic/board.js';
 import { getSkill } from '../logic/skills.js';
 import { BOARD_Y, cellCenter } from './layout.js';
+import { canvasFont } from './canvas-font.js';
 
 const COLORS = {
   sparkle: '#fffbe0',
@@ -112,6 +113,8 @@ export function drawWindStreaks(ctx, time) {
 // shows for its full BANNER_MS, one after another, even when one action
 // gives several of them (a skill used on the turn a pending Wind Dash
 // resolves) or actions come fast.
+const BANNER_FONT = canvasFont(22);
+
 export function createBanners() {
   const banners = []; // { text, start, width }, in the order they show
 
@@ -149,7 +152,7 @@ export function createBanners() {
       const fade = age > BANNER_MS - 250 ? (BANNER_MS - age) / 250 : 1;
       ctx.save();
       ctx.globalAlpha = Math.max(0, fade);
-      ctx.font = 'bold 22px monospace';
+      ctx.font = BANNER_FONT;
       // Measured once per banner: measureText makes a new object each call.
       if (banner.width === 0) banner.width = Math.ceil(ctx.measureText(banner.text).width) + 40;
       const w = banner.width;

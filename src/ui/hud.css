@@ -2,13 +2,14 @@
    Lift this file as it is into the game (for example src/ui/hud.css) and build the DOM to match hud-states.html.
    Rules: no wood, no thick borders, no ornaments. The pixel icons and portraits are the only colourful things on a card. */
 
+@font-face { font-family: "Nunito"; font-weight: 200 900; font-style: normal; font-display: swap; src: url("../../assets/fonts/Nunito-VariableFont_wght.ttf") format("truetype"); }
 @font-face { font-family: "DM Sans"; font-weight: 400; font-style: normal; font-display: swap; src: url("../../assets/fonts/dm-sans-latin-400-normal.woff2") format("woff2"); }
 @font-face { font-family: "DM Sans"; font-weight: 500; font-style: normal; font-display: swap; src: url("../../assets/fonts/dm-sans-latin-500-normal.woff2") format("woff2"); }
 @font-face { font-family: "DM Sans"; font-weight: 600; font-style: normal; font-display: swap; src: url("../../assets/fonts/dm-sans-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "DM Sans"; font-weight: 700; font-style: normal; font-display: swap; src: url("../../assets/fonts/dm-sans-latin-700-normal.woff2") format("woff2"); }
 
 .hud {
-  --font: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font: "Nunito", "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --ink: #f4f7fb;
   --ink-2: rgba(244, 247, 251, 0.74);
   --ink-3: rgba(244, 247, 251, 0.6);

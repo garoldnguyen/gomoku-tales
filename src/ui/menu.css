@@ -6,7 +6,7 @@
    pixels, so buttons keep 44 px at every window size. */
 
 #flow {
-  --font: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font: "Nunito", "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --ink: #f4f7fb;
   --ink-2: rgba(244, 247, 251, 0.74);
   --ink-3: rgba(244, 247, 251, 0.6);
