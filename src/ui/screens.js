@@ -54,7 +54,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     button.type = 'button';
     button.className = 'choice';
     button.dataset.character = id;
-    button.dataset.hudBox = `create-${id}`;
+    button.dataset.hudBox = `create-${id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`; // create-wind-rabbit
     const disc = document.createElement('span');
     disc.className = `disc ${character.stone.toLowerCase()}`;
     const name = document.createElement('span');
@@ -191,6 +191,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
       const vm = view.waiting;
       $('waiting-title').textContent = vm.title;
       roomCode.textContent = vm.code;
+      roomCode.dataset.roomCode = vm.code;
       $('waiting-hint').textContent = vm.hint;
       $('waiting-starting').textContent = vm.startingText ?? '';
       leave.disabled = !vm.leave.enabled;

@@ -3,6 +3,8 @@
 #   bash tools/shots.sh                      one picture, High, 1280x720 (the quick set)
 #   bash tools/shots.sh --set levels         Low, Medium and High at 1280x720
 #   bash tools/shots.sh --quality high --shape wide
+#   bash tools/shots.sh flow                 the flow set (same as --set flow); quick works the same way
+#   bash tools/shots.sh e2e                  the flow end to end check (tools/flow_e2e.py, shots/e2e.json)
 #   bash tools/shots.sh --help
 # Finds a Python that has Playwright (SHOTS_PYTHON, then ~/tools/shots/venv, then python3) and runs tools/shots.py.
 set -u
@@ -28,4 +30,8 @@ never claim a visual check you did not do.
 MSG
   exit 2
 fi
+case "${1:-}" in
+  e2e) shift; exec "$PY" "$HERE/flow_e2e.py" "$@" ;;
+  quick|levels|shapes|hud|full|flow) set_name=$1; shift; exec "$PY" "$HERE/shots.py" --set "$set_name" "$@" ;;
+esac
 exec "$PY" "$HERE/shots.py" "$@"

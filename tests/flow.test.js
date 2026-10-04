@@ -120,13 +120,11 @@ test('flowReducer never changes a deeply frozen input', () => {
   }
 });
 
-test('initialFlow: the menu by default, startScreen picks the screen, local starts the local game', () => {
+test('initialFlow: the menu by default, local starts the local game', () => {
   const menu = initialFlow();
   assert.deepEqual(menu, state('menu', 'none', null, null));
   assert.ok(Object.isFrozen(menu));
-  assert.deepEqual(initialFlow({ startScreen: 'lobby' }), state('lobby', 'none', 'online', null));
-  assert.deepEqual(initialFlow({ startScreen: 'nowhere' }), menu);
-  const local = initialFlow({ local: true, startScreen: 'lobby' });
+  const local = initialFlow({ local: true });
   assert.deepEqual(local, state('game', 'none', 'local', null));
   assert.ok(Object.isFrozen(local));
   assert.equal(screenOf(local), 'game');

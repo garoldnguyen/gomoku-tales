@@ -16,6 +16,8 @@ bash tools/shots.sh --set levels                 Low, Medium and High at 1280x72
 bash tools/shots.sh --set shapes                 Medium at wide, hd, tablet, portrait and phone
 bash tools/shots.sh --set hud                    HUD states: fhd and small expanded or collapsed, phone
 bash tools/shots.sh --set full                   levels and shapes together (7 pictures)
+bash tools/shots.sh e2e                          the flow end to end check (tools/flow_e2e.py, Low at 1280x720, shots/e2e.json)
+bash tools/shots.sh flow                         short for --set flow (quick, levels, shapes, hud and full work the same way)
 bash tools/shots.sh --set flow                   the menu, howto, settings, lobby, waiting, starting, gameover and gameover-pending scenes at fhd and hd (Medium, 16 pictures)
 bash tools/shots.sh --quality high --shape wide  one custom picture (comma lists make a product)
 bash tools/shots.sh --scene empty                another scene
@@ -78,6 +80,10 @@ URL: `<entry>?shot=<scene>&quality=<low|medium|high>` plus optional keys. The en
 4. If something is wrong, fix it and take the pictures again. At most 3 rounds, then stop and say what is still wrong.
 5. The reviewer may not be able to see pictures, so the numbers in the summary matter.
 
-## 6. Limits
+## 6. End to end check (e2e)
+
+`bash tools/shots.sh e2e` runs `tools/flow_e2e.py` with the same Python and Chromium as the pictures. It serves the game, opens two pages in one browser context (so BroadcastChannel reaches between them) at quality Low and 1280x720, and walks the real flow: the menu, a local game and a reload, Create Room, a join typed in lower case with a space, the start, a leave with its countdown and game over card, a wrong code and the typing guard. It reads the page through `data-screen` on the body (menu, lobby, waiting, starting, game, gameover) and `data-room-code` on the waiting room code, and waits for those values, never for a fixed time. Limits come from src/config.js. `shots/e2e.json` lists every step with name, ok, ms and a detail, plus the console errors of both pages (they must be 0). It saves `shots/e2e-host.png` and `shots/e2e-guest.png` when both pages entered the game. Exit codes: 0 every step ok, 1 a step failed, 2 the browser or the server could not start.
+
+## 7. Limits
 
 The pictures show layout, colour, shapes, density and overlaps. They do not show frame rate, and bloom and depth of field can differ a little from the real GPU. Never state an FPS number. The owner measures FPS on the real machine with `?fps=1`.

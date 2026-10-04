@@ -40,19 +40,13 @@ export const FLOW_EVENTS = Object.freeze({
   REMATCH_STARTED: 'REMATCH_STARTED',
 });
 
-const SCREEN_NAMES = Object.values(SCREENS);
-const ONLINE_SCREENS = [SCREENS.LOBBY, SCREENS.WAITING, SCREENS.STARTING];
-
-// The first state. options.local true starts on the game in local mode (the
-// ?local=1 page); otherwise options.startScreen picks the screen (the menu
-// when it is missing or unknown). The online screens start in online mode.
+// The first state: the menu, or with options.local true the game in local
+// mode (the ?local=1 page).
 export function initialFlow(options = {}) {
   if (options.local) {
     return Object.freeze({ screen: SCREENS.GAME, overlay: OVERLAYS.NONE, mode: MODES.LOCAL, role: null, notice: null });
   }
-  const screen = SCREEN_NAMES.includes(options.startScreen) ? options.startScreen : SCREENS.MENU;
-  const mode = ONLINE_SCREENS.includes(screen) ? MODES.ONLINE : null;
-  return Object.freeze({ screen, overlay: OVERLAYS.NONE, mode, role: null, notice: null });
+  return Object.freeze({ screen: SCREENS.MENU, overlay: OVERLAYS.NONE, mode: null, role: null, notice: null });
 }
 
 // The next state for an event (a type string or { type }). Returns a new

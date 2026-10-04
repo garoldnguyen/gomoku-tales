@@ -302,8 +302,14 @@ function startAppMode({ local = false } = {}) {
   const screens = attachScreens(document.getElementById('screens'), app);
   assetsLoaded.then((store) => screens.setAssets(store));
   createMenuLayer((type) => app.menuEvent(type));
-  app.onChange(() => showMenu(app.getFlow()));
-  showMenu(app.getFlow());
+  // data-screen on the body names the flow screen (menu, lobby, waiting,
+  // starting, game, gameover) for the end to end check (tools/flow_e2e.py).
+  const showFlow = () => {
+    document.body.dataset.screen = app.getFlow().screen;
+    showMenu(app.getFlow());
+  };
+  app.onChange(showFlow);
+  showFlow();
   // Tell the opponent at once when this window closes or reloads.
   window.addEventListener('pagehide', () => app.close());
 
