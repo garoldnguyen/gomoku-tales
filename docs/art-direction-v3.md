@@ -200,11 +200,11 @@ Measured on `docs/reference/v3/scene-*.jpg` (1920 x 1080) and kept in ONE place,
 
 Replace the 2D canvas HUD with a DOM overlay (HTML and CSS) stacked over the WebGL canvas, because frosted glass needs `backdrop-filter`. Copy `docs/reference/v3/hud.css` to `src/ui/hud.css` and build the DOM like `docs/reference/v3/hud-states.html`. Fix the `url()` paths for the fonts to where `assets/fonts` really is.
 
-Layout (1920 wide): top bar centred at 28 px from the top with the turn pill; quality switch top right, 40 px from the right edge; two cards 332 px wide, 56 px from the sides, 120 px from the top. Below 700 px wide the cards become slim bars at the bottom (avatar, name, status, two 48 px skill buttons) and the top bar shows the turn pill and the compact quality switch. `docs/reference/v3/hud-phone.png` shows it.
+Layout (1920 wide): top bar centred at 28 px from the top with the turn pill; quality switch top right, 40 px from the right edge; two cards 250 px wide and at most 310 px tall (Design v4; `HUD_CARD_WIDTH_PX` and `HUD_CARD_HEIGHT_PX` in `src/config.js`, was 332 px wide), 56 px from the sides, 120 px from the top. Below 700 px wide the cards become slim bars at the bottom (avatar, name, status, two 48 px skill buttons) and the top bar shows the turn pill and the compact quality switch. `docs/reference/v3/hud-phone.png` shows it.
 
 Tokens: card `rgba(14,20,34,0.64)` with an 18 px blur, 1 px border `rgba(255,255,255,0.18)`, corners 28 px, rows 18 px, status chips are pills. Wind blue `#3b8cff`, bear red `#ff4b5c`, win gold `#ffe14d`, ready green `#8fe3a8`. One font, DM Sans. Text sizes: name 22, skill title 17, state 13, label 12. Touch targets at least 44 px.
 
-Card content: portrait tile (2x portrait, tinted by team), name, `Plays X, 7 planted`, a status chip, a divider, the label `SKILLS`, and two skill rows (64 px icon, title, state).
+Card content: portrait tile (2x portrait, tinted by team), name, `Plays X, 7 planted`, a status chip, a divider, the label `SKILLS`, and two skill rows (Design v4: rows 60 px tall, `HUD_SKILL_ROW_PX`, the icon filling the square at the row's start with object-fit cover and no gap; then title and state). Text sizes on the smaller v4 card: name 18, skill title 15, state 12, label 11.
 
 States (use these exact English strings):
 

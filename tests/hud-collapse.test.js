@@ -374,14 +374,14 @@ test('hud-layout: the chevron stays a 44 px touch target at every card and pill 
 });
 
 test('hud-layout: where no pill fits beside the board the cards stay full and keep the saved choice', () => {
-  // 900x520: the cards are drawn at about 0.56; a pill with 44 px buttons
+  // 1000x560: the cards are drawn at about 0.81; a pill with 44 px buttons
   // and chevron would reach over the plots.
-  const small = hudFoldLayout(900, 520, { collapsed: ALL_COLLAPSED });
+  const small = hudFoldLayout(1000, 560, { collapsed: ALL_COLLAPSED });
   assert.equal(small.layout.compact, false);
   assert.equal(small.foldable, false);
   assert.deepEqual(small.folded, { X: false, O: false });
-  assert.deepEqual(hudBoxes(900, 520, { collapsed: ALL_COLLAPSED }).map((b) => b.name), ['turn', 'quality', 'fullscreen', 'card-x', 'card-o']);
-  checkBoxes(900, 520, ALL_COLLAPSED);
+  assert.deepEqual(hudBoxes(1000, 560, { collapsed: ALL_COLLAPSED }).map((b) => b.name), ['turn', 'quality', 'fullscreen', 'card-x', 'card-o']);
+  checkBoxes(1000, 560, ALL_COLLAPSED);
   // Full size windows fold; the slim layouts never do.
   assert.equal(canFold(1920, 1080, hudLayout(1920, 1080)), true);
   assert.deepEqual(hudFoldLayout(1920, 1080, { collapsed: { X: true, O: false } }).folded, { X: true, O: false });

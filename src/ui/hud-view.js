@@ -190,6 +190,25 @@ function skillView(state, player, skillId, { over, active, yours, targeting }) {
   };
 }
 
+// The skill detail popup (Design v4): what a click on a skill button opens
+// next to its card, read from a view model of hudViewModel(). Returns
+// { player, id, title, state, stateText, description, hint } or null when
+// the card has no such skill. The text comes from SKILL_INFO through the
+// skill row, never typed again.
+export function skillPopupViewModel(vm, player, skillId) {
+  const row = vm.cards.find((c) => c.player === player)?.skills.find((s) => s.id === skillId);
+  if (!row) return null;
+  return {
+    player,
+    id: skillId,
+    title: row.title,
+    state: row.state,
+    stateText: row.stateText,
+    description: row.description,
+    hint: row.hint,
+  };
+}
+
 function countStones(board, player) {
   let count = 0;
   for (const row of board) for (const cell of row) if (cell === player) count++;

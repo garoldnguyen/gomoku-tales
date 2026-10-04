@@ -155,8 +155,8 @@ test('topBarLayout: without the Fullscreen API there is no button and the turn p
     assert.ok(top.turn.w >= topBarLayout(w, h).turn.w, `${w}x${h}`);
     assert.deepEqual(hudBoxes(w, h, { fullscreen: false }).map((b) => b.name).includes('fullscreen'), false);
   }
-  // 900x520: full cards at their smallest; the turn pill loses only the button's room.
-  assert.equal(topBarLayout(900, 520, hudLayout(900, 520), { fullscreen: false }).turn.w - topBarLayout(900, 520).turn.w,
+  // 1000x560: small full cards; the turn pill loses only the button's room.
+  assert.equal(topBarLayout(1000, 560, hudLayout(1000, 560), { fullscreen: false }).turn.w - topBarLayout(1000, 560).turn.w,
     2 * (FULLSCREEN_SIZE + TOOL_GAP));
 });
 

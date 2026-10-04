@@ -9,12 +9,18 @@
 // chevron button per card, the pill's own skill buttons calling the same
 // onSkill, and one shared tooltip with the skill's description, placed by
 // tooltipPosition(). The slim layouts of narrow windows never fold.
+//
+// Design v4: a click on a skill button still runs onSkill and also opens
+// the skill detail popup (skillPopupViewModel) next to its card: title,
+// state, the full description and the hint. Escape or a press outside it
+// closes it; neither is swallowed, so Escape still cancels a target flow
+// and a press on the board still picks the target.
 
 import { X, O } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
 import { getSkill } from '../logic/skills.js';
 import { CARD_HEIGHT, chevronSize, hudFoldLayout, pillScale, topBarLayout } from './hud-layout.js';
-import { PORTRAIT_ART, QUALITY_CHOICES, SKILL_ICON_ART } from './hud-view.js';
+import { PORTRAIT_ART, QUALITY_CHOICES, SKILL_ICON_ART, skillPopupViewModel } from './hud-view.js';
 import { TOOLTIP_LONG_PRESS_MS, TOOLTIP_SHOW_MS, tooltipPosition } from './tooltip-position.js';
 
 const LOOK_CLASSES = { selected: 'is-selected', cooling: 'is-cooling', off: 'is-off', ready: null };
@@ -23,6 +29,7 @@ const SVG = 'http://www.w3.org/2000/svg';
 const RING_RADIUS = 33;
 const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 const TOOLTIP_ID = 'hud-tooltip';
+const POPUP_ID = 'hud-skill-popup';
 
 // root: the empty .hud element. handlers:
 //   onSkill(player, skillId)  a skill row was pressed
@@ -111,6 +118,19 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   el('div', 'tip-rule', tip);
   const tipHint = el('div', 'tip-hint', tip);
 
+  // The skill detail popup (filled and placed in openPopup below).
+  const popup = el('div', 'skill-popup', root);
+  popup.id = POPUP_ID;
+  popup.setAttribute('role', 'dialog');
+  popup.dataset.hudBox = 'skill-popup';
+  popup.hidden = true;
+  const popHead = el('div', 'tip-head', popup);
+  const popTitle = el('div', 'pop-title', popHead);
+  const popState = el('div', 'tip-state', popHead);
+  const popText = el('div', 'pop-text', popup);
+  el('div', 'tip-rule', popup);
+  const popHint = el('div', 'tip-hint', popup);
+
   // A skill button: a row of the expanded card or a button of the pill.
   // Both run onSkill, unless a long press just showed the tooltip.
   let skipClick = null;
@@ -124,6 +144,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       }
       hideTip();
       onSkill(player, skillId);
+      openPopup(button, player, skillId, c);
     });
     attachTip(button, c, s);
     return button;
@@ -169,7 +190,6 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       const t = el('span', 't', button);
       const title = el('span', 'title', t);
       const state = el('span', 'state', t);
-      const desc = el('span', 'desc', button);
 
       // The pill's button for the same skill.
       const pill = skillButton('pskill', pillSkills, player, skillId, c, s);
@@ -196,7 +216,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       el('span', 'ready-dot', pill);
 
       return {
-        button, ico, ring, count, title, state, desc, pill, arc, pcount, look: null, progress: null, view: null,
+        button, ico, ring, count, title, state, pill, arc, pcount, look: null, progress: null, view: null,
       };
     });
     return { card, team, text, pillSkills, chevron, body, name, meta, chip, skills, folded: false, collapsed: false };
@@ -253,17 +273,20 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     root.classList.toggle('no-fold', !fits);
     const value = String(next.scale);
     if (root.style.getPropertyValue('--card-scale') !== value) root.style.setProperty('--card-scale', value);
-    const pill = String(pillScale(next.scale));
+    const pill = String(pillScale(next.scale, window.innerWidth, window.innerHeight));
     if (root.style.getPropertyValue('--pill-scale') !== pill) root.style.setProperty('--pill-scale', pill);
     // The chevrons stay 44 px on screen however small the card or pill is drawn.
     const chevronCard = `${chevronSize(next.scale)}px`;
     if (root.style.getPropertyValue('--chevron-card') !== chevronCard) root.style.setProperty('--chevron-card', chevronCard);
-    const chevronPill = `${chevronSize(pillScale(next.scale))}px`;
+    const chevronPill = `${chevronSize(pillScale(next.scale, window.innerWidth, window.innerHeight))}px`;
     if (root.style.getPropertyValue('--chevron-pill') !== chevronPill) root.style.setProperty('--chevron-pill', chevronPill);
     const width = `${next.railWidth}px`;
     if (root.style.getPropertyValue('--rail-width') !== width) root.style.setProperty('--rail-width', width);
     if (fold()) layout();
-    else placeTip();
+    else {
+      placeTip();
+      placePopup();
+    }
   };
   window.addEventListener('resize', layout);
   window.addEventListener('orientationchange', layout);
@@ -281,6 +304,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       // Focus on a part that hides moves to the chevron, which stays.
       const lost = dom.card.contains(document.activeElement) && document.activeElement !== dom.chevron;
       if (lost || (tipOwner && dom.card.contains(tipOwner.button))) hideTip();
+      if (popupOwner && dom.card.contains(popupOwner.button)) hidePopup();
       dom.folded = folded;
       dom.card.classList.toggle('is-collapsed', folded);
       dom.card.dataset.hudBox = `${folded ? 'pill' : 'card'}-${dom.team}`;
@@ -308,6 +332,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   }
   function showTip(button, c, s) {
     clearTimeout(hoverTimer);
+    if (popupOwner) return; // the open popup already says it all
     if (tipOwner && tipOwner.button !== button) tipOwner.button.removeAttribute('aria-describedby');
     tipOwner = { button, c, s };
     button.setAttribute('aria-describedby', TOOLTIP_ID);
@@ -375,12 +400,59 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   }
   window.addEventListener('keydown', (event) => {
     if (event.key === 'Escape' && tipOwner) hideTip();
+    if (event.key === 'Escape' && popupOwner) hidePopup();
   });
+
+  // The skill detail popup: one element, for the skill last clicked. It
+  // reads the latest view model, so its state text follows the game.
+  let popupOwner = null; // { button, player, skillId, c }
+  let lastVm = null;
+  function fillPopup() {
+    const view = lastVm && skillPopupViewModel(lastVm, popupOwner.player, popupOwner.skillId);
+    if (!view) return;
+    setText(popTitle, view.title);
+    setText(popState, view.stateText);
+    setAttr(popState, 'data-state', view.state);
+    setText(popText, view.description);
+    setText(popHint, view.hint);
+    setAttr(popup, 'aria-label', view.title);
+  }
+  function openPopup(button, player, skillId, c) {
+    popupOwner = { button, player, skillId, c };
+    button.setAttribute('aria-controls', POPUP_ID);
+    fillPopup();
+    popup.hidden = false;
+    placePopup();
+  }
+  // Below (or above) the button's card, like the tooltip is to its button,
+  // so it covers neither the card nor its other skill. A button that is no
+  // longer drawn closes it.
+  function placePopup() {
+    if (!popupOwner) return;
+    const rect = popupOwner.button.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) {
+      hidePopup();
+      return;
+    }
+    const at = tooltipPosition(cards[popupOwner.c].card.getBoundingClientRect(),
+      { width: popup.offsetWidth, height: popup.offsetHeight }, { width: window.innerWidth, height: window.innerHeight });
+    popup.style.left = `${at.left}px`;
+    popup.style.top = `${at.top}px`;
+    popup.dataset.placement = at.placement;
+  }
+  function hidePopup() {
+    if (popupOwner) popupOwner.button.removeAttribute('aria-controls');
+    popupOwner = null;
+    popup.hidden = true;
+  }
   // A long press that ends without a click (moved off) must not eat the
   // next one, and a touch anywhere else closes its tooltip.
   window.addEventListener('pointerdown', (event) => {
     if (skipClick && !skipClick.contains(event.target)) skipClick = null;
     if (tipOwner && event.pointerType === 'touch' && !tipOwner.button.contains(event.target)) hideTip();
+    // A press outside the popup and its button closes it (and still goes on
+    // to whatever it pressed, the board too).
+    if (popupOwner && !popup.contains(event.target) && !popupOwner.button.contains(event.target)) hidePopup();
   }, true);
 
   const setQuality = (level) => {
@@ -390,6 +462,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   return {
     // Shows the view model of hudViewModel().
     render(vm) {
+      lastVm = vm;
       setQuality(vm.quality);
       setAttr(turn, 'data-team', vm.turn.team);
       setText(turnWho, vm.turn.who);
@@ -424,7 +497,6 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
           setAttr(row.pill, 'data-state', skill.state);
           setText(row.title, skill.title);
           setText(row.state, skill.stateText);
-          setText(row.desc, skill.description);
           const count = skill.cooldownTurns > 0 ? String(skill.cooldownTurns) : '';
           setText(row.count, count);
           setText(row.pcount, count);
@@ -446,6 +518,10 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
         fillTip();
         placeTip();
       }
+      if (popupOwner) {
+        fillPopup();
+        placePopup();
+      }
 
       const message = vm.toast ?? '';
       setText(toast, message);
@@ -458,7 +534,10 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     show(visible) {
       if (root.hidden === visible) {
         root.hidden = !visible;
-        if (!visible) hideTip();
+        if (!visible) {
+          hideTip();
+          hidePopup();
+        }
         layout();
       }
     },

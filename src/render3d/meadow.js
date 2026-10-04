@@ -8,8 +8,8 @@
 // toward the camera, so the back of the meadow is -z.
 
 import {
-  CHARACTER_X, HUD_CARD_HEIGHT_PX, HUD_CARD_SIDE_PX,
-  HUD_CARD_TOP_PX, HUD_CARD_WIDTH_PX, HUD_SCREEN_PX, MEADOW_BALES, MEADOW_BUSHES, MEADOW_MARGIN,
+  CHARACTER_X, HUD_CALM_HEIGHT_PX, HUD_CARD_SIDE_PX,
+  HUD_CARD_TOP_PX, HUD_CALM_WIDTH_PX, HUD_SCREEN_PX, MEADOW_BALES, MEADOW_BUSHES, MEADOW_MARGIN,
   MEADOW_PATCH_PLANTS, MEADOW_PATCHES, MEADOW_SPACING, MEADOW_TREE_BRIGHTNESS, MEADOW_TREE_SCALE,
   MEADOW_TREES_SIDE, MEADOW_TUFTS, PX_WORLD, SPRITE_STRETCH_Y,
 } from '../config.js';
@@ -99,15 +99,16 @@ export function patchQuota(count = MEADOW_PATCHES) {
   return Object.fromEntries(PATCH_SPECIES.map((s, i) => [s.name, quota[i]]));
 }
 
-// The HUD cards as rectangles in normalized device coordinates (x and y
-// from -1 to 1, y up) of the HUD_SCREEN_PX screen.
+// The calm areas behind the HUD cards (HUD_CALM_WIDTH_PX by
+// HUD_CALM_HEIGHT_PX at each card's anchor) as rectangles in normalized
+// device coordinates (x and y from -1 to 1, y up) of the HUD_SCREEN_PX screen.
 export function hudCardScreens() {
   const [w, h] = HUD_SCREEN_PX;
   const toNdcX = (px) => (px / w) * 2 - 1;
   const toNdcY = (px) => 1 - (px / h) * 2;
   const top = toNdcY(HUD_CARD_TOP_PX);
-  const bottom = toNdcY(HUD_CARD_TOP_PX + HUD_CARD_HEIGHT_PX);
-  const inner = toNdcX(HUD_CARD_SIDE_PX + HUD_CARD_WIDTH_PX);
+  const bottom = toNdcY(HUD_CARD_TOP_PX + HUD_CALM_HEIGHT_PX);
+  const inner = toNdcX(HUD_CARD_SIDE_PX + HUD_CALM_WIDTH_PX);
   const outer = toNdcX(HUD_CARD_SIDE_PX);
   return [
     { minX: outer, maxX: inner, minY: bottom, maxY: top },

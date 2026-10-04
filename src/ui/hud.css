@@ -189,12 +189,6 @@
 .hud .chevron svg { transition: transform 180ms ease-out; }
 .hud .card.is-collapsed .chevron svg { transform: rotate(180deg); }
 .hud.is-compact .chevron, .hud.no-fold .chevron { display: none; }
-/* The description under each skill row of the full card. */
-.hud .skill { flex-wrap: wrap; row-gap: 10px; }
-.hud .skill .desc { flex-basis: 100%; font-size: 13px; font-weight: 400; line-height: 1.45; color: var(--ink-2); }
-.hud .skill.is-cooling .desc, .hud .skill.is-off .desc { color: var(--ink-3); }
-.hud.is-compact .skill .desc { display: none; }
-.hud .card { gap: 16px; }
 /* Folding: about 180 ms (opacity and a small slide, apart from the --card-scale transform), instant under reduced motion. */
 @keyframes hud-fold-a { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0 0; } }
 @keyframes hud-fold-b { from { opacity: 0; translate: 0 -6px; } to { opacity: 1; translate: 0 0; } }
@@ -263,3 +257,42 @@
 .hud.is-compact .topbar { max-width: calc(100% - 268px); }
 .hud.is-compact.no-fullscreen .topbar, .hud.is-compact.fs-below .topbar { max-width: calc(100% - 216px); }
 .hud.is-compact.fs-below .top-tools { flex-direction: column-reverse; align-items: flex-end; }
+
+/* Design v4 (part 3): the smaller expanded card, HUD_CARD_WIDTH_PX (250) wide
+   and at most HUD_CARD_HEIGHT_PX (310) tall at 1920x1080 (src/config.js;
+   hud-layout.js uses the same numbers). The skill descriptions live in the
+   tooltip and the skill detail popup, not on the card. */
+.hud .card { width: 250px; padding: 14px; gap: 10px; border-radius: 24px; }
+.hud .who-row { gap: 10px; }
+.hud .tile { width: 56px; height: 56px; border-radius: 16px; }
+.hud .tile img { width: 52px; height: 52px; }
+.hud .name { font-size: 18px; }
+.hud .meta { font-size: 12px; margin-top: 2px; line-height: 1.25; }
+.hud .chip { padding: 4px 10px; font-size: 12px; }
+.hud .label { font-size: 11px; }
+.hud .skills { gap: 8px; }
+/* A skill row is HUD_SKILL_ROW_PX (60) tall; its icon fills the square at
+   its start, edge to edge (object-fit cover, no gap). */
+.hud .skill { height: 60px; padding: 0; gap: 12px; border-radius: 14px; overflow: hidden; }
+.hud .skill .ico { width: 58px; height: 58px; border-radius: 13px 0 0 13px; overflow: hidden; }
+.hud .skill .ico img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
+.hud .skill .t { min-width: 0; padding-right: 8px; gap: 2px; }
+.hud .skill .title { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud .skill .state { font-size: 12px; }
+.hud .skill .ring { inset: 0; border-radius: inherit; }
+/* The slim bars keep their 32 px icons and the ring around them. */
+.hud.is-compact .skill { overflow: visible; }
+.hud.is-compact .skill .ico { border-radius: var(--r-icon); overflow: visible; }
+.hud.is-compact .skill .ico img { border-radius: var(--r-icon); }
+.hud .card.is-collapsed .tile img { width: 64px; height: 64px; }
+/* The collapsed pill's skill buttons: the icon fills the whole button. */
+.hud .pskill .ico { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 19px; overflow: hidden; }
+.hud .pskill.is-selected .ico { border-radius: 17px; }
+.hud .pskill .ico img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
+/* The skill detail popup, opened by a click on a skill button (hud.js),
+   placed under or over its card by tooltipPosition(). */
+.hud .skill-popup { position: fixed; left: 0; top: 0; z-index: 2; width: 300px; max-width: calc(100vw - 24px); padding: 16px 18px; border-radius: 22px; display: flex; flex-direction: column; gap: 10px; pointer-events: auto;
+  background: rgba(14, 20, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.22); -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.34); }
+.hud[data-quality="low"] .skill-popup { background: var(--card-solid); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+.hud .pop-title { font-size: 18px; font-weight: 700; }
+.hud .pop-text { font-size: 14px; line-height: 1.5; color: rgba(244, 247, 251, 0.88); }

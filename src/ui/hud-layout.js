@@ -3,8 +3,9 @@
 // DOM): src/ui/hud.js calls hudLayout() when the window size changes.
 //
 // The 3D view fills the whole window (docs/art-direction-v3-1.md section
-// 3), and so does the HUD. The cards are 332 px wide, 56 px from the sides
-// and 120 px from the top at full size. Where the
+// 3), and so does the HUD. The cards are HUD_CARD_WIDTH_PX (250) wide, at
+// most HUD_CARD_HEIGHT_PX (310) tall, 56 px from the sides and 120 px from
+// the top at full size (src/config.js). Where the
 // space beside the board is narrower they shrink (scale), and below 700 px
 // wide, or when they would have to shrink so far that the skill rows lose
 // their 44 px touch height, they become the slim bars (compact) with 48 px
@@ -13,19 +14,22 @@
 // it instead (rail). Only if neither fits do the bottom bars lie over the
 // board, so the touch targets never drop under 44 px.
 
-import { BOARD_SIZE, CELL_SIZE } from '../config.js';
+import {
+  BOARD_SIZE, CELL_SIZE, HUD_CARD_HEIGHT_PX, HUD_CARD_SIDE_PX, HUD_CARD_TOP_PX, HUD_CARD_WIDTH_PX, HUD_SKILL_ROW_PX,
+} from '../config.js';
 import { gameCamera, projectToNdc } from '../render3d/camera.js';
 
-export const CARD_WIDTH = 332;
-export const CARD_SIDE = 56;
-export const CARD_TOP = 120;
-// The full card's height with both skill descriptions (the tallest, Wind
-// Rabbit's, measured at 1920x1080; the DOM measures the real one when it can).
-export const CARD_HEIGHT = 592;
+export const CARD_WIDTH = HUD_CARD_WIDTH_PX;
+export const CARD_SIDE = HUD_CARD_SIDE_PX;
+export const CARD_TOP = HUD_CARD_TOP_PX;
+// The full card's height: the most it may take with both skill rows (the
+// DOM measures the real one when it can, and it is drawn shorter).
+export const CARD_HEIGHT = HUD_CARD_HEIGHT_PX;
 // Space kept clear between a card and the plots, and the window edges.
 export const HUD_GAP = 12;
-// A skill row is 86 px tall at full size; below this scale it is under 44 px.
-export const MIN_CARD_SCALE = 0.55;
+// A skill row is HUD_SKILL_ROW_PX tall at full size; below this scale it
+// is under 44 px.
+export const MIN_CARD_SCALE = 44 / HUD_SKILL_ROW_PX;
 // Below this window width the cards are slim bars (hud.css .is-compact).
 export const COMPACT_WIDTH = 700;
 // The slim bars (hud.css .is-compact): each BAR_HEIGHT px tall with its
@@ -58,7 +62,7 @@ export const PILL_HEIGHT = 2 * PILL_PAD + PILL_TILE + 2;
 // below this scale even where the cards do.
 export const MIN_PILL_SCALE = 44 / PILL_TILE;
 // The portrait tile of the full card; its row grows when the chevron is taller.
-export const CARD_TILE = 68;
+export const CARD_TILE = 56;
 
 // The top bar (hud.css), for hudBoxes(): the quality switch at its widest
 // (the full and the slim size), the turn pill's room and heights. The turn
@@ -144,10 +148,18 @@ export function hudLayout(viewW, viewH, cardHeight = CARD_HEIGHT) {
   return BARS;
 }
 
-// The scale of a collapsed pill: the cards' scale, but never under
-// MIN_PILL_SCALE.
-export function pillScale(scale) {
-  return Math.max(scale, MIN_PILL_SCALE);
+// The scale of a collapsed pill: the cards' scale, smaller where the pill
+// (wider than the card) would reach the plots of a viewW by viewH window
+// (when given), but never under MIN_PILL_SCALE.
+export function pillScale(scale, viewW, viewH) {
+  let s = scale;
+  if (viewW !== undefined && viewH !== undefined) {
+    // On screen the pill is (PILL_WIDTH - CHEVRON_SIZE) * s wide plus the
+    // chevron, which stays CHEVRON_SIZE (chevronSize).
+    const room = boardScreenRect(viewW, viewH).left - HUD_GAP - CARD_SIDE * scale - CHEVRON_SIZE;
+    s = Math.min(s, room / (PILL_WIDTH - CHEVRON_SIZE));
+  }
+  return Math.max(s, MIN_PILL_SCALE);
 }
 
 // The chevron's size in the card's own (unscaled) pixels, so that it stays
@@ -158,8 +170,8 @@ export function chevronSize(scale) {
 }
 
 // A pill's and a full card's size in window pixels at the cards' scale.
-export function pillBox(scale) {
-  const s = pillScale(scale);
+export function pillBox(scale, viewW, viewH) {
+  const s = pillScale(scale, viewW, viewH);
   return { w: (PILL_WIDTH - CHEVRON_SIZE + chevronSize(s)) * s, h: PILL_HEIGHT * s };
 }
 export function cardBox(scale, cardHeight = CARD_HEIGHT) {
@@ -175,7 +187,7 @@ export function cardBox(scale, cardHeight = CARD_HEIGHT) {
 export function canFold(viewW, viewH, layout) {
   if (layout.compact) return false;
   const side = CARD_SIDE * layout.scale;
-  return side + pillBox(layout.scale).w + HUD_GAP <= boardScreenRect(viewW, viewH).left;
+  return side + pillBox(layout.scale, viewW, viewH).w + HUD_GAP <= boardScreenRect(viewW, viewH).left + 1e-9;
 }
 
 // The layout hud.js uses: hudLayout() for the full card, or for the pill
@@ -246,7 +258,7 @@ export function hudBoxes(viewW, viewH, { collapsed = {}, cardHeight = CARD_HEIGH
   if (!layout.compact) {
     for (const [team, left] of [['x', true], ['o', false]]) {
       const folded = foldedTeams[team.toUpperCase()];
-      const { w, h } = folded ? pillBox(layout.scale) : cardBox(layout.scale, cardHeight);
+      const { w, h } = folded ? pillBox(layout.scale, viewW, viewH) : cardBox(layout.scale, cardHeight);
       const side = CARD_SIDE * layout.scale;
       boxes.push({ name: `${folded ? 'pill' : 'card'}-${team}`, x: left ? side : viewW - side - w, y: CARD_TOP, w, h });
     }

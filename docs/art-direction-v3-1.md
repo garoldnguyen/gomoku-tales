@@ -111,8 +111,8 @@ Reference: `hud-collapsed.jpg`, `hud-expanded.jpg`, `hud-states.jpg` and the thr
 ### 4.1 Behaviour
 
 - Every card (Wind Rabbit, X, blue; Earth Bear, O, red) has its own chevron button, 44 by 44 px, a real `button`, with `aria-expanded` and `aria-controls` pointing at the part it hides, and the label `Collapse Wind Rabbit panel` or `Expand Wind Rabbit panel` (same for Earth Bear).
-- Expanded: exactly the card of v3 section 8 plus one description line under each skill row (13 px, line height 1.45, muted text, same colour as the label) and the chevron in the card corner.
-- Collapsed: one pill, about 300 by 88 px (limits: width at most 320 and height at most 96 at 1920 by 1080), padding 8, gap 8, radius 32, same glass tokens as the card. Left to right: portrait tile 72 px (portrait 64 px, pixelated) with a 16 px turn dot at its top right, two skill buttons of 72 px (icon 64 px, pixelated), the chevron. It sits at the same anchor as the expanded card (56 px from its side, 120 px from the top).
+- Expanded: exactly the card of v3 section 8 (Design v4: 250 px wide and at most 310 px tall at 1920 by 1080) and the chevron in the card corner. Design v4 removed the description line under each skill row so the card fits that size; the description shows in the tooltip and in the skill detail popup that a click on a skill button opens (title, state, the full description and the hint; Escape or a press outside closes it, and the click still runs the skill).
+- Collapsed: one pill, about 300 by 88 px (limits: width at most 320 and height at most 96 at 1920 by 1080), padding 8, gap 8, radius 32, same glass tokens as the card. Left to right: portrait tile 72 px (portrait 64 px, pixelated) with a 16 px turn dot at its top right, two skill buttons of 72 px (Design v4: the pixelated icon fills the whole button, object-fit cover, no gap), the chevron. It sits at the same anchor as the expanded card (56 px from its side, 120 px from the top).
 - Start expanded. When the player collapses or expands a card, remember it in `localStorage` per team (`gomoku.hud.collapsed.x` and `gomoku.hud.collapsed.o`, value `1` or `0`), always inside try/catch; the game works without storage. Apply the saved state at startup. Unknown or missing values mean expanded.
 - Key `C` toggles both cards. First check the existing keyboard shortcuts in `src/ui/app.js` and the help text; if `C` is taken, use `H`, then `V`. Ignore the key when a modifier key is held, when focus is in a text field, select or contenteditable element, and on key repeat. Write the final key in `docs/design.md`.
 - Motion: about 180 ms ease-out (opacity and transform); instant under `prefers-reduced-motion: reduce`.
@@ -132,7 +132,7 @@ Clicking a collapsed skill button runs exactly the same code path as clicking th
 
 ### 4.3 Skill descriptions (single source of truth)
 
-One table `SKILL_INFO` (for example in `src/ui/skill-info.js`). The expanded card, the tooltip and the `aria-label` read from it. Numbers inside the text come from the game's config constants, never from literals in the string.
+One table `SKILL_INFO` (for example in `src/ui/skill-info.js`). The skill detail popup (Design v4), the tooltip and the `aria-label` read from it. Numbers inside the text come from the game's config constants, never from literals in the string.
 
 | skill | description | hint |
 |---|---|---|

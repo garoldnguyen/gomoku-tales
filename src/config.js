@@ -174,11 +174,21 @@ export const CLOUD_SHADOW_MASK_PX = 128;
 export const SUN_SHADOW_MEADOW_FLOWERS = true;
 // The two HUD glass cards (docs/art-direction-v3.md section 8) at 1920 x
 // 1080: no tall flowers or trees may show behind them. The height is the
-// card with both skill rows.
+// most the expanded card with both skill rows may take (src/ui/hud.css
+// draws it shorter; the skill descriptions live in the tooltip and the
+// skill detail popup, not on the card). A skill row is HUD_SKILL_ROW_PX
+// tall with its icon filling the square at its start.
 export const HUD_CARD_SIDE_PX = 56;
 export const HUD_CARD_TOP_PX = 120;
-export const HUD_CARD_WIDTH_PX = 332;
-export const HUD_CARD_HEIGHT_PX = 430;
+export const HUD_CARD_WIDTH_PX = 250;
+export const HUD_CARD_HEIGHT_PX = 310;
+export const HUD_SKILL_ROW_PX = 60;
+// The calm screen area behind each card where the meadow grows no tall
+// flowers or trees (src/render3d/meadow.js). It keeps the size of the
+// larger v3 card, so it still covers the smaller card and the scenery plan
+// does not change with the HUD.
+export const HUD_CALM_WIDTH_PX = 332;
+export const HUD_CALM_HEIGHT_PX = 430;
 export const HUD_SCREEN_PX = [1920, 1080];
 
 // Wind and sway (section 6, High only). Everything moves along WIND_DIR.

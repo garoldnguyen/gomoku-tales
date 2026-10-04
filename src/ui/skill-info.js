@@ -1,6 +1,6 @@
 // What each skill does, in words (docs/art-direction-v3-1.md section 4.3):
 // ONE table, the single source of the skill descriptions and hints. The
-// expanded HUD card, the shared tooltip and the aria-labels read it through
+// skill detail popup, the shared tooltip and the aria-labels read it through
 // hudViewModel (hud-view.js). Numbers in the text come from the game config
 // constants, never from the strings themselves. Pure (no DOM).
 //

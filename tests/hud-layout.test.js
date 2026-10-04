@@ -41,7 +41,9 @@ test('hudLayout: full size cards at 1920x1080', () => {
 });
 
 test('hudLayout: smaller desktop windows shrink the cards beside the board', () => {
-  for (const [w, h] of [[1280, 720], [1366, 768], [1440, 900]]) {
+  // Design v4: the 250 px card fits at full size from 1280x720 up.
+  for (const [w, h] of [[1280, 720], [1366, 768], [1440, 900]]) assert.equal(hudLayout(w, h).scale, 1, `${w}x${h}`);
+  for (const [w, h] of [[1100, 620], [1024, 600], [960, 540]]) {
     const layout = hudLayout(w, h);
     assert.equal(layout.compact, false, `${w}x${h}`);
     assert.ok(layout.scale < 1 && layout.scale >= MIN_CARD_SCALE, `${w}x${h} scale ${layout.scale}`);
