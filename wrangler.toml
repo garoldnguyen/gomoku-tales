@@ -1,0 +1,19 @@
+# Cloudflare Worker: serves the game files and the relay server at /ws
+# (docs/deploy.md). Only the owner runs wrangler; the game itself needs no
+# build step.
+name = "gomoku-tales"
+main = "worker/index.js"
+compatibility_date = "2025-06-01"
+
+[assets]
+directory = "."
+binding = "ASSETS"
+run_worker_first = ["/ws"]
+
+[[durable_objects.bindings]]
+name = "ROOM"
+class_name = "RoomRelay"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RoomRelay"]

@@ -27,6 +27,11 @@ export const ONLINE_SAME_BROWSER_ONLY = true;
 // page's own host). Read only by chooseTransport in src/net/transport.js.
 export const ONLINE_TRANSPORT = 'broadcast';
 export const RELAY_PATH = '/ws';
+// Relay server limits (worker/limits.js reads these, so they are typed once).
+export const MAX_FRAME_BYTES = 8192; // a larger WebSocket frame closes the socket
+export const MAX_FRAMES_PER_SECOND = 30; // more frames from one socket within a second close it
+export const SPECTATOR_LIMIT = 20; // spectators per room
+export const EMPTY_ROOM_CLEANUP_MS = 60000; // a room with no socket forgets its snapshot after this
 
 // Screen timings not listed in docs/design.md section 10.
 export const GAME_OVER_DELAY_MS = 1500; // time to see the final board before the Game over screen

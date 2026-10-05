@@ -1,0 +1,15 @@
+# Files never served as static assets (gitignore syntax, read by wrangler).
+# Only the game files (index.html, src/, assets/, vendor/, ...) are public.
+worker/
+tests/
+docs/
+tools/
+shots/
+.millstone/
+.git/
+node_modules/
+wrangler.toml
+package.json
+package-lock.json
+.wrangler/
+.assetsignore
