@@ -5,6 +5,9 @@
 //   opened   a promise that resolves when the socket is open and rejects
 //            when the server refuses the connection or it fails (or is
 //            closed) before opening
+//   onClose(handler)  calls handler() once when an opened connection is
+//            lost (the server or the network closed it), at once if it is
+//            already lost; never after close()
 //
 // Messages travel as JSON text. Messages sent before the socket is open are
 // dropped: src/net/room.js resends its state through the heartbeat. A
@@ -38,9 +41,11 @@ export function createWebSocketTransport(roomCode, role, options = {}) {
 
   const socket = new WebSocketImpl(relayUrl(roomCode, role, location, path));
   const handlers = new Set();
+  const closeHandlers = new Set();
   let isOpen = false;
   let settled = false;
   let closed = false;
+  let lost = false; // an opened connection the server or network closed
   let resolveOpened;
   let rejectOpened;
   const opened = new Promise((resolve, reject) => {
@@ -51,7 +56,13 @@ export function createWebSocketTransport(roomCode, role, options = {}) {
   opened.catch(() => {});
 
   const fail = (reason) => {
+    const wasOpen = isOpen;
     isOpen = false;
+    if (wasOpen && !closed) {
+      lost = true;
+      for (const handler of [...closeHandlers]) handler();
+      closeHandlers.clear();
+    }
     if (settled) return;
     settled = true;
     rejectOpened(new Error(reason));
@@ -95,10 +106,21 @@ export function createWebSocketTransport(roomCode, role, options = {}) {
       return () => handlers.delete(handler);
     },
 
+    onClose(handler) {
+      if (closed) return () => {};
+      if (lost) {
+        handler();
+        return () => {};
+      }
+      closeHandlers.add(handler);
+      return () => closeHandlers.delete(handler);
+    },
+
     close() {
       if (closed) return;
       closed = true;
       handlers.clear();
+      closeHandlers.clear();
       fail('closed');
       socket.close();
     },

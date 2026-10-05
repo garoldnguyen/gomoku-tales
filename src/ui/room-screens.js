@@ -3,11 +3,13 @@
 // string, box name and state it draws, so node tests and shot mode see the
 // same screens. Text comes from strings.js, numbers from src/config.js.
 
+import * as CONFIG from '../config.js';
 import {
-  ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH, SELECT_BLUR_PX, SELECT_CARD_OPACITY, SELECT_PANEL_OPACITY,
+  ROOM_CODE_LENGTH, SELECT_BLUR_PX, SELECT_CARD_OPACITY, SELECT_PANEL_OPACITY,
   SELECT_PORTRAIT_SCALE, SELECT_SCRIM_OPACITY,
 } from '../config.js';
 import { O, X } from '../logic/board.js';
+import { onlineSameBrowserOnly } from '../net/transport.js';
 import { CHARACTERS, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
 import { createSeats, otherSeat, seatStone } from '../logic/seats.js';
 import { cooldownTurns } from '../logic/skills.js';
@@ -103,12 +105,16 @@ export const restText = (turns) => STRINGS.selectRestTurns.replace('{turns}', St
 const slug = (id) => id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 
 // The lobby's own panel: the hint line shows only while online play is
-// limited to one browser (ONLINE_SAME_BROWSER_ONLY, or options.sameBrowserOnly).
-export function lobbyViewModel({ sameBrowserOnly = ONLINE_SAME_BROWSER_ONLY } = {}) {
+// limited to one browser (onlineSameBrowserOnly of config, the broadcast
+// transport). connecting is true while a new room's relay connection
+// opens (Create reads Connecting and is disabled), error the connection
+// error or null.
+export function lobbyViewModel({ config = CONFIG, connecting = false, error = null } = {}) {
   return {
     lead: STRINGS.lobbyLead,
-    hint: sameBrowserOnly ? STRINGS.lobbySameBrowserHint : null,
-    create: { label: STRINGS.lobbyCreate, box: 'lobby-create' },
+    hint: onlineSameBrowserOnly(config) ? STRINGS.lobbySameBrowserHint : null,
+    error,
+    create: { label: connecting ? STRINGS.lobbyConnecting : STRINGS.lobbyCreate, disabled: connecting, box: 'lobby-create' },
     join: { label: STRINGS.lobbyJoin, box: 'lobby-join' },
     back: { label: STRINGS.back, box: 'lobby-back' },
   };
@@ -235,8 +241,10 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
 // the host's on the left: this window picks a character for its own seat
 // and presses Ready; the other seat shows the other player's pick. In
 // phase waiting nobody sits in the guest seat yet (a dimmed placeholder).
-// Leave is always enabled. null off those screens.
-export function waitingViewModel(flow, room) {
+// Leave is always enabled. The hint names a second window of this browser
+// for the broadcast transport and sending the code for the relay (config).
+// null off those screens.
+export function waitingViewModel(flow, room, { config = CONFIG } = {}) {
   const starting = flow.screen === SCREENS.STARTING;
   if (!starting && flow.screen !== SCREENS.WAITING) return null;
   const seats = room?.seats ?? createSeats(ROOM_SEATS);
@@ -253,7 +261,7 @@ export function waitingViewModel(flow, room) {
     phase: flow.screen,
     title: starting ? STRINGS.startingTitle : STRINGS.waitingTitle,
     code: room?.code ?? '',
-    hint: STRINGS.waitingHint,
+    hint: onlineSameBrowserOnly(config) ? STRINGS.waitingHint : STRINGS.waitingHintRelay,
     starting,
     startingText: starting && seats.ready[you] ? STRINGS.selectWaitingOther : null,
     lead: select.lead,

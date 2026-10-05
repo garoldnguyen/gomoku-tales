@@ -10,6 +10,7 @@ import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { ROOM_PHASES } from '../src/net/phase.js';
+import { onlineSameBrowserOnly } from '../src/net/transport.js';
 import { GAME, GAME_OVER, LOBBY, MENU, WAITING_SCREEN, createApp } from '../src/ui/app.js';
 import { isFullscreenKey } from '../src/ui/fullscreen.js';
 import { isCollapseKey } from '../src/ui/hud-collapse.js';
@@ -139,11 +140,13 @@ test('strings.js: numbers and names in the rules come from the config, the chara
 
 // --- config and room phases ---
 
-test('config: the flow timings and the same browser flag; no automatic start delay any more', () => {
+test('config: the flow timings and the same browser rule; no automatic start delay any more', () => {
   assert.equal('WAITING_START_DELAY_MS' in config, false, 'the game starts when both players are Ready');
   assert.equal(config.COPY_FEEDBACK_MS, 1500);
   assert.equal(config.JOIN_TIMEOUT_MS, 3000);
-  assert.equal(config.ONLINE_SAME_BROWSER_ONLY, true);
+  // The same-browser rule is onlineSameBrowserOnly(config) (net/transport.js), no flag of its own.
+  assert.equal('ONLINE_SAME_BROWSER_ONLY' in config, false);
+  assert.equal(onlineSameBrowserOnly(config), config.ONLINE_TRANSPORT === 'broadcast');
 });
 
 test('ROOM_PHASES: a frozen object with waiting, starting, playing and over', () => {

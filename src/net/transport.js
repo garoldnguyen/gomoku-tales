@@ -24,6 +24,12 @@ export function chooseTransport(config) {
   return TRANSPORTS.includes(value) ? value : TRANSPORT_BROADCAST;
 }
 
+// The one same-browser rule: online play is limited to windows of this
+// browser on this computer exactly while rooms use the BroadcastChannel.
+export function onlineSameBrowserOnly(config) {
+  return chooseTransport(config) === TRANSPORT_BROADCAST;
+}
+
 export function channelName(roomCode) {
   return CHANNEL_PREFIX + roomCode;
 }

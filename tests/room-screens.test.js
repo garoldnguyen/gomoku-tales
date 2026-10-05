@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { COOLDOWN_LONG, COOLDOWN_SHORT, COPY_FEEDBACK_MS, JOIN_TIMEOUT_MS, ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH } from '../src/config.js';
+import * as config from '../src/config.js';
+import { COOLDOWN_LONG, COOLDOWN_SHORT, COPY_FEEDBACK_MS, JOIN_TIMEOUT_MS, ROOM_CODE_LENGTH } from '../src/config.js';
 import { EMPTY, O, X } from '../src/logic/board.js';
 import { CHARACTERS, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
 import { createSeats, pickCharacter, setReady } from '../src/logic/seats.js';
@@ -13,6 +14,7 @@ import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { ROOM_CODE_ALPHABET, isValidRoomCode, normalizeRoomCode } from '../src/net/room-code.js';
 import { CLOSED, GUEST, HOST, NO_ROOM, ROOM_SEATS, createGuestRoom } from '../src/net/room.js';
+import { onlineSameBrowserOnly } from '../src/net/transport.js';
 import { GAME, JOIN, LOBBY, MENU, SELECT, WAITING_SCREEN, createApp } from '../src/ui/app.js';
 import { FLOW_EVENTS, LOCAL_SEATS, ROLES, SCREENS, flowReducer, initialFlow } from '../src/ui/flow.js';
 import { PORTRAIT_ART } from '../src/ui/hud-view.js';
@@ -65,13 +67,13 @@ test('joinViewModel: Join stays disabled until the box holds ROOM_CODE_LENGTH ch
   assert.equal(joinViewModel({ text: 'ABCD5', error: 'x' }).error, 'x');
 });
 
-test('lobbyViewModel: Create, Join and Back, and the same-browser hint while ONLINE_SAME_BROWSER_ONLY is true', () => {
+test('lobbyViewModel: Create, Join and Back, and the same-browser hint only for the broadcast transport', () => {
   const vm = lobbyViewModel();
   assert.equal(vm.back.label, 'Back');
   assert.deepEqual([vm.create.box, vm.join.box, vm.back.box], ['lobby-create', 'lobby-join', 'lobby-back']);
-  assert.equal(vm.hint, ONLINE_SAME_BROWSER_ONLY ? STRINGS.lobbySameBrowserHint : null);
-  assert.equal(lobbyViewModel({ sameBrowserOnly: true }).hint, STRINGS.lobbySameBrowserHint);
-  assert.equal(lobbyViewModel({ sameBrowserOnly: false }).hint, null);
+  assert.equal(vm.hint, onlineSameBrowserOnly(config) ? STRINGS.lobbySameBrowserHint : null);
+  assert.equal(lobbyViewModel({ config: { ONLINE_TRANSPORT: 'broadcast' } }).hint, STRINGS.lobbySameBrowserHint);
+  assert.equal(lobbyViewModel({ config: { ONLINE_TRANSPORT: 'websocket' } }).hint, null);
 });
 
 // --- the app: Back, join errors, Leave ---

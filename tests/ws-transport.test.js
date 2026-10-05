@@ -88,6 +88,33 @@ test('a later close does not change an opened promise that already resolved', as
   await transport.opened;
 });
 
+test('onClose fires once when an opened connection is lost, also for a late subscriber', () => {
+  const { transport, socket } = make();
+  let calls = 0;
+  transport.onClose(() => { calls += 1; });
+  socket.serverOpen();
+  socket.serverError();
+  socket.serverClose(1006);
+  assert.equal(calls, 1);
+  let late = 0;
+  transport.onClose(() => { late += 1; });
+  assert.equal(late, 1);
+});
+
+test('onClose does not fire for a refusal before opening or for close()', async () => {
+  const refused = make();
+  let calls = 0;
+  refused.transport.onClose(() => { calls += 1; });
+  refused.socket.serverClose(1008);
+  await assert.rejects(refused.transport.opened);
+  const own = make();
+  own.transport.onClose(() => { calls += 1; });
+  own.socket.serverOpen();
+  own.transport.close();
+  own.socket.serverClose(1000);
+  assert.equal(calls, 0);
+});
+
 test('send writes JSON once the socket is open', () => {
   const { transport, socket } = make();
   socket.serverOpen();

@@ -19,12 +19,10 @@ export const ROOM_CODE_LENGTH = 5;
 // Networking timings not listed in docs/design.md section 10.
 export const PRESENCE_CHECK_INTERVAL_MS = 250; // how often the leave countdown is re-checked
 export const JOIN_TIMEOUT_MS = 3000; // no answer to "join" within this time means no such room
-// Online play works only between windows of the same browser on this
-// computer (BroadcastChannel). Becomes false when a WebSocket transport exists.
-export const ONLINE_SAME_BROWSER_ONLY = true;
 // Which transport online rooms use: 'broadcast' (BroadcastChannel, windows
 // of the same browser) or 'websocket' (the relay server at RELAY_PATH on the
-// page's own host). Read only by chooseTransport in src/net/transport.js.
+// page's own host). Read only by chooseTransport in src/net/transport.js;
+// onlineSameBrowserOnly there says whether online play is limited to one browser.
 export const ONLINE_TRANSPORT = 'broadcast';
 export const RELAY_PATH = '/ws';
 // Relay server limits (worker/limits.js reads these, so they are typed once).

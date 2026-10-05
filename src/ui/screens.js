@@ -10,7 +10,7 @@
 
 import { COPY_FEEDBACK_MS } from '../config.js';
 import { AVATAR_PX } from '../render3d/art-assets.js';
-import { GAME, GAME_OVER, JOIN, SELECT, WAITING_SCREEN } from './app.js';
+import { GAME, GAME_OVER, JOIN, LOBBY, SELECT, WAITING_SCREEN } from './app.js';
 import {
   characterStage, copyFeedbackText, portraitScale, copyRoomCode, joinViewModel, lobbyViewModel, selectGlassStyle,
 } from './room-screens.js';
@@ -367,7 +367,15 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     for (const section of sections) section.hidden = section.dataset.screen !== view.screen;
     if (entering) tipEvent({ type: 'escape' });
 
-    if (view.screen === JOIN) {
+    if (view.screen === LOBBY) {
+      // The hint, Create (Connecting while the relay opens) and the
+      // connection error (room-screens.js lobbyViewModel).
+      const vm = view.lobby ?? lobby;
+      $('lobby-hint').textContent = vm.hint ?? '';
+      $('lobby-create').textContent = vm.create.label;
+      $('lobby-create').disabled = vm.create.disabled;
+      $('lobby-error').textContent = vm.error ?? '';
+    } else if (view.screen === JOIN) {
       if (entering && !view.joining) joinInput.value = '';
       showJoin(view);
       if (!view.joining) joinInput.focus();

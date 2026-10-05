@@ -1,7 +1,6 @@
 import { INTERNAL_WIDTH, INTERNAL_HEIGHT, RESUME_GAP_MS, SHOT_EFFECTS_SEED, SHOT_READY_FRAMES, SHOT_SEED, SHOT_TIME_MS } from './config.js';
 import { O, X } from './logic/board.js';
 import { CHARACTERS } from './logic/characters.js';
-import { createBroadcastTransport } from './net/transport.js';
 import { loadAssets, USES_3D } from './render/assets.js';
 import { loadCanvasFont } from './render/canvas-font.js';
 import { createEffects } from './render/effects.js';
@@ -297,7 +296,8 @@ function showEvents(events, effects, time, resumed) {
   renderer.trigger?.(events, time); // the 3D world: pop-ins, character poses and skill visuals
 }
 
-// The app (src/ui/app.js): online rooms over a BroadcastChannel and the
+// The app (src/ui/app.js): online rooms over the transport of
+// chooseTransport (a BroadcastChannel or the relay server) and the
 // local game (Play on this computer, or the ?local=1 page, which starts on
 // it). The lobby, room and game over screens are DOM overlays above the
 // canvases, the game is drawn on them. With the 3D renderer the world stays
@@ -306,7 +306,7 @@ function showEvents(events, effects, time, resumed) {
 // src/render3d/quality.js). Every new game (a start, a rematch, a local
 // restart) clears the old game's visuals (watchNewGame).
 function startAppMode({ local = false } = {}) {
-  const app = createApp({ openTransport: (code) => createBroadcastTransport(code), local });
+  const app = createApp({ local });
   const screens = attachScreens(document.getElementById('screens'), app);
   assetsLoaded.then((store) => screens.setAssets(store));
   createMenuLayer((type) => app.menuEvent(type));

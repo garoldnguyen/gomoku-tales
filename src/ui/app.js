@@ -19,18 +19,31 @@
 // through the same Game and Game over screens. The game
 // over card (game-over.js, docs/flow-design.md section 3.7) offers Rematch
 // (online the host decides, net/room.js; local at once) and Back to Menu.
+//
+// Rooms use the transport of chooseTransport(config) (net/transport.js).
+// A WebSocket transport has an opened promise: the host enters its room
+// and the guest sends its join only once the relay connection is open. A
+// guest the relay refuses gets No room found at once; a host whose
+// connection cannot open stays on the lobby with a connection error. A
+// relay connection lost after it opened closes the room: a pending join
+// shows the connection error on Join Room; the waiting room (host or
+// seated guest), a game in play and the game over card go to the lobby
+// with it.
 
+import * as CONFIG from '../config.js';
 import { GAME_OVER_DELAY_MS } from '../config.js';
 import { bothReady, seatSides } from '../logic/seats.js';
 import { systemClock } from '../net/clock.js';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../net/room-code.js';
 import { FULL, GUEST, HOST, NO_ROOM, OVER, PLAYING, STARTING, createGuestRoom, createHostRoom } from '../net/room.js';
+import { TRANSPORT_WEBSOCKET, chooseTransport, createBroadcastTransport } from '../net/transport.js';
+import { ROLE_GUEST, ROLE_HOST, createWebSocketTransport } from '../net/ws-transport.js';
 import { FLOW_EVENTS, LOCAL_SEATS, MODES, NOTICE_HOST_LEFT, ROLES, SCREENS, flowReducer, initialFlow, isSelecting } from './flow.js';
 import { gameOverViewModel, rematchViewModel } from './game-over.js';
 import { createLocalGame } from './local-game.js';
 import { MENU_EVENTS } from './menu.js';
 import { characterName, createOnlineGame } from './online-game.js';
-import { localSelectViewModel, waitingViewModel } from './room-screens.js';
+import { lobbyViewModel, localSelectViewModel, waitingViewModel } from './room-screens.js';
 import { STRINGS, withCode } from './strings.js';
 
 // Screens.
@@ -44,8 +57,22 @@ export const GAME_OVER = 'gameOver';
 
 export const BAD_CODE_ERROR = STRINGS.joinErrorBadCode;
 
+// The transport opener of config: openTransport(code, role) returns a
+// BroadcastChannel transport, or a WebSocket transport to the relay for
+// role (ROLE_HOST or ROLE_GUEST). options go to the transport (tests give
+// BroadcastChannelImpl, or WebSocketImpl and location).
+export function transportOpener(config = CONFIG, options = {}) {
+  if (chooseTransport(config) === TRANSPORT_WEBSOCKET) {
+    return (code, role) => createWebSocketTransport(code, role, options);
+  }
+  return (code) => createBroadcastTransport(code, options);
+}
+
 // options:
-//   openTransport(code) returns a transport for the room (net/transport.js)
+//   config              the config whose transport rooms use (src/config.js)
+//   transportOptions    options for the transports of transportOpener
+//   openTransport(code, role) returns a transport for the room; defaults
+//                       to transportOpener(config, transportOptions)
 //   clock               time and timers (net/clock.js)
 //   random              the host's Tornado Zone random function
 //   makeCode()          a new room code
@@ -53,7 +80,9 @@ export const BAD_CODE_ERROR = STRINGS.joinErrorBadCode;
 //   localRandom         the local game's Tornado Zone random function
 export function createApp(options) {
   const {
-    openTransport,
+    config = CONFIG,
+    transportOptions = {},
+    openTransport = transportOpener(config, transportOptions),
     clock = systemClock,
     random = Math.random,
     makeCode = () => generateRoomCode(),
@@ -67,6 +96,10 @@ export function createApp(options) {
   let game = null; // online game controller while a game runs
   let joinError = null;
   let joiningCode = null; // code of the room being joined, while waiting for an answer
+  let opening = null; // a transport whose relay connection is still opening
+  let lostUnsubscribe = null; // stops watching the open room's relay connection
+  let connecting = false; // the host's new room waits for its connection to open
+  let lobbyError = null; // the host's connection error on the lobby
   let gameOverTimer = null;
   let localSeat = null; // the local seat that acts on the character select (chooseSeat)
   // The rematch state of the game over card: mine (this window asked),
@@ -108,7 +141,61 @@ export function createApp(options) {
     gameOverTimer = null;
   };
 
+  // The relay connection of the open room was lost (not closed by us). A
+  // join still pending on Join Room shows the error there; a seated guest
+  // (which keeps its joining code until the start), the host, a game in
+  // play and the game over card go to the lobby with it. A game in play is
+  // not left to the presence countdown, which would tell this window that
+  // the opponent left and it won.
+  const connectionLost = () => {
+    lostUnsubscribe = null;
+    if (!room) return;
+    const joining = screenNow() === JOIN;
+    closeRoom();
+    if (joining) {
+      joinError = STRINGS.connectionError;
+    } else {
+      localSeat = null;
+      joinError = null;
+      lobbyPanel = LOBBY;
+      // A game in play ends first (flow.js leaves only from game over).
+      const ended = flow.screen === SCREENS.GAME ? flowReducer(flow, FLOW_EVENTS.GAME_OVER) : flow;
+      flow = flowReducer(flowReducer(ended, FLOW_EVENTS.LEAVE), FLOW_EVENTS.PLAY_ONLINE);
+      lobbyError = STRINGS.connectionError;
+    }
+    changed();
+  };
+
+  // Runs onOpen once transport is ready to carry the room: at once for a
+  // transport without opened (BroadcastChannel), when opened resolves for
+  // the relay, which is then watched for a lost connection. onFail runs
+  // when it is refused or cannot open. Either is skipped if the opening was
+  // cancelled meanwhile (closeRoom).
+  const whenOpen = (transport, onOpen, onFail) => {
+    if (!transport.opened) {
+      onOpen();
+      return;
+    }
+    opening = transport;
+    transport.opened.then(() => {
+      if (opening !== transport) return;
+      opening = null;
+      onOpen();
+      if (room) lostUnsubscribe = transport.onClose?.(connectionLost) ?? null;
+    }, () => {
+      if (opening !== transport) return;
+      opening = null;
+      transport.close();
+      onFail();
+    });
+  };
+
   const closeRoom = () => {
+    opening?.close();
+    opening = null;
+    connecting = false;
+    lostUnsubscribe?.();
+    lostUnsubscribe = null;
     clearGameOverTimer();
     game?.dispose?.();
     game = null;
@@ -355,7 +442,10 @@ export function createApp(options) {
         screen,
         flow,
         // The waiting room (room-screens.js) in phases waiting and starting.
-        waiting: roomView ? waitingViewModel(flow, roomView) : null,
+        waiting: roomView ? waitingViewModel(flow, roomView, { config }) : null,
+        // The lobby panel (room-screens.js): its hint, Create while the
+        // relay connection opens, and the connection error.
+        lobby: lobbyViewModel({ config, connecting, error: lobbyError }),
         // The local character select (room-screens.js) on the game screen
         // of Play on this computer until both seats are Ready.
         select: localSelectViewModel(flow, { seat: localSeat }),
@@ -448,8 +538,9 @@ export function createApp(options) {
     },
 
     openJoin() {
-      if (screenNow() !== LOBBY) return;
+      if (screenNow() !== LOBBY || connecting) return;
       joinError = null;
+      lobbyError = null;
       lobbyPanel = JOIN;
       changed();
     },
@@ -458,12 +549,23 @@ export function createApp(options) {
     // seats, and opens it (the character select) while it waits for the
     // opponent.
     createRoom() {
-      if (screenNow() !== LOBBY) return false;
+      if (screenNow() !== LOBBY || connecting) return false;
       const code = makeCode();
+      const transport = openTransport(code, ROLE_HOST);
       lobbyPanel = LOBBY;
-      flow = flowReducer(flow, FLOW_EVENTS.ROOM_CREATED);
-      openRoom(createHostRoom({ transport: openTransport(code), code, clock, random }));
-      changed();
+      lobbyError = null;
+      connecting = true;
+      whenOpen(transport, () => {
+        connecting = false;
+        flow = flowReducer(flow, FLOW_EVENTS.ROOM_CREATED);
+        openRoom(createHostRoom({ transport, code, clock, random }));
+        changed();
+      }, () => {
+        connecting = false;
+        lobbyError = STRINGS.connectionError;
+        changed();
+      });
+      if (connecting) changed(); // still opening: the lobby reads Connecting
       return true;
     },
 
@@ -480,7 +582,13 @@ export function createApp(options) {
       joinError = null;
       joiningCode = code;
       changed();
-      openRoom(createGuestRoom({ transport: openTransport(code), code, clock }));
+      const transport = openTransport(code, ROLE_GUEST);
+      whenOpen(transport, () => openRoom(createGuestRoom({ transport, code, clock })), () => {
+        // The relay refused the guest: no room with this code.
+        joinError = withCode(STRINGS.joinErrorNotFound, joiningCode);
+        joiningCode = null;
+        changed();
+      });
       return true;
     },
 
@@ -491,11 +599,16 @@ export function createApp(options) {
       changed();
     },
 
-    // Back on the lobby (the button or Escape): the menu. On Join Room
-    // (when no join is pending) it is the lobby's own panel.
+    // Back on the lobby (the button or Escape): the menu, dropping a relay
+    // connection still opening. On Join Room (when no join is pending) it
+    // is the lobby's own panel.
     back() {
       const screen = screenNow();
-      if (screen === LOBBY) send(FLOW_EVENTS.BACK);
+      if (screen === LOBBY) {
+        closeRoom();
+        lobbyError = null;
+        send(FLOW_EVENTS.BACK);
+      }
       else if (screen === JOIN && joiningCode === null) {
         joinError = null;
         lobbyPanel = LOBBY;

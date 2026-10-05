@@ -17,7 +17,7 @@ Names in this file (flow.js, strings.js, newGame, start, rematch and so on) are 
    - Local (Play on this computer): the game screen opens on the character select with the seats Player 1 and Player 2, both picked in the one window; the local game starts when both are Ready.
 3. Rematch needs both players to press it. Same characters, same sides, X (the first pick) moves first. Swapping sides is not part of this version.
 4. A join is accepted only while the room is in phase waiting. In any other phase the answer is full.
-5. Online play still works only between windows of the same browser on the same computer (BroadcastChannel). The UI says so through one config flag, ONLINE_SAME_BROWSER_ONLY = true, which becomes false when a WebSocket transport exists.
+5. Online play uses the transport of ONLINE_TRANSPORT (src/config.js, read only by chooseTransport): broadcast links windows of the same browser on the same computer (BroadcastChannel), websocket goes through the relay server (worker/) so players on different computers can meet. The UI learns which one from a single function, onlineSameBrowserOnly(config) in src/net/transport.js (true only for broadcast); there is no separate flag. Only for broadcast the lobby shows the same-browser hint line. With websocket the host's Create reads Connecting until its relay connection is open, a host that cannot connect stays on the lobby with the connection error, and a guest the relay refuses sees No room found at once. A relay connection lost after it opened closes the room: a pending join shows the connection error on Join Room, and the waiting room (host or seated guest), a game in play and the game over card go to the lobby with it (a game in play is not left to the presence countdown, which would call the disconnected window the winner).
 6. Out of scope: computer opponent, Vietnamese text, sound and music, phone touch layout, accounts, more maps.
 
 ## 3. Screens
@@ -59,7 +59,7 @@ Every screen is a quiet glass DOM layer over the existing 3D world (same tokens 
 ### 3.4 Lobby
 - Create Room opens the room at once with two empty seats (no character choice in the lobby; the pick is made in the room, section 3.5). Join Room opens the code box.
 - Add a Back button (event BACK, also the Escape key) that returns to the menu.
-- When ONLINE_SAME_BROWSER_ONLY is true, show one hint line: online play works between two windows of the same browser on this computer.
+- When onlineSameBrowserOnly(config) is true (the broadcast transport), show one hint line: online play works between two windows of the same browser on this computer.
 - Code box: normalizeCodeInput(raw) uppercases, removes every character that is not in the room code alphabet (spaces, dashes and the confusing 0, O, 1, I vanish) and cuts to ROOM_CODE_LENGTH. Example: "ab c-d5xyz" gives ABCD5. The Join button stays disabled until the box holds ROOM_CODE_LENGTH characters. Enter submits.
 - While the answer is pending the button shows Joining and is disabled, for at most JOIN_TIMEOUT_MS. Errors appear inline under the box (never an alert), in an aria-live polite region, and clear when the player types: room not found, room full, host left.
 
@@ -219,5 +219,5 @@ New scenes for docs/shots.md (static, no network, every one built from a fixed v
 - Swap sides on rematch (Gomoku gives the first player a real advantage).
 - A Menu or Leave button during a game (it would send the existing leave message, so the other player gets the normal countdown).
 - Remember the last chosen character.
-- A WebSocket transport and real play across two computers (then ONLINE_SAME_BROWSER_ONLY becomes false).
+- A WebSocket transport and real play across two computers (then onlineSameBrowserOnly(config) is false).
 - Vietnamese text (strings.js is the single place to translate).
