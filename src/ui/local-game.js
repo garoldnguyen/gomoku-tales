@@ -6,6 +6,7 @@ import { characterForStone } from '../logic/characters.js';
 import { canUseSkill, characterOf, isGameOver, newGame, placeStone, skillCooldown, useSkill } from '../logic/game.js';
 import { getSkill } from '../logic/skills.js';
 import { isSkillLocked } from '../logic/jade-serpent-skills.js';
+import { coveredActionError, localViewEvents, localViewState } from '../logic/cloud.js';
 import { needsTarget, startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
 
 // takeEvents' answer when nothing happened, shared so the render loop makes
@@ -19,17 +20,36 @@ const DRAWN = Object.freeze({ winner: null, reason: 'draw' });
 // options.random is passed to placeStone for the Tornado Zone throw;
 // options.onApplied() is called after every applied action (the app checks
 // whether the game ended); options.characters are the sides of the
-// character select ({ X, O }, the first pick plays X; default DEFAULT_SIDES).
+// character select ({ X, O }, the first pick plays X; default DEFAULT_SIDES);
+// options.makeGame (newGame by default) makes the state, for tests.
 export function createLocalGame(options = {}) {
-  const { random = Math.random, onApplied = () => {}, characters } = options;
-  let state = newGame(characters ? { characters } : {});
+  const { random = Math.random, onApplied = () => {}, characters, makeGame = newGame } = options;
+  let state = makeGame(characters ? { characters } : {});
   let hover = null; // board cell under the pointer
   let hoverSkill = null; // { player, skillId } of the button under the pointer
   let targeting = null; // skill target flow in progress, see targeting.js
   let message = null;
   let pendingEvents = []; // events of applied actions not yet taken for effects
+  // The state drawn (localViewState): the cells under a cloud of the seat
+  // not to move are covered. Kept while the state does not change.
+  let shownFrom = null;
+  let shown = null;
+  const shownState = () => {
+    if (state !== shownFrom) {
+      shownFrom = state;
+      shown = localViewState(state);
+    }
+    return shown;
+  };
   // The pending events, with a new list for the next ones (only on a frame
   // with events).
+  // The same rule as online: an action on a cell under the other seat's
+  // cloud is refused whatever the cell holds. Returns true when refused.
+  const refusedCovered = (player, action) => {
+    const error = coveredActionError(state, player, action);
+    if (error) message = error;
+    return error !== null;
+  };
   const handOverEvents = () => {
     const events = pendingEvents;
     pendingEvents = [];
@@ -44,8 +64,11 @@ export function createLocalGame(options = {}) {
     }
     state = result.state;
     targeting = null;
-    message = describeEvents(result.events);
-    pendingEvents.push(...result.events);
+    // Effects and messages only for what the player to move may see: a
+    // move under the other seat's cloud plays no effect.
+    const events = localViewEvents(state, result.events);
+    message = describeEvents(events);
+    pendingEvents.push(...events);
     onApplied();
     return true;
   };
@@ -89,9 +112,13 @@ export function createLocalGame(options = {}) {
     click(cell) {
       if (!cell) return false;
       const player = state.currentPlayer;
-      if (!targeting) return apply(placeStone(state, { player, x: cell.x, y: cell.y }, { random }));
+      if (!targeting) {
+        if (refusedCovered(player, { kind: 'place', x: cell.x, y: cell.y })) return false;
+        return apply(placeStone(state, { player, x: cell.x, y: cell.y }, { random }));
+      }
 
-      const step = targetClick(state, player, targeting, cell);
+      // Targets are picked on the drawn board: a covered cell shows nothing.
+      const step = targetClick(shownState(), player, targeting, cell);
       if (step.error) {
         message = step.error;
         return false;
@@ -101,6 +128,7 @@ export function createLocalGame(options = {}) {
         message = null;
         return false;
       }
+      if (refusedCovered(player, { kind: 'skill', skill: targeting.skill, target: step.target })) return false;
       return apply(useSkill(state, { player, skill: targeting.skill, target: step.target }));
     },
 
@@ -145,12 +173,14 @@ export function createLocalGame(options = {}) {
 
     getView() {
       const player = state.currentPlayer;
-      const canPlace = !targeting && hover && !isGameOver(state) && isEmptyCell(state.board, hover.x, hover.y);
-      const preview = targeting ? targetPreview(state, player, targeting, hover) : null;
+      // The hover follows the drawn board, so a covered cell tells nothing.
+      const canPlace = !targeting && hover && !isGameOver(state) && isEmptyCell(shownState().board, hover.x, hover.y);
+      // The preview reads the drawn board too: no ring on a covered cell.
+      const preview = targeting ? targetPreview(shownState(), player, targeting, hover) : null;
       const panels = [X, O].map((p) => panelView(state, p, { you: !isGameOver(state) && p === player, targeting, hoverSkill }));
       const buttonReady = panels.some((panel) => panel.skills.some((skill) => skill.hovered && skill.usable));
       return {
-        state,
+        state: shownState(),
         hover: canPlace ? hover : null,
         preview,
         panels,

@@ -20,6 +20,44 @@ export const FRAME_BAD_JSON = 'bad-json';
 // this order.
 export const SNAPSHOT_TYPES = Object.freeze(['seats', 'state', 'start', 'result', 'new-game', 'rematch-status']);
 
+// A host message with spectatorsOnly true goes to the spectators only,
+// never to the guest: the host sends the full game state that way while
+// the guest gets a copy with the cells under the host's clouds covered
+// (masked true, see maskForViewer in src/logic/cloud.js). A masked copy is
+// never kept for the spectator replay.
+export const SPECTATORS_ONLY = 'spectatorsOnly';
+export const MASKED = 'masked';
+
+const TO_HOST = Object.freeze([ROLE_HOST]);
+const TO_GUEST_AND_SPECTATORS = Object.freeze([ROLE_GUEST, ROLE_SPECTATOR]);
+const TO_SPECTATORS = Object.freeze([ROLE_SPECTATOR]);
+const TO_NOBODY = Object.freeze([]);
+
+// The roles a message of a socket of role goes to: guest messages to the
+// host, host messages to the guest and the spectators, a spectatorsOnly
+// host message to the spectators only. Spectators send nothing.
+export function routeFor(role, message) {
+  if (role === ROLE_GUEST) return TO_HOST;
+  if (role !== ROLE_HOST) return TO_NOBODY;
+  return message?.[SPECTATORS_ONLY] === true ? TO_SPECTATORS : TO_GUEST_AND_SPECTATORS;
+}
+
+// Whether a host message is kept for the spectator replay: the last one of
+// each SNAPSHOT_TYPES type, unless it is the guest's masked copy.
+export function keepsSnapshot(role, message) {
+  return role === ROLE_HOST && SNAPSHOT_TYPES.includes(message?.type) && message?.[MASKED] !== true;
+}
+
+// Passes the frame raw (the text of message) of a socket of role to the
+// open sockets of the roles routeFor names; socketsOf(role) lists them.
+// Returns true when the frame is kept for the spectator replay.
+export function forwardFrame(role, raw, message, socketsOf) {
+  for (const to of routeFor(role, message)) {
+    for (const peer of socketsOf(to)) peer.send(raw);
+  }
+  return keepsSnapshot(role, message);
+}
+
 // The /ws query: { ok: true, room, role }, or { ok: false, status } with
 // the HTTP status to refuse with. The room code must be ROOM_CODE_LENGTH
 // characters of ROOM_CODE_ALPHABET.

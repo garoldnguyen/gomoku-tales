@@ -98,7 +98,10 @@ export function createOnlineGame(room) {
       const player = you();
       if (!targeting) return send(() => room.place(cell.x, cell.y));
 
-      const step = targetClick(room.state, player, targeting, cell);
+      // Targets are picked on the shown board (masked for this seat): a
+      // cell under the other seat's cloud shows nothing. The host still
+      // checks the action on the true state.
+      const step = targetClick(room.getView().state, player, targeting, cell);
       if (step.error) {
         message = step.error;
         return false;
@@ -124,7 +127,7 @@ export function createOnlineGame(room) {
         message = "That is your opponent's skill.";
         return false;
       }
-      const reason = blocker() ?? skillLockReason(room.state, player, skillId);
+      const reason = blocker() ?? skillLockReason(room.getView().state, player, skillId);
       if (reason) {
         message = reason;
         return false;

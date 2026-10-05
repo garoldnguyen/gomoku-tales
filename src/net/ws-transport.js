@@ -9,6 +9,9 @@
 //            lost (the server or the network closed it), at once if it is
 //            already lost; never after close()
 //
+//   reachesSpectators  true: the relay passes host messages to spectators
+//            too, so the host sends them the full state (src/net/room.js)
+//
 // Messages travel as JSON text. Messages sent before the socket is open are
 // dropped: src/net/room.js resends its state through the heartbeat. A
 // spectator only listens; its send returns false and sends nothing.
@@ -93,6 +96,7 @@ export function createWebSocketTransport(roomCode, role, options = {}) {
 
   return {
     opened,
+    reachesSpectators: true,
 
     send(message) {
       if (role === ROLE_SPECTATOR || closed) return false;

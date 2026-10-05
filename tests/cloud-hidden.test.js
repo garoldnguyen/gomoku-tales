@@ -1,0 +1,666 @@
+// Cloud Eagle part 2: hidden cloud contents (docs/design.md section 6). A
+// stone or rock under a cloud is seen only by the seat that owns the
+// cloud: maskForViewer, the host's messages (a masked copy for the guest,
+// the full state marked spectatorsOnly for the spectators), the relay's
+// routing, the spectator room, the rooms of both players and local mode.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { EMPTY, ROCK, X, O } from '../src/logic/board.js';
+import { CLOUD_EAGLE, EARTH_BEAR, assignSides } from '../src/logic/characters.js';
+import { newGame, placeStone, useSkill } from '../src/logic/game.js';
+import { CLOUD } from '../src/logic/skills.js';
+import { COVERED_ERROR, cloudCells, coveredActionError, isCovered, localViewEvents, localViewState, maskErrorForViewer, maskEventsForViewer, maskForViewer } from '../src/logic/cloud.js';
+import { LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS } from '../src/config.js';
+import { createFakeClock } from '../src/net/clock.js';
+import { createFakeNetwork } from '../src/net/fake-transport.js';
+import { OVER, PLAYING, createGuestRoom, createHostRoom, hostStateMessages } from '../src/net/room.js';
+import { createOnlineGame } from '../src/ui/online-game.js';
+import { pickAndReady } from './room-start.js';
+import { createSpectatorRoom } from '../src/net/spectator-room.js';
+import { createWebSocketTransport } from '../src/net/ws-transport.js';
+import { createBroadcastTransport } from '../src/net/transport.js';
+import { createLocalGame } from '../src/ui/local-game.js';
+import { startTargeting, targetClick, targetPreview } from '../src/ui/targeting.js';
+import { STONE_CONVERSION, TERRAIN_CREATION } from '../src/logic/skills.js';
+import { SNAPSHOT_TYPES, forwardFrame, keepsSnapshot, routeFor, snapshotFor } from '../worker/pairing.js';
+
+function ok(result) {
+  assert.equal(result.ok, true, result.error);
+  return result;
+}
+
+// Cloud Eagle picked first (X, the host) against Earth Bear (O, the guest).
+function eagleGame() {
+  return newGame({ characters: assignSides([CLOUD_EAGLE, EARTH_BEAR]) });
+}
+
+// X puts a cloud on (7, 7), O plays far away, X plays (7, 7) under its cloud.
+function hiddenStoneGame() {
+  let state = ok(useSkill(eagleGame(), { player: X, skill: CLOUD, target: { x: 7, y: 7 } })).state;
+  state = ok(placeStone(state, { player: O, x: 0, y: 0 })).state;
+  return ok(placeStone(state, { player: X, x: 7, y: 7 }));
+}
+
+function stonesUnder(state, cells) {
+  return cells.filter(({ x, y }) => state.board[y][x] !== EMPTY);
+}
+
+test('maskForViewer: the owner of the cloud sees everything', () => {
+  const { state } = hiddenStoneGame();
+  assert.equal(maskForViewer(state, X), state);
+  assert.equal(maskForViewer(state, X).board[7][7], X);
+});
+
+test('maskForViewer: the other seat sees the cloud cells covered, with no stone', () => {
+  const { state } = hiddenStoneGame();
+  const masked = maskForViewer(state, O);
+  const cells = cloudCells(state.board, state.clouds[0]);
+  assert.notEqual(masked, state);
+  assert.equal(masked.board[7][7], EMPTY);
+  assert.deepEqual(masked.covered, cells);
+  assert.equal(isCovered(masked, 7, 7), true);
+  assert.equal(isCovered(masked, 0, 0), false);
+  assert.equal(masked.board[0][0], O, 'cells outside the cloud are shown');
+  assert.deepEqual(stonesUnder(masked, cells), []);
+  // The true state is not changed, and the cloud itself is no secret.
+  assert.equal(state.board[7][7], X);
+  assert.equal(state.covered, undefined);
+  assert.deepEqual(masked.clouds, state.clouds);
+});
+
+test('maskForViewer: a rock under the cloud is covered too', () => {
+  const { state } = hiddenStoneGame();
+  const board = state.board.map((row) => row.slice());
+  board[6][8] = ROCK;
+  const withRock = { ...state, board, rocks: [{ x: 8, y: 6, breaksAfterTurn: 9 }, { x: 0, y: 14, breaksAfterTurn: 9 }] };
+  withRock.board[14][0] = ROCK;
+  const masked = maskForViewer(withRock, O);
+  assert.equal(masked.board[6][8], EMPTY);
+  assert.deepEqual(masked.rocks, [{ x: 0, y: 14, breaksAfterTurn: 9 }]);
+  assert.equal(masked.board[14][0], ROCK);
+});
+
+test('maskForViewer: a spectator, or no seat, sees the full state', () => {
+  const { state } = hiddenStoneGame();
+  assert.equal(maskForViewer(state, null), state);
+  assert.equal(maskForViewer(state, 'spectator'), state);
+  assert.equal(maskForViewer(state, undefined), state);
+});
+
+test('maskForViewer: without a cloud nothing is covered; a game over is no exception', () => {
+  const plain = eagleGame();
+  assert.equal(maskForViewer(plain, O), plain);
+  const { state } = hiddenStoneGame();
+  // The cells stay hidden until the cloud ends, also after the game ended.
+  assert.equal(maskForViewer({ ...state, winner: X }, O).board[7][7], EMPTY);
+  assert.equal(maskForViewer({ ...state, draw: true }, O).board[7][7], EMPTY);
+  assert.equal(maskForViewer({ ...state, winner: X }, X).board[7][7], X);
+  assert.equal(maskForViewer(null, O), null);
+});
+
+test('maskEventsForViewer leaves out the move under the cloud, never the cloud itself', () => {
+  const placed = ok(useSkill(eagleGame(), { player: X, skill: CLOUD, target: { x: 7, y: 7 } }));
+  assert.equal(maskEventsForViewer(maskForViewer(placed.state, O), placed.events), placed.events);
+  const { state, events } = hiddenStoneGame();
+  const seen = maskEventsForViewer(maskForViewer(state, O), events);
+  assert.ok(events.some((e) => e.type === 'stonePlaced' && e.x === 7 && e.y === 7));
+  assert.equal(seen.some((e) => e.type === 'stonePlaced'), false);
+  assert.ok(seen.some((e) => e.type === 'turnEnded'));
+  assert.equal(maskEventsForViewer(state, events), events, 'an unmasked state leaves every event');
+});
+
+// X wins with a line of five whose cells (5, 7) and (6, 7) lie under X's
+// cloud on (7, 7): the win does not tell O where the hidden stones are.
+function hiddenWinGame() {
+  let state = ok(useSkill(eagleGame(), { player: X, skill: CLOUD, target: { x: 7, y: 7 } })).state;
+  for (const [ox, x] of [[0, 2], [2, 3], [4, 5], [6, 6]]) {
+    state = ok(placeStone(state, { player: O, x: ox, y: 0 })).state;
+    state = ok(placeStone(state, { player: X, x, y: 7 })).state;
+  }
+  return state;
+}
+
+test('a winning line under the other seat\'s cloud does not tell the hidden stones', () => {
+  let state = hiddenWinGame();
+  // Two turns of X ticked the cloud away; put it back for the winning move.
+  state = { ...state, clouds: [{ x: 7, y: 7, owner: X, turnsLeft: 2, placedTurn: state.turn }] };
+  state = ok(placeStone(state, { player: O, x: 8, y: 0 })).state;
+  const won = ok(placeStone(state, { player: X, x: 4, y: 7 }));
+  assert.equal(won.state.winner, X);
+  assert.equal(won.state.winLine.length, 5);
+  const hidden = (cell) => cell.x >= 5 && cell.x <= 9 && cell.y >= 5 && cell.y <= 9;
+  assert.ok(won.state.winLine.some(hidden), 'the true line runs under the cloud');
+
+  const forO = maskForViewer(won.state, O);
+  assert.equal(forO.board[7][5], EMPTY);
+  assert.equal(forO.board[7][6], EMPTY);
+  assert.equal(forO.winLine.some(hidden), false);
+  assert.equal(forO.winLine.length, 3);
+  const winEvent = maskEventsForViewer(forO, won.events).find((e) => e.type === 'win');
+  assert.equal(winEvent.player, X);
+  assert.equal(winEvent.line.some(hidden), false);
+
+  // The owner sees the whole line.
+  assert.equal(maskForViewer(won.state, X), won.state);
+
+  // The guest copy carries neither; the spectators get the full line.
+  const message = { type: 'state', to: 'guest', state: won.state, events: won.events, seq: 9 };
+  const [guestCopy, spectators] = hostStateMessages(message, O, true);
+  // covered names every cloud cell (the cloud is no secret); nothing else
+  // may name a hidden stone.
+  const sent = JSON.stringify({ ...guestCopy, state: { ...guestCopy.state, covered: null } });
+  assert.equal(guestCopy.state.winLine.some(hidden), false);
+  assert.equal(guestCopy.events.find((e) => e.type === 'win').line.some(hidden), false);
+  assert.ok(!sent.includes('"x":5,"y":7') && !sent.includes('"x":6,"y":7'), 'no hidden cell is named anywhere');
+  assert.equal(spectators.state.winLine.length, 5);
+});
+
+test('hostStateMessages: one unchanged message when nothing is hidden', () => {
+  const message = { type: 'state', to: 'guest', state: eagleGame(), events: [], seq: 1 };
+  assert.deepEqual(hostStateMessages(message, O, true), [message]);
+  assert.equal(hostStateMessages(message, O, true)[0], message);
+});
+
+test('hostStateMessages: a masked copy for the guest, the full state for the spectators only', () => {
+  const { state, events } = hiddenStoneGame();
+  const message = { type: 'state', to: 'guest', state, events, seq: 4, handled: 0, round: 1 };
+  const [guestCopy, spectators, ...rest] = hostStateMessages(message, O, true);
+  assert.deepEqual(rest, []);
+  assert.equal(guestCopy.masked, true);
+  assert.equal(guestCopy.spectatorsOnly, undefined);
+  assert.equal(guestCopy.state.board[7][7], EMPTY);
+  assert.equal(guestCopy.events.some((e) => e.type === 'stonePlaced'), false);
+  assert.equal(guestCopy.seq, 4);
+  assert.equal(spectators.spectatorsOnly, true);
+  assert.equal(spectators.masked, undefined);
+  assert.equal(spectators.state, state);
+  assert.equal(spectators.events, events);
+  // Without a relay (broadcast) there are no spectators: only the guest copy.
+  assert.deepEqual(hostStateMessages(message, O, false), [guestCopy]);
+});
+
+test('relay routing: spectatorsOnly host messages go to the spectators only', () => {
+  assert.deepEqual(routeFor('host', { type: 'state' }), ['guest', 'spectator']);
+  assert.deepEqual(routeFor('host', { type: 'state', spectatorsOnly: true }), ['spectator']);
+  assert.deepEqual(routeFor('host', { type: 'state', spectatorsOnly: 'yes' }), ['guest', 'spectator']);
+  assert.deepEqual(routeFor('guest', { type: 'action', spectatorsOnly: true }), ['host']);
+  assert.deepEqual(routeFor('spectator', { type: 'state' }), []);
+  assert.equal(keepsSnapshot('host', { type: 'state' }), true);
+  assert.equal(keepsSnapshot('host', { type: 'state', spectatorsOnly: true }), true);
+  assert.equal(keepsSnapshot('host', { type: 'state', masked: true }), false);
+  assert.equal(keepsSnapshot('host', { type: 'ping' }), false);
+  assert.equal(keepsSnapshot('guest', { type: 'state' }), false);
+});
+
+// Fake sockets of one room, like worker/room.js uses them.
+function fakeSockets() {
+  const socket = () => ({ frames: [], send(raw) { this.frames.push(raw); } });
+  const sockets = { host: [socket()], guest: [socket()], spectator: [socket(), socket()] };
+  const snapshot = {};
+  const relay = (role, message) => {
+    const raw = JSON.stringify(message);
+    if (forwardFrame(role, raw, message, (to) => sockets[to])) snapshot[message.type] = raw;
+  };
+  return { sockets, snapshot, relay };
+}
+
+test('forwardFrame passes frames to fake sockets by role', () => {
+  const { sockets, snapshot, relay } = fakeSockets();
+  relay('host', { type: 'state', seq: 1, from: 'h' });
+  relay('host', { type: 'state', seq: 1, spectatorsOnly: true, from: 'h' });
+  relay('guest', { type: 'action', from: 'g' });
+  assert.deepEqual(sockets.guest[0].frames.map((f) => JSON.parse(f).spectatorsOnly ?? false), [false]);
+  for (const spectator of sockets.spectator) assert.equal(spectator.frames.length, 2);
+  assert.deepEqual(sockets.host[0].frames.map((f) => JSON.parse(f).type), ['action']);
+  assert.equal(JSON.parse(snapshot.state).spectatorsOnly, true);
+});
+
+test('through the relay the guest never receives a hidden stone, and gets the reveal after the cloud ends', () => {
+  const { sockets, snapshot, relay } = fakeSockets();
+  let seq = 0;
+  let state = eagleGame();
+  const shown = []; // the cells each cloud covered for the guest
+  const send = (result) => {
+    state = result.state;
+    seq += 1;
+    for (const message of hostStateMessages({ type: 'state', to: 'guest', state, events: result.events, seq, from: 'h' }, O, true)) relay('host', message);
+    for (const c of state.clouds ?? []) shown.push(...cloudCells(state.board, c));
+  };
+  send(ok(useSkill(state, { player: X, skill: CLOUD, target: { x: 7, y: 7 } }))); // turn 1, X
+  send(ok(placeStone(state, { player: O, x: 0, y: 0 }))); // 2, O
+  send(ok(placeStone(state, { player: X, x: 7, y: 7 }))); // 3, X under its cloud
+  send(ok(placeStone(state, { player: O, x: 1, y: 0 }))); // 4, O
+  assert.equal(state.clouds.length, 1, 'the cloud is still up');
+  // The guest got every state, none with a stone under the cloud.
+  const guestFrames = sockets.guest[0].frames.map((f) => JSON.parse(f));
+  assert.equal(guestFrames.length, 4);
+  for (const frame of guestFrames) {
+    assert.notEqual(frame.spectatorsOnly, true);
+    assert.equal(frame.state.board[7][7], EMPTY);
+    assert.equal(sockets.guest[0].frames.some((f) => JSON.parse(f).events.some((e) => e.type === 'stonePlaced' && e.x === 7)), false);
+  }
+  // The spectators have the full state, live and in the replay.
+  const last = JSON.parse(sockets.spectator[0].frames.at(-1));
+  assert.equal(last.spectatorsOnly, true);
+  assert.equal(last.state.board[7][7], X);
+  const replay = snapshotFor(snapshot).map((t) => JSON.parse(t)).find((m) => m.type === 'state');
+  assert.equal(replay.state.board[7][7], X);
+  assert.ok(SNAPSHOT_TYPES.includes('state'));
+
+  send(ok(placeStone(state, { player: X, x: 14, y: 14 }))); // 5, X: the cloud ends
+  assert.deepEqual(state.clouds, []);
+  const reveal = JSON.parse(sockets.guest[0].frames.at(-1));
+  assert.equal(reveal.masked, undefined);
+  assert.equal(reveal.state.board[7][7], X, 'the guest sees the revealed stone');
+  assert.ok(reveal.events.some((e) => e.type === 'cloudEnded'));
+});
+
+test('the rooms of the players drop spectatorsOnly messages', () => {
+  const network = createFakeNetwork();
+  const clock = createFakeClock();
+  const host = network.connect();
+  const guest = createGuestRoom({ transport: network.connect(), code: 'AB2C9', clock, id: 'guest' });
+  const events = [];
+  guest.onEvent((event) => events.push(event.type));
+  const welcome = { type: 'welcome', to: 'guest', from: 'host', seats: guest.getView().seats, state: null, seq: 0, handled: 0, result: null, round: 0 };
+  host.send({ ...welcome, spectatorsOnly: true });
+  assert.equal(events.includes('joined'), false);
+  host.send(welcome);
+  assert.equal(events.includes('joined'), true);
+  guest.close();
+});
+
+test('a spectator reads the full state, never the masked copy', () => {
+  const network = createFakeNetwork();
+  const host = network.connect();
+  const spectator = createSpectatorRoom({ transport: network.connect(), code: 'AB2C9' });
+  const { state, events } = hiddenStoneGame();
+  const messages = hostStateMessages({ type: 'state', to: 'guest', state, events, seq: 3, round: 1, from: 'host' }, O, true);
+  host.send(messages[0]); // the guest's masked copy
+  assert.equal(spectator.state, null);
+  host.send(messages[1]); // the full state, spectatorsOnly
+  assert.equal(spectator.state.board[7][7], X);
+  host.send({ ...messages[0], seq: 4 });
+  assert.equal(spectator.state.board[7][7], X, 'a later masked copy does not replace it');
+  spectator.close();
+});
+
+test('the relay transport reaches spectators, the broadcast transport does not', () => {
+  class FakeSocket {
+    send() {}
+    close() {}
+  }
+  const ws = createWebSocketTransport('AB2C9', 'host', { WebSocketImpl: FakeSocket, location: { protocol: 'http:', host: 'x' } });
+  assert.equal(ws.reachesSpectators, true);
+  class FakeChannel {
+    postMessage() {}
+    close() {}
+  }
+  const bc = createBroadcastTransport('AB2C9', { BroadcastChannelImpl: FakeChannel });
+  assert.notEqual(bc.reachesSpectators, true);
+  ws.close();
+  bc.close();
+});
+
+test('local mode: the cloud cells are covered while the other seat moves, the owner turn shows everything', () => {
+  const { state } = hiddenStoneGame();
+  assert.equal(state.currentPlayer, O);
+  const seenByO = localViewState(state);
+  assert.equal(seenByO.board[7][7], EMPTY);
+  assert.equal(isCovered(seenByO, 7, 7), true);
+  const xTurn = ok(placeStone(state, { player: O, x: 3, y: 0 })).state;
+  assert.equal(xTurn.currentPlayer, X);
+  assert.equal(localViewState(xTurn), xTurn);
+  assert.equal(localViewState(xTurn).board[7][7], X);
+});
+
+// The skill buttons and targeting of the screens do not know Cloud yet
+// (part 3), so this checks the wiring: getView draws localViewState.
+test('local game: getView draws localViewState of the true state', () => {
+  const game = createLocalGame({ characters: assignSides([CLOUD_EAGLE, EARTH_BEAR]) });
+  game.click({ x: 7, y: 7 });
+  const view = game.getView();
+  assert.equal(view.state, localViewState(game.getState()));
+  assert.equal(game.getView().state, view.state, 'the same object while nothing changes');
+  assert.equal(view.state.board[7][7], X);
+});
+
+test('local mode: a move under the cloud plays no effect for the other seat', () => {
+  const { state, events } = hiddenStoneGame();
+  const seen = localViewEvents(state, events);
+  assert.equal(seen.some((e) => e.type === 'stonePlaced'), false);
+  assert.ok(seen.some((e) => e.type === 'turnEnded'));
+  // On the owner's turn every event is shown.
+  const placed = ok(placeStone(state, { player: O, x: 3, y: 0 }));
+  assert.equal(localViewEvents(placed.state, placed.events), placed.events);
+});
+
+test('local mode: the target preview and click read the drawn board, not the hidden stone', () => {
+  const { state } = hiddenStoneGame();
+  const shown = localViewState(state);
+  const convert = startTargeting(STONE_CONVERSION);
+  assert.deepEqual(targetPreview(state, O, convert, { x: 7, y: 7 }), { type: 'select', x: 7, y: 7 }, 'the true state would tell');
+  assert.equal(targetPreview(shown, O, convert, { x: 7, y: 7 }), null);
+  assert.ok(targetClick(shown, O, convert, { x: 7, y: 7 }).error);
+  const rock = startTargeting(TERRAIN_CREATION);
+  assert.deepEqual(targetPreview(shown, O, rock, { x: 7, y: 7 }), { type: 'rock', x: 7, y: 7 });
+  assert.deepEqual(targetClick(shown, O, rock, { x: 7, y: 7 }), { target: { x: 7, y: 7 } });
+});
+
+// EVERY HOST MESSAGE TO THE GUEST is masked: a real host room (Cloud Eagle,
+// X) and guest room (Earth Bear, O) on the fake network. The host's cloud
+// on (7, 7) hides the X stone it plays on (8, 8); each kind of message the
+// host sends the guest is checked: start, state, rejected, ping, the win,
+// welcome with the result, rematch-status, new-game and the forfeit result.
+const HIDDEN = { x: 8, y: 8 };
+const PUBLIC_KEYS = new Set(['clouds', 'covered', 'cells']);
+
+// Every cell under a cloud of X is empty in the message's state, and no
+// part of the message (outside the clouds themselves) names the hidden cell.
+function assertNothingHidden(message) {
+  const what = `${message.type} ${JSON.stringify(message).slice(0, 120)}`;
+  const state = message.state;
+  if (state?.board) {
+    for (const c of (state.clouds ?? []).filter((each) => each.owner === X)) {
+      for (const { x, y } of cloudCells(state.board, c)) assert.equal(state.board[y][x], EMPTY, `${what}: (${x}, ${y}) shown`);
+    }
+    for (const rock of state.rocks ?? []) assert.equal((state.clouds ?? []).some((c) => c.owner === X && Math.abs(rock.x - c.x) <= 2 && Math.abs(rock.y - c.y) <= 2), false, `${what}: a rock shown`);
+  }
+  const walk = (value) => {
+    if (!value || typeof value !== 'object') return;
+    if (!Array.isArray(value)) assert.equal(value.x === HIDDEN.x && value.y === HIDDEN.y && (state?.clouds ?? []).length > 0, false, `${what}: names the hidden cell`);
+    for (const [key, each] of Object.entries(value)) if (!PUBLIC_KEYS.has(key)) walk(each);
+  };
+  walk(message);
+}
+
+function eagleRooms({ relay = false } = {}) {
+  const network = createFakeNetwork();
+  const clock = createFakeClock();
+  const hostTransport = network.connect();
+  if (relay) hostTransport.reachesSpectators = true;
+  const makeGame = () => newGame({ characters: assignSides([CLOUD_EAGLE, EARTH_BEAR]) });
+  const host = createHostRoom({ transport: hostTransport, code: 'AB2C9', clock, id: 'host', makeGame });
+  const guestTransport = network.connect();
+  const guest = createGuestRoom({ transport: guestTransport, code: 'AB2C9', clock, id: 'guest' });
+  pickAndReady(host, guest);
+  assert.equal(host.phase, PLAYING);
+  assert.equal(host.state.characters[X], CLOUD_EAGLE);
+  const guestBound = () => hostTransport.sent.filter((m) => m.spectatorsOnly !== true);
+  const sentOfType = (type) => guestBound().filter((m) => m.type === type);
+  return { clock, host, guest, hostTransport, guestTransport, guestBound, sentOfType };
+}
+
+// X lines up (6, 8), (7, 8), (9, 8), (10, 8), puts the cloud on (7, 7) and
+// plays the hidden (8, 8): five in row 8, four of them under the cloud.
+function playHiddenWin({ host, guest }, { win = true } = {}) {
+  const moves = [[6, 8], [0, 0], [7, 8], [2, 0], [9, 8], [4, 0], [10, 8], [6, 0]];
+  for (let i = 0; i < moves.length; i++) ok((i % 2 === 0 ? host : guest).place(...moves[i]));
+  ok(host.useSkill(CLOUD, { x: 7, y: 7 }));
+  ok(guest.place(8, 0));
+  if (win) ok(host.place(HIDDEN.x, HIDDEN.y));
+}
+
+for (const relay of [false, true]) {
+  const over = relay ? ' (relay)' : '';
+
+  test(`host messages${over}: start and every state message carry no hidden stone`, () => {
+    const ctx = eagleRooms({ relay });
+    assert.equal(ctx.sentOfType('start').length, 1);
+    playHiddenWin(ctx, { win: false });
+    ok(ctx.host.place(13, 13)); // not under the cloud: the game goes on
+    ok(ctx.guest.place(10, 0));
+    ok(ctx.host.place(HIDDEN.x, HIDDEN.y)); // the win
+    for (const message of ctx.guestBound()) assertNothingHidden(message);
+    assert.ok(ctx.sentOfType('state').length >= 12);
+    assert.equal(ctx.guest.state.board[HIDDEN.y][HIDDEN.x], EMPTY);
+    assert.equal(ctx.host.state.board[HIDDEN.y][HIDDEN.x], X, 'the host keeps the true state');
+    if (relay) assert.ok(ctx.hostTransport.sent.some((m) => m.spectatorsOnly === true && m.state.board[HIDDEN.y][HIDDEN.x] === X));
+    else assert.equal(ctx.hostTransport.sent.some((m) => m.spectatorsOnly === true), false);
+  });
+
+  test(`host messages${over}: the win under the cloud tells only the uncovered cells`, () => {
+    const ctx = eagleRooms({ relay });
+    playHiddenWin(ctx);
+    assert.equal(ctx.host.phase, OVER);
+    assert.equal(ctx.guest.phase, OVER);
+    const last = ctx.sentOfType('state').at(-1);
+    assert.equal(last.masked, true);
+    assert.equal(last.state.winner, X);
+    assert.deepEqual(last.state.winLine, [{ x: 10, y: 8 }]);
+    assert.deepEqual(last.events.find((e) => e.type === 'win').line, [{ x: 10, y: 8 }]);
+    assert.equal(last.events.some((e) => e.type === 'stonePlaced'), false);
+    for (const message of ctx.guestBound()) assertNothingHidden(message);
+  });
+
+  test(`host messages${over}: a refused action on a covered cell says only that it is under a cloud`, () => {
+    const ctx = eagleRooms({ relay });
+    playHiddenWin(ctx, { win: false });
+    ok(ctx.host.place(HIDDEN.x, HIDDEN.y - 4)); // (8, 4): outside, the game goes on
+    const rejected = [];
+    ctx.guest.onEvent((e) => e.type === 'rejected' && rejected.push(e.error));
+    ok(ctx.guest.place(7, 8)); // a hidden X stone: sent, refused by the host
+    const answer = ctx.sentOfType('rejected').at(-1);
+    assert.equal(answer.error, COVERED_ERROR);
+    assert.deepEqual(rejected, [COVERED_ERROR]);
+    for (const message of ctx.guestBound()) assertNothingHidden(message);
+  });
+
+  test(`host messages${over}: pings, welcome with the result, rematch-status and new-game carry no hidden stone`, () => {
+    const ctx = eagleRooms({ relay });
+    playHiddenWin(ctx);
+    ctx.clock.advance(PEER_TIMEOUT_MS / 2); // heartbeat pings in over
+    ctx.guestTransport.send({ type: 'join', from: 'guest' }); // the guest asks again: welcome (with result) and start
+    const welcome = ctx.sentOfType('welcome').at(-1);
+    assert.ok('result' in welcome);
+    assert.equal(welcome.masked, true);
+    assert.equal(welcome.state.board[HIDDEN.y][HIDDEN.x], EMPTY);
+    assert.equal(ctx.sentOfType('start').at(-1).masked, true);
+    assert.ok(ctx.sentOfType('ping').length > 0);
+    ok({ ok: ctx.guest.requestRematch() });
+    assert.ok(ctx.sentOfType('rematch-status').length > 0);
+    ok({ ok: ctx.host.requestRematch() });
+    const newGameMessage = ctx.sentOfType('new-game').at(-1);
+    assert.ok(newGameMessage, 'the rematch started');
+    assert.equal(newGameMessage.state.board[HIDDEN.y][HIDDEN.x], EMPTY);
+    for (const message of ctx.guestBound()) assertNothingHidden(message);
+  });
+
+  test(`host messages${over}: the forfeit result in the pings carries no hidden stone`, () => {
+    const ctx = eagleRooms({ relay });
+    playHiddenWin(ctx, { win: false });
+    ok(ctx.host.place(13, 13));
+    ctx.guestTransport.setMuted(true);
+    ctx.clock.advance(PEER_TIMEOUT_MS + LEAVE_COUNTDOWN_S * 1000);
+    assert.equal(ctx.host.phase, OVER);
+    const withResult = ctx.sentOfType('ping').filter((m) => m.result);
+    assert.ok(withResult.length > 0);
+    assert.equal(withResult[0].result.reason, 'opponentLeft');
+    for (const message of ctx.guestBound()) assertNothingHidden(message);
+  });
+}
+
+test('maskErrorForViewer: a refusal on a covered cell does not tell what it holds', () => {
+  const { state } = hiddenStoneGame(); // X stone on (7, 7) under X's cloud
+  const place = (x, y) => ({ kind: 'place', x, y });
+  assert.equal(maskErrorForViewer(state, O, place(7, 7), 'That cell is taken.'), COVERED_ERROR);
+  assert.equal(maskErrorForViewer(state, O, { kind: 'skill', target: { x: 6, y: 6 } }, 'x'), COVERED_ERROR);
+  assert.equal(maskErrorForViewer(state, O, { kind: 'skill', target: { from: { x: 0, y: 0 }, to: { x: 8, y: 8 } } }, 'x'), COVERED_ERROR);
+  assert.equal(maskErrorForViewer(state, O, place(0, 0), 'That cell is taken.'), 'That cell is taken.');
+  assert.equal(maskErrorForViewer(state, X, place(7, 7), 'That cell is taken.'), 'That cell is taken.', 'the owner hears the true error');
+  assert.equal(maskErrorForViewer(state, null, place(7, 7), 'e'), 'e');
+});
+
+// The host's own skill clicks read the shown (masked) board too: Earth Bear
+// hosts (X) against a Cloud Eagle guest (O) whose cloud hides an O stone.
+test('online game: the host picks skill targets on the shown board, not the hidden stone', () => {
+  let state = newGame({ characters: assignSides([EARTH_BEAR, CLOUD_EAGLE]) });
+  state = ok(placeStone(state, { player: X, x: 0, y: 0 })).state;
+  state = ok(placeStone(state, { player: O, x: 7, y: 7 })).state;
+  state = ok(placeStone(state, { player: X, x: 1, y: 0 })).state;
+  state = ok(useSkill(state, { player: O, skill: CLOUD, target: { x: 7, y: 7 } })).state;
+  state = ok(placeStone(state, { player: X, x: 2, y: 0 })).state;
+  state = ok(placeStone(state, { player: O, x: 14, y: 14 })).state; // an O stone in the open
+  const used = [];
+  const room = {
+    state, // the true state, as the host room keeps it
+    onEvent: () => () => {},
+    getView: () => ({ state: maskForViewer(state, X), you: X, yourTurn: true, waiting: false, result: null }),
+    useSkill: (skill, target) => {
+      used.push(target);
+      return { ok: true };
+    },
+  };
+  const game = createOnlineGame(room);
+  assert.equal(game.clickSkill(X, STONE_CONVERSION), true);
+  assert.equal(game.click({ x: 7, y: 7 }), false, 'the hidden O stone cannot be picked');
+  const hidden = game.getView().message;
+  assert.equal(game.click({ x: 6, y: 6 }), false);
+  assert.equal(game.getView().message, hidden, 'a hidden stone and an empty covered cell answer the same');
+  game.setHover({ x: 7, y: 7 });
+  assert.equal(game.getView().preview, null);
+  assert.equal(game.click({ x: 14, y: 14 }), true, 'a stone in the open can be picked');
+  assert.deepEqual(used, [{ x: 14, y: 14 }]);
+});
+
+// EVERY host message to the guest goes through hostStateMessages (and so
+// through maskForViewer and maskEventsForViewer): one test per message
+// type, over the broadcast transport and over the relay. Each scenario
+// leaves X's hidden stones under the cloud on (7, 7) (playHiddenWin) and
+// returns the guest-bound messages of its type.
+const MESSAGE_SCENARIOS = {
+  // The guest asks again mid-game: the host seats it again with the state.
+  welcome: (ctx) => {
+    playHiddenWin(ctx, { win: false });
+    ctx.guestTransport.send({ type: 'join', from: 'guest' });
+  },
+  // The start resent with the welcome carries the current state.
+  start: (ctx) => {
+    playHiddenWin(ctx, { win: false });
+    ctx.guestTransport.send({ type: 'join', from: 'guest' });
+  },
+  state: (ctx) => {
+    playHiddenWin(ctx, { win: false });
+    ok(ctx.host.place(13, 13));
+  },
+  // The win is a state message whose events hold the win.
+  win: (ctx) => playHiddenWin(ctx),
+  // The forfeit result goes out in the host's pings.
+  result: (ctx) => {
+    playHiddenWin(ctx, { win: false });
+    ctx.guestTransport.setMuted(true);
+    ctx.clock.advance(PEER_TIMEOUT_MS + LEAVE_COUNTDOWN_S * 1000);
+  },
+  ping: (ctx) => {
+    playHiddenWin(ctx, { win: false });
+    ctx.clock.advance(PEER_TIMEOUT_MS / 2);
+  },
+  rejected: (ctx) => {
+    playHiddenWin(ctx, { win: false });
+    ok(ctx.host.place(13, 13));
+    ctx.guest.place(7, 8); // a hidden X stone
+  },
+  'rematch-status': (ctx) => {
+    playHiddenWin(ctx);
+    ok({ ok: ctx.guest.requestRematch() });
+  },
+  'new-game': (ctx) => {
+    playHiddenWin(ctx);
+    ok({ ok: ctx.guest.requestRematch() });
+    ok({ ok: ctx.host.requestRematch() });
+    ctx.guestTransport.send({ type: 'join', from: 'guest' }); // and the resend of the rematch
+  },
+};
+
+const STATE_TYPES = new Set(['welcome', 'start', 'state', 'win']);
+
+for (const relay of [false, true]) {
+  const over = relay ? ' (relay)' : '';
+  for (const [name, play] of Object.entries(MESSAGE_SCENARIOS)) {
+    test(`every host message${over}: ${name} passes through the mask`, () => {
+      const ctx = eagleRooms({ relay });
+      play(ctx);
+      const type = name === 'win' ? 'state' : name === 'result' ? 'ping' : name;
+      let messages = ctx.sentOfType(type);
+      if (name === 'win') messages = messages.filter((m) => m.events?.some((e) => e.type === 'win'));
+      if (name === 'result') messages = messages.filter((m) => m.result);
+      assert.ok(messages.length > 0, `a ${name} message was sent`);
+      for (const message of messages) assertNothingHidden(message);
+      const last = messages.at(-1);
+      if (STATE_TYPES.has(name)) {
+        // The mask covered the cloud: the guest's copy is the masked one.
+        assert.equal(last.masked, true);
+        assert.equal(last.state.board[8][7], EMPTY);
+        assert.equal(isCovered(last.state, 7, 8), true);
+      }
+      if (name === 'win') assert.deepEqual(last.events.find((e) => e.type === 'win').line, [{ x: 10, y: 8 }]);
+      if (name === 'result') assert.deepEqual(Object.keys(last.result).sort(), ['reason', 'winner']);
+      if (name === 'rejected') assert.equal(last.error, COVERED_ERROR);
+      if (name === 'new-game') {
+        assert.equal(last.round, 2);
+        assert.deepEqual(last.state.clouds ?? [], []);
+        for (const row of last.state.board) assert.ok(row.every((cell) => cell === EMPTY));
+      }
+      // The guest's room holds no hidden stone either.
+      if (ctx.guest.state) assertNothingHidden({ type: 'guest view', state: ctx.guest.state });
+      // Over the relay, only the spectatorsOnly copy carries the full state.
+      if (!relay) assert.equal(ctx.hostTransport.sent.some((m) => m.spectatorsOnly === true), false);
+    });
+  }
+}
+
+test('hostStateMessages: events sent without a state are masked by the host\'s true state', () => {
+  const { state, events } = hiddenStoneGame();
+  const message = { type: 'state', to: 'guest', events, seq: 4 };
+  const [guestCopy, spectators] = hostStateMessages(message, O, true, state);
+  assert.equal(guestCopy.masked, true);
+  assert.equal('state' in guestCopy, false);
+  assert.equal(guestCopy.events.some((e) => e.type === 'stonePlaced'), false);
+  assert.equal(spectators.spectatorsOnly, true);
+  assert.equal(spectators.events, events);
+  const plain = { type: 'ping', to: 'guest', seq: 4, result: { winner: X, reason: 'opponentLeft' } };
+  assert.deepEqual(hostStateMessages(plain, O, true, state), [plain], 'a message with no cell goes out as it is');
+});
+
+test('coveredActionError: any action on a covered cell is refused whatever it holds, the Cloud skill excepted', () => {
+  const { state } = hiddenStoneGame(); // X stone on (7, 7) under X's cloud, (8, 8) empty under it
+  assert.equal(coveredActionError(state, O, { kind: 'place', x: 7, y: 7 }), COVERED_ERROR);
+  assert.equal(coveredActionError(state, O, { kind: 'place', x: 8, y: 8 }), COVERED_ERROR, 'an empty covered cell answers the same');
+  assert.equal(coveredActionError(state, O, { kind: 'skill', skill: STONE_CONVERSION, target: { x: 6, y: 6 } }), COVERED_ERROR);
+  assert.equal(coveredActionError(state, O, { kind: 'skill', skill: CLOUD, target: { x: 7, y: 7 } }), null);
+  assert.equal(coveredActionError(state, O, { kind: 'place', x: 0, y: 1 }), null);
+  assert.equal(coveredActionError(state, X, { kind: 'place', x: 8, y: 8 }), null, 'the owner plays under its own cloud');
+});
+
+for (const relay of [false, true]) {
+  test(`the guest cannot probe the cloud${relay ? ' (relay)' : ''}: an empty and a taken covered cell are refused alike`, () => {
+    const ctx = eagleRooms({ relay });
+    playHiddenWin(ctx, { win: false });
+    ok(ctx.host.place(13, 13));
+    const rejected = [];
+    ctx.guest.onEvent((e) => e.type === 'rejected' && rejected.push(e.error));
+    ctx.guest.place(7, 8); // a hidden X stone
+    ctx.guest.place(8, 7); // an empty covered cell
+    assert.deepEqual(rejected, [COVERED_ERROR, COVERED_ERROR]);
+    assert.equal(ctx.host.state.board[7][8], EMPTY, 'nothing was placed');
+    assert.equal(ctx.host.state.currentPlayer, O, 'the guest is still to move');
+    const answers = ctx.sentOfType('rejected').slice(-2).map(({ error, reason, seq }) => ({ error, reason, seq }));
+    assert.deepEqual(answers[0], answers[1]);
+    ok(ctx.guest.place(12, 0)); // outside the cloud the game goes on
+  });
+}
+
+test('local mode: the player not owning the cloud cannot place under it, whatever the cell holds', () => {
+  // X's cloud on (7, 7) with an X stone under it; O is to move.
+  const game = createLocalGame({ makeGame: () => hiddenStoneGame().state });
+  assert.equal(game.getState().currentPlayer, O);
+  assert.equal(game.click({ x: 7, y: 7 }), false); // a hidden X stone
+  const taken = game.getView().message;
+  assert.equal(game.click({ x: 8, y: 8 }), false); // an empty covered cell
+  assert.equal(game.getView().message, taken);
+  assert.equal(taken, COVERED_ERROR);
+  assert.equal(game.getState().board[8][8], EMPTY);
+  assert.equal(game.getState().currentPlayer, O);
+  assert.equal(game.click({ x: 0, y: 1 }), true); // outside the cloud
+  assert.equal(game.click({ x: 8, y: 8 }), true, 'the owner plays under its own cloud');
+});

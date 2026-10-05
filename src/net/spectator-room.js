@@ -8,6 +8,8 @@
 // host's messages only: the replay of the last seats, state, start,
 // new-game and rematch-status when it connects, then every live host
 // message (welcome, seats, start, state, ping, new-game, rematch-status).
+// A masked host message (the guest's copy, with hidden cells covered) is
+// read without its state: the full one follows marked spectatorsOnly.
 // It builds the room from them:
 //   seats  from seats, welcome, start and the host's pings before the start
 //   state  the newest game state: the host's seq only grows (start, every
@@ -112,7 +114,11 @@ export function createSpectatorRoom({ transport, code }) {
     handlers.clear();
   };
 
-  const handle = (message) => {
+  // The guest's copy of a host message with the cells under the host's
+  // clouds covered (masked) carries no state for a spectator: the full
+  // state follows in the same message marked spectatorsOnly.
+  const handle = (heard) => {
+    const message = heard.masked === true ? { ...heard, state: null } : heard;
     if (HOST_ONLY.includes(message.type) && room.hostId === null) room.hostId = message.from;
     if (room.hostId !== null && message.from !== room.hostId) return; // not the host (a guest heard on a shared channel)
     switch (message.type) {

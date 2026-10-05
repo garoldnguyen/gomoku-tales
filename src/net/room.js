@@ -58,6 +58,24 @@
 //   new-game  host -> guest   { round, state, seq, handled } both asked: the next game
 //                             begins with a fresh state
 //
+// Hidden cloud contents (docs/design.md section 6): the guest never gets a
+// stone or rock under a cloud of the host. Every host message (welcome,
+// start, state with the win, new-game, and the ones with no cell) goes out
+// through hostStateMessages (room.send does it for every host message):
+// when maskForViewer covers cells for the guest, the guest's copy carries
+// the masked state (and only the events it may see) with masked true, and
+// over a transport that reaches spectators (reachesSpectators, the relay)
+// the same message with the full state follows marked spectatorsOnly; the
+// relay passes that one to the spectators only. The rooms of both players
+// drop any spectatorsOnly message. The host keeps the true state and shows
+// itself the state masked for its own stone. An action that names a cell
+// covered for the acting seat is refused with COVERED_ERROR before the
+// rules run (coveredActionError), whatever the cell holds, even an empty
+// one, so whether it is taken never tells what the cloud hides (the Cloud
+// skill itself excepted); skill targets are picked on the shown board.
+// The other host messages (seats, ping with its result and rematch status,
+// rematch-status, rejected, full, leave) carry no cell.
+//
 // Actions are { kind: 'place', x, y } or { kind: 'skill', skill, target };
 // the host fills in the acting player from who sent it.
 //
@@ -133,6 +151,7 @@
 
 import { HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS } from '../config.js';
 import { isGameOver, newGame, placeStone, useSkill } from '../logic/game.js';
+import { coveredActionError, maskErrorForViewer, maskEventsForViewer, maskForViewer } from '../logic/cloud.js';
 import { bothReady, clearSeat, createSeats, isSeats, pickCharacter, seatSides, seatStone, setReady } from '../logic/seats.js';
 import { systemClock } from './clock.js';
 import { ROOM_PHASES } from './phase.js';
@@ -167,13 +186,15 @@ export function makePeerId() {
 }
 
 // Creates the room as its host, with two empty seats. options.random is
-// used for the Tornado Zone throw.
+// used for the Tornado Zone throw; options.makeGame (newGame by default)
+// makes the state of each game from { characters }, for tests.
 export function createHostRoom(options) {
   const {
     transport,
     code,
     clock = systemClock,
     random = Math.random,
+    makeGame = newGame,
     id = makePeerId(),
   } = options;
 
@@ -206,7 +227,7 @@ export function createHostRoom(options) {
   // Both seats are Ready: the game of the picks begins on both sides at once.
   const start = () => {
     room.round = 1;
-    room.state = newGame({ characters: seatSides(room.seats) });
+    room.state = makeGame({ characters: seatSides(room.seats) });
     room.seq += 1;
     room.takeSides();
     room.phase = PLAYING;
@@ -276,7 +297,7 @@ export function createHostRoom(options) {
   // Both asked: the next round begins with a fresh game and a fresh link.
   const startNewGame = () => {
     room.round += 1;
-    room.state = newGame({ characters: room.state.characters }); // same characters, same sides
+    room.state = makeGame({ characters: room.state.characters }); // same characters, same sides
     room.seq += 1;
     room.phase = PLAYING;
     room.resetRematch();
@@ -291,13 +312,19 @@ export function createHostRoom(options) {
   const apply = (player, action) => {
     const blocker = actionBlocker(room);
     if (blocker) return { ok: false, ...blocker };
+    // An action on a cell under the other seat's cloud is refused whatever
+    // the cell holds, so neither a refusal nor an accepted move tells what
+    // the cloud hides.
+    const covered = coveredActionError(room.state, player, action);
+    if (covered) return { ok: false, error: covered };
     const result = runAction(room.state, player, action, random);
-    if (!result.ok) return { ok: false, error: result.error };
+    // A refusal tells nothing about a cell under the other seat's cloud.
+    if (!result.ok) return { ok: false, error: maskErrorForViewer(room.state, player, action, result.error) };
     room.state = result.state;
     room.seq += 1;
     room.updateOver();
     room.send({ type: 'state', to: room.peerId, state: room.state, events: result.events, seq: room.seq, handled: room.handled, round: room.round });
-    room.emit({ type: 'state', state: room.state, events: result.events });
+    room.emit({ type: 'state', state: room.state, events: maskEventsForViewer(maskForViewer(room.state, room.stone), result.events) });
     return { ok: true };
   };
 
@@ -613,6 +640,24 @@ function isClaim(result, winner) {
   return result?.reason === 'opponentLeft' && result.winner === winner;
 }
 
+// The messages the host sends for message (every host message goes
+// through here): the message itself when nothing in it is hidden from the
+// guest (guestStone); otherwise the guest's copy with the state masked by
+// maskForViewer, the events it may see (maskEventsForViewer) and masked
+// true, then, when withSpectators, the full message marked spectatorsOnly
+// for the relay's spectators. The events of a message without a state are
+// masked by current, the host's true state.
+export function hostStateMessages(message, guestStone, withSpectators, current = null) {
+  const hasState = message.state !== undefined;
+  const state = maskForViewer(hasState ? message.state : current, guestStone);
+  const events = Array.isArray(message.events) ? maskEventsForViewer(state, message.events) : message.events;
+  if ((!hasState || state === message.state) && events === message.events) return [message];
+  const guestCopy = { ...message, masked: true };
+  if (hasState) guestCopy.state = state;
+  if (Array.isArray(message.events)) guestCopy.events = events;
+  return withSpectators ? [guestCopy, { ...message, spectatorsOnly: true }] : [guestCopy];
+}
+
 // Runs a room action through the game rules.
 function runAction(state, player, action, random) {
   if (action?.kind === 'place') return placeStone(state, { player, x: action.x, y: action.y }, { random });
@@ -668,8 +713,13 @@ function createRoomCore({ role, transport, code, clock, id }) {
       room.peerStone = seatStone(room.seats, other);
     },
 
+    // Every host message goes out as the guest may see it
+    // (hostStateMessages), and over the relay in full for the spectators.
     send(message) {
-      transport.send({ ...message, from: id });
+      const all = role === HOST && message.masked !== true && message.spectatorsOnly !== true
+        ? hostStateMessages(message, room.peerStone, transport.reachesSpectators === true, room.state)
+        : [message];
+      for (const each of all) transport.send({ ...each, from: id });
     },
 
     emit(event) {
@@ -832,6 +882,19 @@ function createRoomCore({ role, transport, code, clock, id }) {
     room.emit({ type: 'peerGone', phase });
   };
 
+  // The state this window shows: masked for its own stone (the host keeps
+  // the true state; the guest's is masked already). Kept while the state
+  // does not change, so the view hands out the same object.
+  let shownFrom = null;
+  let shown = null;
+  const shownState = () => {
+    if (room.state !== shownFrom) {
+      shownFrom = room.state;
+      shown = maskForViewer(room.state, room.stone);
+    }
+    return shown;
+  };
+
   // The opponent's presence for the view: the countdown only in playing.
   const peerView = () => {
     if (!presence) return null;
@@ -852,6 +915,7 @@ function createRoomCore({ role, transport, code, clock, id }) {
   unsubscribe = transport.onMessage((message) => {
     if (room.phase === CLOSED) return;
     if (!message || typeof message.type !== 'string' || typeof message.from !== 'string' || message.from === id) return;
+    if (message.spectatorsOnly === true) return; // the full state is for the spectators only
     room.handle(message);
   });
 
@@ -952,7 +1016,7 @@ function createRoomCore({ role, transport, code, clock, id }) {
         character: room.character ?? room.seats.picks[room.role] ?? null,
         hostCharacter: room.hostCharacter,
         you: room.stone,
-        state: room.state,
+        state: shownState(),
         peer,
         result: room.result,
         yourTurn: canAct,

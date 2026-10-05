@@ -2,7 +2,9 @@
 // the room code, using the WebSocket hibernation API so an idle room costs
 // nothing. The relay does not know the game rules; it only passes frames:
 //
-//   host       its messages go to the guest and to every spectator
+//   host       its messages go to the guest and to every spectator; a
+//              message marked spectatorsOnly goes to the spectators only
+//              (the full game state, while the guest gets a masked copy)
 //   guest      its messages go to the host only
 //   spectator  only listens; any message it sends closes its socket
 //
@@ -11,7 +13,7 @@
 // socket's first message, so the leave message sent to the other side when
 // a host or guest closes names the peer the browser rooms know.
 //
-// The last host message of each SNAPSHOT_TYPES type is kept in ctx.storage
+// The last host message of each SNAPSHOT_TYPES type (not a masked copy) is kept in ctx.storage
 // and replayed to every new spectator. A room with no socket forgets it
 // after EMPTY_ROOM_CLEANUP_MS.
 
@@ -23,8 +25,8 @@ import {
   JOIN_NO_ROOM,
   FRAME_OK,
   FRAME_TOO_LARGE,
-  SNAPSHOT_TYPES,
   parseRelayQuery,
+  forwardFrame,
   decideJoin,
   checkFrame,
   countFrame,
@@ -116,13 +118,7 @@ export class RoomRelay extends DurableObject {
       ws.serializeAttachment(attachment);
     }
 
-    if (attachment.role === ROLE_GUEST) {
-      for (const peer of this.openSockets(ROLE_HOST)) peer.send(raw);
-      return;
-    }
-    for (const peer of this.openSockets(ROLE_GUEST)) peer.send(raw);
-    for (const peer of this.openSockets(ROLE_SPECTATOR)) peer.send(raw);
-    if (SNAPSHOT_TYPES.includes(message.type)) {
+    if (forwardFrame(attachment.role, raw, message, (role) => this.openSockets(role))) {
       const snapshot = await this.loadSnapshot();
       snapshot[message.type] = raw;
       await this.ctx.storage.put(SNAPSHOT_KEY, snapshot);

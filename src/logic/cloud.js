@@ -12,6 +12,7 @@
 
 import { CLOUD_SIZE, CLOUD_TURNS } from '../config.js';
 import { EMPTY, X, O, cloneBoard, findWinLineAt, inBounds } from './board.js';
+import { CLOUD } from './skills.js';
 
 export function createCloud(x, y, owner, placedTurn) {
   return { x, y, owner, turnsLeft: CLOUD_TURNS, placedTurn };
@@ -88,4 +89,133 @@ export function skyWatchCells(state, owner) {
     }
   }
   return cells;
+}
+
+// HIDDEN CLOUD CONTENTS: a stone or rock under a cloud is seen only by the
+// seat that owns the cloud (docs/design.md section 6). maskForViewer(state,
+// viewer) is the state as viewer (X or O) may see it: every cell under a
+// cloud of the other seat is covered, with no stone and no rock, and listed
+// in covered ([{ x, y }], row by row). The winning line leaves out its
+// covered cells too, so a win does not tell where a hidden stone is. The
+// owner of a cloud sees everything under it; any other viewer (a
+// spectator, null) sees the full state. Returns state itself when
+// nothing is covered. The host keeps the true state; this is only what is
+// shown and sent.
+export function maskForViewer(state, viewer) {
+  if (!state || (viewer !== X && viewer !== O)) return state;
+  const covered = coveredCells(state, viewer);
+  if (covered.length === 0) return state;
+  const board = cloneBoard(state.board);
+  for (const { x, y } of covered) board[y][x] = EMPTY;
+  const masked = { ...state, board, covered };
+  if (Array.isArray(state.rocks)) masked.rocks = state.rocks.filter((rock) => !isCovered(masked, rock.x, rock.y));
+  if (Array.isArray(state.winLine)) masked.winLine = uncoveredOf(masked, state.winLine);
+  const dash = state.pendingDash;
+  if (dash && dash.player !== viewer && (isCovered(masked, dash.from?.x, dash.from?.y) || isCovered(masked, dash.to?.x, dash.to?.y))) {
+    masked.pendingDash = null;
+  }
+  return masked;
+}
+
+// The cells under the clouds of the seat other than viewer, row by row,
+// each once.
+export function coveredCells(state, viewer) {
+  const hiding = cloudsOf(state).filter((c) => c.owner !== viewer);
+  if (hiding.length === 0) return [];
+  const cells = [];
+  for (let y = 0; y < state.board.length; y++) {
+    for (let x = 0; x < state.board[y].length; x++) {
+      if (hiding.some((c) => inCloud(c, x, y))) cells.push({ x, y });
+    }
+  }
+  return cells;
+}
+
+// The cells of the list that masked does not cover.
+function uncoveredOf(masked, cells) {
+  return cells.filter((cell) => !isCovered(masked, cell.x, cell.y));
+}
+
+// True when (x, y) is a covered cell of a state made by maskForViewer.
+export function isCovered(state, x, y) {
+  const covered = state?.covered;
+  if (!covered) return false;
+  for (const cell of covered) if (cell.x === x && cell.y === y) return true;
+  return false;
+}
+
+// The events of an action as viewer may see them, after maskForViewer gave
+// masked: an event that names a covered cell (its x, y, from, to or
+// target) is left out, so no move under the other seat's cloud is told.
+// The cloud itself is no secret: cloudPlaced, cloudEnded and the use of
+// the cloud skill always stay. A win stays, but its line leaves out the
+// covered cells. Returns events itself when nothing is changed.
+export function maskEventsForViewer(masked, events) {
+  if (!masked?.covered || !Array.isArray(events)) return events;
+  let changed = false;
+  const kept = [];
+  for (const event of events) {
+    if (hidesEvent(masked, event)) {
+      changed = true;
+    } else if (event?.type === 'win' && Array.isArray(event.line)) {
+      const line = uncoveredOf(masked, event.line);
+      if (line.length !== event.line.length) changed = true;
+      kept.push(line.length === event.line.length ? event : { ...event, line });
+    } else {
+      kept.push(event);
+    }
+  }
+  return changed ? kept : events;
+}
+
+const PUBLIC_EVENTS = Object.freeze(['cloudPlaced', 'cloudEnded', 'win', 'draw', 'turnEnded']);
+
+function hidesEvent(masked, event) {
+  if (PUBLIC_EVENTS.includes(event?.type)) return false;
+  if (event.type === 'skillUsed' && event.skill === CLOUD) return false;
+  const at = (point) => point != null && isCovered(masked, point.x, point.y);
+  return at(event) || at(event.from) || at(event.to) || at(event.target);
+}
+
+// LOCAL MODE (two players on one screen): the board is shown to the player
+// to move, so the cells under the other seat's cloud are covered while
+// that player moves, and the owner's turn shows everything.
+export function localViewState(state) {
+  return maskForViewer(state, state?.currentPlayer);
+}
+
+// LOCAL MODE: the events of an action as the player to move next (in
+// state, the state after the action) may see them, for the effects and
+// messages: a move under the other seat's cloud plays no effect.
+export function localViewEvents(state, events) {
+  return maskEventsForViewer(localViewState(state), events);
+}
+
+// The answer to an action refused by the rules, as viewer may hear it: when
+// the action names a cell covered for viewer (its x, y or the target's x,
+// y, from or to), the error is COVERED_ERROR whatever the cell holds, so
+// the refusal does not tell a stone from a rock. Otherwise error itself.
+export const COVERED_ERROR = 'That cell is under a cloud.';
+
+export function maskErrorForViewer(state, viewer, action, error) {
+  return namesCoveredCell(state, viewer, action) ? COVERED_ERROR : error;
+}
+
+// The refusal of an action of player BEFORE the rules run, online: an
+// action that names a cell under the other seat's cloud is refused with
+// COVERED_ERROR whatever the cell holds (an empty covered cell too), so
+// whether it is taken or accepted never tells what the cloud hides. The
+// CLOUD skill is the exception: its result does not depend on the cell.
+// Returns null when the action may go to the rules.
+export function coveredActionError(state, player, action) {
+  if (action?.kind === 'skill' && action.skill === CLOUD) return null;
+  return namesCoveredCell(state, player, action) ? COVERED_ERROR : null;
+}
+
+function namesCoveredCell(state, viewer, action) {
+  const masked = maskForViewer(state, viewer);
+  if (!masked?.covered || !action) return false;
+  const at = (point) => point != null && isCovered(masked, point.x, point.y);
+  const target = action.target;
+  return at(action) || at(target) || at(target?.from) || at(target?.to);
 }
