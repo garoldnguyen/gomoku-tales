@@ -27,6 +27,14 @@ export const ONLINE_SAME_BROWSER_ONLY = true;
 export const GAME_OVER_DELAY_MS = 1500; // time to see the final board before the Game over screen
 export const COPY_FEEDBACK_MS = 1500; // how long Copied shows after the room code was copied
 export const SELECT_PORTRAIT_SCALE = 2; // whole-number scale of the 128 px portraits on the character cards (sharp pixels)
+// The see-through character select (src/ui/room.css, room-screens.js
+// selectGlassStyle): how opaque the dark glass of the panel, the character
+// cards and the scrim behind the panel is, and how much the panel blurs
+// the map behind it on the levels with frosted glass (none on Low).
+export const SELECT_PANEL_OPACITY = 0.4;
+export const SELECT_CARD_OPACITY = 0.3;
+export const SELECT_SCRIM_OPACITY = 0.25;
+export const SELECT_BLUR_PX = 8;
 // The landing menu (src/ui/menu.css): the dark scrim over the 3D scene
 // blurs it this much on the levels with frosted glass (none on Low).
 export const MENU_SCRIM_BLUR_PX = 6;

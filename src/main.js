@@ -390,12 +390,16 @@ function startAppMode({ local = false } = {}) {
       hud?.show(false);
     }
     // The Game over screen keeps the final board and the poses in view,
-    // and the menu the empty farm.
-    const blur = screen !== GAME && screen !== GAME_OVER && screen !== MENU && blursMenus(renderer.features);
+    // and the menu the empty farm. The character select keeps the map
+    // sharp around its see-through panel, which frosts what is behind it
+    // itself (screens.setFrosted, room.css).
+    const frosted = blursMenus(renderer.features);
+    const blur = screen !== GAME && screen !== GAME_OVER && screen !== MENU && !PICKING_SCREENS.includes(screen) && frosted;
     if (blur !== blurred) {
       blurred = blur;
       stage.classList.toggle('backdrop-blur', blur);
     }
+    screens.setFrosted(frosted);
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
@@ -425,9 +429,10 @@ async function startShotMode({ scene }) {
   if (overView) game.cancel();
   const hudPlayer = overView ? SHOT_GAME_OVER.you : null;
   const hudWinner = overView ? SHOT_GAME_OVER.winner : null;
+  let shotScreens = null;
   if (roomView || overView) {
-    const screens = attachScreens(document.getElementById('screens'), stillRoomApp(roomView ?? overView));
-    assetsLoaded.then((store) => screens.setAssets(store));
+    shotScreens = attachScreens(document.getElementById('screens'), stillRoomApp(roomView ?? overView));
+    assetsLoaded.then((store) => shotScreens.setAssets(store));
   } else if (flow) {
     createMenuLayer(() => {});
     showMenu(flow);
@@ -464,6 +469,7 @@ async function startShotMode({ scene }) {
       if (overView) view.status = null; // the turn pill reads the winner, as at the end of a game
       if (hud) showHud(game, view, hudPlayer, hudWinner, null);
     }
+    shotScreens?.setFrosted(blursMenus(renderer.features));
     drawn++;
     state.ready = drawn >= SHOT_READY_FRAMES;
     requestAnimationFrame(frame);

@@ -11,7 +11,11 @@
 import { COPY_FEEDBACK_MS } from '../config.js';
 import { AVATAR_PX } from '../render3d/art-assets.js';
 import { GAME, GAME_OVER, JOIN, SELECT, WAITING_SCREEN } from './app.js';
-import { characterStage, copyFeedbackText, portraitScale, copyRoomCode, joinViewModel, lobbyViewModel } from './room-screens.js';
+import {
+  characterStage, copyFeedbackText, portraitScale, copyRoomCode, joinViewModel, lobbyViewModel, selectGlassStyle,
+} from './room-screens.js';
+import { TIP_CLOSED, selectTipReducer, selectTipViewModel, tipDelay } from './select-tooltip.js';
+import { tooltipPosition } from './tooltip-position.js';
 import { STRINGS } from './strings.js';
 
 export function attachScreens(root, app, { clipboard = globalThis.navigator?.clipboard } = {}) {
@@ -30,6 +34,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   let copyTimer = null;
   let assets = null; // the asset store (render/assets.js), see setAssets
   const warned = new Set(); // portrait keys already warned about
+  let frosted = null; // see setFrosted
 
   // The fixed text.
   const lobby = lobbyViewModel();
@@ -92,8 +97,13 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
 
   // Escape: Back on the lobby and its panels, Leave in the waiting room
   // (only while Leave is enabled) and Back on the local character select.
+  // An open skill tooltip closes first, and only it.
   window.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape' || root.hidden) return;
+    if (tipState.open !== null || tipState.pending !== null) {
+      tipEvent({ type: 'escape' });
+      return;
+    }
     const screen = app.getScreen();
     if (screen === WAITING_SCREEN || screen === SELECT) {
       if (screen === SELECT || !leave.disabled) act('leaveRoom');
@@ -216,31 +226,115 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     if (card.name) el('span', 'seat-status', node).textContent = card.statusText;
   });
 
-  // The three character cards of the active seat (characterSelectViewModel
-  // characters): portrait (or emblem) with the seal, name, tagline and one row per skill
-  // with its rest turns. A card is a button that picks the character.
-  const showCharacters = (container, list, seat) => rebuild(container, list, (card, parent) => {
-    const button = el('button', `character colour-${card.colour}`, parent);
-    button.type = 'button';
-    button.dataset.hudBox = card.box;
-    button.dataset.character = card.character;
-    button.disabled = card.disabled;
-    button.setAttribute('aria-pressed', String(card.selected));
-    const tile = el('span', 'emblem-tile', button);
-    showStage(card, tile);
-    el('span', 'seal', tile).textContent = card.seal;
-    const body = el('span', 'character-body', button);
-    const head = el('span', 'character-head', body);
-    el('span', 'character-name', head).textContent = card.name;
-    if (card.takenText) el('span', 'taken', head).textContent = card.takenText;
-    el('span', 'tagline', body).textContent = card.tagline;
-    for (const skill of card.skills) {
-      const row = el('span', 'skill-row', body);
-      el('span', 'skill-name', row).textContent = skill.name;
-      el('span', 'rest', row).textContent = skill.restText;
+  // The skill tooltip of the character cards (select-tooltip.js): one
+  // element with the skill's name, rest turns and SKILL_INFO description,
+  // placed by tooltipPosition next to its row. Keyboard focus shows it at
+  // once, a mouse hover after SELECT_TIP_HOVER_MS; pointer leave, blur and
+  // Escape close it.
+  const tip = el('div', 'select-tip', root);
+  tip.id = 'select-tip';
+  tip.setAttribute('role', 'tooltip');
+  tip.hidden = true;
+  const tipHead = el('div', 'select-tip-head', tip);
+  const tipTitle = el('span', 'select-tip-title', tipHead);
+  const tipRest = el('span', 'rest', tipHead);
+  const tipText = el('p', 'select-tip-text', tip);
+  const tipRows = new Map(); // key -> { row, skill }
+  let tipState = TIP_CLOSED;
+  let tipTimer = null;
+  let tipRow = null; // the row whose tooltip shows
+  const placeTip = () => {
+    if (!tipRow) return;
+    const at = tooltipPosition(tipRow.getBoundingClientRect(), { width: tip.offsetWidth, height: tip.offsetHeight },
+      { width: window.innerWidth, height: window.innerHeight });
+    tip.style.left = `${at.left}px`;
+    tip.style.top = `${at.top}px`;
+    tip.dataset.placement = at.placement;
+  };
+  const tipEvent = (event) => {
+    const next = selectTipReducer(tipState, event);
+    if (next === tipState) return;
+    tipState = next;
+    clearTimeout(tipTimer);
+    tipTimer = null;
+    const delay = tipDelay(event);
+    if (next.pending !== null && delay !== null) {
+      const key = next.pending;
+      tipTimer = setTimeout(() => tipEvent({ type: 'hoverTimer', key }), delay);
     }
-    button.addEventListener('click', () => act('pick', card.character, seat));
-  });
+    tipRow?.removeAttribute('aria-describedby');
+    tipRow = null;
+    const shown = next.open === null ? null : tipRows.get(next.open) ?? null;
+    tip.hidden = shown === null;
+    if (!shown) return;
+    const vm = selectTipViewModel(shown.skill);
+    tipTitle.textContent = vm.title;
+    tipRest.textContent = vm.restText;
+    tipText.textContent = vm.description;
+    tipRow = shown.row;
+    tipRow.setAttribute('aria-describedby', tip.id);
+    placeTip();
+  };
+  window.addEventListener('resize', placeTip);
+  const attachTip = (row, key, skill) => {
+    tipRows.set(key, { row, skill });
+    row.addEventListener('pointerenter', (event) => {
+      if (event.pointerType === 'mouse') tipEvent({ type: 'hover', key });
+    });
+    row.addEventListener('pointerleave', () => tipEvent({ type: 'leave', key }));
+    // Only keyboard focus: a mouse click on a row picks the card.
+    row.addEventListener('focus', () => {
+      if (row.matches(':focus-visible')) tipEvent({ type: 'focus', key });
+    });
+    row.addEventListener('blur', () => tipEvent({ type: 'blur', key }));
+  };
+  // A rebuilt or hidden list closes the tooltip of its old rows.
+  const dropTips = (container) => {
+    for (const [key, { row }] of tipRows) {
+      if (!container.contains(row)) continue;
+      tipRows.delete(key);
+      if (tipState.open === key || tipState.pending === key) tipEvent({ type: 'escape' });
+    }
+  };
+
+  // The three character cards of the active seat (characterSelectViewModel
+  // characters): portrait (or emblem) with the seal, name, tagline and one
+  // row per skill with its rest turns. The pick button holds the portrait,
+  // name and tagline; the skill rows under it take keyboard focus for
+  // their tooltip, and a click anywhere on an enabled card picks it.
+  const showCharacters = (container, list, seat) => {
+    if (built.get(container) !== JSON.stringify(list)) dropTips(container);
+    rebuild(container, list, (card, parent) => {
+      const node = el('div', `character colour-${card.colour}`, parent);
+      node.dataset.character = card.character;
+      node.classList.toggle('is-selected', card.selected);
+      node.classList.toggle('is-disabled', card.disabled);
+      const button = el('button', 'character-pick', node);
+      button.type = 'button';
+      button.dataset.hudBox = card.box;
+      button.disabled = card.disabled;
+      button.setAttribute('aria-pressed', String(card.selected));
+      const tile = el('span', 'emblem-tile', button);
+      showStage(card, tile);
+      el('span', 'seal', tile).textContent = card.seal;
+      const body = el('span', 'character-body', button);
+      const head = el('span', 'character-head', body);
+      el('span', 'character-name', head).textContent = card.name;
+      if (card.takenText) el('span', 'taken', head).textContent = card.takenText;
+      el('span', 'tagline', body).textContent = card.tagline;
+      const skills = el('div', 'skill-list', node);
+      for (const skill of card.skills) {
+        const row = el('div', 'skill-row', skills);
+        row.tabIndex = 0;
+        el('span', 'skill-name', row).textContent = skill.name;
+        el('span', 'rest', row).textContent = skill.restText;
+        attachTip(row, `${container.id}:${card.character}:${skill.id}`, skill);
+      }
+      node.addEventListener('click', () => {
+        if (!button.disabled) act('pick', card.character, seat);
+      });
+    });
+  };
 
   // The Ready button of the active seat (characterSelectViewModel readyButton).
   const showReady = (button, ready) => {
@@ -271,6 +365,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     root.classList.toggle('over', view.screen === GAME_OVER);
     root.classList.toggle('picking', view.screen === WAITING_SCREEN || view.screen === SELECT);
     for (const section of sections) section.hidden = section.dataset.screen !== view.screen;
+    if (entering) tipEvent({ type: 'escape' });
 
     if (view.screen === JOIN) {
       if (entering && !view.joining) joinInput.value = '';
@@ -318,6 +413,14 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   update();
 
   return {
+    // frosted: the window's quality level has frosted glass (quality.js
+    // blursMenus); the see-through select panel then blurs the map behind it.
+    setFrosted(value) {
+      if (value === frosted) return;
+      frosted = value;
+      root.classList.toggle('is-solid', !frosted);
+      for (const [name, css] of Object.entries(selectGlassStyle({ frosted }))) root.style.setProperty(name, css);
+    },
     // The asset store (render/assets.js) of the portraits: the character
     // cards are built again with it.
     setAssets(store) {

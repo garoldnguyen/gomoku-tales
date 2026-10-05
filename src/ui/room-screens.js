@@ -3,7 +3,10 @@
 // string, box name and state it draws, so node tests and shot mode see the
 // same screens. Text comes from strings.js, numbers from src/config.js.
 
-import { ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH, SELECT_PORTRAIT_SCALE } from '../config.js';
+import {
+  ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH, SELECT_BLUR_PX, SELECT_CARD_OPACITY, SELECT_PANEL_OPACITY,
+  SELECT_PORTRAIT_SCALE, SELECT_SCRIM_OPACITY,
+} from '../config.js';
 import { O, X } from '../logic/board.js';
 import { CHARACTERS, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
 import { createSeats, otherSeat, seatStone } from '../logic/seats.js';
@@ -74,6 +77,24 @@ export function portraitScale(width, height) {
   return 1;
 }
 
+// The see-through glass of the character select (room.css): the panel,
+// the character cards and the scrim behind the panel are the dark
+// --card-solid glass token of hud.css (alpha GLASS_SOLID_ALPHA) mixed with
+// transparent, so they reach SELECT_PANEL_OPACITY, SELECT_CARD_OPACITY and
+// SELECT_SCRIM_OPACITY with no new colour. The panel blurs the map behind
+// it by SELECT_BLUR_PX when frosted (Medium and High), not at all on Low.
+// Returns the CSS custom properties screens.js sets on #screens.
+export const GLASS_SOLID_ALPHA = 0.92;
+const mix = (opacity) => `${Math.round((opacity / GLASS_SOLID_ALPHA) * 1000) / 10}%`;
+export function selectGlassStyle({ frosted = true } = {}) {
+  return {
+    '--panel-mix': mix(SELECT_PANEL_OPACITY),
+    '--character-mix': mix(SELECT_CARD_OPACITY),
+    '--scrim-mix': mix(SELECT_SCRIM_OPACITY),
+    '--select-blur': `${frosted ? SELECT_BLUR_PX : 0}px`,
+  };
+}
+
 // The rest turns text of a skill row, from COOLDOWN_SHORT or COOLDOWN_LONG
 // (logic/skills.js cooldownTurns).
 export const restText = (turns) => STRINGS.selectRestTurns.replace('{turns}', String(turns));
@@ -125,7 +146,9 @@ export function joinViewModel({ text = '', joining = false, error = null } = {})
 // seat may pick first. A local seat card that is not active and not Ready
 // is choosable: pressing it makes that seat the active one. Each card
 // has the portrait key (characterStage: the emblem while it is missing), the seal, the tagline and one row per skill with its
-// rest turns; a card taken by the other seat is disabled and says Taken.
+// rest turns and its SKILL_INFO description (the skill row's tooltip, the
+// same text as the in-game HUD); a card taken by the other seat is
+// disabled and says Taken.
 export function characterSelectViewModel({ seats, labels, editable = [], you = null, absent = [], prefer = null }) {
   const open = editable.filter((seat) => !absent.includes(seat));
   const preferred = open.includes(prefer) && !seats.ready[prefer] ? prefer : null;
@@ -150,7 +173,8 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
         seal: look.seal,
         skills: CHARACTERS[id].skills.map((skillId) => {
           const rest = cooldownTurns(skillId);
-          return { id: skillId, name: SKILL_INFO[skillId].title, rest, restText: restText(rest) };
+          const info = SKILL_INFO[skillId];
+          return { id: skillId, name: info.title, rest, restText: restText(rest), description: info.description };
         }),
         selected: active !== null && activePick === id,
         taken,
