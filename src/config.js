@@ -359,6 +359,33 @@ export const SHAKE3D_LIGHT = 0.04; // world units at the start of a light shake 
 export const SHAKE3D_HEAVY = 0.13; // a strong shake (unused by the farm visuals)
 export const BANNER_3D_Y = 84; // top of the skill banner on the 3D HUD, under the title and hint
 
+// Character placement effects (src/render3d/character-look.js): what plays
+// when a seat plants a seed, by the character of that seat. Counts are the
+// full counts; placementPlan never plans more particles than the level's
+// particleCap (src/render3d/quality.js).
+export const DANDELION_STREAK_COUNT = 3; // windDandelion: soft curved wind streaks over the plot
+export const DANDELION_PUFF_MIN = 6; // windDandelion: dandelion seed puffs drifting to the lower right
+export const DANDELION_PUFF_MAX = 8;
+export const DANDELION_STREAK_MS = 520; // a wind streak sweeps across the plot this long
+export const DANDELION_STREAK_STAGGER_MS = 80; // the streaks start up to this far apart
+export const DANDELION_PUFF_MS = 1100; // a seed puff drifts this long before it fades
+export const DANDELION_PUFF_DRIFT = 1.4; // world units a puff drifts with the wind
+export const DANDELION_PUFF_STAGGER_MS = 60; // the puffs lift off this far apart
+export const SOIL_SPECK_COUNT = 8; // soilBurst: soil specks thrown out of the plot
+export const SOIL_CHIP_MIN = 4; // soilBurst: rock chips thrown out and falling back
+export const SOIL_CHIP_MAX = 6;
+export const SOIL_SPECK_MS = 420; // a soil speck flies and falls back this long
+export const SOIL_CHIP_MS = 620; // a rock chip flies and falls back this long
+export const SOIL_THROW_JITTER_MS = 40; // a speck or chip leaves the plot up to this late
+export const SOIL_THROW_RADIUS = 0.55; // world units a speck or chip lands from the plot centre at most
+export const SOIL_THROW_HEIGHT = 0.6; // world units at the top of a chip's arc
+export const VINE_RISE_MS = 300; // vineCoil: the vine rises out of the plot
+export const VINE_COIL_MS = 600; // it coils twice around the plant
+export const VINE_SINK_MS = 300; // then sinks back into the soil: 1200 ms in all
+export const VINE_COIL_TURNS = 2;
+export const VINE_COIL_RADIUS = 0.28; // world units from the plant's stem
+export const VINE_LEAF_COUNT = 4; // vineCoil: leaf flecks shed while it coils (particles)
+
 // Shot mode (?shot=<scene>, docs/shots.md section 4): the screenshot
 // self-check freezes every time driven thing at this time and seeds the
 // game's random source (the Tornado Zone throw) with this number.
