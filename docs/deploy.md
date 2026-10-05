@@ -43,6 +43,22 @@ not need it.
   `.wrangler/`, `wrangler.toml`, `package.json` and `package-lock.json` out
   of the public site.
 
+## Local test
+
+To play online rooms through the local relay without changing
+`ONLINE_TRANSPORT` in `src/config.js`, start `npx wrangler dev` (see
+below) and open:
+
+    http://localhost:8787/?transport=websocket
+
+The URL parameter `transport` with the value `websocket` or `broadcast`
+overrides `ONLINE_TRANSPORT` (`chooseTransport` in `src/net/transport.js`).
+It works only when the page is served from `localhost`, `127.0.0.1` or
+`::1`. On any other host, such as the deployed domain, and for any other
+value, the parameter is ignored and `ONLINE_TRANSPORT` decides. Open the
+same URL in a second window or browser to join the room. The lobby hint
+follows the chosen transport (no same-browser line for `websocket`).
+
 ## Manual local test with wrangler dev
 
 Needs Node.js and an internet connection the first time (npx downloads

@@ -205,3 +205,33 @@ test('only chooseTransport reads ONLINE_TRANSPORT', async () => {
   await walk('src');
   assert.deepEqual(readers.sort(), ['src/config.js', 'src/net/transport.js']);
 });
+
+test('?transport=websocket on localhost overrides broadcast', () => {
+  const broadcast = { ONLINE_TRANSPORT: 'broadcast' };
+  for (const hostname of ['localhost', '127.0.0.1', '::1', '[::1]']) {
+    assert.equal(chooseTransport(broadcast, { search: '?transport=websocket', hostname }), TRANSPORT_WEBSOCKET);
+  }
+  assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'websocket' }, { search: '?transport=broadcast', hostname: 'localhost' }), TRANSPORT_BROADCAST);
+  assert.equal(chooseTransport(config, { search: '?local=0&transport=websocket', hostname: 'localhost' }), TRANSPORT_WEBSOCKET);
+});
+
+test('?transport= is ignored on a real domain', () => {
+  for (const hostname of ['example.com', 'localhost.example.com', 'game.workers.dev', '']) {
+    assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'broadcast' }, { search: '?transport=websocket', hostname }), TRANSPORT_BROADCAST);
+    assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'websocket' }, { search: '?transport=broadcast', hostname }), TRANSPORT_WEBSOCKET);
+  }
+});
+
+test('an unknown ?transport= value is ignored', () => {
+  for (const search of ['?transport=carrier-pigeon', '?transport=', '?transport=WEBSOCKET']) {
+    assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'broadcast' }, { search, hostname: 'localhost' }), TRANSPORT_BROADCAST);
+    assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'websocket' }, { search, hostname: 'localhost' }), TRANSPORT_WEBSOCKET);
+  }
+});
+
+test('no ?transport= parameter returns the config value', () => {
+  assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'broadcast' }, { search: '', hostname: 'localhost' }), TRANSPORT_BROADCAST);
+  assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'websocket' }, { search: '?local=1', hostname: '127.0.0.1' }), TRANSPORT_WEBSOCKET);
+  assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'websocket' }, {}), TRANSPORT_WEBSOCKET);
+  assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'websocket' }, null), TRANSPORT_WEBSOCKET);
+});
