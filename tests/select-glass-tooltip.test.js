@@ -8,7 +8,7 @@ import {
 } from '../src/config.js';
 import { CHARACTERS } from '../src/logic/characters.js';
 import { createSeats } from '../src/logic/seats.js';
-import { cooldownTurns } from '../src/logic/skills.js';
+import { cooldownTurns, isPassiveSkill } from '../src/logic/skills.js';
 import { GUEST, HOST, ROOM_SEATS } from '../src/net/room.js';
 import { LOCAL_SEATS } from '../src/ui/flow.js';
 import {
@@ -18,6 +18,7 @@ import {
   SELECT_TIP_HOVER_MS, TIP_CLOSED, selectTipReducer, selectTipViewModel, tipDelay,
 } from '../src/ui/select-tooltip.js';
 import { SKILL_INFO, skillInfo } from '../src/ui/skill-info.js';
+import { STRINGS } from '../src/ui/strings.js';
 import { TOOLTIP_MARGIN, TOOLTIP_SHOW_MS, tooltipPosition } from '../src/ui/tooltip-position.js';
 
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
@@ -42,6 +43,11 @@ test('the character select gives each skill its SKILL_INFO description (the HUD 
         assert.equal(skill.description, skillInfo(skill.id).description, 'the same text as the in-game HUD');
         assert.ok(skill.description.length > 0);
         assert.equal(skill.rest, cooldownTurns(skill.id));
+        if (isPassiveSkill(skill.id)) {
+          // Sky Watch (Cloud Eagle) is always on: no timer, no turns.
+          assert.equal(skill.restText, STRINGS.skillAlwaysOn);
+          continue;
+        }
         assert.equal(skill.restText, restText(skill.rest));
         assert.ok(skill.restText.includes(String(skill.rest)));
       }

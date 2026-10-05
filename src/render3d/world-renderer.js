@@ -38,8 +38,18 @@
 // pick order). They are tinted once when a match starts (the sides
 // change) and again on a quality change, the old textures disposed. Every
 // planted seed also plays the placement effect of its side's character.
+//
+// Cloud Eagle (cloud-overlay.js): each cloud shows over its cells,
+// translucent with the plants inside visible for its owner and
+// spectators, opaque for the other seat (whose state has nothing under it,
+// maskForViewer). The Sky Watch cells show as soft yellow outlines to the
+// Cloud Eagle side and to spectators. Both are worked out again only when
+// the drawn state or its viewer changes.
 
-import { BOARD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
+import {
+  BOARD_SIZE, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, SKY_WATCH_OPACITY,
+  SPRITE_STRETCH_Y,
+} from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
 import { DEFAULT_SIDES } from '../logic/characters.js';
 import { createInitialState, isGameOver } from '../logic/game.js';
@@ -48,6 +58,7 @@ import { artMeta, artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
 import { boardMarksInto, createBoardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
 import { placementCues } from './character-look.js';
+import { COVER, cloudTileGrid, createCloudOverlay, skyWatchOutlineGrid, viewerOf } from './cloud-overlay.js';
 import { createEffects3d } from './effects3d.js';
 import { enteredStage, plantedCells, plantPoseInto, STAGE_LAND, STAGE_OPEN, STAGE_REST } from './growth.js';
 import { createWorldHitTest } from './hit-test.js';
@@ -56,7 +67,7 @@ import { plantFrameIndex, plantFrames } from './plant-frames.js';
 import { QUALITY_ORDER } from './quality.js';
 import { buildMarkTints, disposeMarkTints } from './mark-tints.js';
 import { fadedAlphaTest } from './sprite-frames.js';
-import { sheetTopRow } from './sprites.js';
+import { sheetCanvas, sheetTopRow } from './sprites.js';
 import { metaAnchor, stageStartMs } from './v3-meta.js';
 import { createCellDecal, createPieceSprite, createWorld, decalMaterial, placeOnCell, zonePieceGeometry } from './world.js';
 
@@ -93,6 +104,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
   const decals = createDecalLayer(world);
   const ghosts = createGhosts(world);
   const lastMove = createLastMoveMark(world);
+  const clouds = createCloudLayer(world);
   // A plant that a skill moves or converts regrows from Land (effects3d.js).
   const effects = createEffects3d(world, { regrow: (x, y, player, plantedAt) => pieces.growOne(x, y, player, plantedAt) });
 
@@ -162,6 +174,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       boardMarksInto(view, marks);
       decals.show(marks.decals, marks.count, time);
       lastMove.show(view.state.board, time);
+      clouds.show(view);
       ghosts.show(marks.ghost);
       world.setHoveredCell(view.hover ?? null);
       effects.update(time);
@@ -177,6 +190,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       world.characters.setActive(null);
       decals.show(NO_DECALS, 0, time);
       lastMove.hide();
+      clouds.hide();
       ghosts.show(null);
       world.setHoveredCell(null);
       effects.update(time);
@@ -428,6 +442,7 @@ const DECALS = {
   win: { order: 2, art: ART.v3.decal.win },
   dashTarget: { order: 4, art: ART.v3.decal.dashTarget },
   select: { order: 5, art: ART.v3.decal.select },
+  cloudPreview: { order: 1, grid: cloudTileGrid, opacity: CLOUD_PREVIEW_OPACITY },
 };
 
 // Pools of flat cell decals; show(decals, count, time) places the first
@@ -435,7 +450,8 @@ const DECALS = {
 function createDecalLayer(world) {
   const pools = {};
   for (const [kind, look] of Object.entries(DECALS)) {
-    const material = decalMaterial(artSource(look.art));
+    const material = decalMaterial(look.grid ? sheetCanvas([look.grid()]) : artSource(look.art));
+    if (look.opacity !== undefined) material.opacity = look.opacity;
     pools[kind] = { material, order: look.order, meshes: [], used: 0 };
   }
   const poolList = Object.values(pools);
@@ -473,6 +489,63 @@ function createDecalLayer(world) {
         const pool = poolList[p];
         for (let i = pool.used; i < pool.meshes.length; i++) pool.meshes[i].visible = false;
       }
+    },
+  };
+}
+
+// Cloud Eagle's clouds and Sky Watch outlines (cloud-overlay.js) as flat
+// cell decals from pure pixel tiles (no art file). Pools of meshes, made
+// the first time that many show; the decals are placed again only when
+// the overlay changes.
+const CLOUD_ORDER = { seeThrough: 1, cover: 6, outline: 7 };
+function createCloudLayer(world) {
+  const overlayFor = createCloudOverlay();
+  const cloudTile = sheetCanvas([cloudTileGrid()]);
+  const looks = {
+    seeThrough: decalMaterial(cloudTile),
+    cover: decalMaterial(cloudTile),
+    outline: decalMaterial(sheetCanvas([skyWatchOutlineGrid()])),
+  };
+  looks.seeThrough.opacity = CLOUD_SEE_THROUGH_OPACITY;
+  looks.outline.opacity = SKY_WATCH_OPACITY;
+  const pools = { seeThrough: [], cover: [], outline: [] };
+  const used = { seeThrough: 0, cover: 0, outline: 0 };
+  const kinds = Object.keys(pools);
+  let shownVersion = -1;
+  const placeDecal = (kind, x, y) => {
+    let mesh = pools[kind][used[kind]];
+    if (!mesh) {
+      mesh = createCellDecal(looks[kind]);
+      mesh.renderOrder = CLOUD_ORDER[kind];
+      world.scene.add(mesh);
+      pools[kind].push(mesh);
+    }
+    used[kind]++;
+    mesh.visible = true;
+    placeOnCell(mesh, x, y);
+  };
+  const hideFrom = (kind, first) => {
+    const meshes = pools[kind];
+    for (let i = first; i < meshes.length; i++) meshes[i].visible = false;
+  };
+  // Only when the overlay changed (a new state or viewer).
+  const placeOverlay = (overlay) => {
+    for (const kind of kinds) used[kind] = 0;
+    for (const cell of overlay.clouds) placeDecal(cell.look === COVER ? 'cover' : 'seeThrough', cell.x, cell.y);
+    for (const cell of overlay.skyWatch) placeDecal('outline', cell.x, cell.y);
+    for (const kind of kinds) hideFrom(kind, used[kind]);
+  };
+  return {
+    hide() {
+      if (shownVersion === -1) return;
+      for (let k = 0; k < kinds.length; k++) hideFrom(kinds[k], 0);
+      shownVersion = -1;
+    },
+    show(view) {
+      const overlay = overlayFor(view.state, viewerOf(view));
+      if (overlay.version === shownVersion) return;
+      shownVersion = overlay.version;
+      placeOverlay(overlay);
     },
   };
 }

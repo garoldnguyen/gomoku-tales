@@ -2,21 +2,22 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as config from '../src/config.js';
-import { CHARACTERS, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
+import { CHARACTERS, CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
 import { O, X } from '../src/logic/board.js';
 import { QUALITY_LEVELS, QUALITY_ORDER } from '../src/render3d/quality.js';
 import {
-  CHARACTER_LOOK, SIDE_SHAPE, SOIL_BURST, VINE_COIL, WIND_DANDELION, hexToRgb, markLookFor, paletteSwap,
+  CHARACTER_LOOK, CLOUD_SWIRL, SIDE_SHAPE, SOIL_BURST, VINE_COIL, WIND_DANDELION, hexToRgb, markLookFor, paletteSwap,
   particleCount, placementPlan, planDurationMs,
 } from '../src/render3d/character-look.js';
 
-const EFFECTS = [WIND_DANDELION, SOIL_BURST, VINE_COIL];
+const EFFECTS = [WIND_DANDELION, SOIL_BURST, VINE_COIL, CLOUD_SWIRL];
 
 test('each character has one colour and one effect', () => {
   assert.deepEqual(Object.keys(CHARACTER_LOOK).sort(), Object.keys(CHARACTERS).sort());
   assert.deepEqual(markLookFor(WIND_RABBIT), { colour: '#3b8cff', effect: WIND_DANDELION });
   assert.deepEqual(markLookFor(EARTH_BEAR), { colour: '#c9703a', effect: SOIL_BURST });
   assert.deepEqual(markLookFor(JADE_SERPENT), { colour: '#2fbf7a', effect: VINE_COIL });
+  assert.deepEqual(markLookFor(CLOUD_EAGLE), { colour: '#fff2a8', effect: CLOUD_SWIRL });
   for (const id of Object.keys(CHARACTERS)) {
     const look = markLookFor(id);
     assert.deepEqual(Object.keys(look).sort(), ['colour', 'effect']);
@@ -24,8 +25,8 @@ test('each character has one colour and one effect', () => {
   }
   const colours = Object.values(CHARACTER_LOOK).map((look) => look.colour);
   const effects = Object.values(CHARACTER_LOOK).map((look) => look.effect);
-  assert.equal(new Set(colours).size, 3);
-  assert.equal(new Set(effects).size, 3);
+  assert.equal(new Set(colours).size, 4);
+  assert.equal(new Set(effects).size, 4);
   assert.equal(markLookFor('nobody'), null);
 });
 

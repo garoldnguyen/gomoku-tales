@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import * as config from '../src/config.js';
 import { COOLDOWN_LONG, COOLDOWN_SHORT, COPY_FEEDBACK_MS, JOIN_TIMEOUT_MS, ROOM_CODE_LENGTH } from '../src/config.js';
 import { EMPTY, O, X } from '../src/logic/board.js';
-import { CHARACTERS, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
+import { CHARACTERS, CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
 import { createSeats, pickCharacter, setReady } from '../src/logic/seats.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
@@ -238,8 +238,8 @@ test('waitingViewModel in phase starting: both seats, only the own seat can pick
   assert.equal(vm.leave.enabled, true, 'no start on a timer, so Leave is always there');
   assert.ok(vm.cards.every((card) => !card.placeholder));
   const [mine, other] = vm.cards;
-  assert.deepEqual(mine.choices.map((choice) => choice.character), [WIND_RABBIT, EARTH_BEAR, JADE_SERPENT]);
-  assert.deepEqual(mine.choices.map((choice) => choice.disabled), [false, true, false]);
+  assert.deepEqual(mine.choices.map((choice) => choice.character), [WIND_RABBIT, EARTH_BEAR, JADE_SERPENT, CLOUD_EAGLE]);
+  assert.deepEqual(mine.choices.map((choice) => choice.disabled), [false, true, false, false]);
   assert.equal(mine.choices[1].taken, true);
   assert.equal(mine.choices[1].takenText, 'Taken');
   assert.equal(mine.readyButton.disabled, true, 'Ready needs a pick');
@@ -265,16 +265,16 @@ test('the joiner sees the same room in phase starting, with its own seat tagged 
   assert.equal(guest.code, host.code);
   assert.deepEqual(guest.cards.map((card) => card.box), host.cards.map((card) => card.box));
   assert.deepEqual(guest.cards.map((card) => card.you), [false, true]);
-  assert.deepEqual(guest.cards[1].choices.map((choice) => choice.disabled), [true, false, false]);
+  assert.deepEqual(guest.cards[1].choices.map((choice) => choice.disabled), [true, false, false, false]);
   assert.equal(waitingViewModel(initialFlow(), { code: 'ABCD5', seats, seat: HOST }), null);
 });
 
-test('characterSelectViewModel: three characters, Ready enabled only after a pick', () => {
-  assert.deepEqual([...SELECT_CHARACTERS], [WIND_RABBIT, EARTH_BEAR, JADE_SERPENT]);
+test('characterSelectViewModel: four characters, Ready enabled only after a pick', () => {
+  assert.deepEqual([...SELECT_CHARACTERS], [WIND_RABBIT, EARTH_BEAR, JADE_SERPENT, CLOUD_EAGLE]);
   const labels = { [HOST]: 'A', [GUEST]: 'B' };
   const empty = characterSelectViewModel({ seats: createSeats(ROOM_SEATS), labels, editable: [HOST, GUEST] });
   for (const card of empty.seats) {
-    assert.equal(card.choices.length, 3);
+    assert.equal(card.choices.length, 4);
     assert.ok(card.choices.every((choice) => !choice.disabled && !choice.selected));
     assert.equal(card.readyButton.disabled, true);
     assert.equal(card.statusText, 'Choosing');
@@ -294,7 +294,7 @@ test('localSelectViewModel: Player 1 and Player 2 both pick on the game screen o
   assert.equal(vm.title, 'Choose your character');
   assert.deepEqual(vm.cards.map((card) => card.label), ['Player 1', 'Player 2']);
   assert.deepEqual(vm.cards.map((card) => card.seat), [...LOCAL_SEATS]);
-  assert.ok(vm.cards.every((card) => card.choices.length === 3 && card.readyButton));
+  assert.ok(vm.cards.every((card) => card.choices.length === 4 && card.readyButton));
   assert.equal(vm.back.box, 'select-back');
   assert.equal(localSelectViewModel(initialFlow()), null);
 });
@@ -440,17 +440,24 @@ test('room.css: the room code at least 40 px, the pulse 0.6 to 1 over 1.6 s and 
 
 // --- the character select look (Game v5 part 3, docs/reference/v5) ---
 
-test('characterSelectViewModel characters: three cards with emblem, seal, tagline and skill rest turns from COOLDOWN_SHORT and COOLDOWN_LONG', () => {
+test('characterSelectViewModel characters: four cards with emblem, seal, tagline and skill rest turns from COOLDOWN_SHORT and COOLDOWN_LONG', () => {
   const labels = { [HOST]: 'A', [GUEST]: 'B' };
   const vm = characterSelectViewModel({ seats: createSeats(ROOM_SEATS), labels, editable: [HOST], you: HOST });
   assert.equal(vm.active, HOST);
-  assert.equal(vm.characters.length, 3);
-  assert.deepEqual(vm.characters.map((card) => card.character), [WIND_RABBIT, EARTH_BEAR, JADE_SERPENT]);
-  assert.deepEqual(vm.characters.map((card) => card.seal), ['GH', 'MB', 'JS']);
-  assert.deepEqual(vm.characters.map((card) => card.emblem), ['cross', 'bloom', 'leaf']);
-  assert.deepEqual(vm.characters.map((card) => card.colour), ['blue', 'red', 'jade']);
-  assert.deepEqual(vm.characters.map((card) => card.box), ['pick-host-wind-rabbit', 'pick-host-earth-bear', 'pick-host-jade-serpent']);
-  for (const card of vm.characters) {
+  assert.equal(vm.characters.length, 4);
+  assert.deepEqual(vm.characters.map((card) => card.character), [WIND_RABBIT, EARTH_BEAR, JADE_SERPENT, CLOUD_EAGLE]);
+  assert.deepEqual(vm.characters.map((card) => card.seal), ['GH', 'MB', 'JS', 'CE']);
+  assert.deepEqual(vm.characters.map((card) => card.emblem), ['cross', 'bloom', 'leaf', 'cloud']);
+  assert.deepEqual(vm.characters.map((card) => card.colour), ['blue', 'red', 'jade', 'gold']);
+  assert.deepEqual(vm.characters.map((card) => card.box), [
+    'pick-host-wind-rabbit', 'pick-host-earth-bear', 'pick-host-jade-serpent', 'pick-host-cloud-eagle',
+  ]);
+  // Cloud Eagle: Sky Watch is passive (Always on, no timer), Cloud rests COOLDOWN_LONG turns.
+  const eagle = vm.characters[3];
+  assert.deepEqual(eagle.skills.map((skill) => skill.rest), [0, COOLDOWN_LONG]);
+  assert.deepEqual(eagle.skills.map((skill) => skill.restText), [STRINGS.skillAlwaysOn, `${COOLDOWN_LONG} turns`]);
+  assert.equal(eagle.portrait, null, 'no portrait art yet: the emblem shows');
+  for (const card of vm.characters.slice(0, 3)) {
     assert.equal(card.name, CHARACTERS[card.character].name);
     assert.equal(card.tagline, CHARACTER_LOOKS[card.character].tagline);
     assert.ok(card.tagline.length > 0);
@@ -470,8 +477,8 @@ test('characterSelectViewModel characters: the taken state, Ready enabled only a
   const labels = { [HOST]: 'A', [GUEST]: 'B' };
   const view = (seats) => characterSelectViewModel({ seats, labels, editable: [GUEST], you: GUEST });
   const taken = view(roomSeats([HOST, EARTH_BEAR]));
-  assert.deepEqual(taken.characters.map((card) => card.taken), [false, true, false]);
-  assert.deepEqual(taken.characters.map((card) => card.disabled), [false, true, false]);
+  assert.deepEqual(taken.characters.map((card) => card.taken), [false, true, false, false]);
+  assert.deepEqual(taken.characters.map((card) => card.disabled), [false, true, false, false]);
   assert.equal(taken.characters[1].takenText, 'Taken');
   assert.equal(taken.characters[0].takenText, null);
   assert.equal(taken.readyButton.disabled, true);

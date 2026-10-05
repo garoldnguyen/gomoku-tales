@@ -41,9 +41,10 @@ test('Cloud Eagle owns Sky Watch (passive, no cooldown) and Cloud (cooldown COOL
   assert.equal(cooldownTurns(SKY_WATCH), 0);
   assert.equal(cooldownTurns(CLOUD), COOLDOWN_LONG);
   assert.equal(cooldownTurns(CLOUD), 6);
-  // The screens' tables do not list Cloud Eagle yet.
-  assert.equal(Object.hasOwn(CHARACTERS, CLOUD_EAGLE), false);
-  assert.equal(Object.hasOwn(SKILLS, CLOUD), false);
+  // Since part 3 the screens' tables list Cloud Eagle too.
+  assert.equal(Object.hasOwn(CHARACTERS, CLOUD_EAGLE), true);
+  assert.equal(Object.hasOwn(SKILLS, CLOUD), true);
+  assert.equal(Object.hasOwn(SKILLS, SKY_WATCH), true);
 });
 
 test('Sky Watch is always on: it cannot be used and never has a cooldown', () => {

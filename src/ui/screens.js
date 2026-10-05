@@ -158,7 +158,8 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
 
   // The emblems of the character cards (room-screens.js CHARACTER_LOOKS),
   // drawn in a 100 by 100 box: the blue four-petal cross, the red round
-  // bloom and the jade circle with a leaf. Their colours come from room.css.
+  // bloom, the jade circle with a leaf and the pale yellow cloud with a
+  // feather. Their colours come from room.css.
   const SVG = 'http://www.w3.org/2000/svg';
   const EMBLEMS = {
     cross: [['circle', 'petal', { cx: 50, cy: 28, r: 16 }], ['circle', 'petal', { cx: 50, cy: 72, r: 16 }],
@@ -167,6 +168,9 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     bloom: [['circle', 'petal', { cx: 50, cy: 50, r: 34 }], ['circle', 'core', { cx: 50, cy: 50, r: 13 }]],
     leaf: [['circle', 'petal', { cx: 50, cy: 50, r: 36 }],
       ['path', 'core', { d: 'M50 22 C 70 34, 70 66, 50 78 C 34 66, 34 34, 50 22 Z' }]],
+    cloud: [['circle', 'petal', { cx: 34, cy: 58, r: 20 }], ['circle', 'petal', { cx: 54, cy: 44, r: 24 }],
+      ['circle', 'petal', { cx: 72, cy: 60, r: 18 }], ['rect', 'petal', { x: 22, y: 58, width: 62, height: 20, rx: 10 }],
+      ['path', 'core', { d: 'M40 70 C 48 56, 60 48, 70 46 C 66 56, 56 66, 40 70 Z' }]],
   };
   const emblem = (name, parent) => {
     const svg = document.createElementNS(SVG, 'svg');
@@ -334,7 +338,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     }
   };
 
-  // The three character cards of the active seat (characterSelectViewModel
+  // The four character cards of the active seat (characterSelectViewModel
   // characters): portrait (or emblem) with the seal, name, tagline and one
   // row per skill with its rest turns. The pick button holds the portrait,
   // name and tagline; the skill rows under it take keyboard focus for

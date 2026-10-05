@@ -13,8 +13,10 @@
 // Bear, who plays O in the two character lobby, has it, so it only ever
 // turns X into O there). Venom also takes only an opponent's plant.
 
-import { ROCK_LIFETIME_TURNS, TORNADO_SIZE } from '../config.js';
-import { HISS, STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, VENOM, WIND_DASH, getSkill } from '../logic/skills.js';
+import { CLOUD_SIZE, CLOUD_TURNS, ROCK_LIFETIME_TURNS, TORNADO_SIZE } from '../config.js';
+import {
+  CLOUD, HISS, SKY_WATCH, STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, VENOM, WIND_DASH, getSkill,
+} from '../logic/skills.js';
 
 const info = (skillId, description, hint) => Object.freeze({ title: getSkill(skillId).name, description, hint });
 
@@ -48,6 +50,16 @@ export const SKILL_INFO = Object.freeze({
     VENOM,
     'Pick one of the opponent\'s plants. It withers and its plot is left empty. Rocks cannot be picked.',
     'Click to select, then choose a plant',
+  ),
+  [SKY_WATCH]: info(
+    SKY_WATCH,
+    'Always on. Soft yellow outlines show every empty plot where the opponent would make five in a row with one more plant.',
+    'Always on, nothing to click',
+  ),
+  [CLOUD]: info(
+    CLOUD,
+    `Pick the centre of a ${CLOUD_SIZE} by ${CLOUD_SIZE} cloud on any plot. For your next ${CLOUD_TURNS} turns the opponent cannot see the plants or rocks under it; you still can. It plants no seed.`,
+    'Click to select, then choose the cloud centre',
   ),
 });
 

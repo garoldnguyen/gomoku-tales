@@ -124,6 +124,9 @@ export const STRINGS = Object.freeze({
   selectTaglineWindRabbit: 'Fast and hard to read.',
   selectTaglineEarthBear: 'Slow and steady.',
   selectTaglineJadeSerpent: 'Patient, then sudden.',
+  selectTaglineCloudEagle: 'Sees far, hides much.',
+  skillAlwaysOn: 'Always on', // a passive skill (Sky Watch): no rest turns, no timer
+  cloudTargetPrompt: 'Cloud: choose the cloud centre', // the target step of Cloud Eagle's Cloud
 
   // Watch a match (sections 3.8 and 3.9): the spectator's room code
   // screen, the waiting room it sees, the live game card and the Room

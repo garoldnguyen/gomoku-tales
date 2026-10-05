@@ -83,8 +83,8 @@ test('each character owns its two skills', () => {
   }
 });
 
-test('the six skills have the design cooldown classes', () => {
-  assert.equal(Object.keys(SKILLS).length, 6);
+test('the eight skills have the design cooldown classes', () => {
+  assert.equal(Object.keys(SKILLS).length, 8);
   assert.equal(getSkill(WIND_DASH).cooldownClass, SHORT);
   assert.equal(getSkill(TORNADO_ZONE).cooldownClass, LONG);
   assert.equal(getSkill(TERRAIN_CREATION).cooldownClass, SHORT);

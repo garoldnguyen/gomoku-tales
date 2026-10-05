@@ -23,7 +23,8 @@
 //   placement         the placement effect of the character whose side
 //                     planted the seed (placement(), character-look.js):
 //                     Wind Rabbit's dandelion wind, Earth Bear's soil
-//                     burst, Jade Serpent's vine coil
+//                     burst, Jade Serpent's vine coil, Cloud Eagle's cloud
+//                     swirl with rising white feathers
 //   Stone Conversion  the plant wilts back to Sprout, a small spark runs
 //                     through the soil and the other team's plant regrows
 //                     from Land (X becomes O or O becomes X)
@@ -96,6 +97,8 @@ const COLORS = {
   dandelion: 0xfff6ec, // and the seed puffs
   vine: 0x2fbf7a, // vineCoil: the jade vine
   vineDark: 0x1f8a57,
+  cloudPuff: 0xf4f8ff, // cloudSwirl: the soft cloud puffs
+  feather: 0xffffff, // and the white feathers
 };
 // The petals of wind-bits: pink, white, yellow, lilac.
 const PETALS = [0xffb8d4, 0xfff6ec, 0xffe066, 0xcdb0f0];
@@ -405,6 +408,17 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       case 'vineLeaf':
         sp.size = 2 * PX;
         sp.color = COLORS.leaf;
+        break;
+      case 'cloudPuff':
+        sp.size = 4 * PX;
+        sp.grow = 3 * PX; // it swells as it dissolves
+        sp.color = COLORS.cloudPuff;
+        sp.alpha = 0.75;
+        break;
+      case 'feather':
+        sp.size = 2 * PX;
+        sp.color = COLORS.feather;
+        sp.shape = SHAPE_PLUS;
         break;
       default:
         return;

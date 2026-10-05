@@ -171,6 +171,7 @@ export function createOnlineGame(room) {
       return {
         state,
         you: player,
+        viewer: player,
         code: view.code,
         hover: canPlace ? hover : null,
         preview,

@@ -216,7 +216,7 @@
    three character cards of the active seat, then Back or Leave, the two
    seats and Ready in one row. Each card shows the owner's pixel portrait;
    while it is missing, its emblem: the blue four-petal cross, the red
-   round bloom or the jade circle with a leaf.
+   round bloom, the jade circle with a leaf or the pale yellow cloud.
 
    See-through glass (Game v5 part 5): the scrim, the panel and the cards
    are the --card-solid glass mixed with transparent (--scrim-mix,
@@ -232,7 +232,7 @@
 
 #screens .card.select-card {
   box-sizing: border-box;
-  width: min(calc(var(--u) * 780), calc(100vw - 24px));
+  width: min(calc(var(--u) * 860), calc(100vw - 24px));
   max-width: none;
   gap: calc(var(--u) * 10);
   padding: calc(var(--u) * 15) calc(var(--u) * 24);
@@ -296,8 +296,8 @@
 
 #screens .characters {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: calc(var(--u) * 14);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: calc(var(--u) * 12);
   width: 100%;
 }
 
@@ -377,6 +377,13 @@
   --c: var(--ready);
   --c-tile: color-mix(in srgb, var(--ready) 22%, transparent);
   --c-ink: color-mix(in srgb, var(--ready) 35%, var(--ink));
+}
+
+/* Cloud Eagle: a pale yellow cloud on a soft gold glow. */
+#screens .character.colour-gold {
+  --c: var(--gold-ink);
+  --c-tile: var(--gold-tile);
+  --c-ink: var(--ink);
 }
 
 /* The pick: a gold hairline. Once Ready every card is disabled, and the

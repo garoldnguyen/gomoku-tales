@@ -390,6 +390,24 @@ export const VINE_LEAF_COUNT = 4; // vineCoil: leaf flecks shed while it coils (
 export const PLACEMENT_SLOTS = 8; // placement effects playing at once (effects3d.js); a ninth replaces the oldest
 export const VINE_POINTS = 48; // vineCoil: pixel dots along the whole vine, from the soil to the top of the coil
 export const VINE_POINT_PX = 3; // art pixels wide, each dot of the vine
+export const SWIRL_PUFF_COUNT = 6; // cloudSwirl: soft cloud puffs circling over the plot
+export const SWIRL_MS = 900; // a puff circles this long, then dissolves
+export const SWIRL_RADIUS = 0.34; // world units from the plot centre to a puff
+export const SWIRL_TURN = 0.2; // a puff glides this share of a full turn round the plot (along the chord, so the share stays small)
+export const SWIRL_HEIGHT = 0.45; // world units above the soil where the swirl circles
+export const SWIRL_STAGGER_MS = 40; // the puffs start this far apart
+export const FEATHER_MIN = 3; // cloudSwirl: white feathers that rise and dissolve
+export const FEATHER_MAX = 5;
+export const FEATHER_MS = 1100; // a feather rises this long before it is gone
+export const FEATHER_RISE = 0.9; // world units a feather rises
+export const FEATHER_DRIFT = 0.3; // world units it drifts with the wind meanwhile
+export const FEATHER_STAGGER_MS = 120; // the feathers lift off this far apart
+
+// Cloud Eagle on the board (src/render3d/cloud-overlay.js): the cloud over
+// its CLOUD_SIZE by CLOUD_SIZE area and the Sky Watch outlines.
+export const CLOUD_SEE_THROUGH_OPACITY = 0.42; // the owner's (and spectators') translucent cloud
+export const CLOUD_PREVIEW_OPACITY = 0.3; // the cloud being placed, under the pointer
+export const SKY_WATCH_OPACITY = 0.8; // the soft yellow outlines
 
 // Shot mode (?shot=<scene>, docs/shots.md section 4): the screenshot
 // self-check freezes every time driven thing at this time and seeds the

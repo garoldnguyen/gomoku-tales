@@ -8,11 +8,12 @@
 
 import {
   DANDELION_PUFF_DRIFT, DANDELION_PUFF_MAX, DANDELION_PUFF_MIN, DANDELION_PUFF_MS, DANDELION_PUFF_STAGGER_MS,
-  DANDELION_STREAK_COUNT, DANDELION_STREAK_MS, DANDELION_STREAK_STAGGER_MS, SOIL_CHIP_MAX, SOIL_CHIP_MIN, SOIL_CHIP_MS, SOIL_SPECK_COUNT,
+  DANDELION_STREAK_COUNT, DANDELION_STREAK_MS, DANDELION_STREAK_STAGGER_MS, FEATHER_DRIFT, FEATHER_MAX, FEATHER_MIN, FEATHER_MS,
+  FEATHER_RISE, FEATHER_STAGGER_MS, SOIL_CHIP_MAX, SOIL_CHIP_MIN, SOIL_CHIP_MS, SOIL_SPECK_COUNT,
   SOIL_SPECK_MS, SOIL_THROW_HEIGHT, SOIL_THROW_JITTER_MS, SOIL_THROW_RADIUS, VINE_COIL_MS, VINE_COIL_RADIUS, VINE_COIL_TURNS,
-  VINE_LEAF_COUNT, VINE_RISE_MS, VINE_SINK_MS,
+  SWIRL_HEIGHT, SWIRL_MS, SWIRL_PUFF_COUNT, SWIRL_RADIUS, SWIRL_STAGGER_MS, SWIRL_TURN, VINE_LEAF_COUNT, VINE_RISE_MS, VINE_SINK_MS,
 } from '../config.js';
-import { DEFAULT_SIDES, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
+import { CLOUD_EAGLE, DEFAULT_SIDES, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
 import { O, X } from '../logic/board.js';
 import { qualityFeatures } from './quality.js';
 import { seededRandom } from './seeded-random.js';
@@ -21,12 +22,14 @@ import { WIND_GROUND } from './wind.js';
 export const WIND_DANDELION = 'windDandelion';
 export const SOIL_BURST = 'soilBurst';
 export const VINE_COIL = 'vineCoil';
+export const CLOUD_SWIRL = 'cloudSwirl';
 
 // One colour and one placement effect per character.
 export const CHARACTER_LOOK = Object.freeze({
   [WIND_RABBIT]: Object.freeze({ colour: '#3b8cff', effect: WIND_DANDELION }), // blue
   [EARTH_BEAR]: Object.freeze({ colour: '#c9703a', effect: SOIL_BURST }), // ochre red
   [JADE_SERPENT]: Object.freeze({ colour: '#2fbf7a', effect: VINE_COIL }), // jade green
+  [CLOUD_EAGLE]: Object.freeze({ colour: '#fff2a8', effect: CLOUD_SWIRL }), // pale yellow
 });
 
 // The shape stays with the side, never with the character.
@@ -285,7 +288,41 @@ function vineCoil(random, cap) {
   return steps;
 }
 
-const BUILDERS = Object.freeze({ [WIND_DANDELION]: windDandelion, [SOIL_BURST]: soilBurst, [VINE_COIL]: vineCoil });
+// A soft cloud swirl over the plot: SWIRL_PUFF_COUNT puffs circle part of
+// a turn round it and dissolve, and 3 to 5 white feathers rise and
+// dissolve, drifting with the wind. The puffs come first; the cap then cuts
+// the feathers.
+function cloudSwirl(random, cap) {
+  const wanted = FEATHER_MIN + Math.floor(random() * (FEATHER_MAX - FEATHER_MIN + 1));
+  const [puffs, feathers] = split(cap, SWIRL_PUFF_COUNT, wanted);
+  const steps = [];
+  for (let i = 0; i < puffs; i++) {
+    const angle = (i / Math.max(1, puffs)) * Math.PI * 2 + random() * 0.4;
+    const end = angle + SWIRL_TURN * Math.PI * 2;
+    const height = SWIRL_HEIGHT * between(random, 0.85, 1.15);
+    steps.push({
+      kind: 'cloudPuff', particle: true, startMs: i * SWIRL_STAGGER_MS, durationMs: SWIRL_MS,
+      from: [Math.cos(angle) * SWIRL_RADIUS, height, Math.sin(angle) * SWIRL_RADIUS],
+      to: [Math.cos(end) * SWIRL_RADIUS, height, Math.sin(end) * SWIRL_RADIUS],
+    });
+  }
+  for (let i = 0; i < feathers; i++) {
+    const fromX = between(random, -0.2, 0.2);
+    const fromZ = between(random, -0.2, 0.2);
+    const drift = FEATHER_DRIFT * between(random, 0.6, 1);
+    steps.push({
+      kind: 'feather', particle: true, startMs: i * FEATHER_STAGGER_MS, durationMs: FEATHER_MS,
+      from: [fromX, between(random, 0.25, 0.4), fromZ],
+      to: [fromX + drift * WIND_GROUND.x, between(random, 0.25, 0.4) + FEATHER_RISE * between(random, 0.8, 1), fromZ + drift * WIND_GROUND.z],
+      spin: between(random, -1, 1),
+    });
+  }
+  return steps;
+}
+
+const BUILDERS = Object.freeze({
+  [WIND_DANDELION]: windDandelion, [SOIL_BURST]: soilBurst, [VINE_COIL]: vineCoil, [CLOUD_SWIRL]: cloudSwirl,
+});
 
 // The full length of a plan in ms.
 export function planDurationMs(plan) {

@@ -44,7 +44,8 @@ test('the 3D loader table names the three portraits, each with a 128 px placehol
 test('the character data names each portrait once, and the select view model passes it on', () => {
   for (const [id, key] of Object.entries(KEYS)) assert.equal(CHARACTER_LOOKS[id].portrait, key);
   const cards = selectView().characters;
-  assert.deepEqual(cards.map((card) => card.portrait), [KEYS[WIND_RABBIT], KEYS[EARTH_BEAR], KEYS[JADE_SERPENT]]);
+  // Cloud Eagle has no portrait art yet (null): its card shows the emblem.
+  assert.deepEqual(cards.map((card) => card.portrait), [KEYS[WIND_RABBIT], KEYS[EARTH_BEAR], KEYS[JADE_SERPENT], null]);
   // Screen code never names a portrait key itself.
   const screens = readFileSync(new URL('../src/ui/screens.js', import.meta.url), 'utf8');
   for (const key of Object.values(KEYS)) assert.ok(!screens.includes(key), `screens.js names "${key}"`);
@@ -75,12 +76,13 @@ test('a missing or wrong-size portrait file warns at most, and the card falls ba
     uses: USES_3D,
   });
   const stages = selectView().characters.map((card) => characterStage(card, store));
-  assert.deepEqual(stages.map((stage) => stage.kind), ['emblem', 'emblem', 'portrait']);
+  assert.deepEqual(stages.map((stage) => stage.kind), ['emblem', 'emblem', 'portrait', 'emblem']);
+  assert.equal(stages[3].emblem, 'cloud', 'Cloud Eagle shows its emblem until the owner sends the portrait');
   assert.deepEqual(stages.slice(0, 2).map((stage) => stage.emblem), ['cross', 'bloom']);
   assert.ok(warnings.some((message) => message.includes(KEYS[EARTH_BEAR])), 'the wrong size warns');
 });
 
-test('portraitScale: whole numbers from 1 up to SELECT_PORTRAIT_SCALE, 2 wherever 256 px fit, the flow shot shapes included', () => {
+test('portraitScale: whole numbers from 1 up to SELECT_PORTRAIT_SCALE, 2 wherever 256 px fit on one of the four cards, the flow shot shapes included', () => {
   assert.equal(SELECT_PORTRAIT_SCALE, 2);
   for (const [w, h] of [[1280, 720], [1920, 1080], [2560, 1440], [3840, 2160], [390, 844], [800, 500], [1080, 1920]]) {
     const scale = portraitScale(w, h);
@@ -88,8 +90,9 @@ test('portraitScale: whole numbers from 1 up to SELECT_PORTRAIT_SCALE, 2 whereve
   }
   assert.equal(portraitScale(2560, 1440), 2);
   assert.equal(portraitScale(3840, 2160), 2);
-  // The flow shot shapes show the portraits at 256 px.
-  assert.equal(portraitScale(1280, 720), 2);
+  // The flow shot shapes: at 1920 by 1080 the portraits show at 256 px;
+  // at 1280 by 720 a card of the four is too narrow for 256 px, so 128.
+  assert.equal(portraitScale(1280, 720), 1);
   assert.equal(portraitScale(1920, 1080), 2);
   // Too low or too small for 256 px: scale 1, still a whole number.
   assert.equal(portraitScale(1280, 600), 1);

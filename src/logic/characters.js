@@ -14,15 +14,12 @@ export const CHARACTERS = {
   [WIND_RABBIT]: { id: WIND_RABBIT, name: 'Wind Rabbit', skills: [WIND_DASH, TORNADO_ZONE] },
   [EARTH_BEAR]: { id: EARTH_BEAR, name: 'Earth Bear', skills: [TERRAIN_CREATION, STONE_CONVERSION] },
   [JADE_SERPENT]: { id: JADE_SERPENT, name: 'Jade Serpent', skills: [HISS, VENOM] },
-};
-
-// Every character the rules know: CHARACTERS and the fourth, Cloud Eagle.
-// Cloud Eagle stays out of CHARACTERS, the table the character select, the
-// HUD and the looks walk, until those screens know it.
-export const ALL_CHARACTERS = {
-  ...CHARACTERS,
   [CLOUD_EAGLE]: { id: CLOUD_EAGLE, name: 'Cloud Eagle', skills: [SKY_WATCH, CLOUD] },
 };
+
+// Every character the rules know. Since the character select, the HUD and
+// the looks know Cloud Eagle, this is CHARACTERS itself.
+export const ALL_CHARACTERS = CHARACTERS;
 
 // The side that moves first.
 export const FIRST_PLAYER = X;

@@ -6,7 +6,7 @@
 import { X, O } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
 import { characterOf, isGameOver, skillCooldown } from '../logic/game.js';
-import { cooldownTurns, getSkill } from '../logic/skills.js';
+import { cooldownTurns, getSkill, isPassiveSkill } from '../logic/skills.js';
 import { ALL_EXPANDED } from './hud-collapse.js';
 import { skillInfo } from './skill-info.js';
 import { STRINGS } from './strings.js';
@@ -147,12 +147,14 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
 
 // A skill row. Rows that cannot be used now are `disabled`; the DOM keeps
 // them focusable and clickable (aria-disabled) so a click still explains
-// why, with the game's existing messages.
+// why, with the game's existing messages. A passive skill (Sky Watch) has
+// no timer: it reads Always on while the round goes on, and is never used.
 function skillView(state, player, skillId, { over, active, yours, targeting }) {
   const info = skillInfo(skillId);
   const title = info?.title ?? getSkill(skillId).name;
+  const passive = isPassiveSkill(skillId);
   const total = cooldownTurns(skillId);
-  const remaining = over ? 0 : skillCooldown(state, player, skillId);
+  const remaining = over || passive ? 0 : skillCooldown(state, player, skillId);
   let look;
   let skillState;
   let text;
@@ -160,6 +162,10 @@ function skillView(state, player, skillId, { over, active, yours, targeting }) {
     look = OFF;
     skillState = STATE_WAITING;
     text = 'Round over';
+  } else if (passive) {
+    look = READY;
+    skillState = STATE_READY;
+    text = STRINGS.skillAlwaysOn;
   } else if (remaining > 0) {
     look = COOLING;
     skillState = STATE_COOLING;
@@ -188,8 +194,9 @@ function skillView(state, player, skillId, { over, active, yours, targeting }) {
     look,
     cooldownTurns: remaining,
     cooldownProgress: progress,
+    passive,
     selected: look === SELECTED,
-    disabled: look === OFF || look === COOLING || !yours,
+    disabled: passive || look === OFF || look === COOLING || !yours,
     ariaLabel: `${title}: ${text}`,
     description: info?.description ?? '',
     hint: info?.hint ?? '',

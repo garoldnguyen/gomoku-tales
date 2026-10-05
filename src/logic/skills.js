@@ -23,16 +23,13 @@ export const SKILLS = {
   [STONE_CONVERSION]: { id: STONE_CONVERSION, name: 'Stone Conversion', character: 'earthBear', cooldownClass: LONG },
   [HISS]: { id: HISS, name: 'Hiss', character: 'jadeSerpent', cooldownClass: SHORT },
   [VENOM]: { id: VENOM, name: 'Venom', character: 'jadeSerpent', cooldownClass: LONG },
-};
-
-// Every skill the rules know: SKILLS and Cloud Eagle's two. Cloud Eagle's
-// skills stay out of SKILLS, the table the HUD and the character select
-// walk, until those screens know Cloud Eagle.
-export const ALL_SKILLS = {
-  ...SKILLS,
   [SKY_WATCH]: { id: SKY_WATCH, name: 'Sky Watch', character: 'cloudEagle', cooldownClass: PASSIVE },
   [CLOUD]: { id: CLOUD, name: 'Cloud', character: 'cloudEagle', cooldownClass: LONG },
 };
+
+// Every skill the rules know. Since the HUD and the character select know
+// Cloud Eagle, this is SKILLS itself.
+export const ALL_SKILLS = SKILLS;
 
 export function getSkill(skillId) {
   return Object.hasOwn(ALL_SKILLS, skillId) ? ALL_SKILLS[skillId] : null;

@@ -14,6 +14,7 @@
 //   'dashTarget'  the Wind Dash target cell being chosen
 //   'select'      a chosen or pickable source plant (Wind Dash, Stone Conversion)
 //   'win'         a cell of the winning line
+//   'cloudPreview' a cell of the Cloud being placed (Cloud Eagle)
 
 // Returns { decals: [{ kind, x, y, dx, dy }], ghost: { kind, x, y } | null }
 // where a ghost kind is 'X' or 'O' (a stone about to be placed) or 'rock',
@@ -62,6 +63,9 @@ export function boardMarksInto(view, out) {
         break;
       case 'rock':
         setGhost(out, 'rock', preview.x, preview.y);
+        break;
+      case 'cloud':
+        for (let i = 0; i < preview.cells.length; i++) addDecal(out, 'cloudPreview', preview.cells[i].x, preview.cells[i].y, 0, 0);
         break;
     }
   }

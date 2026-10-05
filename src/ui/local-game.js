@@ -181,6 +181,7 @@ export function createLocalGame(options = {}) {
       const buttonReady = panels.some((panel) => panel.skills.some((skill) => skill.hovered && skill.usable));
       return {
         state: shownState(),
+        viewer: player, // the board is drawn for the player to move
         hover: canPlace ? hover : null,
         preview,
         panels,

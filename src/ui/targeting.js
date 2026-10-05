@@ -4,8 +4,10 @@
 // still validates the finished action; these checks only guide the clicks.
 
 import { X, O, isEmptyCell, inBounds } from '../logic/board.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION, HISS, VENOM } from '../logic/skills.js';
+import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION, HISS, VENOM, CLOUD } from '../logic/skills.js';
+import { cloudCells } from '../logic/cloud.js';
 import { tornadoCells } from '../logic/wind-rabbit-skills.js';
+import { STRINGS } from './strings.js';
 
 // Skills used at once on the button click, with no target flow.
 const NO_TARGET_SKILLS = new Set([HISS]);
@@ -32,6 +34,8 @@ export function targetPrompt(targeting) {
       return "Stone Conversion: choose an opponent's stone";
     case VENOM:
       return "Venom: choose an opponent's stone";
+    case CLOUD:
+      return STRINGS.cloudTargetPrompt;
     default:
       return 'Choose a target';
   }
@@ -62,6 +66,7 @@ export function targetClick(state, player, targeting, cell) {
       return { target: { from, to: { x, y } } };
     }
     case TORNADO_ZONE:
+    case CLOUD:
       return { target: { x, y } };
     case TERRAIN_CREATION:
       if (!isEmptyCell(board, x, y)) return { error: 'Choose an empty cell.' };
@@ -81,6 +86,7 @@ export function targetClick(state, player, targeting, cell) {
 //   { type: 'dash', from, to }     whirl on the source, red frame on `to` (or null)
 //   { type: 'zone', x, y, cells }  the Tornado Zone centred on (x, y) and its cells
 //   { type: 'rock', x, y }         a ghost rock
+//   { type: 'cloud', x, y, cells } the Cloud centred on (x, y) and its cells
 export function targetPreview(state, player, targeting, hover) {
   const { board } = state;
   const cell = hover && inBounds(board, hover.x, hover.y) ? hover : null;
@@ -95,6 +101,8 @@ export function targetPreview(state, player, targeting, hover) {
     }
     case TORNADO_ZONE:
       return cell ? { type: 'zone', x: cell.x, y: cell.y, cells: tornadoCells(board, cell.x, cell.y) } : null;
+    case CLOUD:
+      return cell ? { type: 'cloud', x: cell.x, y: cell.y, cells: cloudCells(board, cell) } : null;
     case TERRAIN_CREATION:
       return cell && isEmptyCell(board, cell.x, cell.y) ? { type: 'rock', x: cell.x, y: cell.y } : null;
     case STONE_CONVERSION:

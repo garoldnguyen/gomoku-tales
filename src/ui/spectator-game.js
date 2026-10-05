@@ -93,6 +93,7 @@ export function createSpectatorGame(room) {
       return {
         state,
         you: null,
+        viewer: null, // a spectator sees the full state
         code: view.code,
         hover: null,
         preview: null,

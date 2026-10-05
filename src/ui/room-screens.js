@@ -10,9 +10,9 @@ import {
 } from '../config.js';
 import { O, X } from '../logic/board.js';
 import { onlineSameBrowserOnly } from '../net/transport.js';
-import { CHARACTERS, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
+import { CHARACTERS, CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
 import { createSeats, otherSeat, seatStone } from '../logic/seats.js';
-import { cooldownTurns } from '../logic/skills.js';
+import { cooldownTurns, isPassiveSkill } from '../logic/skills.js';
 import { GUEST, HOST, ROOM_SEATS } from '../net/room.js';
 import { normalizeRoomCode } from '../net/room-code.js';
 import { ART, AVATAR_PX } from '../render3d/art-assets.js';
@@ -29,7 +29,9 @@ export const SELECT_CHARACTERS = Object.freeze(Object.keys(CHARACTERS));
 // glass token of room.css), the owner's pixel portrait (its asset key, the
 // one place the select names it), the emblem shown while the portrait is
 // missing (the blue four-petal cross, the red round bloom, the jade circle
-// with a leaf), the seal initials and the tagline of strings.js.
+// with a leaf, the pale yellow cloud with a feather), the seal initials and
+// the tagline of strings.js. Cloud Eagle has no portrait yet (null): its
+// card shows the emblem until the owner sends the art.
 export const CHARACTER_LOOKS = Object.freeze({
   [WIND_RABBIT]: Object.freeze({
     colour: 'blue', portrait: ART.avatar[WIND_RABBIT], emblem: 'cross', seal: 'GH', tagline: STRINGS.selectTaglineWindRabbit,
@@ -39,6 +41,9 @@ export const CHARACTER_LOOKS = Object.freeze({
   }),
   [JADE_SERPENT]: Object.freeze({
     colour: 'jade', portrait: ART.avatar[JADE_SERPENT], emblem: 'leaf', seal: 'JS', tagline: STRINGS.selectTaglineJadeSerpent,
+  }),
+  [CLOUD_EAGLE]: Object.freeze({
+    colour: 'gold', portrait: null, emblem: 'cloud', seal: 'CE', tagline: STRINGS.selectTaglineCloudEagle,
   }),
 });
 
@@ -55,13 +60,14 @@ export function characterStage(card, assets) {
 // --u of index.html: the window's 16:9 box over 960): the panel's height
 // without the card stage plus the window padding (measured on the waiting
 // room, the taller panel: its title and code share a row, room.css), the
-// room a stage needs around its portrait, and the inner width of one
-// character card. Phones (PHONE_MAX_WIDTH and narrower, room.css) always
+// room a stage needs around its portrait, and the inner width of one of
+// the four character cards (the 860 wide panel, room.css, less its
+// padding, three gaps and each card's padding and border). Phones (PHONE_MAX_WIDTH and narrower, room.css) always
 // show scale 1.
 export const SELECT_INTERNAL_WIDTH = 960;
 export const SELECT_REST_HEIGHT_U = 334;
 export const SELECT_STAGE_PAD_U = 8;
-export const SELECT_CARD_INNER_U = 214;
+export const SELECT_CARD_INNER_U = 172;
 export const PHONE_MAX_WIDTH = 600;
 
 // The whole-number scale of the 128 px portraits on the character cards:
@@ -101,6 +107,10 @@ export function selectGlassStyle({ frosted = true } = {}) {
 // The rest turns text of a skill row, from COOLDOWN_SHORT or COOLDOWN_LONG
 // (logic/skills.js cooldownTurns).
 export const restText = (turns) => STRINGS.selectRestTurns.replace('{turns}', String(turns));
+
+// The rest text of a skill: Always on for a passive skill (Sky Watch, no
+// timer), else its rest turns.
+export const skillRestText = (skillId) => (isPassiveSkill(skillId) ? STRINGS.skillAlwaysOn : restText(cooldownTurns(skillId)));
 
 // windRabbit -> wind-rabbit, for data-hud-box names.
 const slug = (id) => id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
@@ -181,7 +191,7 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
         skills: CHARACTERS[id].skills.map((skillId) => {
           const rest = cooldownTurns(skillId);
           const info = SKILL_INFO[skillId];
-          return { id: skillId, name: info.title, rest, restText: restText(rest), description: info.description };
+          return { id: skillId, name: info.title, rest, restText: skillRestText(skillId), description: info.description };
         }),
         selected: active !== null && activePick === id,
         taken,
