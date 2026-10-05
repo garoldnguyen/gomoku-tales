@@ -52,7 +52,7 @@ export const STRINGS = Object.freeze({
   menuPlayLocal: 'Play on this computer',
   menuHowTo: 'How to Play',
   menuSettings: 'Settings',
-  menuPlace: 'Windy Spring Breeze Hill', // the pill under the title
+  menuPlace: 'Colorful Garden', // the pill under the title
   // The muted second line of each menu button.
   menuPlayOnlineHint: 'Create a room or join one',
   menuPlayLocalHint: 'Two players, one window',

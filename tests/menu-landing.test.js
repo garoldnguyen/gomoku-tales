@@ -12,7 +12,7 @@ import { STRINGS } from '../src/ui/strings.js';
 const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
 test('the new menu strings exist with the exact English text', () => {
-  assert.equal(STRINGS.menuPlace, 'Windy Spring Breeze Hill');
+  assert.equal(STRINGS.menuPlace, 'Colorful Garden');
   assert.equal(STRINGS.menuPlayOnlineHint, 'Create a room or join one');
   assert.equal(STRINGS.menuPlayLocalHint, 'Two players, one window');
   assert.equal(STRINGS.menuHowToHint, 'Rules and skills');
