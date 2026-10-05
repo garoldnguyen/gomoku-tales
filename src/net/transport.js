@@ -8,10 +8,21 @@
 //   close()            stops sending and receiving
 //
 // Version 1 uses a BroadcastChannel, which links windows of the same origin
-// and browser profile. A WebSocket transport can be added later with the
-// same three methods without changing game code.
+// and browser profile. src/net/ws-transport.js offers the same three methods
+// over a WebSocket to the relay server; chooseTransport picks between them.
 
 export const CHANNEL_PREFIX = 'gomoku-tales-';
+
+export const TRANSPORT_BROADCAST = 'broadcast';
+export const TRANSPORT_WEBSOCKET = 'websocket';
+export const TRANSPORTS = Object.freeze([TRANSPORT_BROADCAST, TRANSPORT_WEBSOCKET]);
+
+// The only place that reads ONLINE_TRANSPORT. Returns the configured
+// transport name; an unknown value falls back to broadcast.
+export function chooseTransport(config) {
+  const value = config?.ONLINE_TRANSPORT;
+  return TRANSPORTS.includes(value) ? value : TRANSPORT_BROADCAST;
+}
 
 export function channelName(roomCode) {
   return CHANNEL_PREFIX + roomCode;
