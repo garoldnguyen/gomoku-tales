@@ -103,7 +103,7 @@ export const STRINGS = Object.freeze({
 
   // Character select (sections 3.5 and 3.6): the room's seats online, and
   // Player 1 and Player 2 on the game screen of Play on this computer.
-  selectLocalTitle: 'Pick your characters',
+  selectLocalTitle: 'Choose your character',
   selectLead: 'The first to pick plays X and moves first.',
   selectPlayer1: 'Player 1',
   selectPlayer2: 'Player 2',

@@ -289,7 +289,7 @@ test('characterSelectViewModel: three characters, Ready enabled only after a pic
 test('localSelectViewModel: Player 1 and Player 2 both pick on the game screen of Play on this computer', () => {
   const flow = flowReducer(initialFlow(), FLOW_EVENTS.PLAY_LOCAL);
   const vm = localSelectViewModel(flow);
-  assert.equal(vm.title, 'Pick your characters');
+  assert.equal(vm.title, 'Choose your character');
   assert.deepEqual(vm.cards.map((card) => card.label), ['Player 1', 'Player 2']);
   assert.deepEqual(vm.cards.map((card) => card.seat), [...LOCAL_SEATS]);
   assert.ok(vm.cards.every((card) => card.choices.length === 3 && card.readyButton));
