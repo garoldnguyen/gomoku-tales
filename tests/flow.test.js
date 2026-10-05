@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FLOW_EVENTS, LOCAL_SEATS, MODES, NOTICE_HOST_LEFT, OVERLAYS, ROLES, SCREENS, flowReducer, initialFlow, isSelecting, screenOf,
+  FLOW_EVENTS, LOCAL_SEATS, MODES, NOTICE_HOST_LEFT, NOTICE_ROOM_CLOSED, OVERLAYS, ROLES, SCREENS, flowReducer, initialFlow, isSelecting,
+  isSpectating, screenOf,
 } from '../src/ui/flow.js';
 import { EARTH_BEAR, WIND_RABBIT } from '../src/logic/characters.js';
 
@@ -43,6 +44,11 @@ const STATES = {
   'game/local': local('game', ALL_READY),
   'gameover/online': state('gameover', 'none', 'online', 'host'),
   'gameover/local': local('gameover', ALL_READY),
+  // Watch a match: the spectator's screens (sections 3.8 and 3.9).
+  'spectate': state('spectate', 'none', 'online', 'spectator'),
+  'spectate-waiting': state('spectate-waiting', 'none', 'online', 'spectator'),
+  'spectate-game': state('spectate-game', 'none', 'online', 'spectator'),
+  'room-closed': state('room-closed', 'none', 'online', 'spectator', NOTICE_ROOM_CLOSED),
 };
 
 // The events: every event of FLOW_EVENTS as a bare name, and PICK and
@@ -71,6 +77,7 @@ const ALLOWED = {
     PLAY_LOCAL: local('game', EMPTY),
     OPEN_HOWTO: state('menu', 'howto', null, null),
     OPEN_SETTINGS: state('menu', 'settings', null, null),
+    WATCH: state('spectate', 'none', 'online', 'spectator'),
   },
   'menu+howto': {
     CLOSE_OVERLAY: MENU,
@@ -131,18 +138,37 @@ const ALLOWED = {
     LEAVE: MENU,
     REMATCH_STARTED: local('game', ALL_READY),
   },
+  'spectate': {
+    BACK: MENU,
+    SPECTATOR_JOINED: state('spectate-waiting', 'none', 'online', 'spectator'),
+  },
+  'spectate-waiting': {
+    START: state('spectate-game', 'none', 'online', 'spectator'),
+    ROOM_CLOSED: state('room-closed', 'none', 'online', 'spectator', NOTICE_ROOM_CLOSED),
+    LEAVE: MENU,
+  },
+  'spectate-game': {
+    ROOM_CLOSED: state('room-closed', 'none', 'online', 'spectator', NOTICE_ROOM_CLOSED),
+    LEAVE: MENU,
+  },
+  'room-closed': { LEAVE: MENU },
 };
 
 test('the table names every screen, overlay and event of section 4', () => {
-  assert.deepEqual(Object.values(SCREENS), ['menu', 'lobby', 'waiting', 'starting', 'game', 'gameover']);
+  assert.deepEqual(Object.values(SCREENS), [
+    'menu', 'lobby', 'waiting', 'starting', 'game', 'gameover', 'spectate', 'spectate-waiting', 'spectate-game', 'room-closed',
+  ]);
   assert.deepEqual(Object.values(OVERLAYS), ['none', 'howto', 'settings']);
   assert.deepEqual(Object.values(MODES), ['online', 'local']);
-  assert.deepEqual(Object.values(ROLES), ['host', 'guest']);
+  assert.deepEqual(Object.values(ROLES), ['host', 'guest', 'spectator']);
   assert.deepEqual([...LOCAL_SEATS], [P1, P2]);
   assert.deepEqual(Object.values(E).sort(), [
     'BACK', 'CLOSE_OVERLAY', 'GAME_OVER', 'JOINED', 'LEAVE', 'OPEN_HOWTO', 'OPEN_SETTINGS', 'OPPONENT_JOINED',
-    'OPPONENT_LEFT', 'PICK', 'PLAY_LOCAL', 'PLAY_ONLINE', 'READY', 'REMATCH_STARTED', 'ROOM_CREATED', 'START',
+    'OPPONENT_LEFT', 'PICK', 'PLAY_LOCAL', 'PLAY_ONLINE', 'READY', 'REMATCH_STARTED', 'ROOM_CLOSED', 'ROOM_CREATED',
+    'SPECTATOR_JOINED', 'START', 'WATCH',
   ]);
+  // Every screen of SCREENS has a state in the table.
+  for (const screen of Object.values(SCREENS)) assert.ok(Object.values(STATES).some((flow) => flow.screen === screen), screen);
   for (const [name, events] of Object.entries(ALLOWED)) {
     assert.ok(STATES[name], name);
     for (const event of Object.keys(events)) assert.ok(EVENTS[event], `${name}: ${event}`);
@@ -170,7 +196,7 @@ test('flowReducer: every state times every event gives exactly the table result'
       if (expected) allowed++;
     }
   }
-  assert.equal(allowed, 39);
+  assert.equal(allowed, 48);
   assert.equal(flowReducer(STATES.menu, null), STATES.menu);
   assert.equal(flowReducer(STATES.menu, {}), STATES.menu);
 });
@@ -178,6 +204,29 @@ test('flowReducer: every state times every event gives exactly the table result'
 test('isSelecting: only the local game screen before both seats are Ready', () => {
   const selecting = Object.entries(STATES).filter(([, flow]) => isSelecting(flow)).map(([name]) => name);
   assert.deepEqual(selecting, ['select/empty', 'select/one', 'select/both', 'select/one-ready']);
+});
+
+test('isSpectating: only the spectator inside a room (waiting room or live game)', () => {
+  const spectating = Object.entries(STATES).filter(([, flow]) => isSpectating(flow)).map(([name]) => name);
+  assert.deepEqual(spectating, ['spectate-waiting', 'spectate-game']);
+});
+
+test('the spectate transitions: Watch a match, the waiting room, the live game, Room closed and back to the menu', () => {
+  const walk = (events) => events.reduce(flowReducer, initialFlow());
+  const watching = walk([E.WATCH, E.SPECTATOR_JOINED, E.START]);
+  assert.deepEqual(watching, state('spectate-game', 'none', 'online', 'spectator'));
+  // A spectator never reaches the players' screens: no game over, no
+  // rematch, no pick or Ready, no opponent events.
+  for (const event of [E.GAME_OVER, E.REMATCH_STARTED, E.OPPONENT_LEFT, E.OPPONENT_JOINED, E.JOINED, E.ROOM_CREATED,
+    { type: E.PICK, seat: P1, character: R }, { type: E.READY, seat: P1 }]) {
+    assert.equal(flowReducer(watching, event), watching, String(event.type ?? event));
+  }
+  const closed = flowReducer(watching, E.ROOM_CLOSED);
+  assert.equal(closed.screen, SCREENS.ROOM_CLOSED);
+  assert.equal(closed.notice, NOTICE_ROOM_CLOSED);
+  assert.deepEqual(flowReducer(closed, E.LEAVE), MENU);
+  // The connection refused on the code box changes no screen.
+  assert.equal(flowReducer(walk([E.WATCH]), E.ROOM_CLOSED).screen, SCREENS.SPECTATE);
 });
 
 test('flowReducer never changes a deeply frozen input', () => {

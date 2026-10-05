@@ -86,7 +86,7 @@
 }
 
 /* --- the menu: a dark scrim over the scene, then one glass card with the
-   title, the place pill, four two line buttons and the hint bar. The px
+   title, the place pill, five two line buttons and the hint bar. The px
    sizes are MENU_LAYOUT of src/ui/menu.js (a test compares them). --- */
 
 #flow .scrim {

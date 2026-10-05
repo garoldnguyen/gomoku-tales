@@ -19,7 +19,9 @@
 //                             select; request counts the guest's picks and Readys up from 1
 //   ready     guest -> host   { character, request } the guest pressed Ready for the pick
 //                             character (refused if that is no longer its pick)
-//   seats     host -> guest   { seats, error?, reason?, answer? } the seats (logic/seats.js)
+//   seats     host -> guest   { seats, guest, error?, reason?, answer? } the seats (logic/seats.js);
+//                             guest is false while no guest is seated (then
+//                             the message goes to nobody, for spectators)
 //                             after every change, and as the answer to every pick and
 //                             ready (answer is its request, with the error when the host
 //                             refused it; the guest drops an error of an older request)
@@ -223,7 +225,11 @@ export function createHostRoom(options) {
     if (changed) room.seats = result.seats;
     const error = result.ok ? {} : { error: result.error, reason: result.reason };
     const answered = side === GUEST ? { ...error, ...(Number.isInteger(answer) ? { answer } : {}) } : {};
-    if (room.peerId && (changed || side === GUEST)) room.send({ type: 'seats', to: room.peerId, seats: room.seats, ...answered });
+    // Before a guest is in, a change still goes out (to nobody: no guest
+    // takes it), so the relay's spectators see the host's pick.
+    // guest says whether a guest is seated, so a spectator's waiting room
+    // drops a guest that went (the relay passes it only host messages).
+    if (changed || (room.peerId && side === GUEST)) room.send({ type: 'seats', to: room.peerId, seats: room.seats, guest: room.peerId !== null, ...answered });
     if (changed) room.emit({ type: 'seats', seats: room.seats });
     else if (!result.ok && side === HOST) room.emit({ type: 'seats', seats: room.seats, ...error });
     if (changed && room.phase === STARTING && bothReady(room.seats)) start();
@@ -251,6 +257,9 @@ export function createHostRoom(options) {
       room.seats = emptied;
       room.emit({ type: 'seats', seats: room.seats });
     }
+    // To nobody (the guest is gone): the relay's spectators see the guest
+    // seat empty again.
+    room.send({ type: 'seats', to: null, seats: room.seats, guest: false });
   };
 
   // A rematch request of side (HOST or GUEST) for the game of round. Returns

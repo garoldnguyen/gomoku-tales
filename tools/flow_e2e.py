@@ -108,10 +108,10 @@ def run_steps(context, base, numbers, steps, errors):
     def step1():
         a = open_game(context, base, errors, "A")
         pages["a"] = a
-        names = ("menu-play-online", "menu-play-local", "menu-howto", "menu-settings")
+        names = ("menu-play-online", "menu-play-local", "menu-watch", "menu-howto", "menu-settings")
         found = [n for n in names if box(a, n).count() == 1 and box(a, n).is_visible()]
-        check(len(found) == 4, "menu buttons found: %s" % ", ".join(found))
-        return "4 menu buttons"
+        check(len(found) == 5, "menu buttons found: %s" % ", ".join(found))
+        return "5 menu buttons"
 
     def step2():
         a = pages["a"]

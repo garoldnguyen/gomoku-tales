@@ -1,5 +1,6 @@
 // DOM side of the lobby, room, local character select and game over screens
-// (docs/flow-design.md sections 3.4 to 3.7). The markup lives in index.html; this fills in its text from
+// (docs/flow-design.md sections 3.4 to 3.7), and the spectator's room code
+// box, watched game card and Room closed notice (sections 3.8 and 3.9). The markup lives in index.html; this fills in its text from
 // strings.js, draws the view models of room-screens.js, wires the buttons
 // to the screen flow in app.js and shows the right screen whenever the app
 // changes. The Game screen itself is drawn on the canvas, so the overlay
@@ -10,9 +11,11 @@
 
 import { COPY_FEEDBACK_MS } from '../config.js';
 import { AVATAR_PX } from '../render3d/art-assets.js';
-import { GAME, GAME_OVER, JOIN, LOBBY, SELECT, WAITING_SCREEN } from './app.js';
+import { watchCardBox } from './hud-layout.js';
+import { GAME, GAME_OVER, JOIN, LOBBY, ROOM_CLOSED_SCREEN, SELECT, SPECTATE_SCREEN, WAITING_SCREEN, WATCH } from './app.js';
 import {
-  characterStage, copyFeedbackText, portraitScale, copyRoomCode, joinViewModel, lobbyViewModel, selectGlassStyle,
+  characterStage, copyFeedbackText, portraitScale, copyRoomCode, joinViewModel, lobbyViewModel, roomClosedViewModel,
+  selectGlassStyle, spectateViewModel,
 } from './room-screens.js';
 import { TIP_CLOSED, selectTipReducer, selectTipViewModel, tipDelay } from './select-tooltip.js';
 import { tooltipPosition } from './tooltip-position.js';
@@ -30,6 +33,9 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   const leave = $('waiting-leave');
   const overRematch = $('over-rematch');
   const overMenu = $('over-menu');
+  const spectateForm = $('spectate-form');
+  const spectateInput = $('spectate-code');
+  const spectateSubmit = $('spectate-submit');
   let shown = null;
   let copyTimer = null;
   let assets = null; // the asset store (render/assets.js), see setAssets
@@ -48,6 +54,15 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   for (const back of root.querySelectorAll('.back-button')) back.textContent = STRINGS.back;
   $('copy-code').textContent = STRINGS.waitingCopy;
   leave.textContent = STRINGS.waitingLeave;
+  const spectate = spectateViewModel();
+  $('spectate-title').textContent = spectate.title;
+  $('spectate-lead').textContent = spectate.lead;
+  $('spectate-label').textContent = spectate.label;
+  $('spectate-back').textContent = spectate.back.label;
+  const closed = roomClosedViewModel();
+  $('room-closed-title').textContent = closed.title;
+  $('room-closed-detail').textContent = closed.detail;
+  $('room-closed-menu').textContent = closed.back.label;
 
   for (const button of root.querySelectorAll('[data-action]')) {
     button.addEventListener('click', () => act(button.dataset.action));
@@ -72,6 +87,28 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   joinForm.addEventListener('submit', (event) => {
     event.preventDefault();
     if (!joinSubmit.disabled) act('joinRoom', joinInput.value);
+  });
+
+  // The spectator's code box works like Join Room's: code characters only,
+  // the inline error clears on typing, Enter submits.
+  const showSpectate = (view) => {
+    const vm = spectateViewModel({
+      text: spectateInput.value, connecting: view.spectate?.inputDisabled ?? false, error: view.spectate?.error ?? null,
+    });
+    if (spectateInput.value !== vm.value) spectateInput.value = vm.value;
+    spectateInput.disabled = vm.inputDisabled;
+    spectateSubmit.textContent = vm.watch.label;
+    spectateSubmit.disabled = vm.watch.disabled;
+    $('spectate-error').textContent = vm.error ?? '';
+    spectateInput.setAttribute('aria-invalid', String(vm.error !== null));
+  };
+  spectateInput.addEventListener('input', () => {
+    act('clearSpectateError');
+    showSpectate(app.getView());
+  });
+  spectateForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    if (!spectateSubmit.disabled) act('watchRoom', spectateInput.value);
   });
 
   const clearCopy = () => {
@@ -356,13 +393,33 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   const selectCharacters = $('select-characters');
   $('select-back').textContent = STRINGS.back;
 
+  // The watch card goes where it never lies over the plots (hud-layout.js
+  // watchCardBox): measured at its width, then placed, slim where the full
+  // card does not fit. On entering the watched game and on resize.
+  const watchCard = root.querySelector('.watch-card');
+  const placeWatch = () => {
+    if (shown !== WATCH) return;
+    const viewW = window.innerWidth;
+    const viewH = window.innerHeight;
+    const width = watchCardBox(viewW, viewH, 0).w;
+    watchCard.classList.remove('is-slim');
+    watchCard.style.width = `${width}px`;
+    const box = watchCardBox(viewW, viewH, watchCard.offsetHeight);
+    watchCard.classList.toggle('is-slim', box.slim);
+    watchCard.style.width = `${box.w}px`;
+    root.style.setProperty('--watch-left', `${box.x}px`);
+    root.style.setProperty('--watch-bottom', `${viewH - box.y - box.h}px`);
+  };
+  window.addEventListener('resize', placeWatch);
+
   const update = () => {
     const view = app.getView();
     const entering = view.screen !== shown;
     shown = view.screen;
 
     root.hidden = view.screen === GAME;
-    root.classList.toggle('over', view.screen === GAME_OVER);
+    root.classList.toggle('over', view.screen === GAME_OVER || view.screen === WATCH);
+    root.classList.toggle('watching', view.screen === WATCH);
     root.classList.toggle('picking', view.screen === WAITING_SCREEN || view.screen === SELECT);
     for (const section of sections) section.hidden = section.dataset.screen !== view.screen;
     if (entering) tipEvent({ type: 'escape' });
@@ -379,9 +436,21 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
       if (entering && !view.joining) joinInput.value = '';
       showJoin(view);
       if (!view.joining) joinInput.focus();
+    } else if (view.screen === SPECTATE_SCREEN) {
+      if (entering) spectateInput.value = '';
+      showSpectate(view);
+      if (!spectateInput.disabled) spectateInput.focus();
+    } else if (view.screen === WATCH && view.watch) {
+      const vm = view.watch;
+      $('watch-title').textContent = vm.title;
+      $('watch-players').textContent = vm.players;
+      $('watch-status').textContent = vm.status;
+      $('watch-leave').textContent = vm.leave.label;
+      placeWatch();
     } else if (view.screen === WAITING_SCREEN && view.waiting) {
       const vm = view.waiting;
       $('waiting-title').textContent = vm.title;
+      leave.textContent = vm.leave.label;
       roomCode.textContent = vm.code;
       roomCode.dataset.roomCode = vm.code;
       $('waiting-hint').textContent = vm.hint;
@@ -412,7 +481,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     }
     if (view.screen !== WAITING_SCREEN) clearCopy();
 
-    if (entering && view.screen !== JOIN && !root.hidden) {
+    if (entering && view.screen !== JOIN && view.screen !== SPECTATE_SCREEN && !root.hidden) {
       root.querySelector(`[data-screen="${view.screen}"] button:not(:disabled)`)?.focus();
     }
   };

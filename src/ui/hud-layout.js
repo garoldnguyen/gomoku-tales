@@ -275,3 +275,54 @@ export function hudBoxes(viewW, viewH, { collapsed = {}, cardHeight = CARD_HEIGH
   boxes.push({ name: 'card-o', x: COMPACT_EDGE, y: viewH - BAR_BOTTOM - BAR_HEIGHT, w, h: BAR_HEIGHT });
   return boxes;
 }
+
+// The spectator's watch card (docs/flow-design.md section 3.9, room.css
+// .watch-card) stays up the whole game, so it goes where it never lies over
+// the plots: beside the board under the left HUD card (full cards), in the
+// left strip under the upright bar (rail), or between the board and the
+// slim bars (compact; above the board under the top bar where that room
+// is too short), at most CARD_WIDTH wide (the slim row spans the bars'
+// width). Where the full card
+// (cardHeight px tall at that width, measured by the DOM) does not fit it
+// turns slim: one row, the title and Stop watching, WATCH_SLIM_HEIGHT px
+// tall (10 px padding, the 44 px button, a 1 px border); the players and
+// the phase stay readable on the HUD cards and turn pill. Returns
+// { name, x, y, w, h, slim } in window pixels. Called when the window size
+// changes, not per frame.
+export const WATCH_SLIM_HEIGHT = 2 * 10 + 44 + 2;
+export function watchCardBox(viewW, viewH, cardHeight, layout = hudLayout(viewW, viewH)) {
+  const board = boardScreenRect(viewW, viewH);
+  let x = HUD_GAP;
+  let w = Math.min(CARD_WIDTH, board.left - 2 * HUD_GAP);
+  let floor = viewH - HUD_GAP;
+  let ceiling = CARD_TOP + cardBox(layout.scale).h + HUD_GAP;
+  if (layout.rail) {
+    x = COMPACT_EDGE;
+    w = layout.railWidth;
+    ceiling = RAIL_TOP + (layout.stacked ? RAIL_HEIGHT_STACKED : RAIL_HEIGHT_ROW) + HUD_GAP;
+  } else if (layout.compact) {
+    x = COMPACT_EDGE;
+    w = Math.min(CARD_WIDTH, viewW - 2 * COMPACT_EDGE);
+    floor = viewH - BARS_HEIGHT - HUD_GAP;
+    ceiling = board.bottom + HUD_GAP;
+  }
+  let slim = floor - ceiling < cardHeight;
+  if (layout.compact && !layout.rail) {
+    // Where the room below the board is too short (a short phone, the bars
+    // over the board) the card goes above the board, under the top bar.
+    const top = topBarLayout(viewW, viewH, layout);
+    const under = Math.max(...[top.turn, top.quality, top.fullscreen].filter(Boolean).map((b) => b.y + b.h)) + HUD_GAP;
+    const above = board.top - HUD_GAP - under;
+    const below = floor - ceiling;
+    const fits = (h) => (below >= h ? 'below' : above >= h ? 'above' : null);
+    const place = fits(cardHeight) ?? fits(WATCH_SLIM_HEIGHT) ?? 'below';
+    slim = !(below >= cardHeight || (place === 'above' && above >= cardHeight));
+    // The slim row spans the slim bars' width.
+    if (slim) w = viewW - 2 * COMPACT_EDGE;
+    const h = slim ? WATCH_SLIM_HEIGHT : cardHeight;
+    const y = place === 'above' ? under : floor - h;
+    return { name: 'watch-card', x, y, w: Math.floor(w), h, slim };
+  }
+  const h = slim ? WATCH_SLIM_HEIGHT : cardHeight;
+  return { name: 'watch-card', x, y: floor - h, w: Math.floor(w), h, slim };
+}

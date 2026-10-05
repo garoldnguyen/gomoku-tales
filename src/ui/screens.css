@@ -144,7 +144,8 @@
   gap: calc(var(--u) * 10);
 }
 
-#join-code {
+#join-code,
+#spectate-code {
   width: calc(var(--u) * 110);
   min-height: 44px;
   box-sizing: border-box;
@@ -161,7 +162,8 @@
   border-radius: calc(var(--u) * 10);
 }
 
-#join-code:focus {
+#join-code:focus,
+#spectate-code:focus {
   outline: 3px solid #fff;
   outline-offset: 2px;
 }

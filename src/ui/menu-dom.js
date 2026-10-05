@@ -20,6 +20,7 @@ const SVG = 'http://www.w3.org/2000/svg';
 const MENU_ICONS = {
   'play-online': ['M12 3a9 9 0 1 0 0 18a9 9 0 1 0 0-18', 'M3 12h18', 'M12 3c2.5 2.6 3.6 5.6 3.6 9s-1.1 6.4-3.6 9c-2.5-2.6-3.6-5.6-3.6-9s1.1-6.4 3.6-9'],
   'play-local': ['M9 11a3 3 0 1 0 0-6a3 3 0 1 0 0 6', 'M3.5 19c.6-3 2.8-5 5.5-5s4.9 2 5.5 5', 'M16 11a2.5 2.5 0 1 0 0-5', 'M16.5 14c2.2.3 3.7 2.2 4 5'],
+  watch: ['M2.5 12c2.2-4 5.6-6.5 9.5-6.5s7.3 2.5 9.5 6.5c-2.2 4-5.6 6.5-9.5 6.5s-7.3-2.5-9.5-6.5', 'M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6'],
   howto: ['M5 4.5h5.5a2.5 2.5 0 0 1 2.5 2.5v12.5a2 2 0 0 0-2-2H5z', 'M19 4.5h-5.5a2.5 2.5 0 0 0-2.5 2.5v12.5a2 2 0 0 1 2-2H19z'],
   settings: ['M4 7h10', 'M18 7h2', 'M4 17h2', 'M10 17h10', 'M16 5v4', 'M8 15v4'],
 };
@@ -76,7 +77,7 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
   };
 
   // The dark scrim over the 3D scene (blurred on the frosted levels), then
-  // the menu card: title, place pill, the four buttons and the hint bar.
+  // the menu card: title, place pill, the five buttons and the hint bar.
   el('div', 'scrim', root);
   const menu = el('section', 'menu-card glass', root);
   menu.dataset.hudBox = 'menu-card';

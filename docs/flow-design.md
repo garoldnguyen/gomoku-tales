@@ -11,7 +11,7 @@ Names in this file (flow.js, strings.js, newGame, start, rematch and so on) are 
 4. Every screen is testable three ways: pure view models in node tests, scenes in shot mode (docs/shots.md), and one end to end run in a real browser (step 7).
 
 ## 2. Decisions
-1. Menu: four buttons. Play Online (goes to the lobby), Play on this computer (the ?local=1 mode, two players in one window), How to Play, Settings.
+1. Menu: five buttons. Play Online (goes to the lobby), Play on this computer (the ?local=1 mode, two players in one window), Watch a match (a spectator of an online room, sections 3.8 and 3.9), How to Play, Settings.
 2. Characters are picked inside the game, never in the lobby. There are three (Wind Rabbit, Earth Bear, Jade Serpent) and two seats. Each player picks a character for their seat and presses Ready. A character picked by one seat is disabled for the other seat. The first pick plays X and moves first, the second plays O (assignSides). A seat may change its pick until it is Ready (it keeps its place in the pick order); Ready needs a pick and locks it. The game starts when both seats are Ready. There is no automatic start and no timer (WAITING_START_DELAY_MS is gone), and there is no request button.
    - Online: the host owns the start. The guest sends its pick and its Ready to the host, the host checks them with the same seat rules (src/logic/seats.js), updates the room and answers with the seats. When both seats are Ready the host sends start with round 1. The guest enters the game only on start.
    - Local (Play on this computer): the game screen opens on the character select with the seats Player 1 and Player 2, both picked in the one window; the local game starts when both are Ready.
@@ -30,6 +30,7 @@ Every screen is a quiet glass DOM layer over the existing 3D world (same tokens 
 |                                      |
 |          [ Play Online ]             |
 |     [ Play on this computer ]        |
+|         [ Watch a match ]            |
 |          [ How to Play ]             |
 |           [ Settings ]               |
 +--------------------------------------+
@@ -38,6 +39,7 @@ Every screen is a quiet glass DOM layer over the existing 3D world (same tokens 
 - Buttons are real button elements in one column, centred horizontally, in the order above. Each is at least 44 px high and 240 px wide, with at least 12 px between buttons. The whole menu fits inside 1280 by 720 without scrolling.
 - The first button has focus when the menu appears. Tab follows the visual order. Enter and Space activate. The focus ring is 2 px, from the existing tokens.
 - Play on this computer opens the same local game screen as ?local=1, on the character select of Player 1 and Player 2 (section 3.6). No You tag.
+- Watch a match (data-hud-box menu-watch, event WATCH) opens the spectator's room code screen (section 3.8).
 - ?local=1 in the URL still skips the menu. ?shot= scenes also skip it.
 
 ### 3.2 How to Play
@@ -115,10 +117,30 @@ In local mode (Play on this computer and ?local=1) the game screen opens on the 
   - gone (the other left, or the game ended by forfeit): label Rematch, disabled, hint "Opponent left". Gone beats every other state.
   - local mode: always idle, and pressing it starts the new game at once.
 
-## 4. Flow state machine
-State: screen, overlay (none, howto, settings), mode (null, online, local), role (null, host, guest), notice (null or host-left), seats (the two seats of the local character select, src/logic/seats.js, or null). The reducer is pure and returns a new frozen object. Any event not listed for the current state returns the same object unchanged.
+### 3.8 Watch a match: the room code screen (flow screen spectate)
+```
++--------------------------------------+
+|            Watch a match             |
+|  Enter the code of a room to watch.  |
+|   Room code [ ABCD5 ]   [ Watch ]    |
+|   No room found with code ABCD5.     |
+|              [ Back ]                |
++--------------------------------------+
+```
+- A glass card like Join Room (data-hud-box spectate-panel, spectate-code, spectate-submit, spectate-back). The code box works like the join box of section 3.4 (normalized, Watch disabled until the code is whole, Enter submits). Errors appear inline in an aria-live polite region and clear when the player types.
+- Watch opens a relay connection to the room as role spectator through ws-transport (src/net/ws-transport.js), whatever ONLINE_TRANSPORT says: the BroadcastChannel has no spectators. While it opens Watch reads Connecting and the box is disabled. A refused connection (no host in the room, or the room is full of spectators, SPECTATOR_LIMIT) shows No room found with code X. Back (and Escape) returns to the menu and drops a connection still opening.
+- The spectator room (src/net/spectator-room.js) only listens. It never sends a message (the relay closes a spectator that sends), has no seat, no heartbeat and no presence, so it is never in the leave countdown, and the players never learn it is there. It builds the room from the relay's replay (the last seats, state, start, new-game and rematch-status of the host) and every live host message; a state with an older seq than the one shown is dropped. The host sends its seat changes even before a guest is in, so a spectator sees the host's pick.
 
-"Selecting" means: screen game, mode local, seats set and not both Ready (isSelecting). Online the seats live in the room, where the host decides (section 5); the flow keeps seats null and only picks the screens.
+### 3.9 Watching (flow screens spectate-waiting, spectate-game, room-closed)
+- spectate-waiting: while the room has no game, the spectator sees the waiting room of section 3.5 read-only: title Waiting for the game, the code with Copy, the hint "You are watching. The game shows here when both players are Ready.", the seats Host and Guest (the guest a dimmed Waiting placeholder until a guest is in, and again if the guest goes before the start: the host's seats message carries guest false, sent to nobody so only spectators take it) with their picks and Ready states, the three character cards all disabled, no Ready button, and Leave reading Stop watching.
+- spectate-game: once the first game state arrives (the start, or the replay of a game already running) the spectator sees the live board, the HUD and a compact watch card (data-hud-box watch-card) placed by watchCardBox in src/ui/hud-layout.js so it never covers a plot: in the lower left beside the field below the left HUD card, under the upright HUD bar in the left strip of small landscape windows, and between the field and the slim HUD bars on narrow windows (above the field under the top bar where that room is too short). Where the full card does not fit it is one slim row with only the title and Stop watching. The card shows: Watching room ABCD5, the player names Wind Rabbit (X) vs Earth Bear (O), the phase line (whose turn, X wins, Draw, or X wins, the opponent left) and Stop watching (watch-leave). Input is locked: no hover, no cell clicks, no skill buttons (every skill row of the HUD is disabled, the turn pill says You are watching), no target flow and no game over card. A rematch (new-game) shows the clean board of the next round on the same screen.
+- room-closed: when the host leaves (its leave message, or the relay's leave when the host's socket closes) or the spectator's connection is lost, the spectator sees the notice Room closed (data-hud-box room-closed-card) with the line "The host left, so the room is closed." and a Back to Menu button (room-closed-menu) that returns to the menu.
+- All text lives in src/ui/strings.js. Shot scenes: spectate (the empty code box), spectate-game (the field scene watched, with the watch card) and room-closed.
+
+## 4. Flow state machine
+State: screen, overlay (none, howto, settings), mode (null, online, local), role (null, host, guest, spectator), notice (null, host-left or room-closed), seats (the two seats of the local character select, src/logic/seats.js, or null). The reducer is pure and returns a new frozen object. Any event not listed for the current state returns the same object unchanged.
+
+"Selecting" means: screen game, mode local, seats set and not both Ready (isSelecting). "Spectating" means: screen spectate-waiting or spectate-game (isSpectating); a spectator only ever reaches the screens spectate, spectate-waiting, spectate-game and room-closed, and none of them takes a pick, a Ready, a cell or a skill. Online the seats live in the room, where the host decides (section 5); the flow keeps seats null and only picks the screens.
 
 | Event | Allowed when | Result |
 | --- | --- | --- |
@@ -142,6 +164,12 @@ State: screen, overlay (none, howto, settings), mode (null, online, local), role
 | READY { seat } | selecting, and the seat has a pick | seats with the seat Ready; when both are Ready the local game starts (no longer selecting) |
 | GAME_OVER | game, not selecting | screen gameover |
 | REMATCH_STARTED | gameover | screen game (seats kept: same characters, same sides) |
+| WATCH | menu, overlay none | screen spectate, mode online, role spectator, notice null |
+| BACK | spectate | screen menu, mode null, role null, notice null |
+| SPECTATOR_JOINED | spectate | screen spectate-waiting (the relay connection is open) |
+| START | spectate-waiting | screen spectate-game (the first game state arrived) |
+| ROOM_CLOSED | spectate-waiting or spectate-game | screen room-closed, notice room-closed |
+| LEAVE | spectate-waiting, spectate-game or room-closed (Stop watching, Back to Menu) | screen menu, mode null, role null, notice null |
 
 Before step 4 the app still starts on the lobby (initialFlow option startScreen). From step 4 it starts on the menu. initialFlow with local true starts on the game in local mode with two empty seats, so ?local=1 opens on the character select.
 
@@ -203,7 +231,7 @@ New scenes for docs/shots.md (static, no network, every one built from a fixed v
 - Global key shortcuts (HUD toggle C with fallbacks H and V, Fullscreen F and Z) must ignore events from typing targets (input, textarea, select, contenteditable) through one pure isTypingTarget(element). Room code letters include C, F, Z, H and V, so without this guard typing a code would toggle the HUD or the fullscreen.
 
 ## 9. Owner checklist (after step 7)
-1. Reload the page. The menu is the first screen, the farm is behind it, there are four buttons.
+1. Reload the page. The menu is the first screen, the farm is behind it, there are five buttons.
 2. Play on this computer: the game starts. Play until someone wins. Press Rematch: a clean board appears at once, no old plants, rocks or banners. Press Back to Menu.
 3. How to Play: the skill numbers read 3, 6 and 4 turns, the four skill texts are there, nothing is cut off at the window size you use.
 4. Settings: switch Low, Medium, High. The page does not reload. The Fullscreen button works.

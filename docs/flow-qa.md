@@ -6,7 +6,7 @@ The owner's checks for the screen flow (docs/flow-design.md section 9). Serve th
 
 Tick each line when it holds.
 
-1. [ ] Reload the page. The menu is the first screen, the farm is behind it, there are four buttons.
+1. [ ] Reload the page. The menu is the first screen, the farm is behind it, there are five buttons.
 2. [ ] Play on this computer: the game starts. Play until someone wins. Press Rematch: a clean board appears at once, no old plants, rocks or banners. Press Back to Menu.
 3. [ ] How to Play: the skill numbers read 3, 6 and 4 turns, the four skill texts are there, nothing is cut off at the window size you use.
 4. [ ] Settings: switch Low, Medium, High. The page does not reload. The Fullscreen button works.

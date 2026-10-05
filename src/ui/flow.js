@@ -3,11 +3,14 @@
 // itself. Pure (no DOM), so it runs under node --test.
 //
 // State: { screen, overlay, mode, role, notice, seats }
-//   screen   menu, lobby, waiting, starting, game, gameover
+//   screen   menu, lobby, waiting, starting, game, gameover, and for a
+//            spectator (Watch a match): spectate (the room code screen),
+//            spectate-waiting (the room has no game yet), spectate-game
+//            (the live game, input locked) and room-closed
 //   overlay  none, howto, settings (only on top of the menu)
 //   mode     null, online, local
-//   role     null, host, guest
-//   notice   null or host-left
+//   role     null, host, guest, spectator
+//   notice   null, host-left or room-closed
 //   seats    local mode: the two seats of the character select
 //            (logic/seats.js, LOCAL_SEATS), else null. The game screen
 //            shows the character select until both seats are Ready
@@ -24,12 +27,17 @@ export const SCREENS = Object.freeze({
   STARTING: 'starting',
   GAME: 'game',
   GAMEOVER: 'gameover',
+  SPECTATE: 'spectate',
+  SPECTATE_WAITING: 'spectate-waiting',
+  SPECTATE_GAME: 'spectate-game',
+  ROOM_CLOSED: 'room-closed',
 });
 
 export const OVERLAYS = Object.freeze({ NONE: 'none', HOWTO: 'howto', SETTINGS: 'settings' });
 export const MODES = Object.freeze({ ONLINE: 'online', LOCAL: 'local' });
-export const ROLES = Object.freeze({ HOST: 'host', GUEST: 'guest' });
+export const ROLES = Object.freeze({ HOST: 'host', GUEST: 'guest', SPECTATOR: 'spectator' });
 export const NOTICE_HOST_LEFT = 'host-left';
+export const NOTICE_ROOM_CLOSED = 'room-closed';
 
 // The seats of the local character select: Player 1 and Player 2.
 export const LOCAL_SEATS = Object.freeze(['player1', 'player2']);
@@ -51,6 +59,9 @@ export const FLOW_EVENTS = Object.freeze({
   REMATCH_STARTED: 'REMATCH_STARTED',
   PICK: 'PICK', // { type, seat, character }: a local seat picks a character
   READY: 'READY', // { type, seat }: a local seat presses Ready
+  WATCH: 'WATCH', // Watch a match on the menu: the spectator's room code screen
+  SPECTATOR_JOINED: 'SPECTATOR_JOINED', // the relay let the spectator into the room
+  ROOM_CLOSED: 'ROOM_CLOSED', // the host left or the spectator's connection closed
 });
 
 // The first state: the menu, or with options.local true the game in local
@@ -68,6 +79,12 @@ export function isSelecting(flow) {
   return flow.screen === SCREENS.GAME && flow.mode === MODES.LOCAL && flow.seats !== null && !bothReady(flow.seats);
 }
 
+// True on the screens of a spectator inside a room: it only listens, so no
+// screen of these takes a pick, a Ready, a cell or a skill.
+export function isSpectating(flow) {
+  return flow.screen === SCREENS.SPECTATE_WAITING || flow.screen === SCREENS.SPECTATE_GAME;
+}
+
 // The next state for an event (a type string or { type }). Returns a new
 // frozen object for an allowed transition, and the same object otherwise.
 export function flowReducer(flow, event) {
@@ -80,6 +97,15 @@ export function flowReducer(flow, event) {
   switch (type) {
     case FLOW_EVENTS.PLAY_ONLINE:
       if (onMenu) return next({ screen: SCREENS.LOBBY, mode: MODES.ONLINE, role: null, notice: null });
+      break;
+    case FLOW_EVENTS.WATCH:
+      if (onMenu) return next({ screen: SCREENS.SPECTATE, mode: MODES.ONLINE, role: ROLES.SPECTATOR, notice: null });
+      break;
+    case FLOW_EVENTS.SPECTATOR_JOINED:
+      if (screen === SCREENS.SPECTATE) return next({ screen: SCREENS.SPECTATE_WAITING });
+      break;
+    case FLOW_EVENTS.ROOM_CLOSED:
+      if (isSpectating(flow)) return next({ screen: SCREENS.ROOM_CLOSED, notice: NOTICE_ROOM_CLOSED });
       break;
     case FLOW_EVENTS.PLAY_LOCAL:
       if (onMenu) return next({ screen: SCREENS.GAME, mode: MODES.LOCAL, seats: createSeats(LOCAL_SEATS) });
@@ -95,6 +121,7 @@ export function flowReducer(flow, event) {
       break;
     case FLOW_EVENTS.BACK:
       if (screen === SCREENS.LOBBY) return next({ screen: SCREENS.MENU, mode: null, notice: null });
+      if (screen === SCREENS.SPECTATE) return next({ screen: SCREENS.MENU, mode: null, role: null, notice: null });
       if (menuOverlay) return next({ overlay: OVERLAYS.NONE });
       break;
     case FLOW_EVENTS.ROOM_CREATED:
@@ -108,6 +135,7 @@ export function flowReducer(flow, event) {
       break;
     case FLOW_EVENTS.START:
       if (screen === SCREENS.STARTING) return next({ screen: SCREENS.GAME });
+      if (screen === SCREENS.SPECTATE_WAITING) return next({ screen: SCREENS.SPECTATE_GAME });
       break;
     case FLOW_EVENTS.OPPONENT_LEFT:
       if (screen === SCREENS.STARTING && role === ROLES.HOST) return next({ screen: SCREENS.WAITING });
@@ -118,6 +146,9 @@ export function flowReducer(flow, event) {
     case FLOW_EVENTS.LEAVE:
       if (screen === SCREENS.WAITING || screen === SCREENS.STARTING || screen === SCREENS.GAMEOVER || isSelecting(flow)) {
         return next({ screen: SCREENS.MENU, mode: null, role: null, seats: null });
+      }
+      if (isSpectating(flow) || screen === SCREENS.ROOM_CLOSED) {
+        return next({ screen: SCREENS.MENU, mode: null, role: null, notice: null });
       }
       break;
     case FLOW_EVENTS.GAME_OVER:

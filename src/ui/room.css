@@ -44,7 +44,8 @@
 /* The error region keeps its line even when empty, so a message coming
    or going does not move the buttons, and the live region stays in the
    page for screen readers. */
-#join-error {
+#join-error,
+#spectate-error {
   min-height: 1.35em;
 }
 
@@ -137,6 +138,76 @@
   color: var(--ink-3);
 }
 
+
+/* --- the watched game (section 3.9) --- */
+/* The spectator's card stays up the whole game, so it is small and sits
+   in the lower left, where it never lies over the plots: screens.js places
+   it from watchCardBox() in src/ui/hud-layout.js (beside the board below
+   the left HUD card, under the upright bar in the left strip, or between
+   the board and the slim bars) and sets its width, --watch-left and
+   --watch-bottom. Where the full card does not fit it is one slim row
+   (.is-slim): the title and Stop watching. */
+#screens.watching {
+  align-items: flex-end;
+  justify-content: flex-start;
+  padding: 0 0 var(--watch-bottom, 12px) var(--watch-left, 12px);
+}
+
+#screens .card.watch-card {
+  width: min(250px, calc(100vw - 24px));
+  gap: 4px;
+  padding: 10px 14px;
+}
+
+#screens .watch-card h2 {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+#screens .watch-card p {
+  font-size: 13px;
+}
+
+#screens .watch-card .over-actions button {
+  white-space: normal;
+}
+
+#screens .card.watch-card.is-slim {
+  flex-direction: row;
+  gap: 10px;
+}
+
+#screens .watch-card.is-slim h2 {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+#screens .watch-card.is-slim p {
+  display: none;
+}
+
+#screens .watch-card.is-slim .over-actions {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+#screens .watch-card.is-slim .over-actions button {
+  white-space: nowrap;
+}
+
+#screens .over-card #watch-players:empty {
+  display: none;
+}
+
+#screens .over-card #watch-status {
+  min-height: 1.3em;
+  font-weight: 600;
+  color: var(--ink);
+}
 
 /* --- character select (sections 3.5 and 3.6, docs/reference/v5) --- */
 

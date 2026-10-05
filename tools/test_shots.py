@@ -58,12 +58,12 @@ class ParseTests(unittest.TestCase):
 class SetTests(unittest.TestCase):
     def test_sets_have_expected_sizes(self):
         sizes = {k: len(v) for k, v in shots.named_sets().items()}
-        self.assertEqual(sizes, {"quick": 1, "levels": 3, "shapes": 5, "hud": 5, "full": 7, "flow": 18})
+        self.assertEqual(sizes, {"quick": 1, "levels": 3, "shapes": 5, "hud": 5, "full": 7, "flow": 24})
 
     def test_flow_set_has_its_scenes_at_fhd_and_hd(self):
         planned = shots.plan_shots(set_name="flow", scene="field")
         pairs = {(s["scene"], s["shape"]) for s in planned}
-        self.assertEqual(pairs, {(scene, shape) for scene in ("menu", "howto", "settings", "lobby", "waiting", "starting", "select", "gameover", "gameover-pending") for shape in ("fhd", "hd")})
+        self.assertEqual(pairs, {(scene, shape) for scene in ("menu", "howto", "settings", "lobby", "waiting", "starting", "select", "gameover", "gameover-pending", "spectate", "spectate-game", "room-closed") for shape in ("fhd", "hd")})
         self.assertEqual((shots.SHAPES["fhd"], shots.SHAPES["hd"]), ((1920, 1080), (1280, 720)))
 
     def test_every_set_plans_with_unique_names(self):

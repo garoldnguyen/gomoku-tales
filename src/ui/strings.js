@@ -35,6 +35,11 @@ export function withCode(text, code) {
   return text.replace('{code}', code ?? '');
 }
 
+// A text of STRINGS with each {key} filled in from values.
+export function fillText(text, values) {
+  return text.replace(/\{(\w+)\}/g, (whole, key) => (Object.hasOwn(values, key) ? String(values[key]) : whole));
+}
+
 // howToRule1 to howToRule6 of STRINGS.
 function rulesEntries(lines) {
   return Object.fromEntries(lines.map((line, i) => [`howToRule${i + 1}`, line]));
@@ -119,6 +124,30 @@ export const STRINGS = Object.freeze({
   selectTaglineWindRabbit: 'Fast and hard to read.',
   selectTaglineEarthBear: 'Slow and steady.',
   selectTaglineJadeSerpent: 'Patient, then sudden.',
+
+  // Watch a match (sections 3.8 and 3.9): the spectator's room code
+  // screen, the waiting room it sees, the live game card and the Room
+  // closed notice.
+  menuWatch: 'Watch a match',
+  menuWatchHint: 'Follow a game with its room code',
+  spectateTitle: 'Watch a match',
+  spectateLead: 'Enter the code of a room to watch its game. Spectators cannot play or pick.',
+  spectateWatchButton: 'Watch',
+  spectateConnecting: 'Connecting',
+  spectateWaitingTitle: 'Waiting for the game',
+  spectateWaitingHint: 'You are watching. The game shows here when both players are Ready.',
+  spectateHost: 'Host',
+  spectateGuest: 'Guest',
+  spectateLeave: 'Stop watching',
+  watchingRoom: 'Watching room {code}',
+  watchingHint: 'You are watching', // the HUD turn pill of a spectator
+  watchingVersus: '{x} (X) vs {o} (O)',
+  watchingTurn: "{name}'s turn",
+  watchingWins: '{name} wins',
+  watchingDraw: 'Draw, the board is full',
+  watchingForfeit: '{name} wins, the opponent left',
+  roomClosed: 'Room closed',
+  roomClosedDetail: 'The host left, so the room is closed.',
 
   // Game over (section 3.7).
   gameOverYouWin: 'You win',

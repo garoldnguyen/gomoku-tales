@@ -19,7 +19,8 @@ import { ART, AVATAR_PX } from '../render3d/art-assets.js';
 import { LOCAL_SEATS, ROLES, SCREENS, isSelecting } from './flow.js';
 import { PORTRAIT_ART } from './hud-view.js';
 import { SKILL_INFO } from './skill-info.js';
-import { STRINGS } from './strings.js';
+import { spectatorName, spectatorStatus } from './spectator-game.js';
+import { STRINGS, fillText, withCode } from './strings.js';
 
 // The characters of the character select, in table order.
 export const SELECT_CHARACTERS = Object.freeze(Object.keys(CHARACTERS));
@@ -236,15 +237,19 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
   };
 }
 
-// The waiting room for a flow state (flow.js; screen waiting or starting)
-// and this window's room ({ code, seats, seat }: the room view). Two seats,
-// the host's on the left: this window picks a character for its own seat
-// and presses Ready; the other seat shows the other player's pick. In
-// phase waiting nobody sits in the guest seat yet (a dimmed placeholder).
-// Leave is always enabled. The hint names a second window of this browser
-// for the broadcast transport and sending the code for the relay (config).
-// null off those screens.
+// The waiting room for a flow state (flow.js; screen waiting, starting or
+// spectate-waiting) and this window's room ({ code, seats, seat }: the room
+// view). Two seats, the host's on the left: this window picks a character
+// for its own seat and presses Ready; the other seat shows the other
+// player's pick. In phase waiting nobody sits in the guest seat yet (a
+// dimmed placeholder). Leave is always enabled. The hint names a second
+// window of this browser for the broadcast transport and sending the code
+// for the relay (config). A spectator (spectate-waiting) sees the same
+// room with the seats Host and Guest and no seat of its own: every
+// character card is disabled and there is no Ready; Leave reads Stop
+// watching. null off those screens.
 export function waitingViewModel(flow, room, { config = CONFIG } = {}) {
+  if (flow.screen === SCREENS.SPECTATE_WAITING) return spectatorWaitingViewModel(room);
   const starting = flow.screen === SCREENS.STARTING;
   if (!starting && flow.screen !== SCREENS.WAITING) return null;
   const seats = room?.seats ?? createSeats(ROOM_SEATS);
@@ -270,6 +275,79 @@ export function waitingViewModel(flow, room, { config = CONFIG } = {}) {
     readyButton: select.readyButton,
     copy: { label: STRINGS.waitingCopy, enabled: true, box: 'waiting-copy' },
     leave: { label: STRINGS.waitingLeave, enabled: true, box: 'waiting-leave' },
+  };
+}
+
+// The waiting room a spectator sees (spectate-waiting): the host's seats,
+// nothing editable, no Ready. The guest seat is a placeholder until a
+// guest is known (room.guestPresent of net/spectator-room.js).
+function spectatorWaitingViewModel(room) {
+  const seats = room?.seats ?? createSeats(ROOM_SEATS);
+  const select = characterSelectViewModel({
+    seats,
+    labels: { [HOST]: STRINGS.spectateHost, [GUEST]: STRINGS.spectateGuest },
+    editable: [],
+    absent: room?.guestPresent ? [] : [GUEST],
+  });
+  return {
+    phase: SCREENS.SPECTATE_WAITING,
+    title: STRINGS.spectateWaitingTitle,
+    code: room?.code ?? '',
+    hint: STRINGS.spectateWaitingHint,
+    starting: false,
+    startingText: null,
+    lead: select.lead,
+    cards: select.seats,
+    characters: select.characters,
+    readyButton: null,
+    copy: { label: STRINGS.waitingCopy, enabled: true, box: 'waiting-copy' },
+    leave: { label: STRINGS.spectateLeave, enabled: true, box: 'waiting-leave' },
+  };
+}
+
+// The room code screen of Watch a match (flow screen spectate), like the
+// Join Room box: text is what the box holds, connecting is true while the
+// relay connection opens (the box and Watch are disabled, Watch reads
+// Connecting), error the inline error or null.
+export function spectateViewModel({ text = '', connecting = false, error = null } = {}) {
+  const value = normalizeRoomCode(text);
+  return {
+    title: STRINGS.spectateTitle,
+    lead: STRINGS.spectateLead,
+    label: STRINGS.lobbyCodeLabel,
+    value,
+    inputDisabled: connecting,
+    watch: {
+      label: connecting ? STRINGS.spectateConnecting : STRINGS.spectateWatchButton,
+      disabled: connecting || value.length !== ROOM_CODE_LENGTH,
+      box: 'spectate-submit',
+    },
+    error: error ?? null,
+    back: { label: STRINGS.back, box: 'spectate-back' },
+  };
+}
+
+// The card of the live game a spectator watches (flow screen
+// spectate-game), a small card in the lower left corner, off the board: the room, the two
+// players (their characters and stones) and the phase line (whose turn,
+// or how the game ended), and Stop watching. code is the room code, state
+// the game state and result the leave result.
+export function watchViewModel({ code = '', state = null, result = null } = {}) {
+  return {
+    title: withCode(STRINGS.watchingRoom, code),
+    players: state ? fillText(STRINGS.watchingVersus, { x: spectatorName(X, state), o: spectatorName(O, state) }) : '',
+    status: spectatorStatus(state, result),
+    leave: { label: STRINGS.spectateLeave, box: 'watch-leave' },
+  };
+}
+
+// The Room closed notice (flow screen room-closed): the host left, and the
+// spectator goes back to the menu.
+export function roomClosedViewModel() {
+  return {
+    title: STRINGS.roomClosed,
+    detail: STRINGS.roomClosedDetail,
+    back: { label: STRINGS.gameOverBackToMenu, box: 'room-closed-menu' },
   };
 }
 

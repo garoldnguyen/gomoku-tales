@@ -29,6 +29,16 @@
 // shows the connection error on Join Room; the waiting room (host or
 // seated guest), a game in play and the game over card go to the lobby
 // with it.
+//
+// Watch a match (docs/flow-design.md sections 3.8 and 3.9): the menu's
+// fifth button opens the spectate screen, a room code box. Watch opens a
+// relay connection as role spectator (always ws-transport; the
+// BroadcastChannel has no spectators) and a listen-only spectator room
+// (net/spectator-room.js). The spectator sees the waiting room while the
+// room has no game, then the live game (spectator-game.js) with every
+// input locked. It never sends anything and is never in the presence
+// countdown. When the host leaves or the connection closes it sees the
+// Room closed notice, whose button goes back to the menu.
 
 import * as CONFIG from '../config.js';
 import { GAME_OVER_DELAY_MS } from '../config.js';
@@ -37,13 +47,19 @@ import { systemClock } from '../net/clock.js';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../net/room-code.js';
 import { FULL, GUEST, HOST, NO_ROOM, OVER, PLAYING, STARTING, createGuestRoom, createHostRoom } from '../net/room.js';
 import { TRANSPORT_WEBSOCKET, chooseTransport, createBroadcastTransport } from '../net/transport.js';
-import { ROLE_GUEST, ROLE_HOST, createWebSocketTransport } from '../net/ws-transport.js';
-import { FLOW_EVENTS, LOCAL_SEATS, MODES, NOTICE_HOST_LEFT, ROLES, SCREENS, flowReducer, initialFlow, isSelecting } from './flow.js';
+import { createSpectatorRoom } from '../net/spectator-room.js';
+import { ROLE_GUEST, ROLE_HOST, ROLE_SPECTATOR, createWebSocketTransport } from '../net/ws-transport.js';
+import {
+  FLOW_EVENTS, LOCAL_SEATS, MODES, NOTICE_HOST_LEFT, ROLES, SCREENS, flowReducer, initialFlow, isSelecting, isSpectating,
+} from './flow.js';
 import { gameOverViewModel, rematchViewModel } from './game-over.js';
 import { createLocalGame } from './local-game.js';
 import { MENU_EVENTS } from './menu.js';
 import { characterName, createOnlineGame } from './online-game.js';
-import { lobbyViewModel, localSelectViewModel, waitingViewModel } from './room-screens.js';
+import {
+  lobbyViewModel, localSelectViewModel, roomClosedViewModel, spectateViewModel, waitingViewModel, watchViewModel,
+} from './room-screens.js';
+import { createSpectatorGame } from './spectator-game.js';
 import { STRINGS, withCode } from './strings.js';
 
 // Screens.
@@ -54,6 +70,9 @@ export const WAITING_SCREEN = 'waiting';
 export const SELECT = 'select'; // the local character select on the game screen
 export const GAME = 'game';
 export const GAME_OVER = 'gameOver';
+export const SPECTATE_SCREEN = 'spectate'; // the spectator's room code box
+export const WATCH = 'watch'; // the live game a spectator watches, input locked
+export const ROOM_CLOSED_SCREEN = 'roomClosed'; // the spectator's Room closed notice
 
 export const BAD_CODE_ERROR = STRINGS.joinErrorBadCode;
 
@@ -73,6 +92,9 @@ export function transportOpener(config = CONFIG, options = {}) {
 //   transportOptions    options for the transports of transportOpener
 //   openTransport(code, role) returns a transport for the room; defaults
 //                       to transportOpener(config, transportOptions)
+//   openSpectatorTransport(code) returns the spectator's transport; defaults
+//                       to a WebSocket transport of role spectator with
+//                       transportOptions
 //   clock               time and timers (net/clock.js)
 //   random              the host's Tornado Zone random function
 //   makeCode()          a new room code
@@ -83,6 +105,7 @@ export function createApp(options) {
     config = CONFIG,
     transportOptions = {},
     openTransport = transportOpener(config, transportOptions),
+    openSpectatorTransport = (code) => createWebSocketTransport(code, ROLE_SPECTATOR, transportOptions),
     clock = systemClock,
     random = Math.random,
     makeCode = () => generateRoomCode(),
@@ -100,6 +123,8 @@ export function createApp(options) {
   let lostUnsubscribe = null; // stops watching the open room's relay connection
   let connecting = false; // the host's new room waits for its connection to open
   let lobbyError = null; // the host's connection error on the lobby
+  let spectateConnecting = false; // the spectator's relay connection is opening
+  let spectateError = null; // the inline error of the spectate screen
   let gameOverTimer = null;
   let localSeat = null; // the local seat that acts on the character select (chooseSeat)
   // The rematch state of the game over card: mine (this window asked),
@@ -132,6 +157,10 @@ export function createApp(options) {
       case SCREENS.STARTING: return WAITING_SCREEN;
       case SCREENS.GAME: return isSelecting(flow) ? SELECT : GAME;
       case SCREENS.GAMEOVER: return GAME_OVER;
+      case SCREENS.SPECTATE: return SPECTATE_SCREEN;
+      case SCREENS.SPECTATE_WAITING: return WAITING_SCREEN; // the waiting room, read-only
+      case SCREENS.SPECTATE_GAME: return WATCH;
+      case SCREENS.ROOM_CLOSED: return ROOM_CLOSED_SCREEN;
       default: return LOBBY;
     }
   };
@@ -150,6 +179,10 @@ export function createApp(options) {
   const connectionLost = () => {
     lostUnsubscribe = null;
     if (!room) return;
+    if (isSpectating(flow)) {
+      roomClosed();
+      return;
+    }
     const joining = screenNow() === JOIN;
     closeRoom();
     if (joining) {
@@ -194,6 +227,7 @@ export function createApp(options) {
     opening?.close();
     opening = null;
     connecting = false;
+    spectateConnecting = false;
     lostUnsubscribe?.();
     lostUnsubscribe = null;
     clearGameOverTimer();
@@ -231,6 +265,41 @@ export function createApp(options) {
         gameOverTimer = null;
         if (flow.screen === SCREENS.GAME) send(FLOW_EVENTS.GAME_OVER);
       }, GAME_OVER_DELAY_MS);
+    }
+  };
+
+  // The spectator's room closed (the host left, or the relay connection
+  // was lost): the Room closed notice.
+  const roomClosed = () => {
+    closeRoom();
+    send(FLOW_EVENTS.ROOM_CLOSED);
+  };
+
+  // The watched room has its first game state: the live game.
+  const startWatching = () => {
+    if (flow.screen !== SCREENS.SPECTATE_WAITING || !room) return;
+    game = createSpectatorGame(room);
+    freshGame();
+    send(FLOW_EVENTS.START);
+  };
+
+  const onSpectatorEvent = (event) => {
+    switch (event.type) {
+      case 'start':
+        startWatching();
+        break;
+      case 'newGame':
+        freshGame(); // a rematch: the page clears the old board
+        changed();
+        break;
+      case 'roomClosed':
+        roomClosed();
+        break;
+      case 'seats':
+      case 'state':
+      case 'result':
+        changed();
+        break;
     }
   };
 
@@ -446,6 +515,12 @@ export function createApp(options) {
         // The lobby panel (room-screens.js): its hint, Create while the
         // relay connection opens, and the connection error.
         lobby: lobbyViewModel({ config, connecting, error: lobbyError }),
+        // The spectator's room code box (room-screens.js); the DOM keeps
+        // the typed text.
+        spectate: screen === SPECTATE_SCREEN ? spectateViewModel({ connecting: spectateConnecting, error: spectateError }) : null,
+        // The card of the watched game, and the Room closed notice.
+        watch: screen === WATCH ? watchViewModel({ code: roomView?.code, state: roomView?.state, result: roomView?.result }) : null,
+        roomClosed: screen === ROOM_CLOSED_SCREEN ? roomClosedViewModel() : null,
         // The local character select (room-screens.js) on the game screen
         // of Play on this computer until both seats are Ready.
         select: localSelectViewModel(flow, { seat: localSeat }),
@@ -508,6 +583,7 @@ export function createApp(options) {
     // local it is one of LOCAL_SEATS (flow.js). Returns true when it was
     // taken (online: sent).
     pick(character, seat) {
+      if (flow.role === ROLES.SPECTATOR) return false; // spectators only watch
       if (screenNow() === SELECT) return localSeatEvent({ type: FLOW_EVENTS.PICK, seat, character });
       if (screenNow() !== WAITING_SCREEN || !room) return false;
       return room.pick(character).ok;
@@ -517,6 +593,7 @@ export function createApp(options) {
     // seat (online). Local: the game starts when both seats are Ready.
     // Online: the host starts it when both are Ready.
     ready(seat) {
+      if (flow.role === ROLES.SPECTATOR) return false; // spectators only watch
       if (screenNow() === SELECT) return localSeatEvent({ type: FLOW_EVENTS.READY, seat });
       if (screenNow() !== WAITING_SCREEN || !room) return false;
       return room.ready().ok;
@@ -592,6 +669,45 @@ export function createApp(options) {
       return true;
     },
 
+    // Watch on the spectate screen: opens the relay connection of the room
+    // with the typed code as a spectator. Returns false and shows an error
+    // if the code is not a valid room code. The relay refuses a spectator
+    // when the room has no host (or is full of spectators): No room found.
+    watchRoom(input) {
+      if (screenNow() !== SPECTATE_SCREEN || spectateConnecting) return false;
+      const code = normalizeRoomCode(input);
+      if (!isValidRoomCode(code)) {
+        spectateError = code.length === 0 ? STRINGS.joinErrorEmpty : BAD_CODE_ERROR;
+        changed();
+        return false;
+      }
+      spectateError = null;
+      spectateConnecting = true;
+      changed();
+      const transport = openSpectatorTransport(code);
+      whenOpen(transport, () => {
+        spectateConnecting = false;
+        room = createSpectatorRoom({ transport, code });
+        roomUnsubscribe = room.onEvent(onSpectatorEvent);
+        send(FLOW_EVENTS.SPECTATOR_JOINED);
+        // The relay replays the room as soon as it opens: a game already
+        // running shows at once.
+        if (room.state) startWatching();
+      }, () => {
+        spectateConnecting = false;
+        spectateError = withCode(STRINGS.joinErrorNotFound, code);
+        changed();
+      });
+      return true;
+    },
+
+    // The spectator typed in the code box: the inline error goes away.
+    clearSpectateError() {
+      if (spectateError === null) return;
+      spectateError = null;
+      changed();
+    },
+
     // The player typed in the code box: the inline error goes away.
     clearJoinError() {
       if (joinError === null) return;
@@ -599,14 +715,19 @@ export function createApp(options) {
       changed();
     },
 
-    // Back on the lobby (the button or Escape): the menu, dropping a relay
-    // connection still opening. On Join Room (when no join is pending) it
+    // Back on the lobby or the spectate screen (the button or Escape): the
+    // menu, dropping a relay connection still opening. On Join Room (when no join is pending) it
     // is the lobby's own panel.
     back() {
       const screen = screenNow();
       if (screen === LOBBY) {
         closeRoom();
         lobbyError = null;
+        send(FLOW_EVENTS.BACK);
+      }
+      else if (screen === SPECTATE_SCREEN) {
+        closeRoom();
+        spectateError = null;
         send(FLOW_EVENTS.BACK);
       }
       else if (screen === JOIN && joiningCode === null) {
@@ -620,7 +741,14 @@ export function createApp(options) {
     // Back on the local character select: closes the room, which tells the
     // other player and stops its timers and its transport, so the code can
     // no longer be joined, then the menu.
+    // A spectator's Stop watching and the Room closed notice's Back to
+    // Menu close its listen-only room (nothing is sent) and go to the menu.
     leaveRoom() {
+      if (isSpectating(flow) || flow.screen === SCREENS.ROOM_CLOSED) {
+        closeRoom();
+        send(FLOW_EVENTS.LEAVE);
+        return true;
+      }
       if (flow.screen !== SCREENS.WAITING && flow.screen !== SCREENS.STARTING && !isSelecting(flow)) return false;
       closeRoom();
       localSeat = null;

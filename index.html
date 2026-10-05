@@ -113,6 +113,19 @@
         <button type="button" class="secondary back-button" data-action="backToLobby" data-hud-box="join-back"></button>
       </section>
 
+      <!-- Watch a match (docs/flow-design.md section 3.8): the spectator's room code box. -->
+      <section class="card" data-screen="spectate" data-hud-box="spectate-panel">
+        <h2 id="spectate-title"></h2>
+        <p class="lead" id="spectate-lead"></p>
+        <form id="spectate-form" class="join-row" autocomplete="off" novalidate>
+          <label for="spectate-code" id="spectate-label"></label>
+          <input id="spectate-code" name="code" spellcheck="false" autocapitalize="characters" placeholder="ABCD5" aria-describedby="spectate-error" data-hud-box="spectate-code">
+          <button type="submit" id="spectate-submit" data-hud-box="spectate-submit"></button>
+        </form>
+        <p class="error" id="spectate-error" aria-live="polite"></p>
+        <button type="button" class="secondary" id="spectate-back" data-action="back" data-hud-box="spectate-back"></button>
+      </section>
+
       <!-- The room's character select (docs/flow-design.md section 3.5, look of docs/reference/v5/character-select-desktop.html):
            the code, the three character cards of this window's seat, then Leave, both seats and Ready. -->
       <section class="card room-card select-card" data-screen="waiting" data-hud-box="waiting-panel">
@@ -147,6 +160,23 @@
           <div class="seats" id="select-cards"></div>
           <button type="button" class="select-ready" id="select-ready"></button>
         </div>
+      </section>
+
+      <!-- The game a spectator watches (docs/flow-design.md section 3.9): a small card placed off the board (src/ui/hud-layout.js watchCardBox), input locked. -->
+      <section class="card over-card watch-card" data-screen="watch" data-hud-box="watch-card" aria-labelledby="watch-title">
+        <h2 id="watch-title"></h2>
+        <p id="watch-players"></p>
+        <p id="watch-status" aria-live="polite"></p>
+        <div class="over-actions">
+          <button type="button" class="secondary" id="watch-leave" data-action="leaveRoom" data-hud-box="watch-leave"></button>
+        </div>
+      </section>
+
+      <!-- Room closed (docs/flow-design.md section 3.9): the host left the watched room. -->
+      <section class="card" data-screen="roomClosed" data-hud-box="room-closed-card" aria-labelledby="room-closed-title">
+        <h2 id="room-closed-title"></h2>
+        <p class="lead" id="room-closed-detail" aria-live="polite"></p>
+        <button type="button" id="room-closed-menu" data-action="leaveRoom" data-hud-box="room-closed-menu"></button>
       </section>
 
       <!-- Game over card (docs/flow-design.md section 3.7): top centre, the finished board stays visible. -->

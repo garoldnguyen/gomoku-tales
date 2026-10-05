@@ -70,7 +70,10 @@ DEFAULT_CONFIG = {
 
 # Flow screens (docs/flow-design.md section 7): the scenes of the flow set, drawn at these window shapes.
 # In these scenes every visible button must be at least MIN_BUTTON_SIDE px on both sides.
-FLOW_SCENES = ("menu", "howto", "settings", "lobby", "waiting", "starting", "select", "gameover", "gameover-pending")
+FLOW_SCENES = (
+    "menu", "howto", "settings", "lobby", "waiting", "starting", "select", "gameover", "gameover-pending",
+    "spectate", "spectate-game", "room-closed",
+)
 FLOW_SHAPES = ("fhd", "hd")
 MIN_BUTTON_SIDE = 44
 # The game over card (docs/flow-design.md section 3.7): in these scenes the box GAMEOVER_CARD must be

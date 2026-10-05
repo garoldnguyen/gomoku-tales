@@ -20,18 +20,19 @@ test('the new menu strings exist with the exact English text', () => {
   assert.equal(STRINGS.menuKeysHint, 'Up, Down to choose, Enter to select');
 });
 
-test('menuViewModel: the pill, the hint bar and the four buttons with their hints in order', () => {
+test('menuViewModel: the pill, the hint bar and the five buttons with their hints in order', () => {
   const vm = menuViewModel(initialFlow());
   assert.equal(vm.place, STRINGS.menuPlace);
   assert.equal(vm.keysHint, STRINGS.menuKeysHint);
   assert.deepEqual(vm.buttons.map((b) => [b.label, b.hint]), [
     ['Play Online', 'Create a room or join one'],
     ['Play on this computer', 'Two players, one window'],
+    ['Watch a match', 'Follow a game with its room code'],
     ['How to Play', 'Rules and skills'],
     ['Settings', 'Graphics quality and full screen'],
   ]);
   assert.deepEqual(vm.buttons.map((b) => b.event), [
-    FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.PLAY_LOCAL, FLOW_EVENTS.OPEN_HOWTO, FLOW_EVENTS.OPEN_SETTINGS,
+    FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.PLAY_LOCAL, FLOW_EVENTS.WATCH, FLOW_EVENTS.OPEN_HOWTO, FLOW_EVENTS.OPEN_SETTINGS,
   ]);
 });
 
@@ -51,7 +52,7 @@ test('stepMenuFocus: Up and Down move the focus and wrap at both ends', () => {
 test('menuKeyAction: arrows move, Enter selects, typing targets and modifiers are ignored', () => {
   const key = (k, extra = {}) => ({ key: k, target: { tagName: 'BUTTON' }, ...extra });
   assert.deepEqual(menuKeyAction(key('ArrowDown'), 0), { move: 1 });
-  assert.deepEqual(menuKeyAction(key('ArrowUp'), 0), { move: 3 });
+  assert.deepEqual(menuKeyAction(key('ArrowUp'), 0), { move: MENU_BUTTONS.length - 1 });
   assert.deepEqual(menuKeyAction(key('Enter'), 2), { select: 2 });
   assert.deepEqual(menuKeyAction(key('Enter'), -1), { select: 0 });
   assert.equal(menuKeyAction(key('Enter', { repeat: true }), 2), null);

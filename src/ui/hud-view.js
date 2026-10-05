@@ -9,6 +9,7 @@ import { characterOf, isGameOver, skillCooldown } from '../logic/game.js';
 import { cooldownTurns, getSkill } from '../logic/skills.js';
 import { ALL_EXPANDED } from './hud-collapse.js';
 import { skillInfo } from './skill-info.js';
+import { STRINGS } from './strings.js';
 import { targetPrompt } from './targeting.js';
 
 export const QUALITY_CHOICES = Object.freeze([
@@ -42,6 +43,9 @@ export const STATE_COOLING = 'cooling';
 export const STATE_WAITING = 'waiting';
 
 export const PLANT_HINT = 'Plant a seed';
+// The localPlayer of a spectator (Watch a match): no card is its own, so
+// every skill row is disabled and the turn pill never asks it to plant.
+export const SPECTATOR_VIEW = 'spectator';
 
 // gameState: the rules state (src/logic/game.js).
 // uiState, all optional:
@@ -55,7 +59,8 @@ export const PLANT_HINT = 'Plant a seed';
 //   hint           the page hint (room code, keys), as a tooltip
 //   collapsed      { X, O }: which cards are folded into pills (hud-collapse.js)
 // localPlayer: this window's stone online, or null when one window plays
-// both sides (?local=1), where the player to move is always "you".
+// both sides (?local=1), where the player to move is always "you", or
+// SPECTATOR_VIEW for a spectator, who is never "you".
 //
 // Each card speaks to its own character: "Your turn" on the card of the
 // player to move, "Waiting" on the other.
@@ -106,7 +111,8 @@ function turnView(state, { over, winner, toMove, leaving, peerCountdown, targeti
   }
   const mine = localPlayer === null || localPlayer === toMove;
   let hint;
-  if (targeting && mine) hint = targetPrompt(targeting);
+  if (localPlayer === SPECTATOR_VIEW) hint = STRINGS.watchingHint;
+  else if (targeting && mine) hint = targetPrompt(targeting);
   else if (mine) hint = PLANT_HINT;
   else hint = status ?? "Opponent's turn";
   return { player: toMove, team: teamOf(toMove), who: `${nameOf(state, toMove)}'s turn`, hint, countdown: null };

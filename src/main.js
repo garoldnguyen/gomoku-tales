@@ -10,14 +10,14 @@ import { blursMenus, browserStorage, cycleQuality, startQuality } from './render
 import { seededRandom } from './render3d/seeded-random.js';
 import { loadForestMeta, withForestMeta } from './render3d/forest-meta.js';
 import { loadV3Meta } from './render3d/v3-meta.js';
-import { GAME, GAME_OVER, MENU, SELECT, WAITING_SCREEN, createApp } from './ui/app.js';
+import { GAME, GAME_OVER, MENU, SELECT, WAITING_SCREEN, WATCH, createApp } from './ui/app.js';
 import { MODES, SCREENS } from './ui/flow.js';
 import {
   fullscreenActive, fullscreenSupported, fullscreenViewModel, isFullscreenKey, onFullscreenChange, toggleFullscreen,
 } from './ui/fullscreen.js';
 import { createHud } from './ui/hud.js';
 import { isCollapseKey, startCollapsed, toggleAll, withCollapsed, writeCollapsed } from './ui/hud-collapse.js';
-import { hudViewModel } from './ui/hud-view.js';
+import { SPECTATOR_VIEW, hudViewModel } from './ui/hud-view.js';
 import { attachGameInput, hitTest, isQualityKey, shortcutKeyHandler } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
 import { watchNewGame } from './ui/new-game-watch.js';
@@ -25,7 +25,7 @@ import { menuViewModel } from './ui/menu.js';
 import { createMenu } from './ui/menu-dom.js';
 import { attachScreens } from './ui/screens.js';
 import {
-  parseShotParams, setUpShotScene, SHOT_GAME_OVER, shotFlow, shotGameOverView, shotRoomView, stillRoomApp,
+  parseShotParams, setUpShotScene, SHOT_GAME_OVER, shotFlow, shotGameOverView, shotRoomView, shotWatchView, stillRoomApp,
 } from './ui/shot-mode.js';
 
 const canvas = document.getElementById('game');
@@ -277,9 +277,10 @@ function frameViewOf(view, time, effects, hint) {
   return frameView;
 }
 
-// The online game's hint line, e.g. "Room ABCD  |  You play Wind Rabbit (X)".
+// The online game's hint line, e.g. "Room ABCD  |  You play Wind Rabbit (X)",
+// or "Room ABCD  |  Watching" for a spectator.
 function roomHint(code, name, stone) {
-  return `Room ${code}  |  You play ${name} (${stone})`;
+  return stone ? `Room ${code}  |  You play ${name} (${stone})` : `Room ${code}  |  Watching`;
 }
 
 // Hands the events of applied actions to the effects. On the first frame
@@ -321,6 +322,8 @@ function startAppMode({ local = false } = {}) {
   // Tell the opponent at once when this window closes or reloads.
   window.addEventListener('pagehide', () => app.close());
 
+  // Only the Game screen takes input: a spectator's game (WATCH) is drawn
+  // the same way but never gets a hover, a click or a skill.
   const playing = () => (app.getScreen() === GAME ? app.getGame() : null);
 
   attachGameInput(pointerCanvas, {
@@ -363,14 +366,14 @@ function startAppMode({ local = false } = {}) {
     const resumed = resumeWatch.tick(time);
     const screen = app.getScreen();
     const game = app.getGame();
-    const inGame = (screen === GAME || screen === GAME_OVER) && game !== null;
+    const inGame = (screen === GAME || screen === GAME_OVER || screen === WATCH) && game !== null;
     if (newGame.check(inGame ? game : null, app.getGameNumber())) hintCode = null; // a new game may be a new character
     if (inGame) {
       showEvents(game.takeEvents(), effects, time, resumed);
       const view = game.getView();
       pointerCanvas.style.cursor = screen === GAME && view.pointer ? 'pointer' : 'default';
       const local = app.getFlow().mode === MODES.LOCAL;
-      const you = local ? null : view.you;
+      const you = local ? null : view.you ?? SPECTATOR_VIEW;
       if (local) {
         hint = localHint;
       } else if (view.code !== hintCode || view.you !== hintStone) {
@@ -394,7 +397,7 @@ function startAppMode({ local = false } = {}) {
     // sharp around its see-through panel, which frosts what is behind it
     // itself (screens.setFrosted, room.css).
     const frosted = blursMenus(renderer.features);
-    const blur = screen !== GAME && screen !== GAME_OVER && screen !== MENU && !PICKING_SCREENS.includes(screen) && frosted;
+    const blur = screen !== GAME && screen !== GAME_OVER && screen !== WATCH && screen !== MENU && !PICKING_SCREENS.includes(screen) && frosted;
     if (blur !== blurred) {
       blurred = blur;
       stage.classList.toggle('backdrop-blur', blur);
@@ -422,16 +425,19 @@ async function startShotMode({ scene }) {
   // canvas past the window edges, which the window check counts as a gap.
   // The gameover scenes show the game over card from a still view over the
   // field scene, with the HUD of the online viewer whose Wind Rabbit won
-  // (no skill selected: the game is over).
+  // (no skill selected: the game is over). The spectate-game scene shows
+  // the watch card over the field scene, with the HUD of a spectator (no
+  // skill selected: a spectator has no input).
   const flow = shotFlow(scene);
   const roomView = shotRoomView(scene);
   const overView = shotGameOverView(scene);
-  if (overView) game.cancel();
-  const hudPlayer = overView ? SHOT_GAME_OVER.you : null;
+  const watchView = shotWatchView(scene, game.getState());
+  if (overView || watchView) game.cancel();
+  const hudPlayer = overView ? SHOT_GAME_OVER.you : watchView ? SPECTATOR_VIEW : null;
   const hudWinner = overView ? SHOT_GAME_OVER.winner : null;
   let shotScreens = null;
-  if (roomView || overView) {
-    shotScreens = attachScreens(document.getElementById('screens'), stillRoomApp(roomView ?? overView));
+  if (roomView || overView || watchView) {
+    shotScreens = attachScreens(document.getElementById('screens'), stillRoomApp(roomView ?? overView ?? watchView));
     assetsLoaded.then((store) => shotScreens.setAssets(store));
   } else if (flow) {
     createMenuLayer(() => {});

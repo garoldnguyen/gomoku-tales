@@ -15,12 +15,13 @@ import { isTypingTarget } from './input.js';
 import { SKILL_INFO } from './skill-info.js';
 import { STRINGS, howToRules } from './strings.js';
 
-// The four menu buttons in their visual (and Tab and arrow key) order, each
+// The five menu buttons in their visual (and Tab and arrow key) order, each
 // with its muted second line. box is the data-hud-box name of the
 // screenshot self-check (docs/shots.md).
 export const MENU_BUTTONS = Object.freeze([
   Object.freeze({ id: 'play-online', label: STRINGS.menuPlayOnline, hint: STRINGS.menuPlayOnlineHint, event: FLOW_EVENTS.PLAY_ONLINE, box: 'menu-play-online' }),
   Object.freeze({ id: 'play-local', label: STRINGS.menuPlayLocal, hint: STRINGS.menuPlayLocalHint, event: FLOW_EVENTS.PLAY_LOCAL, box: 'menu-play-local' }),
+  Object.freeze({ id: 'watch', label: STRINGS.menuWatch, hint: STRINGS.menuWatchHint, event: FLOW_EVENTS.WATCH, box: 'menu-watch' }),
   Object.freeze({ id: 'howto', label: STRINGS.menuHowTo, hint: STRINGS.menuHowToHint, event: FLOW_EVENTS.OPEN_HOWTO, box: 'menu-howto' }),
   Object.freeze({ id: 'settings', label: STRINGS.menuSettings, hint: STRINGS.menuSettingsHint, event: FLOW_EVENTS.OPEN_SETTINGS, box: 'menu-settings' }),
 ]);

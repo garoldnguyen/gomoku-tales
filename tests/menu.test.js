@@ -24,15 +24,15 @@ const open = (event) => flowReducer(menuFlow, event);
 
 // --- the menu ---
 
-test('menuViewModel: the four buttons in order with their flow events and box names', () => {
+test('menuViewModel: the five buttons in order with their flow events and box names', () => {
   const vm = menuViewModel(menuFlow);
   assert.equal(vm.visible, true);
   assert.equal(vm.title, 'Gomoku Tales');
-  assert.deepEqual(vm.buttons.map((b) => b.label), ['Play Online', 'Play on this computer', 'How to Play', 'Settings']);
+  assert.deepEqual(vm.buttons.map((b) => b.label), ['Play Online', 'Play on this computer', 'Watch a match', 'How to Play', 'Settings']);
   assert.deepEqual(vm.buttons.map((b) => b.event), [
-    FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.PLAY_LOCAL, FLOW_EVENTS.OPEN_HOWTO, FLOW_EVENTS.OPEN_SETTINGS,
+    FLOW_EVENTS.PLAY_ONLINE, FLOW_EVENTS.PLAY_LOCAL, FLOW_EVENTS.WATCH, FLOW_EVENTS.OPEN_HOWTO, FLOW_EVENTS.OPEN_SETTINGS,
   ]);
-  assert.deepEqual(vm.buttons.map((b) => b.box), ['menu-play-online', 'menu-play-local', 'menu-howto', 'menu-settings']);
+  assert.deepEqual(vm.buttons.map((b) => b.box), ['menu-play-online', 'menu-play-local', 'menu-watch', 'menu-howto', 'menu-settings']);
   assert.equal(vm.focus, MENU_BUTTONS[0].id, 'the first button gets the focus');
   assert.equal(vm.overlay, OVERLAYS.NONE);
   assert.equal(vm.howto, null);
