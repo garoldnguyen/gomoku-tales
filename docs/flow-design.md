@@ -68,21 +68,22 @@ Every screen is a quiet glass DOM layer over the existing 3D world (same tokens 
 ### 3.5 Room: the character select (phases waiting and starting)
 The look follows the approved design in docs/reference/v5/character-select-desktop.html and character-select-phone.html (placeholder art, the owner will replace it), drawn with the existing glass tokens only.
 ```
-+--------------------------------------------------------------+
-|                    Pick your character                       |
-|                     ABCD5   [ Copy ]                         |
-|      Open a second window of this browser and join.          |
-|        The first to pick plays X and moves first.            |
-|  +--------------+  +--------------+  +--------------+        |
-|  | (cross)   GH |  | (bloom)   MB |  | (leaf)    JS |        |
-|  | Wind Rabbit  |  | Earth Bear   |  | Jade Serpent |        |
-|  | Wind Dash  3 |  | Terrain    3 |  | Hiss       3 |        |
-|  | Tornado    6 |  | Stone Conv 6 |  | Venom      6 |        |
-|  +--------------+  +--------------+  +--------------+        |
-|  [ Leave ]  (X You: Wind Rabbit) (Opponent: Choosing) [Ready]|
-+--------------------------------------------------------------+
++-------------------------------------------------------------------------+
+|                         Pick your character                             |
+|                          ABCD5   [ Copy ]                               |
+|            Open a second window of this browser and join.               |
+|              The first to pick plays X and moves first.                 |
+|  +------------+  +------------+  +------------+  +------------+         |
+|  | (cross) GH |  | (bloom) MB |  | (leaf)  JS |  | (cloud) CE |         |
+|  | Wind Rabbit|  | Earth Bear |  | Jade Serp. |  | Cloud Eagle|         |
+|  | Wind Dash 3|  | Terrain   3|  | Hiss      3|  | Sky Watch  |         |
+|  | Tornado   6|  | Stone Conv6|  | Venom     6|  | Cloud     6|         |
+|  +------------+  +------------+  +------------+  +------------+         |
+|  [ Leave ]  (X You: Wind Rabbit) (Opponent: Choosing)          [Ready]  |
++-------------------------------------------------------------------------+
 ```
-- Three character cards (data-hud-box pick-<seat>-<character>) for this window's seat: the emblem (the blue four-petal cross for Wind Rabbit, the red round bloom for Earth Bear, the jade circle with a leaf for Jade Serpent), a seal (a small rounded square with the initials GH, MB or JS in the card colour), the name, a tagline and one row per skill with its rest turns (COOLDOWN_SHORT or COOLDOWN_LONG). The picked card has a gold outline. On phones the cards stack, the emblem on the left, and Ready spans the panel above Leave.
+- Four character cards in one row, in the order of CHARACTERS (Wind Rabbit, Earth Bear, Jade Serpent, Cloud Eagle; data-hud-box pick-<seat>-<character>, for example pick-host-cloud-eagle) for this window's seat: the portrait, or while it is missing the emblem (the blue four-petal cross for Wind Rabbit, the red round bloom for Earth Bear, the jade circle with a leaf for Jade Serpent, the pale yellow cloud with a feather for Cloud Eagle), a seal (a small rounded square with the initials GH, MB, JS or CE in the card colour), the name, a tagline and one row per skill with its rest turns (COOLDOWN_SHORT or COOLDOWN_LONG; Cloud Eagle's passive Sky Watch says Always on instead). The four cards share the panel width (SELECT_CARD_INNER_U in src/ui/room-screens.js), so the portrait scale is chosen for four cards. The picked card has a gold outline. On phones the four cards stack, the emblem on the left, and Ready spans the panel above Leave.
+- Any two of the four may meet: the pick order alone gives the sides (the first pick plays X), so Cloud Eagle can play X or O like the others.
 - Under the cards one row: Leave (or Back on this computer), the two seats, and Ready (ready-<seat>). Leave, Back and Ready are at least 44 px high.
 - Two seats side by side: the host's on the left, the guest's on the right (data-hud-box card-host and card-guest). Each seat shows the stone of the pick order (X for the first pick, O for the second), its label (You or Opponent), its pick and its state (Choosing or Ready).
 - The cards and Ready act for this window's own seat (data-hud-box pick-host-wind-rabbit and so on, ready-host or ready-guest). A character taken by the other seat is disabled and says Taken. Ready is disabled until the seat has a pick, and once pressed the seat's buttons are disabled.

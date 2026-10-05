@@ -8,7 +8,7 @@ import { parseManifest, USES_3D } from '../src/render/assets.js';
 import { SPRITES } from '../src/render/game-renderer.js';
 import { BOARD_FRAME_PX, BOARD_PX, PANEL_H, PANEL_W } from '../src/render/layout.js';
 import {
-  ART, artNames, artProblem, PLACEHOLDERS_3D, placeholderShape, UNKNOWN_PLACEHOLDER,
+  ART, ART_SLOTS, artNames, artProblem, PLACEHOLDERS_3D, placeholderShape, UNKNOWN_PLACEHOLDER,
 } from '../src/render3d/art-assets.js';
 import { CHARACTER_ANIMS, CHARACTER_FRAME_COUNT } from '../src/render3d/character-poses.js';
 import { PORTRAIT_ART, SKILL_ICON_ART } from '../src/ui/hud-view.js';
@@ -105,8 +105,10 @@ test('the 3D game loads everything it draws and requests no file that is missing
   for (const name of [...Object.values(PORTRAIT_ART), ...Object.values(SKILL_ICON_ART)]) {
     assert.ok(names.has(name), `the glass HUD draws "${name}" but USES_3D skips it`);
   }
-  // A missing file would be a failed request (a 404) in the browser console.
+  // A missing file would be a failed request (a 404) in the browser console;
+  // only the art slots still waiting for the owner's files may be missing.
   for (const entry of loaded3d) {
+    if (ART_SLOTS.includes(entry.name)) continue;
     assert.ok(existsSync(new URL(`../assets/${entry.file}`, import.meta.url)), `assets/${entry.file} is missing`);
   }
 });

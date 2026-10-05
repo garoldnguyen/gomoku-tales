@@ -5,7 +5,8 @@
 // is missing. src/render3d/art.js turns these into canvases.
 // Pure: no DOM or Three.js, so it runs under node --test.
 
-import { EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
+import { CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
+import { CHARACTER_LOOK } from './character-look.js';
 import { CHARACTER_ANIMS } from './character-poses.js';
 import { bearFrames, rabbitFrames } from './placeholder-art.js';
 import { blockSheetPainter, farmBoardPainter, ringPainter, stripPainter } from './v3-placeholder-art.js';
@@ -25,6 +26,15 @@ export const ART = {
     [WIND_RABBIT]: 'avatar-wind-rabbit',
     [EARTH_BEAR]: 'avatar-earth-bear',
     [JADE_SERPENT]: 'avatar-jade-serpent',
+  },
+  // Cloud Eagle's art slots (docs/design.md section 5.4): its portrait, its
+  // HUD picture and its two skill icons. Until the owner sends the files
+  // they show the generated placeholder with a warning (ART_SLOTS).
+  cloudEagle: {
+    avatar: 'cloud-eagle-avatar',
+    hud: 'cloud-eagle-hud',
+    skyWatchIcon: 'sky-watch-icon',
+    cloudIcon: 'cloud-icon',
   },
   // Farmland v3 pack in assets/3d/v3/ (docs/art-direction-v3.md section 2).
   // Tuning data for these names is in assets/v3-meta.json (v3-meta.js).
@@ -130,6 +140,20 @@ const AVATAR_COLORS = {
   [ART.avatar[JADE_SERPENT]]: '#8fe3a8',
 };
 
+// Frame size of each Cloud Eagle slot (one square frame each); its
+// placeholder is a block in Cloud Eagle's mark colour.
+export const CLOUD_EAGLE_ART_PX = Object.freeze({
+  [ART.cloudEagle.avatar]: 512,
+  [ART.cloudEagle.hud]: 256,
+  [ART.cloudEagle.skyWatchIcon]: 128,
+  [ART.cloudEagle.cloudIcon]: 128,
+});
+
+// Manifest names whose files the owner has not sent yet. The game asks for
+// them like any other art; a missing one only warns and draws its
+// placeholder.
+export const ART_SLOTS = Object.freeze(artNames(ART.cloudEagle));
+
 // Placeholder colours of the v3 upright sprites and strips, one per frame
 // (cycled). Plants keep the team colours of section 2.
 const V3_COLORS = {
@@ -211,6 +235,15 @@ export const PLACEHOLDERS_3D = {
     frames: 1,
     paint: blockSheetPainter({ width: AVATAR_PX, height: AVATAR_PX, frames: 1, colors: [AVATAR_COLORS[name]] }),
   }])),
+  ...Object.fromEntries(artNames(ART.cloudEagle).map((name) => {
+    const size = CLOUD_EAGLE_ART_PX[name];
+    return [name, {
+      width: size,
+      height: size,
+      frames: 1,
+      paint: blockSheetPainter({ width: size, height: size, frames: 1, colors: [CHARACTER_LOOK[CLOUD_EAGLE].colour] }),
+    }];
+  })),
 };
 
 // Placeholder for a name that has none: a small pink square.

@@ -68,6 +68,11 @@
     "avatar-jade-serpent": { "file": "3d/v5/avatar-jade-serpent-128.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
     "avatar-wind-rabbit": { "file": "3d/v5/avatar-wind-rabbit-128.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
 
+    "cloud-eagle-avatar": { "file": "3d/v5/cloud-eagle-avatar.png", "use": "3d", "width": 512, "height": 512, "frames": 1, "frameMs": 0 },
+    "cloud-eagle-hud": { "file": "3d/v5/cloud-eagle-hud.png", "use": "3d", "width": 256, "height": 256, "frames": 1, "frameMs": 0 },
+    "sky-watch-icon": { "file": "3d/v5/sky-watch-icon.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "cloud-icon": { "file": "3d/v5/cloud-icon.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+
     "forest-wall-pine": { "file": "3d/v3/forest-wall-pine.png", "use": "3d", "width": 192, "height": 64, "frames": 1, "frameMs": 0 },
     "forest-wall-round": { "file": "3d/v3/forest-wall-round.png", "use": "3d", "width": 192, "height": 56, "frames": 1, "frameMs": 0 },
     "tree-birch": { "file": "3d/v3/tree-birch.png", "use": "3d", "width": 30, "height": 58, "frames": 2, "frameMs": 0 },

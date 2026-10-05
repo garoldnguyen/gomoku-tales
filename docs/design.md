@@ -46,12 +46,13 @@ Which screen is shown is decided only by the flow reducer in src/ui/flow.js (scr
 - If the board is full and nobody has won, it is a draw.
 
 ## 5. Characters and skills
-There are three characters: Wind Rabbit, Earth Bear and Jade Serpent. Each owns two skills. A character has no fixed stone colour: the side is decided by pick order. The player who picks first plays X and moves first; the player who picks second plays O. Both players cannot pick the same character. (assignSides(pickOrder) in src/logic/characters.js; until the character select exists, the two character lobby uses Wind Rabbit as X and Earth Bear as O.) The X and O shapes belong to the side, the colours to the character.
+There are four characters: Wind Rabbit, Earth Bear, Jade Serpent and Cloud Eagle (CHARACTERS in src/logic/characters.js, in this order on the character select). Each owns two skills. A character has no fixed stone colour: the side is decided by pick order. The player who picks first plays X and moves first; the player who picks second plays O, whichever two of the four characters they pick. Both players cannot pick the same character. (assignSides(pickOrder) in src/logic/characters.js; until the character select exists, the two character lobby uses Wind Rabbit as X and Earth Bear as O.) The X and O shapes belong to the side, the colours to the character.
 
-Character colours and placement effects (the 3D game; CHARACTER_LOOK in src/render3d/character-look.js, counts and timings in src/config.js). Each character has one mark colour: Wind Rabbit blue #3b8cff, Earth Bear ochre red #c9703a, Jade Serpent jade green #2fbf7a. The marks of a side take the colour of the character that plays it, whichever side that is: its plants (X always the four-petal cross bloom, O always the round bloom), its last-move ring, and while it is to move the hover ring and the selection decal. They are tinted from the blue X and red O art with paletteSwap when a match starts and again on a quality change. When a side plants a seed, its character's placement effect plays once on that plot, on top of the usual growth:
+Character colours and placement effects (the 3D game; CHARACTER_LOOK in src/render3d/character-look.js, counts and timings in src/config.js). Each character has one mark colour: Wind Rabbit blue #3b8cff, Earth Bear ochre red #c9703a, Jade Serpent jade green #2fbf7a, Cloud Eagle pale yellow #fff2a8. The marks of a side take the colour of the character that plays it, whichever side that is: its plants (X always the four-petal cross bloom, O always the round bloom), its last-move ring, and while it is to move the hover ring and the selection decal. They are tinted from the blue X and red O art with paletteSwap when a match starts and again on a quality change. When a side plants a seed, its character's placement effect plays once on that plot, on top of the usual growth:
 - Wind Rabbit, dandelion wind: soft wind streaks and 6 to 8 dandelion seed puffs drift off toward the lower right with the one wind.
 - Earth Bear, soil burst: soil specks and 4 to 6 rock chips are thrown out of the plot and fall back.
 - Jade Serpent, vine coil: a jade vine rises from the plot, coils twice around the plant and sinks back into the soil (1.2 seconds), shedding a few leaf flecks.
+- Cloud Eagle, cloud swirl: a few soft cloud puffs circle part of a turn over the plot and dissolve, and 3 to 5 white feathers rise and drift off with the wind.
 The particles follow the quality level's particle cap (none on Low); the vine plays on every level. The 2D renderer (?render=2d) keeps blue X and red O and has no placement effects.
 
 Cooldown rule: after you use a skill you cannot use it during your next N turns (short cooldown N = 3, long cooldown N = 6). Cooldowns count your own turns only.
@@ -99,6 +100,21 @@ VENOM (long cooldown, COOLDOWN_LONG). Uses your turn.
 - The target must be an opponent stone. An empty cell, a rock, your own stone or a cell off the board is rejected like the other skills: nothing happens, the turn and the cooldown are not used.
 - If the removed stone was the source of a pending Wind Dash, that dash fails when it resolves (see 5.1).
 
+### 5.4 Cloud Eagle
+Look: a proud pale yellow and white pixel eagle with a little cloud under its wings.
+
+Art slots (assets/manifest.json, use 3d, ART.cloudEagle in src/render3d/art-assets.js): cloud-eagle-avatar 512x512, cloud-eagle-hud 256x256, sky-watch-icon 128x128 and cloud-icon 128x128, one still frame each. Until the owner sends the files, each missing file only warns in the console and shows a pale yellow placeholder of the same size.
+
+SKY WATCH (passive, no cooldown). Never uses a turn and is never clicked.
+- Always on for the side that plays Cloud Eagle: every empty cell where the opponent would make five in a row with one more stone is outlined in soft yellow (skyWatchCells in src/logic/cloud.js, by the normal win rule on the full board).
+- Only the Cloud Eagle side and spectators see the outlines; the opponent never does. Cells the viewer cannot see (under the opponent's cloud) are left out. No outlines once the game is over.
+
+CLOUD (long cooldown, COOLDOWN_LONG = 6). Uses your turn. Places no stone.
+- Choose the centre of a cloud on any cell of the board, empty or holding a stone or rock. The cloud covers CLOUD_SIZE by CLOUD_SIZE cells (5x5, CLOUD_SIZE = 5) centred on that cell, clipped by the board edges.
+- The cloud lasts for the owner's next CLOUD_TURNS turns (CLOUD_TURNS = 2; the turn it is placed in does not count) and disappears at the end of the second of them.
+- While it lasts, the opponent cannot see the stones and rocks under it: those cells are drawn covered, and a stone or skill target the opponent names on a covered cell is refused with "That cell is under a cloud." (see section 6, Hidden cloud contents). The owner and spectators see a translucent cloud with everything under it.
+- The cloud changes nothing on the board: stones placed under it stay, rocks keep their lifetime, and the win check runs on the full board as always.
+
 ## 6. Online rooms (version 1)
 - Room code: 5 characters, uppercase letters and digits, leaving out easily confused characters (no 0, O, 1, I).
 - Transport interface in src/net/transport.js with send(message), onMessage(handler) and close(). Two implementations, picked by ONLINE_TRANSPORT in src/config.js through chooseTransport(config); src/ui/app.js builds every room with it (transportOpener) and src/net/room.js does not know which one it has:
@@ -137,8 +153,16 @@ For the 3D game see docs/art-direction-v3.md sections 4, 7 and 9 (no straight wi
 - No sound in version 1.
 
 ## 9. Out of scope for version 1
-More maps, more characters, accounts or rankings, a computer opponent, play across two computers, sound and music, a phone touch layout, Vietnamese text.
+More maps, characters beyond the four of section 5, accounts or rankings, a computer opponent, play across two computers, sound and music, a phone touch layout, Vietnamese text.
 In scope after all, for the 3D game only: the colour of each character and its placement effect (section 5). Not in scope: a colour or effect chosen by the player, a colour per side instead of per character, character colours or placement effects in the 2D renderer, and placement effects for seeds that a skill moves, throws or converts (only a planted seed plays one).
+
+### 9.1 Visual QA (the 3D game, Cloud Eagle and the character colours)
+What a human checks by eye (tests cannot judge the look). Open http://localhost:8000/?local=1 and pick the characters named below.
+- The character colours: Wind Rabbit blue #3b8cff, Earth Bear ochre red #c9703a, Jade Serpent jade green #2fbf7a, Cloud Eagle pale yellow #fff2a8. Play each character on X and on O: the shape follows the side (X the four-petal cross bloom, O the round bloom), the colour follows the character, for the plants, the last-move ring, the hover ring and the selection decal. The pale yellow plants and rings stay readable on the tilled soil.
+- The cloud swirl: a planted Cloud Eagle seed plays puffs circling the plot and white feathers drifting toward the lower right with the one wind; on Low no particles.
+- The cloud: a 5x5 cloud (smaller at the edges) sits over the plots. Seen by the owner and by a spectator it is translucent and the plants and rocks inside show; seen by the opponent it is a solid cover with nothing inside and no hint of what it hides. While Cloud is being aimed a faint cloud follows the pointer. After the owner's next two turns the cloud is gone and the plots show again.
+- Sky Watch: soft yellow outlines on exactly the empty plots where the opponent would make five with one more plant, shown to the Cloud Eagle side and spectators only, never on a covered plot and never after the game is over.
+- The HUD and the character select: Cloud Eagle's card shows its cloud emblem until its art arrives; Sky Watch reads Always on and Cloud shows its rest turns (6). The console warns once per missing Cloud Eagle file and nothing crashes.
 
 ## 10. Config values (src/config.js)
 BOARD_SIZE = 15
