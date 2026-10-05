@@ -295,6 +295,20 @@ export function sheetTopRow(sheet, frameWidth, frame) {
   return rows.get(frame);
 }
 
+// The shared texture of a sheet, or null before a sprite showed it.
+export function sheetTextureOf(sheet) {
+  return sheetTextures.get(sheet) ?? null;
+}
+
+// Disposes the shared texture of a sheet that no sprite shows any more
+// (a re-tinted mark sheet, mark-tints.js).
+export function releaseSheetTexture(sheet) {
+  const texture = sheetTextures.get(sheet);
+  if (!texture) return;
+  texture.dispose();
+  sheetTextures.delete(sheet);
+}
+
 function baseTexture(sheet) {
   let texture = sheetTextures.get(sheet);
   if (!texture) {
@@ -335,6 +349,7 @@ export class PixelSprite {
     // Sprites that share a sheet share its image on the GPU; animated ones
     // need their own texture object for their own frame offset.
     const base = baseTexture(sheet);
+    this.baseTexture = base;
     this.texture = frameCount > 1 ? base.clone() : base;
     this.texture.repeat.set(1 / frameCount, 1);
 
@@ -368,7 +383,20 @@ export class PixelSprite {
     this.object.add(this.shadow, this.sunShadow, this.plane);
     this.blobScaleX = this.shadow.scale.x;
     this.blobScaleZ = this.shadow.scale.z;
+    // A sheet tinted for the marks of a match (mark-tints.js): its GPU
+    // resources are rebuilt with the tint, so they are marked as such.
+    if (sheet.markTint) {
+      for (const resource of [base, this.texture, material, this.sunShadow.material]) resource.userData.markTint = true;
+    }
     this.setFrame(0);
+  }
+
+  // Frees this sprite's own texture copy and materials (the sheet's shared
+  // texture stays: see releaseSheetTexture). Remove it from the world first.
+  dispose() {
+    if (this.texture !== this.baseTexture) this.texture.dispose();
+    this.plane.material.dispose();
+    this.sunShadow.material.dispose();
   }
 
   // Scales both shadows around the feet by `factor` (1: full size), for a

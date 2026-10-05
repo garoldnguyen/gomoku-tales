@@ -385,6 +385,9 @@ export const VINE_SINK_MS = 300; // then sinks back into the soil: 1200 ms in al
 export const VINE_COIL_TURNS = 2;
 export const VINE_COIL_RADIUS = 0.28; // world units from the plant's stem
 export const VINE_LEAF_COUNT = 4; // vineCoil: leaf flecks shed while it coils (particles)
+export const PLACEMENT_SLOTS = 8; // placement effects playing at once (effects3d.js); a ninth replaces the oldest
+export const VINE_POINTS = 48; // vineCoil: pixel dots along the whole vine, from the soil to the top of the coil
+export const VINE_POINT_PX = 3; // art pixels wide, each dot of the vine
 
 // Shot mode (?shot=<scene>, docs/shots.md section 4): the screenshot
 // self-check freezes every time driven thing at this time and seeds the

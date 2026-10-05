@@ -252,6 +252,17 @@ export function createWorld(canvas, {
       if (cell) placeOnCell(hover, cell.x, cell.y);
     },
 
+    // The texture of the hover decal (the ring tinted for the player to
+    // move, mark-tints.js). Called every frame: it only assigns.
+    setHoverMap(map) {
+      if (hoverMaterial.map !== map) hoverMaterial.map = map;
+    },
+
+    // The texture the hover decal shows now.
+    get hoverMap() {
+      return hoverMaterial.map;
+    },
+
     get hoveredCell() {
       return hoveredCell;
     },
@@ -328,18 +339,20 @@ export function createWorld(canvas, {
 }
 
 // A board piece sprite (docs/art-direction-v3.md section 4): 'X' or 'O'
-// is the plant (plant-x, a blue cross bloom, or plant-o, a red round
+// is the plant (plant-x, a four-petal cross bloom, or plant-o, a round
 // bloom) with its anchor pixel on the plot centre, showing the Rest stage
 // until its owner steps the growth with setFrame; 'rock' is the mossy
 // rock-v3 boulder on its bottom centre (the manifest key "rock" is the 2D
-// sprite). Sprites of a kind share one texture.
-export function createPieceSprite(kind) {
+// sprite). Sprites of a kind share one texture. `sheet` replaces a
+// plant's art with a sheet of the same size: the plant tinted to the
+// colour of its side's character (mark-tints.js).
+export function createPieceSprite(kind, sheet = null) {
   if (kind === 'rock') {
     return new PixelSprite({ sheet: artSource(ART.v3.rock), shadowRadius: ROCK_SHADOW_RADIUS });
   }
   const name = ART.v3.plant[kind];
   const sprite = new PixelSprite({
-    sheet: artSource(name),
+    sheet: sheet ?? artSource(name),
     frameCount: placeholderShape(name).frames,
     shadowRadius: PIECE_SHADOW_RADIUS,
     anchor: metaAnchor(artMeta(), name),

@@ -17,10 +17,10 @@ The owner's five points, in order:
 Pillars that every task must respect:
 
 - Readability first. A player must be able to read the 15 by 15 grid, every plant and the hover and last-move marks at a glance, on every quality level, even with a cloud shadow or a drifting petal over a plot.
-- The shape rule. Colour never carries the team alone. X is always a blue four-petal cross bloom. O is always a red round ring-of-petals bloom. They must still read apart in grayscale and at the smallest zoom.
+- The shape rule. The shape belongs to the side, the colour belongs to the character. X is always a four-petal cross bloom and O is always a round ring-of-petals bloom, whichever character plays it. The marks of a side take the mark colour of its character (`CHARACTER_LOOK` in `src/render3d/character-look.js`: Wind Rabbit blue `#3b8cff`, Earth Bear ochre red `#c9703a`, Jade Serpent jade green `#2fbf7a`), tinted from the art below with `paletteSwap` (`src/render3d/mark-tints.js`). Colour never carries the team alone: X and O must still read apart in grayscale and at the smallest zoom, even when both are near in colour.
 - One wind. Clouds, petals, seed fluff, grass sway and cloud shadows all move in the same direction: from the upper left toward the lower right of the screen. The sun is in the upper left, so shadows fall toward the lower right. Clouds are high above the ground, so their apparent motion is horizontal: they drift straight to the right across the screen.
 - One pixel grid. Everything is pixel art on the same grid as the board: one cell is 32 art pixels, `PX_WORLD = 1/32`. No sprite may be scaled by a non-integer factor at rest. Textures use NearestFilter.
-- Same at every level: camera angle, the 15 by 15 plots, seed to bloom growth, blue X and red O, gold hover brackets, the last-move ring, and the glass panels (only their frost changes).
+- Same at every level: camera angle, the 15 by 15 plots, seed to bloom growth, the cross X and the round O in the colours of their characters, the hover brackets, the last-move ring, and the glass panels (only their frost changes).
 - Each quality level only adds things to the one below it. Switching at any time never changes where anything is.
 
 ## 2. The pack
@@ -109,7 +109,7 @@ Rocks (Terrain Creation) use `rock-v3` (the manifest key `rock` is the old 2D sp
 
 Placement. Draw the plant as an upright camera-facing sprite exactly as the existing piece sprites are drawn (same code path, same blob or sun shadow, same NearestFilter), but anchor pixel (18, 36) of the frame on the plot centre. The sprite is 36 by 40 art pixels, so it stands a little taller than one cell and its bloom overhangs the plot behind it. Draw order must keep a plant in front of the plots behind it and behind the plots in front of it, so rows read correctly. The flat plot is part of the board texture, not the sprite.
 
-Shape rule reminder: X is the four-petal blue cross, O is the red round ring. Do not recolour or reshape them for any effect.
+Shape rule reminder: X is the four-petal cross, O is the round ring. Their colour is the colour of the character that plays the side (the art is drawn in blue for X and red for O, the source colours of the tint); no effect reshapes them or gives them another colour.
 
 ## 5. Quality levels: the exact table
 

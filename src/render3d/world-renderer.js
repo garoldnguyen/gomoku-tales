@@ -21,7 +21,7 @@
 // setQuality(cycleQuality(quality)) through cycleQuality().
 //
 // The world also comes alive from the logic events (sections D and G):
-//   trigger(events, time)  planted seeds grow into plants (growth.js), a character casts when its
+//   trigger(events, time, characters)  planted seeds grow into plants (growth.js), a character casts when its
 //                          player uses a skill, win and lose poses at the
 //                          end, and the skill visuals, sparkles, dust,
 //                          camera shake and HUD banners (effects3d.js)
@@ -30,20 +30,31 @@
 //                          brought up to date without replaying the rest
 //   reset()                a new game: no growth or effects, both characters idle
 // The player to move has a gentle glow. None of this changes the rules.
+//
+// The marks are in the colours of the characters (character-look.js,
+// mark-tints.js): the plants, the last-move ring, and for the player to
+// move the hover ring and the selection decal take the colour of the
+// character that plays that side (view.state.characters, the seats by
+// pick order). They are tinted once when a match starts (the sides
+// change) and again on a quality change, the old textures disposed. Every
+// planted seed also plays the placement effect of its side's character.
 
 import { BOARD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, SPRITE_STRETCH_Y } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
+import { DEFAULT_SIDES } from '../logic/characters.js';
 import { createInitialState, isGameOver } from '../logic/game.js';
 import { drawText } from '../render/game-renderer.js';
 import { artMeta, artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
 import { boardMarksInto, createBoardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
+import { placementCues } from './character-look.js';
 import { createEffects3d } from './effects3d.js';
 import { enteredStage, plantedCells, plantPoseInto, STAGE_LAND, STAGE_OPEN, STAGE_REST } from './growth.js';
 import { createWorldHitTest } from './hit-test.js';
 import { parseFpsSwitch } from './fps.js';
 import { plantFrameIndex, plantFrames } from './plant-frames.js';
 import { QUALITY_ORDER } from './quality.js';
+import { buildMarkTints, disposeMarkTints } from './mark-tints.js';
 import { fadedAlphaTest } from './sprite-frames.js';
 import { sheetTopRow } from './sprites.js';
 import { metaAnchor, stageStartMs } from './v3-meta.js';
@@ -76,7 +87,7 @@ function lowestText(fps) {
 // `options.showQualityLine` false hides the quality and FPS line (shot
 // mode, docs/shots.md section 4).
 export function createWorldRenderer(worldCanvas, options = {}) {
-  const { showFps = parseFpsSwitch(globalThis.location?.search ?? ''), showQualityLine = true } = options;
+  const { showFps = parseFpsSwitch(globalThis.location?.search ?? ''), showQualityLine = true, warn = () => {} } = options;
   const world = createWorld(worldCanvas, options);
   const pieces = createPieceLayer(world);
   const decals = createDecalLayer(world);
@@ -86,6 +97,31 @@ export function createWorldRenderer(worldCanvas, options = {}) {
   const effects = createEffects3d(world, { regrow: (x, y, player, plantedAt) => pieces.growOne(x, y, player, plantedAt) });
 
   const marks = createBoardMarks(); // reused every frame
+
+  // The marks tinted for the match (mark-tints.js): built for these sides
+  // at this quality level, null before the first game frame.
+  let tints = null;
+  let tintedX = null;
+  let tintedO = null;
+  let tintedQuality = null;
+  const applyMarkTints = (next) => {
+    const old = tints;
+    // The decals' first textures (the art's own colours) are freed with
+    // the first tint, the tints after that with the next one.
+    const firstMaps = old ? null : [world.hoverMap, decals.selectMap, ...lastMove.maps()];
+    tints = buildMarkTints(next, warn);
+    tintedX = next[X];
+    tintedO = next[O];
+    tintedQuality = world.quality;
+    pieces.retint(tints.plant);
+    ghosts.retint(tints.plant);
+    effects.setPlantSheets(tints.plant);
+    lastMove.retint(tints.last);
+    world.setHoverMap(tints.hover[X]);
+    decals.useSelectMap(tints.select[X]);
+    if (old) disposeMarkTints(old);
+    else for (const map of firstMaps) map.dispose();
+  };
 
   // The level and FPS of this window, top left on the HUD (shown on every
   // level, the FPS counter of docs/art-direction-v3.md section 10). Each
@@ -116,6 +152,11 @@ export function createWorldRenderer(worldCanvas, options = {}) {
   return {
     drawGameScreen(ctx, view) {
       const time = view.time ?? performance.now();
+      const sides = view.state.characters ?? DEFAULT_SIDES;
+      if (tints === null || sides[X] !== tintedX || sides[O] !== tintedO || world.quality !== tintedQuality) applyMarkTints(sides);
+      const toMove = view.state.currentPlayer === O ? O : X;
+      world.setHoverMap(tints.hover[toMove]);
+      decals.useSelectMap(tints.select[toMove]);
       pieces.sync(view.state.board, time, effects);
       world.characters.setActive(isGameOver(view.state) ? null : view.state.currentPlayer);
       boardMarksInto(view, marks);
@@ -161,6 +202,13 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       world.cycleQuality();
     },
 
+    // The marks tinted for the match (buildMarkTints in mark-tints.js:
+    // colour, plant, last, hover and select by player), null before the
+    // first game frame.
+    get markTints() {
+      return tints;
+    },
+
     // This window's quality level ('low', 'medium' or 'high').
     get quality() {
       return world.quality;
@@ -171,12 +219,17 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       return world.features;
     },
 
-    trigger(events, time) {
+    // characters are the sides of the game the events come from
+    // (state.characters): the events of a frame are shown before it is
+    // drawn, so the first seed of a new match must not use the old sides.
+    trigger(events, time, characters) {
       if (events.length === 0) return;
       pieces.grow(plantedCells(events), time);
       lastMove.trigger(events, time);
       world.characters.trigger(events, time);
       effects.trigger(events, time);
+      // The placement effect of the character of each planted seed's side.
+      for (const cue of placementCues(events, characters ?? DEFAULT_SIDES)) effects.placement(cue.x, cue.y, cue.effect, time);
     },
 
     catchUp(events, time) {
@@ -251,6 +304,7 @@ function createPieceLayer(world) {
   const pose = { frame: 0, progress: 0, dropPx: 0, scale: 1 }; // written by plantPoseInto
   const looks = {}; // per player: plantLook, made the first time
   const look = (player) => (looks[player] ??= plantLook(player));
+  let plantSheets = { [X]: null, [O]: null }; // the tinted plant sheets (retint), null: the art's own
 
   const rest = (sprite, kind) => {
     if (kind === 'rock') return;
@@ -283,6 +337,24 @@ function createPieceLayer(world) {
     // at `time` (which may lie ahead: it shows its first stage until then).
     growOne,
 
+    // Plants from now on use the tinted sheets `sheets` (by player): every
+    // plant sprite made from the old ones leaves the world and is freed,
+    // and the next sync makes new ones. Growth goes on where it was.
+    retint(sheets) {
+      plantSheets = sheets;
+      for (let i = 0; i < cellCount; i++) {
+        const kind = shownKind[i];
+        if (kind !== X && kind !== O) continue;
+        dropSprite(world, shownSprite[i]);
+        shownKind[i] = null;
+        shownSprite[i] = null;
+      }
+      for (const kind of [X, O]) {
+        for (const sprite of free[kind]) dropSprite(world, sprite);
+        free[kind].length = 0;
+      }
+    },
+
     // Every plant shows Rest (a new game).
     settleAll() {
       for (let i = 0; i < cellCount; i++) if (!Number.isNaN(growStart[i])) settle(i);
@@ -306,7 +378,7 @@ function createPieceLayer(world) {
           shownKind[i] = kind;
           shownSprite[i] = null;
           if (kind) {
-            const sprite = free[kind].pop() ?? world.addSprite(createPieceSprite(kind));
+            const sprite = free[kind].pop() ?? world.addSprite(createPieceSprite(kind, kind === 'rock' ? null : plantSheets[kind]));
             sprite.object.visible = true;
             placeOnCell(sprite, x, y);
             shownSprite[i] = sprite;
@@ -368,6 +440,16 @@ function createDecalLayer(world) {
   }
   const poolList = Object.values(pools);
   return {
+    // The texture of the selection decals (tinted for the player to move,
+    // mark-tints.js). Called every frame: it only assigns.
+    useSelectMap(map) {
+      if (pools.select.material.map !== map) pools.select.material.map = map;
+    },
+
+    get selectMap() {
+      return pools.select.material.map;
+    },
+
     show(decals, count, time) {
       pools.win.material.opacity = winPulseOpacity(time);
       for (let p = 0; p < poolList.length; p++) poolList[p].used = 0;
@@ -430,6 +512,18 @@ function createLastMoveMark(world) {
       last = null;
     },
 
+    // The textures the two rings show now.
+    maps() {
+      return [marks[X].material.map, marks[O].material.map];
+    },
+
+    // New ring textures by player (tinted, mark-tints.js); the old ones are
+    // the caller's to dispose.
+    retint(maps) {
+      marks[X].material.map = maps[X];
+      marks[O].material.map = maps[O];
+    },
+
     hide,
 
     show(board, time) {
@@ -448,8 +542,8 @@ function createLastMoveMark(world) {
 // hovered cell, or the rock Terrain Creation would drop.
 function createGhosts(world) {
   const ghosts = {};
-  for (const kind of [X, O, 'rock']) {
-    const sprite = world.addSprite(createPieceSprite(kind));
+  const makeGhost = (kind, sheet) => {
+    const sprite = world.addSprite(createPieceSprite(kind, sheet));
     const material = sprite.plane.material;
     material.transparent = true;
     material.opacity = GHOST_OPACITY;
@@ -462,9 +556,19 @@ function createGhosts(world) {
     sprite.sunShadow.visible = false;
     sprite.object.visible = false;
     ghosts[kind] = sprite;
-  }
+  };
+  for (const kind of [X, O, 'rock']) makeGhost(kind, null);
   const kinds = Object.keys(ghosts);
   return {
+    // The plant ghosts from the tinted sheets `sheets` (by player); the old
+    // ones leave the world and are freed.
+    retint(sheets) {
+      for (const player of [X, O]) {
+        dropSprite(world, ghosts[player]);
+        makeGhost(player, sheets[player]);
+      }
+    },
+
     show(ghost) {
       for (let i = 0; i < kinds.length; i++) {
         const kind = kinds[i];
@@ -475,4 +579,10 @@ function createGhosts(world) {
       }
     },
   };
+}
+
+// A plant sprite of an old tint: out of the world, its own GPU resources freed.
+function dropSprite(world, sprite) {
+  world.removeSprite(sprite);
+  sprite.dispose();
 }

@@ -20,6 +20,10 @@
 //                     with a soil puff and a light camera shake (High only,
 //                     the only shake); when it breaks it crumbles into soil
 //                     crumbs and pebbles, leaving bare soil
+//   placement         the placement effect of the character whose side
+//                     planted the seed (placement(), character-look.js):
+//                     Wind Rabbit's dandelion wind, Earth Bear's soil
+//                     burst, Jade Serpent's vine coil
 //   Stone Conversion  the plant wilts back to Sprout, a small spark runs
 //                     through the soil and the other team's plant regrows
 //                     from Land (X becomes O or O becomes X)
@@ -52,13 +56,14 @@
 import * as THREE from 'three';
 import {
   BANNER_3D_Y, BOARD_SIZE, CAMERA_FOV, CONVERT_SPARK_RATE, DASH_SWIRL_RATE, DASH_TRAIL_RATE,
-  MARK_FADE_MS, PLACE_DUST_COUNT, PLANT_OPEN_SPARKLES, PX_WORLD, SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS,
-  SPRITE_STRETCH_Y, THROW_ARC_HEIGHT, TORNADO_BEND_PX, TORNADO_PARTICLE_RATE, TORNADO_SIZE,
+  MARK_FADE_MS, PLACE_DUST_COUNT, PLACEMENT_SLOTS, PLANT_OPEN_SPARKLES, PX_WORLD, SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS,
+  SPRITE_STRETCH_Y, THROW_ARC_HEIGHT, TORNADO_BEND_PX, TORNADO_PARTICLE_RATE, TORNADO_SIZE, VINE_POINT_PX, VINE_POINTS,
 } from '../config.js';
 import { X } from '../logic/board.js';
 import { createBanners } from '../render/effects.js';
 import { artMeta, artSource } from './art.js';
 import { ART } from './art-assets.js';
+import { PLAN_SEED, placementPlan } from './character-look.js';
 import {
   catchUpVisuals, convertPose, crumblePose, dashCurveInto, dashPose, heldCell, regrowCell, rockFallPose,
   shakeLeft, shakeOffset3d, shakeStrength, sparkPathInto, throwPose, visualsForEvents,
@@ -68,6 +73,7 @@ import {
   createParticlePool, createSpawnParams, emit, scaledCount, SHAPE_PLUS, SHAPE_SQUARE,
 } from './particle-pool.js';
 import { cellToWorld, cellToWorldInto } from './picking.js';
+import { clearPlacementRuns, createPlacementRuns, startPlacementRun, stepPlacementRuns, vinePointsInto } from './placement-runs.js';
 import { GLOW } from './post-processing.js';
 import { MAX_PARTICLE_CAP, particleScale, plainSlides } from './quality.js';
 import { effectRandom } from './seeded-random.js';
@@ -86,6 +92,10 @@ const COLORS = {
   leafDark: 0x4fa044,
   spark: 0xffe14d, // gold
   glow: 0xfff6c0,
+  windStreak: 0xeaf6ff, // windDandelion: the pale wind streaks
+  dandelion: 0xfff6ec, // and the seed puffs
+  vine: 0x2fbf7a, // vineCoil: the jade vine
+  vineDark: 0x1f8a57,
 };
 // The petals of wind-bits: pink, white, yellow, lilac.
 const PETALS = [0xffb8d4, 0xfff6ec, 0xffe066, 0xcdb0f0];
@@ -131,6 +141,15 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
   world.scene.add(points.mesh);
   const banners = createBanners();
   const actors = createActorPool(world);
+  // The placement effects playing (placement-runs.js), and the vines of
+  // Jade Serpent's vine coil: one Points draw call of their own, outside
+  // the particle cap (the vine plays on every level), rebuilt every frame
+  // from the runs.
+  const placements = createPlacementRuns(PLACEMENT_SLOTS);
+  const vinePool = createParticlePool(VINE_POINTS * PLACEMENT_SLOTS);
+  const vinePoints = createParticlePoints(vinePool.capacity);
+  world.scene.add(vinePoints.mesh);
+  const vineXyz = new Float32Array(VINE_POINTS * 3);
   const held = new Float64Array(BOARD_SIZE * BOARD_SIZE); // cell index -> time its plant shows again
   const timelines = [];
   for (let i = 0; i < TIMELINE_SLOTS; i++) timelines.push(newTimeline());
@@ -338,6 +357,89 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     at.z = record.fz + (record.tz - record.fz) * progress;
     actor.sprite.object.position.x = at.x;
     actor.sprite.object.position.z = at.z;
+  }
+
+  // --- Placement effects ---
+
+  // One particle step of a placement plan (character-look.js) on the plot
+  // of `run`: it flies from `from` to `to` over its duration, along an arc
+  // `height` (or `curve`) high when it has one. Called once per step by
+  // stepPlacementRuns; the vine steps are drawn by drawVines instead.
+  function spawnPlanStep(step, run) {
+    if (!step.particle) return;
+    const durS = step.durationMs / 1000;
+    const { from, to } = step;
+    const arc = step.height ?? step.curve ?? 0;
+    sp.x = run.x + from[0];
+    sp.y = from[1];
+    sp.z = run.z + from[2];
+    sp.vx = (to[0] - from[0]) / durS;
+    sp.vz = (to[2] - from[2]) / durS;
+    // Up and back down `arc` above the straight line in durS.
+    sp.vy = (to[1] - from[1]) / durS + (4 * arc) / durS;
+    sp.gravity = (8 * arc) / (durS * durS);
+    sp.drag = 0;
+    sp.life = durS;
+    sp.grow = 0;
+    sp.alpha = 1;
+    sp.shape = SHAPE_SQUARE;
+    switch (step.kind) {
+      case 'windStreak':
+        sp.size = 2 * PX;
+        sp.color = COLORS.windStreak;
+        sp.alpha = 0.7;
+        break;
+      case 'dandelionPuff':
+        sp.size = 2 * PX;
+        sp.color = COLORS.dandelion;
+        sp.shape = SHAPE_PLUS;
+        break;
+      case 'rockChip':
+        sp.size = 3 * PX;
+        sp.color = step.startMs % 2 ? COLORS.pebble : COLORS.pebbleDark;
+        break;
+      case 'soilSpeck':
+        sp.size = 2 * PX;
+        sp.color = step.startMs % 2 ? COLORS.soil : COLORS.soilDark;
+        break;
+      case 'vineLeaf':
+        sp.size = 2 * PX;
+        sp.color = COLORS.leaf;
+        break;
+      default:
+        return;
+    }
+    pool.spawnFall(sp);
+  }
+
+  // The vines of the playing vine coils, as still jade dots (vinePointsInto).
+  function drawVines() {
+    vinePool.clear();
+    for (let r = 0; r < placements.length; r++) {
+      const run = placements[r];
+      if (!run.active || !run.vine) continue;
+      const n = vinePointsInto(run.plan, frame.time - run.start, vineXyz);
+      for (let i = 0; i < n; i++) {
+        sp.x = run.x + vineXyz[i * 3];
+        sp.y = vineXyz[i * 3 + 1];
+        sp.z = run.z + vineXyz[i * 3 + 2];
+        sp.vx = 0;
+        sp.vy = 0;
+        sp.vz = 0;
+        sp.gravity = 0;
+        sp.drag = 0;
+        sp.life = 1;
+        sp.size = VINE_POINT_PX * PX;
+        sp.grow = 0;
+        sp.color = i % 4 === 3 ? COLORS.vineDark : COLORS.vine;
+        sp.alpha = 1;
+        sp.shape = SHAPE_SQUARE;
+        const k = vinePool.spawnFall(sp);
+        // Halfway through its life a dot shows at full alpha (alphaAt).
+        if (k >= 0) vinePool.age[k] = 0.5;
+      }
+    }
+    vinePoints.sync(vinePool, frame);
   }
 
   // --- Skill animations with flying seeds, rocks and wilting plants ---
@@ -550,6 +652,22 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       bloomSparkles(cellAt.x, cellAt.z, (anchorY - BLOOM_ROW_PX) * PX * SPRITE_STRETCH_Y, player);
     },
 
+    // The placement effect `effectId` (character-look.js) of a seed
+    // planted on cell (x, y) at `time`: its plan for this level's particle
+    // cap, each step played once.
+    placement(x, y, effectId, time) {
+      const plan = placementPlan(effectId, { features: world.features, seed: PLAN_SEED + y * BOARD_SIZE + x });
+      cellToWorldInto(x, y, cellAt);
+      startPlacementRun(placements, plan, cellAt.x, cellAt.z, time);
+    },
+
+    // The plants of the flying copies (Wind Dash, a thrown or converted
+    // plant) from now on: the tinted sheets of the match by player
+    // (mark-tints.js).
+    setPlantSheets(sheets) {
+      actors.setPlantSheets(sheets);
+    },
+
     // The Land soil puff of a seed on cell (x, y), on levels with the
     // soilPuff growth extra.
     soilPuff(x, y) {
@@ -590,6 +708,8 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       for (let i = 0; i < timelines.length; i++) {
         if (timelines[i].active) stepTimeline(timelines[i]);
       }
+      stepPlacementRuns(placements, time, spawnPlanStep);
+      drawVines();
 
       pool.step(frame);
       points.sync(pool, frame);
@@ -608,6 +728,9 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       for (const record of timelines) if (record.active) endTimeline(record);
       pool.clear();
       points.sync(pool, frame);
+      clearPlacementRuns(placements);
+      vinePool.clear();
+      vinePoints.sync(vinePool, frame);
       dashMark.reset();
       swirl.reset();
       held.fill(0);
@@ -633,15 +756,18 @@ function newTimeline() {
 // emissive map set up once, so the glow never rebuilds a shader.
 function createActorPool(world) {
   const free = { X: [], O: [], rock: [] };
+  let plantSheets = { X: null, O: null }; // the tinted plant sheets (setPlantSheets), null: the art's own
 
   function make(kind) {
-    const sprite = world.addSprite(createPieceSprite(kind));
+    const sheet = kind === 'rock' ? null : plantSheets[kind];
+    const sprite = world.addSprite(createPieceSprite(kind, sheet));
     const material = sprite.plane.material;
     material.emissive.set(COLORS.glow);
     material.emissiveMap = sprite.texture;
     material.emissiveIntensity = 0;
     return {
       kind,
+      sheet,
       sprite,
       material,
       setShadow(factor) {
@@ -667,9 +793,27 @@ function createActorPool(world) {
       actor.setShadow(1);
       actor.material.emissiveIntensity = 0;
       if (actor.kind !== 'rock') sprite.setFrame(STAGE_REST);
-      free[actor.kind].push(actor);
+      if (actor.kind !== 'rock' && actor.sheet !== plantSheets[actor.kind]) dropStaleActor(world, actor);
+      else free[actor.kind].push(actor);
+    },
+
+    // New plant sheets: the waiting plant actors are freed; one still
+    // flying is freed when it lands (release).
+    setPlantSheets(sheets) {
+      plantSheets = sheets;
+      for (const kind of ['X', 'O']) {
+        for (const actor of free[kind]) dropStaleActor(world, actor);
+        free[kind].length = 0;
+      }
     },
   };
+}
+
+// An actor whose plant sheet was re-tinted: out of the world, its sprite's
+// own GPU resources freed.
+function dropStaleActor(world, actor) {
+  world.removeSprite(actor.sprite);
+  actor.sprite.dispose();
 }
 
 // How far a lingering mark has faded out: 1 while it shows, falling to 0

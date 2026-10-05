@@ -288,13 +288,15 @@ function roomHint(code, name, stone) {
 // rather than replaying every effect and banner at once. effects is the 2D
 // placeholder effects, or null for the 3D renderer, which takes the events
 // itself.
-function showEvents(events, effects, time, resumed) {
+// characters are the sides of the game the events come from, for the
+// placement effect of each seed.
+function showEvents(events, effects, time, resumed, characters) {
   if (resumed) {
     renderer.catchUp?.(events, time);
     return;
   }
   effects?.trigger(events, time);
-  renderer.trigger?.(events, time); // the 3D world: pop-ins, character poses and skill visuals
+  renderer.trigger?.(events, time, characters); // the 3D world: pop-ins, character poses and skill visuals
 }
 
 // The app (src/ui/app.js): online rooms over the transport of
@@ -369,8 +371,8 @@ function startAppMode({ local = false } = {}) {
     const inGame = (screen === GAME || screen === GAME_OVER || screen === WATCH) && game !== null;
     if (newGame.check(inGame ? game : null, app.getGameNumber())) hintCode = null; // a new game may be a new character
     if (inGame) {
-      showEvents(game.takeEvents(), effects, time, resumed);
       const view = game.getView();
+      showEvents(game.takeEvents(), effects, time, resumed, view.state.characters);
       pointerCanvas.style.cursor = screen === GAME && view.pointer ? 'pointer' : 'default';
       const local = app.getFlow().mode === MODES.LOCAL;
       const you = local ? null : view.you ?? SPECTATOR_VIEW;
@@ -445,8 +447,9 @@ async function startShotMode({ scene }) {
   }
   const effects = renderer === RENDERER_2D ? createEffects({ random: seededRandom(SHOT_EFFECTS_SEED) }) : null;
   const planted = ({ x, y, player }) => [{ type: 'stonePlaced', player, x, y }];
-  for (const plant of staged.growing) showEvents(planted(plant), effects, SHOT_TIME_MS - plant.ageMs, false);
-  if (staged.last) showEvents(planted(staged.last), effects, SHOT_TIME_MS - staged.last.ageMs, false);
+  const shotSides = game.getView().state.characters;
+  for (const plant of staged.growing) showEvents(planted(plant), effects, SHOT_TIME_MS - plant.ageMs, false, shotSides);
+  if (staged.last) showEvents(planted(staged.last), effects, SHOT_TIME_MS - staged.last.ageMs, false, shotSides);
   hud?.show(!flow);
 
   await assetsLoaded;

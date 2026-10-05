@@ -46,7 +46,13 @@ Which screen is shown is decided only by the flow reducer in src/ui/flow.js (scr
 - If the board is full and nobody has won, it is a draw.
 
 ## 5. Characters and skills
-There are three characters: Wind Rabbit, Earth Bear and Jade Serpent. Each owns two skills. A character has no fixed stone colour: the side is decided by pick order. The player who picks first plays X (blue) and moves first; the player who picks second plays O (red). Both players cannot pick the same character. (assignSides(pickOrder) in src/logic/characters.js; until the character select exists, the two character lobby uses Wind Rabbit as X and Earth Bear as O.) The X and O shapes and team colours belong to the side, not to the character.
+There are three characters: Wind Rabbit, Earth Bear and Jade Serpent. Each owns two skills. A character has no fixed stone colour: the side is decided by pick order. The player who picks first plays X and moves first; the player who picks second plays O. Both players cannot pick the same character. (assignSides(pickOrder) in src/logic/characters.js; until the character select exists, the two character lobby uses Wind Rabbit as X and Earth Bear as O.) The X and O shapes belong to the side, the colours to the character.
+
+Character colours and placement effects (the 3D game; CHARACTER_LOOK in src/render3d/character-look.js, counts and timings in src/config.js). Each character has one mark colour: Wind Rabbit blue #3b8cff, Earth Bear ochre red #c9703a, Jade Serpent jade green #2fbf7a. The marks of a side take the colour of the character that plays it, whichever side that is: its plants (X always the four-petal cross bloom, O always the round bloom), its last-move ring, and while it is to move the hover ring and the selection decal. They are tinted from the blue X and red O art with paletteSwap when a match starts and again on a quality change. When a side plants a seed, its character's placement effect plays once on that plot, on top of the usual growth:
+- Wind Rabbit, dandelion wind: soft wind streaks and 6 to 8 dandelion seed puffs drift off toward the lower right with the one wind.
+- Earth Bear, soil burst: soil specks and 4 to 6 rock chips are thrown out of the plot and fall back.
+- Jade Serpent, vine coil: a jade vine rises from the plot, coils twice around the plant and sinks back into the soil (1.2 seconds), shedding a few leaf flecks.
+The particles follow the quality level's particle cap (none on Low); the vine plays on every level. The 2D renderer (?render=2d) keeps blue X and red O and has no placement effects.
 
 Cooldown rule: after you use a skill you cannot use it during your next N turns (short cooldown N = 3, long cooldown N = 6). Cooldowns count your own turns only.
 
@@ -130,6 +136,7 @@ For the 3D game see docs/art-direction-v3.md sections 4, 7 and 9 (no straight wi
 
 ## 9. Out of scope for version 1
 More maps, more characters, accounts or rankings, a computer opponent, play across two computers, sound and music, a phone touch layout, Vietnamese text.
+In scope after all, for the 3D game only: the colour of each character and its placement effect (section 5). Not in scope: a colour or effect chosen by the player, a colour per side instead of per character, character colours or placement effects in the 2D renderer, and placement effects for seeds that a skill moves, throws or converts (only a planted seed plays one).
 
 ## 10. Config values (src/config.js)
 BOARD_SIZE = 15

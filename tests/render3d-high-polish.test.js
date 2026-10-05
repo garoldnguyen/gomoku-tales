@@ -303,8 +303,10 @@ function resourceKind(resource) {
 }
 
 // Section 8 of docs/art-direction-v3-1.md: a quality switch rebuilds only the
-// forest (and disposes what it replaced); everything else is made once.
-test('switching quality at runtime keeps the game, rebuilds only the forest and leaks no GPU resource', async () => {
+// forest and the marks tinted in the colours of the characters
+// (mark-tints.js, rebuilt on a quality change by design), and disposes
+// what it replaced; everything else is made once.
+test('switching quality at runtime keeps the game, rebuilds only the forest and the mark tints and leaks no GPU resource', async () => {
   const disposed = new Set();
   const disposedMeshes = new Set();
   const restore = [];
@@ -346,14 +348,29 @@ test('switching quality at runtime keeps the game, rebuilds only the forest and 
     const nowInUse = gpuResources(gl.scene);
     const forestNow = gpuResources(gl.scene.getObjectByName('forest'));
     const isNew = (resource) => resource.id > probe[resourceKind(resource)];
+    // The mark tints held now: the tinted textures and materials in use,
+    // the decal textures of both players (one shows at a time) and the
+    // shared texture of each tinted plant sheet (each sprite shows its own
+    // copy of it).
+    const { sheetTextureOf } = await import('../src/render3d/sprites.js');
+    const { markTints } = renderer;
+    const tintsHeld = new Set([...nowInUse].filter((resource) => resource.userData?.markTint === true));
+    for (const player of [X, O]) {
+      for (const texture of [markTints.last[player], markTints.hover[player], markTints.select[player], sheetTextureOf(markTints.plant[player])]) {
+        assert.ok(texture?.userData.markTint, `a ${player} tint texture`);
+        tintsHeld.add(texture);
+      }
+    }
     for (const resource of nowInUse) {
       const name = resource.type ?? resource.constructor.name;
-      if (isNew(resource)) assert.ok(forestNow.has(resource), `${name} is new after the switches but not part of the forest`);
-      else assert.ok(inUse.has(resource), `${name} is new after the switches`);
+      if (isNew(resource)) {
+        assert.ok(forestNow.has(resource) || tintsHeld.has(resource), `${name} is new after the switches but not part of the forest or the mark tints`);
+      } else assert.ok(inUse.has(resource), `${name} is new after the switches`);
       assert.ok(!disposed.has(resource), `${name} is disposed but still in use`);
     }
+    for (const resource of tintsHeld) assert.ok(!disposed.has(resource), 'a held mark tint is disposed');
     for (const resource of inUse) {
-      // Anything a switch replaced must have been disposed (only the forest is replaced).
+      // Anything a switch replaced must have been disposed (only the forest and the mark tints are replaced).
       if (!nowInUse.has(resource)) assert.ok(disposed.has(resource), `${resource.type} was replaced without dispose()`);
     }
     // An instanced mesh owns its instance buffers: a replaced one must be
@@ -367,11 +384,12 @@ test('switching quality at runtime keeps the game, rebuilds only the forest and 
     }
     assert.ok(replacedMeshes > 0, 'the forest replaces its instanced meshes on a quality switch');
     for (const mesh of meshesNow) assert.ok(!disposedMeshes.has(mesh), 'an instanced mesh in the scene is disposed');
-    // Everything made by the switches is the forest's, in use now or disposed: no leak.
+    // Everything made by the switches is the forest's or the mark tints', in use now or disposed: no leak.
     const accounted = { texture: 0, material: 0, geometry: 0 };
-    for (const resource of new Set([...disposed, ...forestNow])) if (isNew(resource)) accounted[resourceKind(resource)]++;
-    assert.deepEqual(made, accounted, 'every texture, material and geometry a switch makes is the forest\'s and is in use or disposed');
+    for (const resource of new Set([...disposed, ...forestNow, ...tintsHeld])) if (isNew(resource)) accounted[resourceKind(resource)]++;
+    assert.deepEqual(made, accounted, 'every texture, material and geometry a switch makes is the forest\'s or the mark tints\' and is in use or disposed');
     assert.ok(made.geometry > 0, 'the forest is rebuilt on a quality switch');
+    assert.ok([...tintsHeld].some(isNew), 'the mark tints are rebuilt on a quality switch');
     assert.equal(JSON.stringify(game.getState()), stateBefore, 'the game goes on as it was');
     assert.equal(game.getState().board[7][7], X);
   } finally {
@@ -434,13 +452,14 @@ const FRAME_PATH = {
   'render3d/effect-plans.js': ['arcHeight', 'clamp01', 'convertPose', 'convertWiltMs', 'crumblePose',
     'dashCurveInto', 'dashFoldMs', 'dashPose', 'reverseGrowthInto', 'reverseGrowthMs', 'rockFallPose', 'shakeLeft',
     'shakeOffset3d', 'shakeStrength', 'snapToStep', 'sparkPathInto', 'throwPose', 'worldUnitsPerPixel'],
-  'render3d/effects3d.js': ['bendAt', 'bloomSparkles', 'crumbs', 'drawBanner', 'end', 'endTimeline', 'hide', 'holds',
+  'render3d/effects3d.js': ['bendAt', 'bloomSparkles', 'crumbs', 'drawBanner', 'drawVines', 'end', 'endTimeline', 'hide', 'holds',
     'markFade', 'moveAlong', 'openSparkles', 'petalGust', 'petalTrail', 'release', 'setShadow', 'show', 'soilPixels',
     'soilPuff', 'sparkTrail', 'startShake', 'stepTimeline', 'sync', 'update'],
   'render3d/fps.js': ['fps', 'lowest', 'tick'],
   'render3d/frame-gap.js': ['tick'],
   'render3d/growth.js': ['dropOffsetPx', 'enteredStage', 'growthStageInto', 'openPopScale', 'plantPoseInto'],
   'render3d/plant-frames.js': ['plantFrameIndex'],
+  'render3d/placement-runs.js': ['clamp01', 'stepPlacementRuns', 'vinePointsInto'],
   'render3d/meadow-scene.js': ['clear', 'release', 'setRipple', 'update'],
   'render3d/particle-pool.js': ['alphaAt', 'clear', 'copy', 'emit', 'scaledCount', 'sizeAt', 'spawnFall',
     'spawnSpiral', 'step', 'take'],
@@ -461,9 +480,9 @@ const FRAME_PATH = {
   'render3d/wind.js': ['bendTowardPx', 'clear', 'fleckSpeed', 'gap', 'gustEnvelope', 'nextReleaseMs',
     'plantSwayAmplitudePx', 'step', 'strength', 'swayAmplitudePx', 'swayLeanSide', 'swayPhase'],
   'render3d/world-renderer.js': ['drawGameScreen', 'drawMenuScreen', 'drawQuality', 'features', 'hide', 'look',
-    'pieceKind', 'plantFramesOf', 'quality', 'rest', 'settle', 'show', 'sync'],
+    'pieceKind', 'plantFramesOf', 'quality', 'rest', 'settle', 'show', 'sync', 'useSelectMap'],
   'render3d/world.js': ['addSprite', 'autoStepped', 'drawingHeight', 'features', 'fps', 'fpsLowest', 'placeOnCell',
-    'quality', 'render', 'resize', 'setCameraShake', 'setHoveredCell', 'showShadow', 'zonePieceGeometry'],
+    'quality', 'render', 'resize', 'setCameraShake', 'setHoveredCell', 'setHoverMap', 'showShadow', 'zonePieceGeometry'],
 };
 const FRAME_ROOTS = ['frame'];
 const NOT_EACH_FRAME = {
@@ -475,6 +494,8 @@ const NOT_EACH_FRAME = {
   // Only when the level changes (the automatic step down after slow frames).
   'render3d/world.js applyQuality': 'only when the quality level changes',
   'render3d/world.js applyViewSize': 'only when the window size or pixel ratio changes',
+  'render3d/world-renderer.js applyMarkTints': 'only when a match starts (new sides) or the quality level changes',
+  'render3d/effects3d.js dropStaleActor': 'only for a flying plant made before the marks were re-tinted',
   // Pools and caches grow the first time they need more, then are reused.
   'render3d/board-marks.js newDecal': 'a decal record pool that grows on a miss (??)',
   'render3d/world-renderer.js plantLook': 'built once per player on a miss (??)',
