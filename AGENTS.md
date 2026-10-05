@@ -3,7 +3,7 @@
 A two-player browser game. Read docs/design.md before every task. It is the source of truth for rules, UI and art.
 
 ## Rules for every task
-- Plain HTML, CSS and JavaScript using ES modules. No framework, no bundler, no build step, no network calls to outside services. Do not add npm dependencies unless the task says so.
+- Plain HTML, CSS and JavaScript using ES modules. No framework, no bundler and no build step for the game. Libraries are allowed. Browser code uses only local copies of a library in vendor/<name>/ with the exact version in vendor/VERSION.txt and its licence file kept; no CDN links and no remote URLs at runtime. Server code (worker/) may use npm packages and its own tooling (for example wrangler, run from the owner's machine to deploy); it is not needed to play locally. The game may call only its own server, never other outside services. Tests run with node --test.
 - Game rules live in pure modules under src/logic/ with no DOM or browser APIs, so they run under Node and can be unit tested.
 - Rendering lives in src/render/, screens and input in src/ui/, networking in src/net/, art files in assets/.
 - Tests use the Node built-in test runner. Run them with: node --test
@@ -17,7 +17,7 @@ A two-player browser game. Read docs/design.md before every task. It is the sour
 
 ## HD-2D RENDERING UPDATE (overrides the rules above where they disagree)
 - The game now uses a 3D scene (Three.js) with 2D pixel sprites. Read docs/art-direction-hd2d.md before every rendering task. It replaces the rendering and art parts of docs/design.md.
-- Three.js is allowed, but only as local files in vendor/ with a pinned version. Keep the licence file and write the exact version in vendor/VERSION.txt. Load it with an import map in index.html that points at vendor/ paths. No CDN links, no remote URLs at runtime, no npm packages, no bundler, no build step. Everything must run from python3 -m http.server 8000 with no internet.
+- Three.js is allowed, but only as local files in vendor/ with a pinned version. Keep the licence file and write the exact version in vendor/VERSION.txt. Load it with an import map in index.html that points at vendor/ paths. No CDN links and no remote URLs at runtime. Npm packages are used only on the server side (worker/), never loaded by the browser. No bundler and no build step for the game. Everything must run from python3 -m http.server 8000 with no internet.
 - 3D code lives in src/render3d/. Do not change src/logic or src/net for rendering reasons.
 - Keep the old 2D renderer working until a task says otherwise. It is reachable with ?render=2d.
 - Keep pure helpers (picking math, camera math, frame timing, quality selection) free of Three.js imports so they run under node --test.
