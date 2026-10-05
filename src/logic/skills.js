@@ -5,6 +5,7 @@ import { COOLDOWN_SHORT, COOLDOWN_LONG } from '../config.js';
 
 export const SHORT = 'short';
 export const LONG = 'long';
+export const PASSIVE = 'passive'; // always on, never used, no cooldown
 
 export const WIND_DASH = 'windDash';
 export const TORNADO_ZONE = 'tornadoZone';
@@ -12,6 +13,8 @@ export const TERRAIN_CREATION = 'terrainCreation';
 export const STONE_CONVERSION = 'stoneConversion';
 export const HISS = 'hiss';
 export const VENOM = 'venom';
+export const SKY_WATCH = 'skyWatch';
+export const CLOUD = 'cloud';
 
 export const SKILLS = {
   [WIND_DASH]: { id: WIND_DASH, name: 'Wind Dash', character: 'windRabbit', cooldownClass: SHORT },
@@ -22,14 +25,28 @@ export const SKILLS = {
   [VENOM]: { id: VENOM, name: 'Venom', character: 'jadeSerpent', cooldownClass: LONG },
 };
 
+// Every skill the rules know: SKILLS and Cloud Eagle's two. Cloud Eagle's
+// skills stay out of SKILLS, the table the HUD and the character select
+// walk, until those screens know Cloud Eagle.
+export const ALL_SKILLS = {
+  ...SKILLS,
+  [SKY_WATCH]: { id: SKY_WATCH, name: 'Sky Watch', character: 'cloudEagle', cooldownClass: PASSIVE },
+  [CLOUD]: { id: CLOUD, name: 'Cloud', character: 'cloudEagle', cooldownClass: LONG },
+};
+
 export function getSkill(skillId) {
-  return Object.hasOwn(SKILLS, skillId) ? SKILLS[skillId] : null;
+  return Object.hasOwn(ALL_SKILLS, skillId) ? ALL_SKILLS[skillId] : null;
+}
+
+// True for a passive skill (Sky Watch): always on, it is never used.
+export function isPassiveSkill(skillId) {
+  return getSkill(skillId)?.cooldownClass === PASSIVE;
 }
 
 // Number of the owner's own turns during which the skill cannot be used
-// after it has been used.
+// after it has been used. A passive skill has none.
 export function cooldownTurns(skillId) {
   const skill = getSkill(skillId);
-  if (!skill) return 0;
+  if (!skill || skill.cooldownClass === PASSIVE) return 0;
   return skill.cooldownClass === LONG ? COOLDOWN_LONG : COOLDOWN_SHORT;
 }

@@ -7,10 +7,11 @@
 import { BOARD_SIZE } from '../config.js';
 import { X, O, cloneBoard, createBoard, inBounds, isBoardFull, isEmptyCell, findWinLineAt } from './board.js';
 import { DEFAULT_SIDES, FIRST_PLAYER, assignSides, characterForStone } from './characters.js';
-import { cooldownTurns, getSkill, TERRAIN_CREATION, STONE_CONVERSION, WIND_DASH, TORNADO_ZONE, HISS, VENOM } from './skills.js';
+import { cooldownTurns, getSkill, isPassiveSkill, TERRAIN_CREATION, STONE_CONVERSION, WIND_DASH, TORNADO_ZONE, HISS, VENOM, CLOUD } from './skills.js';
 import { breakRocks, stoneConversion, terrainCreation } from './earth-bear-skills.js';
 import { inTornado, resolveDash, throwStone, tornadoZone, windDash } from './wind-rabbit-skills.js';
 import { hiss, isSkillLocked, venom } from './jade-serpent-skills.js';
+import { cloud, tickClouds } from './cloud.js';
 
 // Skill effects by skill id.
 const SKILL_EFFECTS = {
@@ -20,6 +21,7 @@ const SKILL_EFFECTS = {
   [STONE_CONVERSION]: stoneConversion,
   [HISS]: hiss,
   [VENOM]: venom,
+  [CLOUD]: cloud,
 };
 
 // A fresh game (docs/flow-design.md section 5), shared by the online host,
@@ -125,6 +127,7 @@ function checkSkill(state, player, skillId) {
   if (!skill) return 'Unknown skill.';
   const character = characterOf(state, player);
   if (!character || !character.skills.includes(skillId)) return 'That is not your skill.';
+  if (isPassiveSkill(skillId)) return `${skill.name} is always on.`;
   const left = skillCooldown(state, player, skillId);
   if (left > 0) return `${skill.name} is on cooldown for ${left} more ${left === 1 ? 'turn' : 'turns'}.`;
   if (isSkillLocked(state, player)) return 'Hiss: you cannot use a skill this turn.';
@@ -135,7 +138,8 @@ function checkSkill(state, player, skillId) {
 // changed and, if the game goes on, ends their turn: a Wind Dash waiting
 // for this turn to end resolves (with a win check for the dashing player),
 // a Tornado Zone lasting through this turn disappears, a Hiss lock lasting
-// through this turn ends, rocks whose
+// through this turn ends, the acting player's clouds lose a turn (and
+// disappear when none is left), rocks whose
 // lifetime ends with this turn break, the draw check runs, their cooldowns
 // count down (a skill used this turn starts its full cooldown) and the
 // other player is to move. If the acting player wins, nothing else happens:
@@ -170,6 +174,12 @@ function finishTurn(state, player, events, changed, usedSkillId = null) {
   if (skillLock && skillLock.endsAfterTurn <= state.turn) {
     state = { ...state, skillLock: null };
     events = [...events, { type: 'hissEnded', player: skillLock.player }];
+  }
+
+  if (state.clouds) {
+    const clouds = tickClouds(state.clouds, player, state.turn);
+    state = { ...state, clouds: clouds.clouds };
+    events = [...events, ...clouds.events];
   }
 
   const rocks = breakRocks(state.board, state.rocks, state.turn);
