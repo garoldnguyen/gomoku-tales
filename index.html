@@ -115,16 +115,20 @@
       <!-- The room's character select (docs/flow-design.md section 3.5, look of docs/reference/v5/character-select-desktop.html):
            the code, the three character cards of this window's seat, then Leave, both seats and Ready. -->
       <section class="card room-card select-card" data-screen="waiting" data-hud-box="waiting-panel">
-        <h2 id="waiting-title"></h2>
-        <div class="code-row">
-          <output class="code" id="room-code" data-hud-box="waiting-code"></output>
-          <button type="button" id="copy-code" data-hud-box="waiting-copy"></button>
-          <p class="status" id="copy-status" aria-live="polite"></p>
+        <div class="select-head">
+          <h2 id="waiting-title"></h2>
+          <div class="code-row">
+            <output class="code" id="room-code" data-hud-box="waiting-code"></output>
+            <button type="button" id="copy-code" data-hud-box="waiting-copy"></button>
+            <p class="status" id="copy-status" aria-live="polite"></p>
+          </div>
         </div>
-        <p class="note" id="waiting-hint"></p>
-        <p class="select-lead" id="waiting-lead"></p>
+        <div class="select-notes">
+          <p class="note" id="waiting-hint"></p>
+          <p class="select-lead" id="waiting-lead"></p>
+          <p class="status starting" id="waiting-starting" aria-live="polite"></p>
+        </div>
         <div class="characters" id="waiting-characters"></div>
-        <p class="status starting" id="waiting-starting" aria-live="polite"></p>
         <div class="select-actions">
           <button type="button" class="secondary select-back" id="waiting-leave" data-hud-box="waiting-leave"></button>
           <div class="seats" id="waiting-cards"></div>

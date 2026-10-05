@@ -5,6 +5,7 @@
 // is missing. src/render3d/art.js turns these into canvases.
 // Pure: no DOM or Three.js, so it runs under node --test.
 
+import { EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
 import { CHARACTER_ANIMS } from './character-poses.js';
 import { bearFrames, rabbitFrames } from './placeholder-art.js';
 import { blockSheetPainter, farmBoardPainter, ringPainter, stripPainter } from './v3-placeholder-art.js';
@@ -18,6 +19,13 @@ const poseNames = (prefix) => Object.fromEntries(POSES.map((pose) => [pose, `${p
 // one sheet the character sprite plays (shown when SHOW_WORLD_CHARACTERS).
 export const ART = {
   character: { X: poseNames('wind-rabbit'), O: poseNames('earth-bear') },
+  // The owner's pixel portraits in assets/3d/v5/, by character id, shown
+  // on the character cards of the character select (src/ui/screens.js).
+  avatar: {
+    [WIND_RABBIT]: 'avatar-wind-rabbit',
+    [EARTH_BEAR]: 'avatar-earth-bear',
+    [JADE_SERPENT]: 'avatar-jade-serpent',
+  },
   // Farmland v3 pack in assets/3d/v3/ (docs/art-direction-v3.md section 2).
   // Tuning data for these names is in assets/v3-meta.json (v3-meta.js).
   v3: {
@@ -113,6 +121,15 @@ const V3_SHAPES = {
   'portrait-earth-bear-v3': [32, 32, 1],
 };
 
+// Frame size of the v5 avatars (one 128 by 128 frame) and the colour of
+// the block that stands in for each while its file is missing.
+export const AVATAR_PX = 128;
+const AVATAR_COLORS = {
+  [ART.avatar[WIND_RABBIT]]: '#3b8cff',
+  [ART.avatar[EARTH_BEAR]]: '#ff4b5c',
+  [ART.avatar[JADE_SERPENT]]: '#8fe3a8',
+};
+
 // Placeholder colours of the v3 upright sprites and strips, one per frame
 // (cycled). Plants keep the team colours of section 2.
 const V3_COLORS = {
@@ -188,6 +205,12 @@ export const PLACEHOLDERS_3D = {
     [ART.character.O[pose], pixelArt(() => bearFrames(pose))],
   ])),
   ...Object.fromEntries(artNames(ART.v3).map((name) => [name, v3Placeholder(name)])),
+  ...Object.fromEntries(artNames(ART.avatar).map((name) => [name, {
+    width: AVATAR_PX,
+    height: AVATAR_PX,
+    frames: 1,
+    paint: blockSheetPainter({ width: AVATAR_PX, height: AVATAR_PX, frames: 1, colors: [AVATAR_COLORS[name]] }),
+  }])),
 };
 
 // Placeholder for a name that has none: a small pink square.

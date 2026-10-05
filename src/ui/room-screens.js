@@ -3,13 +3,14 @@
 // string, box name and state it draws, so node tests and shot mode see the
 // same screens. Text comes from strings.js, numbers from src/config.js.
 
-import { ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH } from '../config.js';
+import { ONLINE_SAME_BROWSER_ONLY, ROOM_CODE_LENGTH, SELECT_PORTRAIT_SCALE } from '../config.js';
 import { O, X } from '../logic/board.js';
 import { CHARACTERS, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
 import { createSeats, otherSeat, seatStone } from '../logic/seats.js';
 import { cooldownTurns } from '../logic/skills.js';
 import { GUEST, HOST, ROOM_SEATS } from '../net/room.js';
 import { normalizeRoomCode } from '../net/room-code.js';
+import { ART, AVATAR_PX } from '../render3d/art-assets.js';
 import { LOCAL_SEATS, ROLES, SCREENS, isSelecting } from './flow.js';
 import { PORTRAIT_ART } from './hud-view.js';
 import { SKILL_INFO } from './skill-info.js';
@@ -18,15 +19,60 @@ import { STRINGS } from './strings.js';
 // The characters of the character select, in table order.
 export const SELECT_CHARACTERS = Object.freeze(Object.keys(CHARACTERS));
 
-// How each character looks on the character select (placeholder art until
-// the owner's portraits come): the card colour (a glass token of room.css),
-// the emblem (the blue four-petal cross, the red round bloom, the jade
-// circle with a leaf), the seal initials and the tagline of strings.js.
+// How each character looks on the character select: the card colour (a
+// glass token of room.css), the owner's pixel portrait (its asset key, the
+// one place the select names it), the emblem shown while the portrait is
+// missing (the blue four-petal cross, the red round bloom, the jade circle
+// with a leaf), the seal initials and the tagline of strings.js.
 export const CHARACTER_LOOKS = Object.freeze({
-  [WIND_RABBIT]: Object.freeze({ colour: 'blue', emblem: 'cross', seal: 'GH', tagline: STRINGS.selectTaglineWindRabbit }),
-  [EARTH_BEAR]: Object.freeze({ colour: 'red', emblem: 'bloom', seal: 'MB', tagline: STRINGS.selectTaglineEarthBear }),
-  [JADE_SERPENT]: Object.freeze({ colour: 'jade', emblem: 'leaf', seal: 'JS', tagline: STRINGS.selectTaglineJadeSerpent }),
+  [WIND_RABBIT]: Object.freeze({
+    colour: 'blue', portrait: ART.avatar[WIND_RABBIT], emblem: 'cross', seal: 'GH', tagline: STRINGS.selectTaglineWindRabbit,
+  }),
+  [EARTH_BEAR]: Object.freeze({
+    colour: 'red', portrait: ART.avatar[EARTH_BEAR], emblem: 'bloom', seal: 'MB', tagline: STRINGS.selectTaglineEarthBear,
+  }),
+  [JADE_SERPENT]: Object.freeze({
+    colour: 'jade', portrait: ART.avatar[JADE_SERPENT], emblem: 'leaf', seal: 'JS', tagline: STRINGS.selectTaglineJadeSerpent,
+  }),
 });
+
+// What the stage of a character card shows: its portrait when the asset
+// store holds a loaded image with a src for the card's portrait key, else
+// its emblem. assets is the asset store (render/assets.js) or null.
+//   { kind: 'portrait', src } or { kind: 'emblem', emblem }
+export function characterStage(card, assets) {
+  const image = card.portrait ? assets?.get(card.portrait) ?? null : null;
+  return image?.src ? { kind: 'portrait', src: image.src } : { kind: 'emblem', emblem: card.emblem };
+}
+
+// The room the character select leaves a portrait, in internal pixels (one
+// --u of index.html: the window's 16:9 box over 960): the panel's height
+// without the card stage plus the window padding (measured on the waiting
+// room, the taller panel: its title and code share a row, room.css), the
+// room a stage needs around its portrait, and the inner width of one
+// character card. Phones (PHONE_MAX_WIDTH and narrower, room.css) always
+// show scale 1.
+export const SELECT_INTERNAL_WIDTH = 960;
+export const SELECT_REST_HEIGHT_U = 334;
+export const SELECT_STAGE_PAD_U = 8;
+export const SELECT_CARD_INNER_U = 214;
+export const PHONE_MAX_WIDTH = 600;
+
+// The whole-number scale of the 128 px portraits on the character cards:
+// SELECT_PORTRAIT_SCALE when it fits the window of width by height CSS
+// pixels, else the largest smaller whole number that fits, at least 1. A
+// whole number keeps every art pixel a square of screen pixels.
+export function portraitScale(width, height) {
+  if (width <= PHONE_MAX_WIDTH) return 1;
+  const u = Math.min(width, (height * 16) / 9) / SELECT_INTERNAL_WIDTH;
+  for (let scale = SELECT_PORTRAIT_SCALE; scale > 1; scale--) {
+    const side = AVATAR_PX * scale;
+    const fitsHeight = side + SELECT_STAGE_PAD_U * u <= height - SELECT_REST_HEIGHT_U * u;
+    const fitsWidth = side + SELECT_STAGE_PAD_U * u <= SELECT_CARD_INNER_U * u;
+    if (fitsHeight && fitsWidth) return scale;
+  }
+  return 1;
+}
 
 // The rest turns text of a skill row, from COOLDOWN_SHORT or COOLDOWN_LONG
 // (logic/skills.js cooldownTurns).
@@ -78,7 +124,7 @@ export function joinViewModel({ text = '', joining = false, error = null } = {})
 // not Ready, else the first seat that is not Ready yet. So either local
 // seat may pick first. A local seat card that is not active and not Ready
 // is choosable: pressing it makes that seat the active one. Each card
-// has the emblem, the seal, the tagline and one row per skill with its
+// has the portrait key (characterStage: the emblem while it is missing), the seal, the tagline and one row per skill with its
 // rest turns; a card taken by the other seat is disabled and says Taken.
 export function characterSelectViewModel({ seats, labels, editable = [], you = null, absent = [], prefer = null }) {
   const open = editable.filter((seat) => !absent.includes(seat));
@@ -99,6 +145,7 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
         name: CHARACTERS[id].name,
         tagline: look.tagline,
         colour: look.colour,
+        portrait: look.portrait,
         emblem: look.emblem,
         seal: look.seal,
         skills: CHARACTERS[id].skills.map((skillId) => {

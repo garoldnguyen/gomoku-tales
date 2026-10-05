@@ -136,8 +136,9 @@
 /* The room and the local select fill the window with their own title (the
    canvas title is off under them): the panel holds the room code, the
    three character cards of the active seat, then Back or Leave, the two
-   seats and Ready in one row. Placeholder art: the emblems are the blue
-   four-petal cross, the red round bloom and the jade circle with a leaf. */
+   seats and Ready in one row. Each card shows the owner's pixel portrait;
+   while it is missing, its emblem: the blue four-petal cross, the red
+   round bloom or the jade circle with a leaf. */
 #screens.picking {
   padding: calc(var(--u) * 12);
 }
@@ -147,7 +148,7 @@
   width: min(calc(var(--u) * 780), calc(100vw - 24px));
   max-width: none;
   gap: calc(var(--u) * 10);
-  padding: calc(var(--u) * 20) calc(var(--u) * 24);
+  padding: calc(var(--u) * 16) calc(var(--u) * 24);
 }
 
 #screens .select-card h2 {
@@ -165,6 +166,28 @@
   left: 100%;
   margin-left: calc(var(--u) * 12);
   white-space: nowrap;
+}
+
+/* The room's title and code share one row, the hint and the lead the
+   next, so the cards keep room for the portraits at scale 2
+   (room-screens.js portraitScale). Long text wraps. */
+#screens .select-head,
+#screens .select-notes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  column-gap: calc(var(--u) * 20);
+  row-gap: calc(var(--u) * 4);
+}
+
+#screens .select-notes {
+  column-gap: calc(var(--u) * 12);
+}
+
+/* Once this seat is Ready the starting text takes the lead's place. */
+#screens .select-notes:has(.starting:not(:empty)) .select-lead {
+  display: none;
 }
 
 #screens .select-lead {
@@ -233,6 +256,23 @@
 #screens .emblem {
   width: calc(var(--u) * 58);
   height: calc(var(--u) * 58);
+}
+
+/* The owner's pixel portrait in place of the emblem (screens.js): drawn at
+   a whole-number scale (--portrait-px, room-screens.js portraitScale) with
+   crisp pixels. Without it (missing art) the emblem shows. */
+#screens .emblem-tile.has-portrait {
+  height: max(calc(var(--u) * 76), calc(var(--portrait-px) + var(--u) * 8));
+}
+
+#screens .emblem-tile.has-portrait .emblem {
+  display: none;
+}
+
+#screens .emblem-tile .portrait {
+  width: var(--portrait-px);
+  height: var(--portrait-px);
+  image-rendering: pixelated;
 }
 
 #screens .emblem .petal {
@@ -534,6 +574,11 @@
   #screens .emblem {
     width: 44px;
     height: 44px;
+  }
+
+  #screens .emblem-tile.has-portrait {
+    width: calc(var(--portrait-px) + 8px);
+    height: calc(var(--portrait-px) + 8px);
   }
 
   #screens .seal {

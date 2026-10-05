@@ -64,6 +64,10 @@
     "trees": { "file": "3d/v3/trees.png", "use": "3d", "width": 34, "height": 48, "frames": 3, "frameMs": 0 },
     "wind-bits": { "file": "3d/v3/wind-bits.png", "use": "3d", "width": 7, "height": 5, "frames": 6, "frameMs": 0 },
 
+    "avatar-earth-bear": { "file": "3d/v5/avatar-earth-bear-128.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "avatar-jade-serpent": { "file": "3d/v5/avatar-jade-serpent-128.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "avatar-wind-rabbit": { "file": "3d/v5/avatar-wind-rabbit-128.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+
     "forest-wall-pine": { "file": "3d/v3/forest-wall-pine.png", "use": "3d", "width": 192, "height": 64, "frames": 1, "frameMs": 0 },
     "forest-wall-round": { "file": "3d/v3/forest-wall-round.png", "use": "3d", "width": 192, "height": 56, "frames": 1, "frameMs": 0 },
     "tree-birch": { "file": "3d/v3/tree-birch.png", "use": "3d", "width": 30, "height": 58, "frames": 2, "frameMs": 0 },

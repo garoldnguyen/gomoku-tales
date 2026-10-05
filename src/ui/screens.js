@@ -9,8 +9,9 @@
 // getView, getScreen and onChange (its actions may be missing).
 
 import { COPY_FEEDBACK_MS } from '../config.js';
+import { AVATAR_PX } from '../render3d/art-assets.js';
 import { GAME, GAME_OVER, JOIN, SELECT, WAITING_SCREEN } from './app.js';
-import { copyFeedbackText, copyRoomCode, joinViewModel, lobbyViewModel } from './room-screens.js';
+import { characterStage, copyFeedbackText, portraitScale, copyRoomCode, joinViewModel, lobbyViewModel } from './room-screens.js';
 import { STRINGS } from './strings.js';
 
 export function attachScreens(root, app, { clipboard = globalThis.navigator?.clipboard } = {}) {
@@ -27,6 +28,8 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   const overMenu = $('over-menu');
   let shown = null;
   let copyTimer = null;
+  let assets = null; // the asset store (render/assets.js), see setAssets
+  const warned = new Set(); // portrait keys already warned about
 
   // The fixed text.
   const lobby = lobbyViewModel();
@@ -132,6 +135,40 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     parent.append(svg);
   };
 
+  // The stage of a character card (room-screens.js characterStage): the
+  // owner's pixel portrait at the whole-number scale of portraitScale
+  // (room.css keeps it pixelated), or the emblem while the portrait is
+  // missing or fails to load. A missing portrait only warns, once per key.
+  const sizePortraits = () => {
+    const side = AVATAR_PX * portraitScale(window.innerWidth, window.innerHeight);
+    root.style.setProperty('--portrait-px', `${side}px`);
+  };
+  sizePortraits();
+  window.addEventListener('resize', sizePortraits);
+  const warnPortrait = (key, why) => {
+    if (warned.has(key)) return;
+    warned.add(key);
+    console.warn(`Portrait "${key}" ${why}; the character card shows its emblem`);
+  };
+  const showStage = (card, tile) => {
+    emblem(card.emblem, tile);
+    const stage = characterStage(card, assets);
+    if (stage.kind !== 'portrait') {
+      if (assets && card.portrait) warnPortrait(card.portrait, 'is not loaded');
+      return;
+    }
+    const img = el('img', 'portrait', tile);
+    img.alt = '';
+    img.draggable = false;
+    img.addEventListener('error', () => {
+      warnPortrait(card.portrait, 'failed to load');
+      img.remove();
+      tile.classList.remove('has-portrait');
+    }, { once: true });
+    img.src = stage.src;
+    tile.classList.add('has-portrait');
+  };
+
   // Rebuilds a container only when its list changed. The button that had
   // focus keeps it after the rebuild (or, now disabled, the container's
   // first enabled button).
@@ -180,7 +217,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   });
 
   // The three character cards of the active seat (characterSelectViewModel
-  // characters): emblem with the seal, name, tagline and one row per skill
+  // characters): portrait (or emblem) with the seal, name, tagline and one row per skill
   // with its rest turns. A card is a button that picks the character.
   const showCharacters = (container, list, seat) => rebuild(container, list, (card, parent) => {
     const button = el('button', `character colour-${card.colour}`, parent);
@@ -190,7 +227,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     button.disabled = card.disabled;
     button.setAttribute('aria-pressed', String(card.selected));
     const tile = el('span', 'emblem-tile', button);
-    emblem(card.emblem, tile);
+    showStage(card, tile);
     el('span', 'seal', tile).textContent = card.seal;
     const body = el('span', 'character-body', button);
     const head = el('span', 'character-head', body);
@@ -281,9 +318,13 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   update();
 
   return {
-    // The asset store (render/assets.js). The character select draws
-    // placeholder emblems until the owner's art comes, so it keeps none.
-    setAssets() {},
+    // The asset store (render/assets.js) of the portraits: the character
+    // cards are built again with it.
+    setAssets(store) {
+      assets = store ?? null;
+      built.clear();
+      update();
+    },
   };
 }
 
