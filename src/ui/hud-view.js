@@ -6,6 +6,7 @@
 import { X, O } from '../logic/board.js';
 import { CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT, characterForStone } from '../logic/characters.js';
 import { characterOf, isGameOver, skillCooldown } from '../logic/game.js';
+import { isSkillLocked } from '../logic/jade-serpent-skills.js';
 import { cooldownTurns, getSkill, isPassiveSkill } from '../logic/skills.js';
 import { ART } from '../render3d/art-assets.js';
 import { ALL_EXPANDED } from './hud-collapse.js';
@@ -181,6 +182,11 @@ function skillView(state, player, skillId, { over, active, yours, targeting }) {
     look = COOLING;
     skillState = STATE_COOLING;
     text = `Ready in ${remaining} ${remaining === 1 ? 'turn' : 'turns'}`;
+  } else if (isSkillLocked(state, player)) {
+    // Jade Serpent's Hiss: no skill this turn (the player can still plant).
+    look = OFF;
+    skillState = STATE_WAITING;
+    text = STRINGS.skillSilenced;
   } else if (targeting?.skill === skillId) {
     look = SELECTED;
     skillState = STATE_SELECTED;

@@ -52,3 +52,18 @@ test('the files of the Cloud Eagle and Jade Serpent art have the manifest sizes'
     assert.deepEqual(pngSize(entry.file), [entry.width, entry.height], name);
   }
 });
+
+test('a player silenced by Hiss sees every skill row Silenced, never Ready', async () => {
+  const { STRINGS } = await import('../src/ui/strings.js');
+  const { useSkill } = await import('../src/logic/game.js');
+  const { HISS } = await import('../src/logic/skills.js');
+  const start = createInitialState(undefined, { [X]: JADE_SERPENT, [O]: CLOUD_EAGLE });
+  const after = useSkill(start, { player: X, skill: HISS });
+  assert.ok(!after.error, after.error);
+  const vm = hudViewModel(after.state);
+  const eagle = vm.cards.find((card) => card.player === O);
+  const cloud = eagle.skills.find((skill) => skill.id === 'cloud');
+  assert.equal(cloud.stateText, STRINGS.skillSilenced);
+  assert.equal(cloud.disabled, true);
+  assert.equal(eagle.skills.find((skill) => skill.id === 'skyWatch').stateText, STRINGS.skillAlwaysOn, 'a passive skill stays on');
+});

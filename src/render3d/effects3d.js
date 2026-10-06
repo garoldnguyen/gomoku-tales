@@ -56,18 +56,23 @@
 
 import * as THREE from 'three';
 import {
-  BANNER_3D_Y, BOARD_SIZE, CAMERA_FOV, CONVERT_SPARK_RATE, DASH_SWIRL_RATE, DASH_TRAIL_RATE,
-  MARK_FADE_MS, PLACE_DUST_COUNT, PLACEMENT_SLOTS, PLANT_OPEN_SPARKLES, PX_WORLD, SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS,
-  SPRITE_STRETCH_Y, THROW_ARC_HEIGHT, TORNADO_BEND_PX, TORNADO_PARTICLE_RATE, TORNADO_SIZE, VINE_POINT_PX, VINE_POINTS,
+  BANNER_3D_Y, BOARD_SIZE, CAMERA_FOV, CAST_RING_DOTS, CAST_RING_FROM, CAST_RING_MS, CAST_RING_TO, CAST_SPARKLES,
+  CLOUD_PUFFS, CLOUD_SIZE, CONVERT_SPARK_RATE, DASH_SWIRL_RATE, DASH_TRAIL_RATE, HISS_MIST, HISS_RING_DOTS,
+  HISS_RING_GAP_MS, HISS_RING_MS, HISS_RING_TO, HISS_RINGS, HISS_WOBBLE, HISS_WOBBLE_WAVES, MARK_FADE_MS,
+  PLACE_DUST_COUNT, PLACEMENT_SLOTS, PLANT_OPEN_SPARKLES, PX_WORLD, RING_DOT_PX, RING_LIGHTEN, RING_MAX_DOTS, RING_SLOTS,
+  SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
+  TORNADO_PARTICLE_RATE, TORNADO_SIZE, VENOM_BUBBLE_RATE, VENOM_TINT, VINE_POINT_PX, VINE_POINTS, WIN_RING_DOTS,
+  WIN_RING_MS, WIN_RING_TO, WIN_SPARKLES, WIN_STAGGER_MS,
 } from '../config.js';
-import { X } from '../logic/board.js';
+import { O, X } from '../logic/board.js';
+import { DEFAULT_SIDES } from '../logic/characters.js';
 import { createBanners } from '../render/effects.js';
 import { artMeta, artSource } from './art.js';
 import { ART } from './art-assets.js';
-import { PLAN_SEED, placementPlan } from './character-look.js';
+import { CHARACTER_LOOK, PLAN_SEED, placementPlan } from './character-look.js';
 import {
   catchUpVisuals, convertPose, crumblePose, dashCurveInto, dashPose, heldCell, regrowCell, rockFallPose,
-  shakeLeft, shakeOffset3d, shakeStrength, sparkPathInto, throwPose, visualsForEvents,
+  shakeLeft, shakeOffset3d, shakeStrength, sparkPathInto, throwPose, venomPose, visualsForEvents,
 } from './effect-plans.js';
 import { STAGE_DROP, STAGE_REST } from './growth.js';
 import {
@@ -78,6 +83,7 @@ import { clearPlacementRuns, createPlacementRuns, startPlacementRun, stepPlaceme
 import { GLOW } from './post-processing.js';
 import { MAX_PARTICLE_CAP, particleScale, plainSlides } from './quality.js';
 import { effectRandom } from './seeded-random.js';
+import { clearRings, createRings, ringDotsInto, startRing, stepRings } from './skill-rings.js';
 import { stageStartMs } from './v3-meta.js';
 import { createCellDecal, createPieceSprite, decalMaterial, placeOnCell, zonePieceGeometry } from './world.js';
 
@@ -99,6 +105,11 @@ const COLORS = {
   vineDark: 0x1f8a57,
   cloudPuff: 0xf4f8ff, // cloudSwirl: the soft cloud puffs
   feather: 0xffffff, // and the white feathers
+  venom: 0x8cff5a, // Venom: the bright venom drops and bubbles
+  venomDark: 0x2f9e44,
+  venomSmoke: 0x3d6b3a, // the sick smoke left when the plant has sunk
+  venomGlow: 0x7dff4a, // the green the wilting plant takes on (emissive)
+  white: 0xffffff,
 };
 // The petals of wind-bits: pink, white, yellow, lilac.
 const PETALS = [0xffb8d4, 0xfff6ec, 0xffe066, 0xcdb0f0];
@@ -111,6 +122,21 @@ const MAX_STEP_MS = 100; // a hidden tab does not make the effects jump on retur
 const TWO_PI = Math.PI * 2;
 const BLOOM_ROW_PX = 12; // art pixel row of a plant frame where the bloom opens
 const ZONE_HALF = (TORNADO_SIZE - 1) / 2; // zone cells reach this far from its centre
+const CLOUD_HALF = (CLOUD_SIZE - 1) / 2; // cloud cells reach this far from its centre
+const BOARD_MIDDLE = (BOARD_SIZE - 1) / 2; // the middle cell of the field, where Hiss rings start
+const VENOM_SINK_DEPTH = 0.25; // world units the sick sprout sinks at the end
+const RING_Y = 0.05; // world height of the ring dots, just over the plots
+
+// The colour of each character as a number (CHARACTER_LOOK), for the
+// twinkles of its skills, and the lighter one of its ring dots.
+const CHARACTER_COLOUR = Object.fromEntries(Object.entries(CHARACTER_LOOK).map(([id, look]) => [id, parseInt(look.colour.slice(1), 16)]));
+const RING_COLOUR = Object.fromEntries(Object.entries(CHARACTER_COLOUR).map(([id, colour]) => [id, towardWhite(colour, RING_LIGHTEN)]));
+
+// `colour` (0xRRGGBB) mixed `share` of the way toward white.
+export function towardWhite(colour, share) {
+  const mix = (c) => Math.round(c + (255 - c) * share);
+  return (mix(colour >> 16) << 16) | (mix((colour >> 8) & 0xff) << 8) | mix(colour & 0xff);
+}
 
 // The stage start times of the plant of `player` (v3-meta.json).
 function plantStages(player) {
@@ -153,6 +179,19 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
   const vinePoints = createParticlePoints(vinePool.capacity);
   world.scene.add(vinePoints.mesh);
   const vineXyz = new Float32Array(VINE_POINTS * 3);
+  // The ring waves (skill-rings.js): one Points draw call of their own,
+  // outside the particle cap (rings play on every level), rebuilt every
+  // frame from the playing rings.
+  const rings = createRings(RING_SLOTS);
+  const ringPool = createParticlePool(RING_SLOTS * RING_MAX_DOTS);
+  const ringPoints = createParticlePoints(ringPool.capacity);
+  world.scene.add(ringPoints.mesh);
+  const ringXyz = new Float32Array(RING_MAX_DOTS * 3);
+  // The colour of the character on each side (CHARACTER_COLOUR), set by
+  // trigger() from the sides of the game the events come from.
+  const sideColour = { [X]: CHARACTER_COLOUR[DEFAULT_SIDES[X]], [O]: CHARACTER_COLOUR[DEFAULT_SIDES[O]] };
+  const sideRing = { [X]: RING_COLOUR[DEFAULT_SIDES[X]], [O]: RING_COLOUR[DEFAULT_SIDES[O]] };
+  const ringAt = { x: 0, z: 0, y: RING_Y, from: 0, to: 0, ms: 0, dots: 0, color: 0, delay: 0, wobble: 0, waves: 0 };
   const held = new Float64Array(BOARD_SIZE * BOARD_SIZE); // cell index -> time its plant shows again
   const timelines = [];
   for (let i = 0; i < TIMELINE_SLOTS; i++) timelines.push(newTimeline());
@@ -162,7 +201,9 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
   // reads ageMs and strength and writes the offset x and y.
   const shake = { start: -Infinity, ageMs: 0.5, strength: 0.5, x: 0.5, y: 0.5 };
   // The pose functions read ageMs (and progress, spark) and write the pose here.
-  const pose = { ageMs: 0.5, frame: 0, done: false, flying: false, progress: 0.5, spark: 0.5, x: 0.5, z: 0.5, lift: 0.5 };
+  const pose = {
+    ageMs: 0.5, frame: 0, done: false, flying: false, progress: 0.5, spark: 0.5, x: 0.5, z: 0.5, lift: 0.5, tint: 0.5, sink: 0.5,
+  };
   const at = { x: 0.5, y: 0.5, z: 0.5 }; // where a trail is left this frame
   const cellAt = { x: 0.5, z: 0.5 }; // a cell centre, for the growth cues
   const pointScaleFactor = 1 / (2 * Math.tan((CAMERA_FOV * Math.PI) / 360));
@@ -362,6 +403,208 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     actor.sprite.object.position.z = at.z;
   }
 
+  // --- Skill rings and the twinkles of every character ---
+
+  // A ring of dots spreading from (wx, wz) (skill-rings.js startRing).
+  function ring(wx, wz, from, to, ms, dots, color, delay) {
+    ringAt.x = wx;
+    ringAt.z = wz;
+    ringAt.from = from;
+    ringAt.to = to;
+    ringAt.ms = ms;
+    ringAt.dots = dots;
+    ringAt.color = color;
+    ringAt.delay = delay;
+    ringAt.wobble = 0;
+    ringAt.waves = 0;
+    return startRing(rings, ringAt, frame.time);
+  }
+
+  // `base` twinkles in `color` bursting up and out of the plot at (wx, wz),
+  // with the odd white one, scaled by the level.
+  function colourSparkles(wx, wz, base, color, rise) {
+    const count = scaledCount(base, frame.scale);
+    for (let i = 0; i < count; i++) {
+      random.fill(u);
+      const angle = (i / count) * TWO_PI + u[0] * 0.5;
+      const speed = 0.4 + u[1] * 0.5;
+      sp.x = wx + Math.cos(angle) * 0.2;
+      sp.y = 0.1 + u[2] * 0.2;
+      sp.z = wz + Math.sin(angle) * 0.2;
+      sp.vx = Math.cos(angle) * speed;
+      sp.vy = rise + u[3] * 0.6;
+      sp.vz = Math.sin(angle) * speed;
+      sp.gravity = 1.4;
+      sp.drag = 1.8;
+      sp.life = 0.5 + u[4] * 0.3;
+      sp.size = (2 + u[5]) * PX;
+      sp.grow = 0;
+      sp.color = i % 4 === 3 ? COLORS.white : color;
+      sp.alpha = 1;
+      sp.shape = i % 2 ? SHAPE_SQUARE : SHAPE_PLUS;
+      pool.spawnFall(sp);
+    }
+  }
+
+  // Hiss: jade mist puffs rising here and there off the field.
+  function hissMist(color) {
+    const count = scaledCount(HISS_MIST, frame.scale);
+    for (let i = 0; i < count; i++) {
+      random.fill(u);
+      cellToWorldInto(Math.floor(u[0] * BOARD_SIZE), Math.floor(u[1] * BOARD_SIZE), cellAt);
+      sp.x = cellAt.x;
+      sp.y = 0.05;
+      sp.z = cellAt.z;
+      sp.vx = 0.1 + u[2] * 0.1; // drifting with the wind, to the lower right
+      sp.vy = 0.3 + u[3] * 0.3;
+      sp.vz = 0.05 + u[4] * 0.05;
+      sp.gravity = 0;
+      sp.drag = 0.6;
+      sp.life = 0.8 + u[5] * 0.5;
+      sp.size = (3 + u[6] * 2) * PX;
+      sp.grow = 3 * PX;
+      sp.color = i % 3 === 2 ? COLORS.white : color;
+      sp.alpha = 0.45;
+      sp.shape = SHAPE_SQUARE;
+      pool.spawnFall(sp);
+    }
+  }
+
+  // Venom: three bright drops falling onto the plant at (wx, wz).
+  function venomDrops(wx, wz) {
+    const count = scaledCount(3, frame.scale);
+    for (let i = 0; i < count; i++) {
+      random.fill(u);
+      sp.x = wx - 0.06 + u[0] * 0.12;
+      sp.y = 1.3 + i * 0.25;
+      sp.z = wz - 0.04 + u[1] * 0.08;
+      sp.vx = 0;
+      sp.vy = -2.2;
+      sp.vz = 0;
+      sp.gravity = 6;
+      sp.drag = 0;
+      sp.life = 0.32 + i * 0.04;
+      sp.size = 3 * PX;
+      sp.grow = 0;
+      sp.color = i % 2 ? COLORS.venomDark : COLORS.venom;
+      sp.alpha = 1;
+      sp.shape = SHAPE_SQUARE;
+      pool.spawnFall(sp);
+    }
+  }
+
+  // Venom: `count` green bubbles rising from the sinking plant at `at`.
+  function venomBubbles(count) {
+    for (let i = 0; i < count; i++) {
+      random.fill(u);
+      sp.x = at.x - 0.15 + u[0] * 0.3;
+      sp.y = 0.05 + u[1] * 0.15;
+      sp.z = at.z - 0.1 + u[2] * 0.2;
+      sp.vx = 0;
+      sp.vy = 0.35 + u[3] * 0.35;
+      sp.vz = 0;
+      sp.gravity = 0;
+      sp.drag = 1;
+      sp.life = 0.4 + u[4] * 0.3;
+      sp.size = (1 + u[5] * 2) * PX;
+      sp.grow = PX;
+      sp.color = u[6] < 0.6 ? COLORS.venom : COLORS.venomDark;
+      sp.alpha = 0.9;
+      sp.shape = SHAPE_SQUARE;
+      pool.spawnFall(sp);
+    }
+  }
+
+  // Venom: the sick smoke left where the plant sank, drifting with the wind.
+  function venomSmoke(wx, wz) {
+    const count = scaledCount(8, frame.scale);
+    for (let i = 0; i < count; i++) {
+      random.fill(u);
+      sp.x = wx - 0.12 + u[0] * 0.24;
+      sp.y = 0.06;
+      sp.z = wz - 0.1 + u[1] * 0.2;
+      sp.vx = 0.08 + u[2] * 0.12;
+      sp.vy = 0.25 + u[3] * 0.25;
+      sp.vz = 0.03 + u[4] * 0.05;
+      sp.gravity = 0;
+      sp.drag = 1.2;
+      sp.life = 0.6 + u[5] * 0.3;
+      sp.size = (3 + u[6] * 2) * PX;
+      sp.grow = 3 * PX;
+      sp.color = i % 2 ? COLORS.venomSmoke : COLORS.venomDark;
+      sp.alpha = 0.6;
+      sp.shape = SHAPE_SQUARE;
+      pool.spawnFall(sp);
+    }
+  }
+
+  // Cloud Eagle's cloud over the area centred on (wx, wz): puffs rolling in
+  // on the wind from the upper left (forming), or drifting off to the lower
+  // right and swelling as they thin (fading).
+  function cloudPuffs(wx, wz, forming) {
+    const count = scaledCount(CLOUD_PUFFS, frame.scale);
+    for (let i = 0; i < count; i++) {
+      random.fill(u);
+      const ox = (u[0] * 2 - 1) * (CLOUD_HALF + 0.5);
+      const oz = (u[1] * 2 - 1) * (CLOUD_HALF + 0.5);
+      if (forming) {
+        // From up to 1.5 world units up the wind, gliding into the area.
+        sp.x = wx + ox - 1.2 - u[2] * 0.6;
+        sp.z = wz + oz - 0.45 - u[2] * 0.2;
+        sp.vx = 1.6 + u[3] * 0.6;
+        sp.vz = 0.55 + u[3] * 0.2;
+        sp.drag = 2.2;
+      } else {
+        sp.x = wx + ox;
+        sp.z = wz + oz;
+        sp.vx = 0.5 + u[3] * 0.4;
+        sp.vz = 0.18 + u[3] * 0.14;
+        sp.drag = 0.4;
+      }
+      sp.y = 0.35 + u[4] * 0.3;
+      sp.vy = forming ? 0 : 0.12 + u[5] * 0.12;
+      sp.gravity = 0;
+      sp.life = 0.6 + u[6] * 0.4;
+      sp.size = (4 + u[7] * 3) * PX;
+      sp.grow = (forming ? 1 : 4) * PX;
+      sp.color = u[8] < 0.75 ? COLORS.cloudPuff : COLORS.white;
+      sp.alpha = 0.7;
+      sp.shape = SHAPE_SQUARE;
+      pool.spawnFall(sp);
+    }
+  }
+
+  // The playing rings, as dots in their colour fading out (ringDotsInto).
+  function drawRings() {
+    ringPool.clear();
+    stepRings(rings, frame.time);
+    for (let r = 0; r < rings.length; r++) {
+      const record = rings[r];
+      if (!record.active) continue;
+      const n = ringDotsInto(record, frame.time, ringXyz);
+      for (let i = 0; i < n; i++) {
+        sp.x = ringXyz[i * 3];
+        sp.y = ringXyz[i * 3 + 1];
+        sp.z = ringXyz[i * 3 + 2];
+        sp.vx = 0;
+        sp.vy = 0;
+        sp.vz = 0;
+        sp.gravity = 0;
+        sp.drag = 0;
+        sp.life = 1;
+        sp.size = RING_DOT_PX * PX;
+        sp.grow = 0;
+        sp.color = i % 5 === 4 ? COLORS.white : record.color;
+        sp.alpha = record.alpha;
+        sp.shape = SHAPE_SQUARE;
+        const k = ringPool.spawnFall(sp);
+        // Halfway through its life a dot shows at its full alpha (alphaAt).
+        if (k >= 0) ringPool.age[k] = 0.5;
+      }
+    }
+    ringPoints.sync(ringPool, frame);
+  }
+
   // --- Placement effects ---
 
   // One particle step of a placement plan (character-look.js) on the plot
@@ -540,6 +783,31 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
         a.sprite.plane.scale.set(pose.scaleX, pose.scaleY, 1);
         if (pose.done) endTimeline(record);
         break;
+      case 'venom':
+        venomPose(pose, record.stages);
+        a.sprite.setFrame(pose.frame);
+        a.material.emissiveIntensity = VENOM_TINT * pose.tint;
+        if (pose.sink > 0) {
+          a.sprite.plane.scale.set(1 - 0.25 * pose.sink, 1 - 0.75 * pose.sink, 1);
+          a.sprite.plane.position.y = -VENOM_SINK_DEPTH * pose.sink;
+          a.setShadow(1 - pose.sink);
+          at.x = record.tx;
+          at.z = record.tz;
+          venomBubbles(emit(record, VENOM_BUBBLE_RATE * frame.scale, frame.dtS));
+        }
+        if (pose.done) {
+          venomSmoke(record.tx, record.tz);
+          endTimeline(record);
+        }
+        break;
+      case 'winPop':
+        // One winning plant's turn in the celebration: it starts `carry` ms
+        // after the win (its place in the line).
+        if (pose.ageMs < record.carry) break;
+        colourSparkles(record.tx, record.tz, WIN_SPARKLES, record.color, 1.1);
+        petalGust(record.tx, record.tz, 4);
+        endTimeline(record);
+        break;
       case 'convert':
         convertPose(pose, record.stages);
         a.sprite.setFrame(pose.frame);
@@ -633,6 +901,48 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
         record.a = actors.acquire(spec.from, spec);
         break;
       }
+      case 'castRing': {
+        const color = sideColour[spec.player] ?? COLORS.white;
+        cellToWorldInto(spec.x, spec.y, cellAt);
+        ring(cellAt.x, cellAt.z, CAST_RING_FROM, CAST_RING_TO, CAST_RING_MS, CAST_RING_DOTS, sideRing[spec.player] ?? color, 0);
+        colourSparkles(cellAt.x, cellAt.z, CAST_SPARKLES, color, 0.7);
+        break;
+      }
+      case 'hiss': {
+        const color = sideColour[spec.player] ?? COLORS.vine;
+        cellToWorldInto(BOARD_MIDDLE, BOARD_MIDDLE, cellAt);
+        for (let i = 0; i < HISS_RINGS; i++) {
+          const record = ring(cellAt.x, cellAt.z, 0.2, HISS_RING_TO, HISS_RING_MS, HISS_RING_DOTS, sideRing[spec.player] ?? color, i * HISS_RING_GAP_MS);
+          record.wobble = HISS_WOBBLE;
+          record.waves = HISS_WOBBLE_WAVES;
+        }
+        hissMist(color);
+        break;
+      }
+      case 'venom': {
+        const record = startTimeline('venom', spec, spec, plantStages(spec.from));
+        record.a = actors.acquire(spec.from, spec);
+        record.a.material.emissive.setHex(COLORS.venomGlow);
+        venomDrops(record.tx, record.tz);
+        break;
+      }
+      case 'cloudForm':
+      case 'cloudFade': {
+        cellToWorldInto(spec.x, spec.y, cellAt);
+        cloudPuffs(cellAt.x, cellAt.z, spec.kind === 'cloudForm');
+        break;
+      }
+      case 'winBloom': {
+        const color = sideColour[spec.player] ?? COLORS.spark;
+        for (let i = 0; i < spec.line.length; i++) {
+          const cell = spec.line[i];
+          const record = startTimeline('winPop', cell, cell, stages);
+          record.carry = i * WIN_STAGGER_MS;
+          record.color = color;
+          ring(record.tx, record.tz, CAST_RING_FROM, WIN_RING_TO, WIN_RING_MS, WIN_RING_DOTS, sideRing[spec.player] ?? color, i * WIN_STAGGER_MS);
+        }
+        break;
+      }
       case 'banner':
         banners.add(spec.text, frame.time);
         break;
@@ -641,10 +951,17 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
 
   return {
     // Starts the visuals for the events of one applied action at `time`.
-    trigger(events, time) {
+    // characters are the sides of the game the events come from
+    // (state.characters): the rings and twinkles of a skill take the colour
+    // of the character that used it.
+    trigger(events, time, characters = DEFAULT_SIDES) {
       frame.time = time;
       frame.scale = particleScale(world.features);
       pool.limit = Math.min(pool.capacity, world.features.particleCap);
+      sideColour[X] = CHARACTER_COLOUR[characters[X]] ?? sideColour[X];
+      sideColour[O] = CHARACTER_COLOUR[characters[O]] ?? sideColour[O];
+      sideRing[X] = RING_COLOUR[characters[X]] ?? sideRing[X];
+      sideRing[O] = RING_COLOUR[characters[O]] ?? sideRing[O];
       for (const spec of visualsForEvents(events)) start(spec);
     },
 
@@ -724,6 +1041,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       }
       stepPlacementRuns(placements, time, spawnPlanStep);
       drawVines();
+      drawRings();
 
       pool.step(frame);
       points.sync(pool, frame);
@@ -745,6 +1063,9 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       clearPlacementRuns(placements);
       vinePool.clear();
       vinePoints.sync(vinePool, frame);
+      clearRings(rings);
+      ringPool.clear();
+      ringPoints.sync(ringPool, frame);
       dashMark.reset();
       swirl.reset();
       held.fill(0);
@@ -762,7 +1083,9 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
 // its plant; landed marks a one-off moment (a rock's impact, a dashing
 // seed's take-off).
 function newTimeline() {
-  return { active: false, kind: null, start: 0.5, fx: 0.5, fz: 0.5, tx: 0.5, tz: 0.5, stages: null, a: null, landed: false, carry: 0.5 };
+  return {
+    active: false, kind: null, start: 0.5, fx: 0.5, fz: 0.5, tx: 0.5, tz: 0.5, stages: null, a: null, landed: false, carry: 0.5, color: 0,
+  };
 }
 
 // Pooled plant and rock sprites ('X', 'O' or 'rock') that the skill
@@ -806,6 +1129,7 @@ function createActorPool(world) {
       sprite.plane.scale.set(1, 1, 1);
       actor.setShadow(1);
       actor.material.emissiveIntensity = 0;
+      actor.material.emissive.setHex(COLORS.glow); // a Venom actor glowed green
       if (actor.kind !== 'rock') sprite.setFrame(STAGE_REST);
       if (actor.kind !== 'rock' && actor.sheet !== plantSheets[actor.kind]) dropStaleActor(world, actor);
       else free[actor.kind].push(actor);

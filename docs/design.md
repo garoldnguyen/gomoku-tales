@@ -154,6 +154,15 @@ For the 3D game see docs/art-direction-v3.md sections 4, 7 and 9 (no straight wi
 - Skill announcements appear as a short text banner (for example "Wind Dash!").
 - No sound in version 1.
 
+### 8.1 Skill effects of the four characters (the 3D game)
+Everything follows the events of src/logic and never changes the rules (src/render3d/effect-plans.js plans them, effects3d.js and the cloud layer of world-renderer.js draw them, numbers in src/config.js). Ring waves are crisp pixel dots and play on every quality level (src/render3d/skill-rings.js, RING_SLOTS, RING_DOT_PX); the twinkles, drops, bubbles and puffs around them are particles, so Low has none and Medium a few.
+- Every skill with a target plot (Tornado Zone, Terrain Creation, Stone Conversion, Venom, Cloud) and Wind Dash from its source plant: a cast ring spreads from the plot in the colour of the character that used it, mixed toward white so it reads on the field (RING_LIGHTEN), with twinkles of that colour (CAST_RING_MS, CAST_RING_FROM, CAST_RING_TO, CAST_SPARKLES).
+- Hiss: HISS_RINGS wavy jade sound rings cross the field from its middle cell, HISS_RING_GAP_MS apart, with jade mist rising (HISS_MIST). On the silenced player's turn every non-passive skill row of the HUD says "Silenced by Hiss" (STRINGS.skillSilenced) and is disabled.
+- Venom: venom drops fall on the plant (VENOM_DROP_MS), it wilts back to Sprout turning venom green (VENOM_TINT), then sinks into the soil with green bubbles (VENOM_SINK_MS, VENOM_BUBBLE_RATE) and leaves a little sick smoke.
+- Cloud: a new cloud thickens from nothing (CLOUD_FORM_MS) while puffs roll in on the wind from the upper left; an ended cloud thins away over its old cells (CLOUD_FADE_MS) while puffs drift off to the lower right (CLOUD_PUFFS). What was under it shows again at once, as the rules say: the thinning cloud uses the light see-through look for every viewer. No effect ever names a plot that is covered for the viewer (visualsForEvents uses only cells an event names directly, after maskEventsForViewer).
+- Sky Watch: the outlines breathe between SKY_WATCH_PULSE_LOW and full opacity once every SKY_WATCH_PULSE_MS.
+- A win: the winning plants celebrate one after another (WIN_STAGGER_MS), each sending a ring (WIN_RING_MS, WIN_RING_TO) and twinkles and petals in the winner's colour (WIN_SPARKLES).
+
 ## 9. Out of scope for version 1
 More maps, characters beyond the four of section 5, accounts or rankings, a computer opponent, play across two computers, sound and music, a phone touch layout, Vietnamese text.
 In scope after all, for the 3D game only: the colour of each character and its placement effect (section 5). Not in scope: a colour or effect chosen by the player, a colour per side instead of per character, character colours or placement effects in the 2D renderer, and placement effects for seeds that a skill moves, throws or converts (only a planted seed plays one).

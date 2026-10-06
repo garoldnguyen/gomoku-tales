@@ -126,6 +126,7 @@ export const STRINGS = Object.freeze({
   selectTaglineJadeSerpent: 'Patient, then sudden.',
   selectTaglineCloudEagle: 'Sees far, hides much.',
   skillAlwaysOn: 'Always on', // a passive skill (Sky Watch): no rest turns, no timer
+  skillSilenced: 'Silenced by Hiss', // a skill the opponent's Hiss locks for this turn
   cloudTargetPrompt: 'Cloud: choose the cloud centre', // the target step of Cloud Eagle's Cloud
 
   // Watch a match (sections 3.8 and 3.9): the spectator's room code

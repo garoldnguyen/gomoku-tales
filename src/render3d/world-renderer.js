@@ -47,7 +47,7 @@
 // the drawn state or its viewer changes.
 
 import {
-  BOARD_SIZE, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, SKY_WATCH_OPACITY,
+  BOARD_SIZE, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, CLOUD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, SKY_WATCH_OPACITY,
   SPRITE_STRETCH_Y,
 } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
@@ -59,6 +59,7 @@ import { ART, placeholderShape } from './art-assets.js';
 import { boardMarksInto, createBoardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
 import { placementCues } from './character-look.js';
 import { COVER, cloudTileGrid, createCloudOverlay, skyWatchOutlineGrid, viewerOf } from './cloud-overlay.js';
+import { cloudFadeAmount, cloudFormAmount, skyWatchPulse } from './effect-plans.js';
 import { createEffects3d } from './effects3d.js';
 import { enteredStage, plantedCells, plantPoseInto, STAGE_LAND, STAGE_OPEN, STAGE_REST } from './growth.js';
 import { createWorldHitTest } from './hit-test.js';
@@ -175,6 +176,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       decals.show(marks.decals, marks.count, time);
       lastMove.show(view.state.board, time);
       clouds.show(view);
+      clouds.update(time);
       ghosts.show(marks.ghost);
       world.setHoveredCell(view.hover ?? null);
       effects.update(time);
@@ -241,7 +243,8 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       pieces.grow(plantedCells(events), time);
       lastMove.trigger(events, time);
       world.characters.trigger(events, time);
-      effects.trigger(events, time);
+      effects.trigger(events, time, characters ?? DEFAULT_SIDES);
+      clouds.trigger(events, time);
       // The placement effect of the character of each planted seed's side.
       for (const cue of placementCues(events, characters ?? DEFAULT_SIDES)) effects.placement(cue.x, cue.y, cue.effect, time);
     },
@@ -258,6 +261,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       lastMove.reset();
       world.characters.reset();
       effects.reset();
+      clouds.reset();
     },
   };
 }
@@ -496,8 +500,13 @@ function createDecalLayer(world) {
 // Cloud Eagle's clouds and Sky Watch outlines (cloud-overlay.js) as flat
 // cell decals from pure pixel tiles (no art file). Pools of meshes, made
 // the first time that many show; the decals are placed again only when
-// the overlay changes.
-const CLOUD_ORDER = { seeThrough: 1, cover: 6, outline: 7 };
+// the overlay changes. A new cloud thickens from nothing (cloudFormAmount),
+// an ended one thins away over its old cells (cloudFadeAmount, the same
+// light see-through look for every viewer: what was under it shows again
+// at once, as the rules say), and the Sky Watch outlines breathe
+// (skyWatchPulse).
+const CLOUD_ORDER = { seeThrough: 1, cover: 6, outline: 7, fading: 6 };
+const CLOUD_HALF = (CLOUD_SIZE - 1) / 2;
 function createCloudLayer(world) {
   const overlayFor = createCloudOverlay();
   const cloudTile = sheetCanvas([cloudTileGrid()]);
@@ -508,6 +517,11 @@ function createCloudLayer(world) {
   };
   looks.seeThrough.opacity = CLOUD_SEE_THROUGH_OPACITY;
   looks.outline.opacity = SKY_WATCH_OPACITY;
+  // The ended cloud thinning away: its own decals and material.
+  const fading = decalMaterial(cloudTile);
+  const fadeMeshes = [];
+  // When the newest cloud was placed and when the last one ended (ms).
+  const timing = { formStart: -Infinity, fadeStart: -Infinity, fadeShown: false };
   const pools = { seeThrough: [], cover: [], outline: [] };
   const used = { seeThrough: 0, cover: 0, outline: 0 };
   const kinds = Object.keys(pools);
@@ -535,11 +549,63 @@ function createCloudLayer(world) {
     for (const cell of overlay.skyWatch) placeDecal('outline', cell.x, cell.y);
     for (const kind of kinds) hideFrom(kind, used[kind]);
   };
+  // The cells of the cloud that ended at (cx, cy), clipped by the board.
+  const placeFading = (cx, cy) => {
+    let n = 0;
+    for (let y = cy - CLOUD_HALF; y <= cy + CLOUD_HALF; y++) {
+      for (let x = cx - CLOUD_HALF; x <= cx + CLOUD_HALF; x++) {
+        if (x < 0 || y < 0 || x >= BOARD_SIZE || y >= BOARD_SIZE) continue;
+        let mesh = fadeMeshes[n];
+        if (!mesh) {
+          mesh = createCellDecal(fading);
+          mesh.renderOrder = CLOUD_ORDER.fading;
+          world.scene.add(mesh);
+          fadeMeshes.push(mesh);
+        }
+        mesh.visible = true;
+        placeOnCell(mesh, x, y);
+        n++;
+      }
+    }
+    for (let i = n; i < fadeMeshes.length; i++) fadeMeshes[i].visible = false;
+  };
+  const hideFading = () => {
+    for (let i = 0; i < fadeMeshes.length; i++) fadeMeshes[i].visible = false;
+    timing.fadeShown = false;
+  };
   return {
+    // A cloud placed or ended in the events of an action.
+    trigger(events, time) {
+      for (const event of events) {
+        if (event.type === 'cloudPlaced') timing.formStart = time;
+        if (event.type === 'cloudEnded') {
+          timing.fadeStart = time;
+          timing.fadeShown = true;
+          placeFading(event.x, event.y);
+        }
+      }
+    },
+    // This frame's thickness of the clouds and breath of the outlines.
+    update(time) {
+      const form = cloudFormAmount(time - timing.formStart);
+      looks.seeThrough.opacity = CLOUD_SEE_THROUGH_OPACITY * form;
+      looks.cover.opacity = form;
+      looks.outline.opacity = SKY_WATCH_OPACITY * skyWatchPulse(time);
+      if (!timing.fadeShown) return;
+      const left = cloudFadeAmount(time - timing.fadeStart);
+      if (left <= 0) hideFading();
+      else fading.opacity = CLOUD_SEE_THROUGH_OPACITY * 1.6 * left;
+    },
     hide() {
+      if (timing.fadeShown) hideFading();
       if (shownVersion === -1) return;
       for (let k = 0; k < kinds.length; k++) hideFrom(kinds[k], 0);
       shownVersion = -1;
+    },
+    reset() {
+      timing.formStart = -Infinity;
+      timing.fadeStart = -Infinity;
+      hideFading();
     },
     show(view) {
       const overlay = overlayFor(view.state, viewerOf(view));

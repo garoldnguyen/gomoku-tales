@@ -77,9 +77,10 @@ test('Wind Dash: the announcement marks source and target, then the seed rides a
     [14, 14], // the bear's turn ends and the dash resolves
   ]);
   const announced = visualsForEvents(results[2].events);
-  assert.deepEqual(kinds(announced), ['dashMark', 'banner']);
-  assert.deepEqual(announced[0], { kind: 'dashMark', from: { x: 7, y: 7 }, to: { x: 9, y: 9 }, player: X });
-  assert.equal(announced[1].text, 'Wind Dash!');
+  assert.deepEqual(kinds(announced), ['castRing', 'dashMark', 'banner']);
+  assert.deepEqual(announced[0], { kind: 'castRing', x: 7, y: 7, player: X }, 'the cast ring spreads from the source plant');
+  assert.deepEqual(announced[1], { kind: 'dashMark', from: { x: 7, y: 7 }, to: { x: 9, y: 9 }, player: X });
+  assert.equal(announced[2].text, 'Wind Dash!');
 
   const resolved = visualsForEvents(results[3].events);
   assert.deepEqual(kinds(resolved), ['place', 'dashStreak', 'banner']);
@@ -109,9 +110,10 @@ test('Tornado Zone: the swirl shows over the zone and a thrown seed flies in an 
     [7, 7], // the bear places inside the zone; random 0 throws it to (6, 6)
   ], { random: () => 0 });
   const announced = visualsForEvents(results[0].events);
-  assert.equal(announced[0].kind, 'tornado');
-  assert.equal(announced[0].cells.length, 9);
-  assert.deepEqual([announced[0].x, announced[0].y], [7, 7]);
+  assert.deepEqual(announced[0], { kind: 'castRing', x: 7, y: 7, player: X });
+  assert.equal(announced[1].kind, 'tornado');
+  assert.equal(announced[1].cells.length, 9);
+  assert.deepEqual([announced[1].x, announced[1].y], [7, 7]);
 
   const thrown = visualsForEvents(results[1].events);
   assert.deepEqual(kinds(thrown), ['place', 'throw', 'tornadoEnd', 'banner']);
@@ -128,10 +130,11 @@ test('Terrain Creation: the rock falls with a light shake and crumbles when it b
     [1, 0], [2, 0], [3, 0], [4, 5], // the rock breaks at the end of the 4th turn after it fell
   ]);
   const fell = visualsForEvents(results[1].events);
-  assert.deepEqual(kinds(fell), ['rockFall', 'banner']);
-  assert.deepEqual(heldCell(fell[0], STAGES), { x: 7, y: 7, ms: ROCK_FALL_MS + ROCK_SETTLE_MS });
-  assert.equal(regrowCell(fell[0], STAGES), null, 'a rock does not grow');
-  assert.equal(shakeStrength(fell[0]), SHAKE3D_LIGHT);
+  assert.deepEqual(kinds(fell), ['castRing', 'rockFall', 'banner']);
+  assert.equal(heldCell(fell[0], STAGES), null, 'a cast ring holds nothing');
+  assert.deepEqual(heldCell(fell[1], STAGES), { x: 7, y: 7, ms: ROCK_FALL_MS + ROCK_SETTLE_MS });
+  assert.equal(regrowCell(fell[1], STAGES), null, 'a rock does not grow');
+  assert.equal(shakeStrength(fell[1]), SHAKE3D_LIGHT);
 
   for (const result of results.slice(2, 5)) assert.ok(!kinds(visualsForEvents(result.events)).includes('rockCrumble'));
   const broke = visualsForEvents(results[5].events);
@@ -144,10 +147,11 @@ test('Stone Conversion: the old plant wilts and the other team\'s plant regrows 
     { skill: STONE_CONVERSION, target: { x: 7, y: 7 } },
   ]);
   const specs = visualsForEvents(results[1].events);
-  assert.deepEqual(specs[0], { kind: 'convert', x: 7, y: 7, from: X, to: O });
+  assert.deepEqual(specs[0], { kind: 'castRing', x: 7, y: 7, player: O });
+  assert.deepEqual(specs[1], { kind: 'convert', x: 7, y: 7, from: X, to: O });
   const holdMs = convertMs(STAGES);
-  assert.deepEqual(heldCell(specs[0], STAGES), { x: 7, y: 7, ms: holdMs });
-  assert.deepEqual(regrowCell(specs[0], STAGES), { x: 7, y: 7, player: O, startMs: holdMs - STAGES[STAGE_LAND] },
+  assert.deepEqual(heldCell(specs[1], STAGES), { x: 7, y: 7, ms: holdMs });
+  assert.deepEqual(regrowCell(specs[1], STAGES), { x: 7, y: 7, player: O, startMs: holdMs - STAGES[STAGE_LAND] },
     'X becomes O, so the shape changes too');
 });
 
@@ -160,7 +164,9 @@ test('a win ends the lingering marks, since it drops a pending dash and the zone
     [4, 0], // five in a row
   ]);
   const specs = visualsForEvents(results.at(-1).events);
-  assert.deepEqual(kinds(specs), ['place', 'endLingering']);
+  assert.deepEqual(kinds(specs), ['place', 'winBloom', 'endLingering']);
+  assert.deepEqual(specs[1].line.length, 5, 'every winning plant celebrates');
+  assert.equal(specs[1].player, X);
   assert.ok(kinds(visualsForEvents([{ type: 'draw' }])).includes('endLingering'));
 });
 

@@ -409,6 +409,41 @@ export const CLOUD_SEE_THROUGH_OPACITY = 0.42; // the owner's (and spectators') 
 export const CLOUD_PREVIEW_OPACITY = 0.3; // the cloud being placed, under the pointer
 export const SKY_WATCH_OPACITY = 0.8; // the soft yellow outlines
 
+// Skill effects of every character (src/render3d/effects3d.js and the pure
+// timing in effect-plans.js and skill-rings.js). Ring waves are crisp pixel
+// dots on every quality level; the particles around them follow the level.
+export const RING_SLOTS = 16; // ring waves playing at once; one more replaces the oldest
+export const RING_MAX_DOTS = 240; // pixel dots in the biggest ring
+export const RING_DOT_PX = 3; // art pixels wide, each dot of a ring
+export const RING_LIGHTEN = 0.45; // ring dots are the character colour mixed this far toward white, to read on the green field
+export const CAST_RING_MS = 520; // a skill's cast ring spreads from its target plot this long
+export const CAST_RING_FROM = 0.15; // world units: the ring starts this wide
+export const CAST_RING_TO = 0.75; // and ends this wide
+export const CAST_RING_DOTS = 28;
+export const CAST_SPARKLES = 8; // character coloured twinkles around a cast ring (particles)
+export const HISS_RINGS = 3; // Hiss: wavy jade sound rings spread from the middle of the field
+export const HISS_RING_GAP_MS = 170; // each ring leaves this long after the one before
+export const HISS_RING_MS = 1100; // a ring crosses the field this long
+export const HISS_RING_TO = 9; // world units: the ring ends past the field corners
+export const HISS_RING_DOTS = RING_MAX_DOTS;
+export const HISS_WOBBLE = 0.12; // world units: the ring's sound wave wobble
+export const HISS_WOBBLE_WAVES = 14; // wobbles round a ring
+export const HISS_MIST = 18; // jade mist puffs rising off the field (particles)
+export const VENOM_DROP_MS = 300; // Venom: the venom drops fall onto the plant this long
+export const VENOM_SINK_MS = 520; // after the wilt, the sick sprout sinks into the soil this long
+export const VENOM_TINT = 0.85; // emissive strength of the venom green on the wilting plant at most
+export const VENOM_BUBBLE_RATE = 40; // venom bubbles per second rising while it sinks (particles)
+export const CLOUD_FORM_MS = 650; // a new cloud thickens from nothing this long
+export const CLOUD_FADE_MS = 700; // an ended cloud thins away this long
+export const CLOUD_PUFFS = 22; // cloud puffs rolling in or drifting away (particles)
+export const SKY_WATCH_PULSE_MS = 1400; // the Sky Watch outlines breathe once in this long
+export const SKY_WATCH_PULSE_LOW = 0.6; // share of SKY_WATCH_OPACITY at the faintest
+export const WIN_STAGGER_MS = 110; // the winning plants celebrate one after another this far apart
+export const WIN_RING_MS = 700;
+export const WIN_RING_TO = 0.95;
+export const WIN_RING_DOTS = 36;
+export const WIN_SPARKLES = 10; // twinkles and petals in the winner's colour per winning plant (particles)
+
 // Shot mode (?shot=<scene>, docs/shots.md section 4): the screenshot
 // self-check freezes every time driven thing at this time and seeds the
 // game's random source (the Tornado Zone throw) with this number.

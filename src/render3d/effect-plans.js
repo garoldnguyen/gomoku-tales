@@ -11,9 +11,9 @@
 // animation never allocates or passes loose numbers around.
 
 import {
-  CONVERT_SPARK_MS, DASH_CURVE, DASH_LIFT, DASH_STREAK_MS, REVERSE_GROWTH_SPEED, ROCK_CRUMBLE_MS,
-  ROCK_FALL_HEIGHT, ROCK_FALL_MS, ROCK_SETTLE_MS, SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS,
-  THROW_MS,
+  CLOUD_FADE_MS, CLOUD_FORM_MS, CONVERT_SPARK_MS, DASH_CURVE, DASH_LIFT, DASH_STREAK_MS, REVERSE_GROWTH_SPEED,
+  ROCK_CRUMBLE_MS, ROCK_FALL_HEIGHT, ROCK_FALL_MS, ROCK_SETTLE_MS, SHAKE3D_LIGHT, SHAKE3D_MS, SKY_WATCH_PULSE_LOW,
+  SKY_WATCH_PULSE_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS, VENOM_DROP_MS, VENOM_SINK_MS,
 } from '../config.js';
 import { bannerTexts } from '../render/effects.js';
 import { dropOffsetPx, STAGE_DROP, STAGE_LAND, STAGE_REST, STAGE_SPROUT } from './growth.js';
@@ -32,16 +32,49 @@ import { dropOffsetPx, STAGE_DROP, STAGE_LAND, STAGE_REST, STAGE_SPROUT } from '
 //   { kind: 'rockCrumble', x, y }         a rock breaks into soil crumbs and pebbles
 //   { kind: 'convert', x, y, from, to }   the plant wilts to Sprout, a spark runs through the soil and
 //                                         it regrows from Land as `to`
+//   { kind: 'castRing', x, y, player }    a ring in the character's colour spreads from a skill's
+//                                         target plot (every skill with a plot target; Wind Dash
+//                                         from its source plant)
+//   { kind: 'hiss', player, locked }      wavy jade sound rings cross the field from its middle
+//   { kind: 'venom', x, y, from }         venom drops on the plant of `from`, which wilts sickly green
+//                                         back to Sprout and sinks into the soil
+//   { kind: 'cloudForm', x, y, player }   the cloud thickens from nothing as puffs roll in on the wind
+//   { kind: 'cloudFade', x, y, player }   the ended cloud thins away as puffs drift off on the wind
+//   { kind: 'winBloom', line, player }    each winning plant in turn sends a ring and twinkles in the
+//                                         winner's colour
 //   { kind: 'endLingering' }              the game is over: marks and columns end
 //   { kind: 'banner', text }              HUD banner text (same texts as the 2D game)
+// Only cells an event names directly are used, so an event the cloud
+// masking left in (src/logic/cloud.js maskEventsForViewer) never shows a
+// covered plot.
 export function visualsForEvents(events) {
   const specs = [];
   for (const event of events) {
     switch (event.type) {
+      case 'skillUsed': {
+        const target = event.target;
+        if (Number.isInteger(target?.x) && Number.isInteger(target?.y)) {
+          specs.push({ kind: 'castRing', x: target.x, y: target.y, player: event.player });
+        }
+        break;
+      }
+      case 'hissCast':
+        specs.push({ kind: 'hiss', player: event.player, locked: event.locked });
+        break;
+      case 'plantRemoved':
+        specs.push({ kind: 'venom', x: event.x, y: event.y, from: event.from });
+        break;
+      case 'cloudPlaced':
+        specs.push({ kind: 'cloudForm', x: event.x, y: event.y, player: event.player });
+        break;
+      case 'cloudEnded':
+        specs.push({ kind: 'cloudFade', x: event.x, y: event.y, player: event.player });
+        break;
       case 'stonePlaced':
         specs.push({ kind: 'place', x: event.x, y: event.y, player: event.player });
         break;
       case 'dashAnnounced':
+        specs.push({ kind: 'castRing', x: event.from.x, y: event.from.y, player: event.player });
         specs.push({ kind: 'dashMark', from: event.from, to: event.to, player: event.player });
         break;
       case 'dashResolved':
@@ -73,6 +106,9 @@ export function visualsForEvents(events) {
         break;
       case 'win':
       case 'draw':
+        if (event.type === 'win' && Array.isArray(event.line) && event.line.length > 0) {
+          specs.push({ kind: 'winBloom', line: event.line, player: event.player });
+        }
         // A win drops a pending dash and the zone without their own events.
         specs.push({ kind: 'endLingering' });
         break;
@@ -296,6 +332,58 @@ export function crumblePose(out) {
   out.scaleY = Math.max(0.05, 1 - t * t);
   out.done = ageMs >= ROCK_CRUMBLE_MS;
   return out;
+}
+
+// Venom pose.ageMs in: the venom drops fall for VENOM_DROP_MS, then the
+// plant wilts back to Sprout (reverse growth) while the venom green rises
+// in it, then the sick sprout sinks into the soil for VENOM_SINK_MS.
+// pose.frame (the stage shown), pose.tint (0 to 1, the venom green),
+// pose.sink (0 to 1, how far it has sunk), pose.done.
+export function venomWiltMs(stageStartMs) {
+  return reverseGrowthMs(stageStartMs, STAGE_REST, STAGE_SPROUT);
+}
+
+export function venomMs(stageStartMs) {
+  return VENOM_DROP_MS + venomWiltMs(stageStartMs) + VENOM_SINK_MS;
+}
+
+export function venomPose(out, stageStartMs) {
+  const { ageMs } = out;
+  const wiltMs = venomWiltMs(stageStartMs);
+  const wilting = ageMs - VENOM_DROP_MS;
+  if (wilting < 0) {
+    out.frame = STAGE_REST;
+    out.tint = 0;
+  } else {
+    out.ageMs = wilting;
+    reverseGrowthInto(out, stageStartMs, STAGE_REST, STAGE_SPROUT);
+    out.ageMs = ageMs;
+    out.tint = clamp01(wilting / wiltMs);
+  }
+  const sink = clamp01((wilting - wiltMs) / VENOM_SINK_MS);
+  out.sink = sink * sink;
+  out.done = ageMs >= VENOM_DROP_MS + wiltMs + VENOM_SINK_MS;
+  return out;
+}
+
+// How thick a cloud is `ageMs` after it was placed (0 to 1): it thickens
+// from nothing over CLOUD_FORM_MS.
+export function cloudFormAmount(ageMs) {
+  return ageMs >= 0 ? smoothstep(ageMs / CLOUD_FORM_MS) : 1;
+}
+
+// How thick an ended cloud still is `ageMs` after it ended: it thins away
+// over CLOUD_FADE_MS. 0 once it is gone.
+export function cloudFadeAmount(ageMs) {
+  return ageMs >= 0 ? 1 - smoothstep(ageMs / CLOUD_FADE_MS) : 0;
+}
+
+// The Sky Watch outlines breathe: the share of their full opacity at
+// `time` (ms), between SKY_WATCH_PULSE_LOW and 1, once per
+// SKY_WATCH_PULSE_MS.
+export function skyWatchPulse(time) {
+  const wave = 0.5 + 0.5 * Math.cos((time / SKY_WATCH_PULSE_MS) * Math.PI * 2);
+  return SKY_WATCH_PULSE_LOW + (1 - SKY_WATCH_PULSE_LOW) * wave;
 }
 
 // Stone Conversion pose.ageMs in: the old plant wilts back to Sprout
