@@ -390,8 +390,10 @@ function startAppMode({ local = false } = {}) {
       }
     } else {
       pointerCanvas.style.cursor = 'default';
-      // The DOM menu and the character select have their own title.
-      renderer.drawMenuScreen(ctx, time, !menuShown() && !PICKING_SCREENS.includes(screen));
+      // Every DOM screen (the menu, the lobby cards and the character
+      // select) has its own Ivory title, so the canvas draws none.
+      menuShown(); // keeps the menu in step with the quality level
+      renderer.drawMenuScreen(ctx, time, false);
       hud?.show(false);
     }
     // The Game over screen keeps the final board and the poses in view,
@@ -471,7 +473,7 @@ async function startShotMode({ scene }) {
       drawn = 0;
     }
     if (flow) {
-      renderer.drawMenuScreen(ctx, SHOT_TIME_MS, roomView !== null && !PICKING_SCREENS.includes(roomView.screen));
+      renderer.drawMenuScreen(ctx, SHOT_TIME_MS, false);
     } else {
       const view = game.getView();
       renderer.drawGameScreen(ctx, frameViewOf(view, SHOT_TIME_MS, effects, null));

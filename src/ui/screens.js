@@ -44,6 +44,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
 
   // The fixed text.
   const lobby = lobbyViewModel();
+  $('lobby-title').textContent = lobby.title;
   $('lobby-lead').textContent = lobby.lead;
   $('lobby-create').textContent = lobby.create.label;
   $('lobby-join').textContent = lobby.join.label;

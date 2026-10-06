@@ -80,5 +80,5 @@ Source of truth: docs/flow-design.md.
 3. All text of the menu, How to Play, Settings, lobby, waiting room and game over screens lives in src/ui/strings.js (English). Numbers inside text come from src/config.js or SKILL_INFO and are never typed twice.
 4. Global key shortcuts must ignore typing targets (isTypingTarget in src/ui/input.js). Room code letters include C, F, Z, H and V.
 5. Every new screen gets a shot scene, data-hud-box names and a Seen: paragraph (see docs/shots.md and the screenshot rule in this file).
-6. New CSS uses the existing glass tokens only. No new hex colours.
+6. Menus and room screens use the Ivory look (docs/flow-design.md section 3.0): new CSS uses the Ivory palette tokens only (the #screens block of src/ui/screens.css); the in-game HUD keeps its glass tokens. No hex colours outside a token block.
 <!-- /GOMOKU-FLOW-V1 -->

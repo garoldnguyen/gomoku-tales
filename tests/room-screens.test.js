@@ -406,9 +406,9 @@ function cssBlocks(text) {
 }
 const COLOUR = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/g;
 
-test('room.css: no colour literal outside the token block, and every token colour is one of the HUD glass', () => {
+test('room.css: no colour literal outside the token block, and every token colour is an Ivory or character colour', () => {
   const css = read('src/ui/room.css');
-  const known = read('src/ui/hud.css');
+  const known = read('src/ui/screens.css') + read('src/ui/hud.css') + read('src/render3d/character-look.js');
   const blocks = cssBlocks(css);
   const isTokens = ([selector, body]) => selector === '#screens' && body.trim().startsWith('--');
   assert.equal(blocks.filter(isTokens).length, 1, 'one token block');
@@ -418,7 +418,7 @@ test('room.css: no colour literal outside the token block, and every token colou
       for (const declaration of body.split(';').map((d) => d.trim()).filter(Boolean)) {
         assert.ok(declaration.startsWith('--'), `only tokens in the token block: ${declaration}`);
         const value = declaration.slice(declaration.indexOf(':') + 1).trim();
-        if (value.match(COLOUR)) assert.ok(known.includes(value), `${declaration} is a HUD glass colour`);
+        if (value.match(COLOUR)) assert.ok(known.includes(value), `${declaration} is an Ivory palette or character colour`);
       }
       continue;
     }

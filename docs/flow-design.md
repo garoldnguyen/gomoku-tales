@@ -21,7 +21,7 @@ Names in this file (flow.js, strings.js, newGame, start, rematch and so on) are 
 6. Out of scope: computer opponent, Vietnamese text, sound and music, phone touch layout, accounts, more maps.
 
 ## 3. Screens
-Every screen is a quiet glass DOM layer over the existing 3D world (same tokens as src/ui/hud.css and screens.css). No second WebGL renderer and no new canvas. Every screen is drawn from a pure view model so that shot mode can draw it without a network.
+Every screen is a DOM layer over the existing 3D world in the Ivory look (see 3.0). No second WebGL renderer and no new canvas. Every screen is drawn from a pure view model so that shot mode can draw it without a network.
 
 ### 3.1 Menu
 ```
@@ -138,6 +138,16 @@ In local mode (Play on this computer and ?local=1) the game screen opens on the 
 - room-closed: when the host leaves (its leave message, or the relay's leave when the host's socket closes) or the spectator's connection is lost, the spectator sees the notice Room closed (data-hud-box room-closed-card) with the line "The host left, so the room is closed." and a Back to Menu button (room-closed-menu) that returns to the menu.
 - All text lives in src/ui/strings.js. Shot scenes: spectate (the empty code box), spectate-game (the field scene watched, with the watch card) and room-closed.
 
+### 3.0 The Ivory look (all screens of this section)
+The menu, How to Play, Settings, the lobby, Join, Watch a match, the waiting room, the character select, Room closed, the game over card and the watch card share one look, chosen by the owner over a dark "obsidian and gold" option:
+- A warm ivory wash over the softly blurred farm (the menu scrim, the lobby screens and the select; the game over and watch cards stay over the clear board). Ivory paper cards with a hairline border, square corners and a soft warm shadow.
+- Type: Cormorant Garamond for titles, names and italic notes, Cinzel capitals for the menu choices and every button, Nunito for running text (src/ui/ivory.css, fonts in assets/fonts with their OFL licences, FONTS.txt).
+- Gold (#a8823a) for small capital labels, hairlines, the selected card's frame and the focus diamonds; ink (#1c1913) for text and the one solid button (Ready).
+- The menu has no card: the place in gold capitals, the title with its last word in italics, a gold diamond rule, five choices divided by hairlines, the focused one marked by a gold wash and a diamond either side. It fits 1280x720 (MENU_LAYOUT), short windows and phones (media rules in menu.css).
+- The character select: paper cards with the portrait on a soft glow of the character colour, the name in Cormorant, the tagline in italics, skill rows divided by hairlines with the rest turns in small gold capitals; the pick is framed in gold and lifted; taken cards are dimmed to grey.
+- Every colour is a token: the Ivory palette is the #screens block of src/ui/screens.css, and the token blocks of menu.css and room.css take their colours from it (tests check this). The in-game glass HUD (hud.css) is unchanged.
+- The canvas draws no title under any DOM screen; each screen has its own (the lobby card says Play Online).
+
 ## 4. Flow state machine
 State: screen, overlay (none, howto, settings), mode (null, online, local), role (null, host, guest, spectator), notice (null, host-left or room-closed), seats (the two seats of the local character select, src/logic/seats.js, or null). The reducer is pure and returns a new frozen object. Any event not listed for the current state returns the same object unchanged.
 
@@ -226,7 +236,7 @@ New scenes for docs/shots.md (static, no network, every one built from a fixed v
 
 ## 8. Text, style and keyboard
 - All text of the new and touched screens lives in src/ui/strings.js, one flat English object. Numbers inside text come from src/config.js or SKILL_INFO, never typed twice.
-- New CSS uses the existing glass tokens only. No new hex colour literals outside the token block (a test reads the new CSS file).
+- New CSS uses the Ivory palette tokens only (section 3.0). No hex colour literals outside a token block (a test reads each CSS file).
 - Font: the DM Sans files already in assets/fonts.
 - All controls are real button, input or select elements. Status text, errors and the Copied message are in aria-live polite regions.
 - Global key shortcuts (HUD toggle C with fallbacks H and V, Fullscreen F and Z) must ignore events from typing targets (input, textarea, select, contenteditable) through one pure isTypingTarget(element). Room code letters include C, F, Z, H and V, so without this guard typing a code would toggle the HUD or the fullscreen.

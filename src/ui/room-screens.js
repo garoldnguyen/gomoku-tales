@@ -88,12 +88,13 @@ export function portraitScale(width, height) {
 
 // The see-through glass of the character select (room.css): the panel,
 // the character cards and the scrim behind the panel are the dark
-// --card-solid glass token of hud.css (alpha GLASS_SOLID_ALPHA) mixed with
-// transparent, so they reach SELECT_PANEL_OPACITY, SELECT_CARD_OPACITY and
-// SELECT_SCRIM_OPACITY with no new colour. The panel blurs the map behind
+// --card-solid ivory paper token of room.css (opaque: alpha
+// GLASS_SOLID_ALPHA) mixed with transparent, so they reach
+// SELECT_PANEL_OPACITY, SELECT_CARD_OPACITY and SELECT_SCRIM_OPACITY with
+// no new colour. The panel blurs the map behind
 // it by SELECT_BLUR_PX when frosted (Medium and High), not at all on Low.
 // Returns the CSS custom properties screens.js sets on #screens.
-export const GLASS_SOLID_ALPHA = 0.92;
+export const GLASS_SOLID_ALPHA = 1;
 const mix = (opacity) => `${Math.round((opacity / GLASS_SOLID_ALPHA) * 1000) / 10}%`;
 export function selectGlassStyle({ frosted = true } = {}) {
   return {
@@ -122,6 +123,7 @@ const slug = (id) => id.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 // error or null.
 export function lobbyViewModel({ config = CONFIG, connecting = false, error = null } = {}) {
   return {
+    title: STRINGS.menuPlayOnline,
     lead: STRINGS.lobbyLead,
     hint: onlineSameBrowserOnly(config) ? STRINGS.lobbySameBrowserHint : null,
     error,

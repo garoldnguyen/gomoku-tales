@@ -1,32 +1,35 @@
 /* The lobby additions, the waiting room and the game over card
    (docs/flow-design.md sections 3.4, 3.5 and 3.7), on top of the glass cards of src/ui/screens.css, built by
-   src/ui/screens.js. Every colour is a token of the block below, and every
-   token value is one of the HUD glass (src/ui/hud.css): no new colours. A
-   test reads this file and fails on a colour literal outside the token
-   block. Sizes scale with --u (one internal pixel, index.html) but never
+   src/ui/screens.js, in the Ivory look (src/ui/screens.css). Every colour
+   is a token of the block below, and every token colour is one of the
+   Ivory palette (the #screens block of src/ui/screens.css) or a character
+   colour of the HUD (src/ui/hud.css). A test reads this file and fails on
+   a colour literal outside the token block. Sizes scale with --u (one internal pixel, index.html) but never
    drop under the floors of the doc: the room code at least 40 px, every
    button at least 44 px. */
 
 #screens {
-  --ink-3: rgba(244, 247, 251, 0.6);
-  --ink-dark: #141a2a;
-  --hair: rgba(255, 255, 255, 0.14);
-  --blue-tile: rgba(59, 140, 255, 0.26);
-  --blue-ink: #cfe4ff;
-  --red-tile: rgba(255, 75, 92, 0.24);
-  --red-ink: #ffd0d5;
-  --ready: #8fe3a8;
+  --ink-3: rgba(28, 25, 19, 0.45);
+  --ink-dark: #fffdf8;
+  --hair: rgba(28, 25, 19, 0.14);
   --blue: #3b8cff;
-  --red: #ff4b5c;
-  --gold: #ffe14d;
-  --gold-tile: rgba(255, 225, 77, 0.24);
-  --gold-ink: #ffec99;
-  --card-solid: rgba(14, 20, 34, 0.92);
-  --highlight: rgba(255, 255, 255, 0.22);
-  --shadow: rgba(10, 20, 40, 0.3);
-  --panel-mix: 43.5%;
-  --character-mix: 32.6%;
-  --scrim-mix: 27.2%;
+  --blue-tile: rgba(59, 140, 255, 0.16);
+  --blue-ink: #2f63b0;
+  --red: #c9703a;
+  --red-tile: rgba(201, 112, 58, 0.16);
+  --red-ink: #8a4a24;
+  --jade: #2fbf7a;
+  --ready: #3d7a52;
+  --gold: #a8823a;
+  --gold-tile: rgba(168, 130, 58, 0.14);
+  --gold-ink: #a8823a;
+  --eagle: #fff2a8;
+  --card-solid: #fffdf8;
+  --highlight: rgba(255, 253, 248, 0.9);
+  --shadow: rgba(60, 45, 20, 0.16);
+  --panel-mix: 0%;
+  --character-mix: 100%;
+  --scrim-mix: 80%;
   --select-blur: 8px;
 }
 
@@ -127,8 +130,9 @@
   flex: 1 1 0;
   min-width: 0;
   min-height: 44px;
-  padding: 8px 14px;
-  font-size: 15px;
+  padding: 8px 10px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
   white-space: nowrap;
 }
 
@@ -234,13 +238,11 @@
   box-sizing: border-box;
   width: min(calc(var(--u) * 860), calc(100vw - 24px));
   max-width: none;
-  gap: calc(var(--u) * 10);
+  gap: calc(var(--u) * 12);
   padding: calc(var(--u) * 15) calc(var(--u) * 24);
   background: color-mix(in srgb, var(--card-solid) var(--panel-mix), transparent);
-  border: 1px solid var(--hair);
-  box-shadow:
-    inset 0 1px 0 var(--highlight),
-    0 calc(var(--u) * 16) calc(var(--u) * 48) color-mix(in srgb, var(--shadow) 70%, transparent);
+  border: 1px solid transparent;
+  box-shadow: none;
   -webkit-backdrop-filter: blur(var(--select-blur));
   backdrop-filter: blur(var(--select-blur));
 }
@@ -251,8 +253,9 @@
 }
 
 #screens .select-card h2 {
-  font-size: calc(var(--u) * 28);
-  font-weight: 800;
+  font-family: var(--serif);
+  font-size: calc(var(--u) * 36);
+  font-weight: 600;
 }
 
 /* Copied or Press Ctrl+C beside the code, so the row stays centred. */
@@ -290,7 +293,9 @@
 }
 
 #screens .select-lead {
+  font-family: var(--serif);
   font-size: calc(var(--u) * 14);
+  font-style: italic;
   color: var(--ink-2);
 }
 
@@ -313,17 +318,19 @@
   align-items: stretch;
   gap: calc(var(--u) * 8);
   min-width: 0;
-  padding: calc(var(--u) * 10);
-  text-align: left;
+  padding: calc(var(--u) * 14) calc(var(--u) * 14) calc(var(--u) * 12);
+  text-align: center;
   background: color-mix(in srgb, var(--card-solid) var(--character-mix), transparent);
   border: 1px solid var(--hair);
-  border-radius: calc(var(--u) * 16);
-  box-shadow: 0 calc(var(--u) * 6) calc(var(--u) * 20) color-mix(in srgb, var(--shadow) 50%, transparent);
+  border-radius: 2px;
+  box-shadow: 0 1px 0 var(--hair), 0 calc(var(--u) * 9) calc(var(--u) * 22) var(--shadow);
   cursor: pointer;
+  transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
 #screens .character:hover:not(.is-disabled) {
   border-color: var(--line);
+  transform: translateY(calc(var(--u) * -3));
 }
 
 #screens .character.is-disabled {
@@ -331,7 +338,8 @@
 }
 
 #screens .character.is-disabled:not(.is-selected) {
-  opacity: 0.6;
+  opacity: 0.45;
+  filter: grayscale(0.8);
 }
 
 #screens .character-pick {
@@ -341,11 +349,15 @@
   gap: calc(var(--u) * 8);
   min-width: 0;
   padding: 0;
-  text-align: left;
+  text-align: center;
+  font-family: inherit;
+  font-size: inherit;
   font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
   background: none;
   border: 0;
-  border-radius: calc(var(--u) * 10);
+  border-radius: 0;
 }
 
 #screens .character-pick:hover:not(:disabled),
@@ -363,8 +375,8 @@
 }
 
 #screens .character:has(.character-pick:focus-visible) {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
+  outline: 2px solid var(--gold);
+  outline-offset: calc(var(--u) * 4);
 }
 
 #screens .character.colour-red {
@@ -374,26 +386,31 @@
 }
 
 #screens .character.colour-jade {
-  --c: var(--ready);
-  --c-tile: color-mix(in srgb, var(--ready) 22%, transparent);
-  --c-ink: color-mix(in srgb, var(--ready) 35%, var(--ink));
+  --c: var(--jade);
+  --c-tile: color-mix(in srgb, var(--jade) 26%, transparent);
+  --c-ink: color-mix(in srgb, var(--jade) 60%, var(--ink));
 }
 
 /* Cloud Eagle: a pale yellow cloud on a soft gold glow. */
 #screens .character.colour-gold {
-  --c: var(--gold-ink);
-  --c-tile: var(--gold-tile);
+  --c: var(--gold);
+  --c-tile: color-mix(in srgb, var(--eagle) 70%, transparent);
   --c-ink: var(--ink);
 }
 
-/* The pick: a gold hairline. Once Ready every card is disabled, and the
-   pick stays bright (.is-disabled above dims only the others). */
+/* The pick: a gold hairline set off the card, and the card lifts. Once
+   Ready every card is disabled, and the pick stays bright (.is-disabled
+   above dims only the others). */
 #screens .character.is-selected {
   border-color: var(--gold);
+  outline: 1px solid var(--gold);
+  outline-offset: calc(var(--u) * 4);
+  transform: translateY(calc(var(--u) * -6));
+  box-shadow: 0 calc(var(--u) * 16) calc(var(--u) * 32) var(--shadow);
 }
 
-/* No square stage, tile or frame: the transparent portrait (or the
-   emblem) sits on a soft glow of the card colour that fades into the card. */
+/* No frame: the transparent portrait (or the emblem) sits on a soft glow
+   of the card colour that fades into the paper. */
 #screens .emblem-tile {
   position: relative;
   display: flex;
@@ -443,14 +460,15 @@
   justify-content: center;
   box-sizing: border-box;
   min-width: calc(var(--u) * 24);
-  height: calc(var(--u) * 24);
-  padding: 0 calc(var(--u) * 3);
-  font-size: calc(var(--u) * 10);
-  font-weight: 800;
-  letter-spacing: calc(var(--u) * 0.5);
-  color: var(--c);
-  border: 1px solid var(--c);
-  border-radius: calc(var(--u) * 6);
+  height: calc(var(--u) * 18);
+  padding: 0 calc(var(--u) * 2);
+  font-family: var(--caps);
+  font-size: calc(var(--u) * 9);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  color: var(--c-ink);
+  border: 0;
+  border-radius: 0;
 }
 
 #screens .character-body {
@@ -462,37 +480,43 @@
 
 #screens .character-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  justify-content: space-between;
+  justify-content: center;
   gap: calc(var(--u) * 6);
 }
 
 #screens .character-name {
-  font-size: calc(var(--u) * 17);
-  font-weight: 800;
+  font-family: var(--serif);
+  font-size: calc(var(--u) * 21);
+  font-weight: 600;
+  line-height: 1.05;
   white-space: nowrap;
 }
 
 #screens .character .taken {
-  padding: 0 calc(var(--u) * 7);
-  font-size: calc(var(--u) * 11);
-  font-weight: 700;
+  padding: 0 calc(var(--u) * 5);
+  font-family: var(--caps);
+  font-size: calc(var(--u) * 8);
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
   color: var(--ink-2);
-  background: var(--row);
-  border-radius: 999px;
+  border: 1px solid var(--line);
 }
 
 #screens .tagline {
-  font-size: calc(var(--u) * 12);
+  font-family: var(--serif);
+  font-size: calc(var(--u) * 13);
   font-style: italic;
-  color: var(--ink-3);
+  color: var(--ink-2);
 }
 
 /* A skill row: hover or keyboard focus shows its tooltip (.select-tip). */
 #screens .skill-list {
   display: flex;
   flex-direction: column;
-  gap: calc(var(--u) * 6);
+  gap: 0;
 }
 
 #screens .skill-row {
@@ -500,9 +524,11 @@
   align-items: center;
   justify-content: space-between;
   gap: calc(var(--u) * 6);
-  padding: calc(var(--u) * 4) calc(var(--u) * 8);
-  border-radius: calc(var(--u) * 9);
-  background: var(--row);
+  padding: calc(var(--u) * 5) calc(var(--u) * 2);
+  border-top: 1px solid var(--hair);
+  border-radius: 0;
+  background: none;
+  text-align: left;
   cursor: help;
 }
 
@@ -520,6 +546,7 @@
    the HUD tooltip. */
 #screens .select-tip {
   position: fixed;
+  color: var(--ink);
   left: 0;
   top: 0;
   z-index: 3;
@@ -532,10 +559,10 @@
   pointer-events: none;
   background: var(--card);
   border: 1px solid var(--hair);
-  border-radius: 14px;
+  border-radius: 2px;
   box-shadow:
     inset 0 1px 0 var(--highlight),
-    0 10px 30px color-mix(in srgb, var(--shadow) 70%, transparent);
+    0 10px 30px var(--shadow);
   -webkit-backdrop-filter: blur(var(--select-blur));
   backdrop-filter: blur(var(--select-blur));
 }
@@ -553,8 +580,9 @@
 }
 
 #screens .select-tip-title {
-  font-size: 14px;
-  font-weight: 700;
+  font-family: var(--serif);
+  font-size: 19px;
+  font-weight: 600;
 }
 
 #screens .select-tip .rest {
@@ -567,18 +595,20 @@
 }
 
 #screens .skill-name {
-  font-size: calc(var(--u) * 13);
-  font-weight: 700;
+  font-size: calc(var(--u) * 12);
+  font-weight: 600;
 }
 
 #screens .rest {
-  padding: calc(var(--u) * 1) calc(var(--u) * 7);
-  font-size: calc(var(--u) * 11);
-  font-weight: 800;
+  padding: 0;
+  font-size: calc(var(--u) * 8);
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
   white-space: nowrap;
   color: var(--gold-ink);
-  background: var(--gold-tile);
-  border-radius: calc(var(--u) * 7);
+  background: none;
+  border-radius: 0;
 }
 
 /* Back or Leave, the two seats, Ready. */
@@ -594,28 +624,32 @@
   flex-shrink: 0;
   min-width: calc(var(--u) * 110);
   min-height: 44px;
+  color: var(--ink-2);
+  border-color: transparent;
 }
 
+/* Ready: ink with paper letters, the one solid button of the page. */
 #screens .select-ready {
   flex-shrink: 0;
   min-width: calc(var(--u) * 150);
   min-height: max(44px, calc(var(--u) * 40));
-  font-size: calc(var(--u) * 17);
-  font-weight: 800;
+  font-size: max(13px, calc(var(--u) * 13));
+  letter-spacing: 0.32em;
   color: var(--ink-dark);
-  background: var(--gold);
-  border: 0;
+  background: var(--ink);
+  border: 1px solid var(--ink);
 }
 
 #screens .select-ready:hover:not(:disabled) {
-  background: var(--gold);
-  filter: brightness(1.06);
+  background: var(--ink);
+  filter: brightness(1.25);
 }
 
 #screens .select-ready:disabled {
   opacity: 1;
   color: var(--ink-3);
-  background: var(--row);
+  background: transparent;
+  border-color: var(--line);
 }
 
 /* A seat: the stone of the pick order, the label, the pick (or Choosing)
@@ -640,9 +674,10 @@
   padding: calc(var(--u) * 4) calc(var(--u) * 10) calc(var(--u) * 4) calc(var(--u) * 6);
   box-sizing: border-box;
   text-align: left;
-  background: var(--row);
-  border: 1px solid var(--hair);
-  border-radius: calc(var(--u) * 14);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
 }
 
 #screens .seat.team-blue {
@@ -656,7 +691,7 @@
 }
 
 #screens .seat.is-active {
-  border-color: var(--ink-3);
+  border-color: var(--gold);
 }
 
 /* A local seat that is not picking yet: press it to pick for that seat. */
@@ -681,8 +716,9 @@
   width: calc(var(--u) * 26);
   height: calc(var(--u) * 26);
   border-radius: 50%;
-  font-size: calc(var(--u) * 13);
-  font-weight: 800;
+  font-family: var(--caps);
+  font-size: calc(var(--u) * 12);
+  font-weight: 600;
   color: var(--team-ink);
   background: var(--team-tile);
 }
@@ -701,22 +737,27 @@
 }
 
 #screens .seat-label {
-  font-size: calc(var(--u) * 11);
+  font-size: calc(var(--u) * 8);
   font-weight: 700;
-  color: var(--ink-3);
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--gold);
 }
 
 #screens .seat-name {
   overflow: hidden;
-  font-size: calc(var(--u) * 13);
-  font-weight: 700;
+  font-family: var(--serif);
+  font-size: calc(var(--u) * 16);
+  font-weight: 600;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 #screens .seat-status {
   flex-shrink: 0;
-  font-size: calc(var(--u) * 11);
+  font-family: var(--serif);
+  font-size: calc(var(--u) * 13);
+  font-style: italic;
   color: var(--ink-3);
 }
 

@@ -180,14 +180,16 @@ test('settingsViewModel: the Fullscreen row follows fullscreenViewModel and hide
 
 // The CSS without comments, as [selector, body] blocks.
 function cssBlocks(text) {
-  const clean = text.replace(/\/\*[\s\S]*?\*\//g, '');
+  // The base rules only: the @media blocks (short windows, phones,
+  // reduced motion) adapt them and are left out.
+  const clean = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
   return [...clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => [m[1].trim(), m[2]]);
 }
 const COLOUR = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?)\(/g;
 
-test('menu.css: no colour literal outside the token block, and every token colour is one of the HUD glass', () => {
+test('menu.css: no colour literal outside the token block, and every token colour is one of the Ivory palette', () => {
   const css = read('src/ui/menu.css');
-  const known = read('src/ui/hud.css') + read('src/ui/screens.css');
+  const known = read('src/ui/screens.css') + read('src/ui/hud.css');
   const blocks = cssBlocks(css);
   const tokens = blocks.filter(([selector, body]) => selector === '#flow' && body.includes('--ink:'));
   assert.equal(tokens.length, 1, 'one token block');
@@ -196,7 +198,7 @@ test('menu.css: no colour literal outside the token block, and every token colou
       for (const declaration of body.split(';').map((d) => d.trim()).filter(Boolean)) {
         assert.ok(declaration.startsWith('--'), `only tokens in the token block: ${declaration}`);
         const value = declaration.slice(declaration.indexOf(':') + 1).trim();
-        if (value.match(COLOUR)) assert.ok(known.includes(value), `${declaration} is a HUD glass colour`);
+        if (value.match(COLOUR)) assert.ok(known.includes(value), `${declaration} is an Ivory palette colour`);
       }
       continue;
     }
@@ -204,7 +206,7 @@ test('menu.css: no colour literal outside the token block, and every token colou
   }
 });
 
-test('menu.css: menu buttons at least 240 by 44 px, 10 px apart; panels 720 px wide, 80 percent high, 44 px Close', () => {
+test('menu.css: menu buttons at least 240 by 44 px, divided by hairlines; panels 720 px wide, 80 percent high, 44 px Close', () => {
   const blocks = new Map(cssBlocks(read('src/ui/menu.css')).map(([selector, body]) => [selector, body]));
   const px = (selector, property) => {
     const match = blocks.get(selector)?.match(new RegExp(`(?:^|[;\\s])${property}:\\s*(\\d+)px`));
@@ -215,7 +217,8 @@ test('menu.css: menu buttons at least 240 by 44 px, 10 px apart; panels 720 px w
   assert.ok(px('#flow .menu-card', 'width') - 2 * 32 >= 240);
   assert.ok(px('#flow .menu-button', 'min-height') >= 44);
   assert.ok(px('#flow button', 'min-height') >= 44);
-  assert.ok(px('#flow .menu-buttons', 'gap') >= 10);
+  assert.equal(px('#flow .menu-buttons', 'gap'), 0);
+  assert.match(blocks.get('#flow .menu-button'), /border-bottom: 1px solid var\(--hair\)/, 'a hairline under every choice');
   assert.match(blocks.get('#flow .menu-buttons'), /flex-direction: column/);
   assert.match(blocks.get('#flow .panel'), /width: min\(720px/);
   assert.match(blocks.get('#flow .panel'), /max-height: 80vh/);

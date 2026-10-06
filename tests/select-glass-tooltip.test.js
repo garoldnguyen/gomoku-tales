@@ -123,10 +123,10 @@ test('tooltipPosition keeps the skill tooltip inside the viewport for rows anywh
 
 // --- the see-through glass ---
 
-test('selectGlassStyle: panel about 40, cards about 30, scrim about 25 percent, an 8 px blur only when frosted', () => {
-  assert.equal(SELECT_PANEL_OPACITY, 0.4);
-  assert.equal(SELECT_CARD_OPACITY, 0.3);
-  assert.equal(SELECT_SCRIM_OPACITY, 0.25);
+test('selectGlassStyle (Ivory): no panel, solid paper cards, an 80 percent wash, an 8 px blur only when frosted', () => {
+  assert.equal(SELECT_PANEL_OPACITY, 0);
+  assert.equal(SELECT_CARD_OPACITY, 1);
+  assert.equal(SELECT_SCRIM_OPACITY, 0.8);
   assert.equal(SELECT_BLUR_PX, 8);
   const style = selectGlassStyle({ frosted: true });
   const opacity = (mix) => (parseFloat(mix) / 100) * GLASS_SOLID_ALPHA;
@@ -137,8 +137,9 @@ test('selectGlassStyle: panel about 40, cards about 30, scrim about 25 percent, 
   assert.equal(selectGlassStyle({ frosted: false })['--select-blur'], '0px');
 });
 
-test('room.css: the glass mixes the existing --card-solid token, with defaults equal to selectGlassStyle', () => {
-  assert.ok(read('src/ui/hud.css').includes(`--card-solid: rgba(14, 20, 34, ${GLASS_SOLID_ALPHA})`));
+test('room.css: the select mixes the ivory --card-solid paper, with defaults equal to selectGlassStyle', () => {
+  assert.equal(GLASS_SOLID_ALPHA, 1, 'the ivory paper is opaque');
+  assert.ok(read('src/ui/room.css').includes('--card-solid: #fffdf8;'));
   const css = read('src/ui/room.css');
   for (const [name, value] of Object.entries(selectGlassStyle({ frosted: true }))) {
     assert.ok(css.includes(`${name}: ${value};`), `${name} default`);
@@ -148,13 +149,13 @@ test('room.css: the glass mixes the existing --card-solid token, with defaults e
   const panel = block('#screens .card.select-card');
   assert.match(panel, /var\(--panel-mix\)/);
   assert.match(panel, /backdrop-filter: blur\(var\(--select-blur\)\)/);
-  assert.match(panel, /inset 0 1px 0 var\(--highlight\)/, 'a 1 px highlight along the top');
-  assert.match(panel, /border: 1px solid/);
+  assert.match(panel, /border: 1px solid transparent/, 'no box: the cards lie on the wash');
   assert.match(block('#screens.is-solid .card.select-card'), /backdrop-filter: none/);
   const card = block('#screens .character');
   assert.match(card, /var\(--character-mix\)/);
   assert.match(card, /border: 1px solid var\(--hair\)/, 'a hairline border');
   assert.match(block('#screens .character.is-selected'), /border-color: var\(--gold\)/, 'a gold hairline on the pick');
+  assert.match(block('#screens .character.is-selected'), /outline: 1px solid var\(--gold\)/, 'and a gold frame set off the card');
 });
 
 test('room.css: the portrait has no tile or frame, only a soft glow that fades into the card', () => {

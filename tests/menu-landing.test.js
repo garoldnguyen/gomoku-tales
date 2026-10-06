@@ -79,11 +79,13 @@ test('menuLayout: the card fits 1280 by 720 without scrolling and every button i
 
 // The CSS without comments, as a map of selector -> body.
 function cssBlocks(text) {
-  const clean = text.replace(/\/\*[\s\S]*?\*\//g, '');
+  // The base rules only: the @media blocks (short windows, phones,
+  // reduced motion) adapt them and are left out.
+  const clean = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media[^{]*\{(?:[^{}]*\{[^{}]*\})*[^{}]*\}/g, '');
   return new Map([...clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => [m[1].trim(), m[2]]));
 }
 
-test('menu.css uses the MENU_LAYOUT sizes, a 2 px focus ring of a glass token and the scrim', () => {
+test('menu.css uses the MENU_LAYOUT sizes, the gold focus mark of the Ivory look and the wash', () => {
   const blocks = cssBlocks(read('src/ui/menu.css'));
   const px = (selector, property) => {
     const match = blocks.get(selector)?.match(new RegExp(`(?:^|[;\\s])${property}:\\s*([\\d\\s]+?)px`));
@@ -100,9 +102,16 @@ test('menu.css uses the MENU_LAYOUT sizes, a 2 px focus ring of a glass token an
   assert.equal(px('#flow .menu-button', 'height'), String(L.buttonHeight));
   assert.equal(px('#flow .menu-buttons', 'gap'), String(L.buttonGap));
   assert.equal(px('#flow .menu-keys', 'height'), String(L.hintHeight));
-  assert.match(blocks.get('#flow .menu-button:focus,\n#flow .menu-button:focus-visible'), /outline: 2px solid var\(--ink\)/);
+  // The focused choice (the keyboard starts on the first one) shows a gold
+  // wash across its line and a gold diamond either side of its label.
+  assert.match(blocks.get('#flow .menu-button:focus,\n#flow .menu-button:focus-visible'), /background: linear-gradient\(90deg, transparent, var\(--row-hover\), transparent\)/);
+  const marks = [...blocks.keys()].find((selector) => selector.includes('.menu-button:focus .menu-label::before'));
+  assert.ok(marks, 'the focus diamonds');
+  assert.match(blocks.get(marks), /background: var\(--gold\)/);
+  assert.match(blocks.get(marks), /transform: rotate\(45deg\)/);
   assert.match(blocks.get('#flow .scrim'), /backdrop-filter: blur\(var\(--scrim-blur\)\)/);
-  assert.match(blocks.get('#flow .scrim'), /background: var\(--scrim\)/);
+  assert.match(blocks.get('#flow .scrim'), /var\(--wash\), var\(--scrim\)/);
+  assert.match(blocks.get('#flow.is-solid .scrim'), /background: var\(--scrim\)/);
   assert.match(blocks.get('#flow.is-solid .scrim'), /backdrop-filter: none/);
 });
 

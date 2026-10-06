@@ -1,0 +1,12 @@
+Fonts kept here (all SIL Open Font License 1.1, licence file beside each):
+
+- Nunito (variable): Nunito-OFL.txt, the HUD and body text.
+- DM Sans 400 to 700 (@fontsource/dm-sans, latin): DM-Sans-OFL.txt.
+- Cinzel 600 (@fontsource/cinzel 5.3.0, latin, cinzel-latin-600-normal.woff2):
+  Cinzel-OFL.txt, the Ivory menu labels and buttons (src/ui/ivory.css).
+- Cormorant Garamond 500, 500 italic and 600 (@fontsource/cormorant-garamond
+  5.3.0, latin): Cormorant-Garamond-OFL.txt, the Ivory titles, names and
+  taglines (src/ui/ivory.css).
+
+Downloaded on 2026-10-06 from https://registry.npmjs.org/ (the packages'
+files/ folders). The browser loads only these local files.

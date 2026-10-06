@@ -80,6 +80,7 @@
       }
     }
   </script>
+  <link rel="stylesheet" href="src/ui/ivory.css">
   <link rel="stylesheet" href="src/ui/screens.css">
   <link rel="stylesheet" href="src/ui/hud.css">
   <link rel="stylesheet" href="src/ui/menu.css">
@@ -94,6 +95,7 @@
          src/ui/screens.js fills in the text from src/ui/strings.js. -->
     <div id="screens" hidden>
       <section class="card" data-screen="lobby" data-hud-box="lobby-panel">
+        <h2 id="lobby-title"></h2>
         <p class="lead" id="lobby-lead"></p>
         <button type="button" id="lobby-create" data-action="createRoom" data-hud-box="lobby-create"></button>
         <button type="button" id="lobby-join" data-action="openJoin" data-hud-box="lobby-join"></button>

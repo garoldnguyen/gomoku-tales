@@ -117,7 +117,10 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
   let qualityRow = null;
 
   const buildMenu = (vm) => {
-    title.textContent = vm.title;
+    // The last word of the title in italics (the Ivory title, menu.css).
+    const words = vm.title.split(' ');
+    title.textContent = words.length > 1 ? `${words.slice(0, -1).join(' ')} ` : '';
+    el('em', null, title).textContent = words.at(-1);
     place.textContent = vm.place;
     keysHint.textContent = vm.keysHint;
     for (const item of vm.buttons) {

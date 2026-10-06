@@ -1,0 +1,10 @@
+/* The Ivory look of the menus and room screens (src/ui/menu.css,
+   src/ui/screens.css, src/ui/room.css): the two serif faces it adds to the
+   HUD's Nunito and DM Sans, from assets/fonts (FONTS.txt). Cinzel for
+   labels in capitals and buttons, Cormorant Garamond for titles, names
+   and italic notes. The in-game glass HUD (hud.css) does not use them. */
+
+@font-face { font-family: "Cinzel"; font-weight: 600; font-style: normal; font-display: swap; src: url("../../assets/fonts/cinzel-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Cormorant Garamond"; font-weight: 500; font-style: normal; font-display: swap; src: url("../../assets/fonts/cormorant-garamond-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Cormorant Garamond"; font-weight: 500; font-style: italic; font-display: swap; src: url("../../assets/fonts/cormorant-garamond-latin-500-italic.woff2") format("woff2"); }
+@font-face { font-family: "Cormorant Garamond"; font-weight: 600; font-style: normal; font-display: swap; src: url("../../assets/fonts/cormorant-garamond-latin-600-normal.woff2") format("woff2"); }
