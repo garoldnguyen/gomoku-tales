@@ -143,6 +143,8 @@
 //   { type: 'full' }                      guest: the room already has two players
 //   { type: 'noRoom' }                    guest: nobody answered the join
 //   { type: 'state', state, events }      an action was applied
+//   { type: 'audience', watchers }        the spectators changed ([{ id, name }],
+//                                         src/net/audience.js)
 //   { type: 'rejected', error }           this window's action was not allowed
 //   { type: 'peer', status, secondsLeft } the opponent's presence changed (presence.js)
 //   { type: 'result', result }            the leave result changed: { winner, reason:
@@ -152,8 +154,9 @@
 import { CHAT_MIN_INTERVAL_MS, HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS } from '../config.js';
 import { isGameOver, newGame, placeStone, useSkill } from '../logic/game.js';
 import { coveredActionError, maskErrorForViewer, maskEventsForViewer, maskForViewer } from '../logic/cloud.js';
-import { bothReady, clearSeat, createSeats, isSeats, pickCharacter, seatSides, seatStone, setReady } from '../logic/seats.js';
+import { bothReady, clearSeat, createSeats, isSeats, pickCharacter, seatSides, seatStone, setReady, setUnready } from '../logic/seats.js';
 import { CHAT, chatOf, cleanChatText, cleanName, namesOf } from './chat.js';
+import { AUDIENCE_TYPES, createAudience } from './audience.js';
 import { systemClock } from './clock.js';
 import { ROOM_PHASES } from './phase.js';
 import { CONNECTED, GONE, checkPresence, countdownStart, createPresence, markHeard, markLeft } from './presence.js';
@@ -362,6 +365,10 @@ export function createHostRoom(options) {
       seatAction(GUEST, (seats, side) => setReady(seats, side, character), message.request);
       return;
     }
+    if (message.type === 'unready') {
+      seatAction(GUEST, (seats, side) => setUnready(seats, side), message.request);
+      return;
+    }
     if (message.type === 'rematch') {
       rematchFrom(GUEST, message.round);
       return;
@@ -394,6 +401,7 @@ export function createHostRoom(options) {
   room.requestRematch = () => rematchFrom(HOST, room.round);
   room.pick = (character) => seatAction(HOST, (seats, side) => pickCharacter(seats, side, character));
   room.ready = () => seatAction(HOST, setReady);
+  room.unready = () => seatAction(HOST, setUnready);
 
   return room.api;
 }
@@ -610,6 +618,8 @@ export function createGuestRoom(options) {
     const character = room.phase === STARTING ? wantedSeats().picks[GUEST] : null;
     return seatRequest((seats) => setReady(seats, GUEST), { type: 'ready', character }, { character, ready: true });
   };
+  // Takes the Ready back (sent to the host, which decides).
+  room.unready = () => seatRequest((seats) => setUnready(seats, GUEST), { type: 'unready' }, { ready: false });
 
   // Asks the host for a rematch; the host decides. Returns true if sent.
   room.requestRematch = () => {
@@ -682,6 +692,7 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
   let lastPeer = null; // last { status, secondsLeft } sent in a 'peer' event
   let peerGoneReported = false; // the peer was reported gone (or forfeited) on this link
   let unsubscribe = null;
+  const audience = createAudience(id); // who watches (spectators)
 
   let lastChatAt = -Infinity; // when this window last sent a chat message
   const room = {
@@ -711,6 +722,7 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
     requestRematch: () => false,
     pick: () => ({ ok: false, error: NOT_SELECTING_ERROR }),
     ready: () => ({ ok: false, error: NOT_SELECTING_ERROR }),
+    unready: () => ({ ok: false, error: NOT_SELECTING_ERROR }),
     lostPeer: () => {}, // (phase) the peer went missing outside phase playing
 
     // The characters and stones of both windows from the seats, at the start.
@@ -843,6 +855,8 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
     receiveCommon(message) {
       if (message.type === 'leave' || (message.type === 'ping' && message.gone === true)) {
         presence = markLeft(presence, clock.now());
+        // Leave match mid-game (resign): gone at once, no countdown.
+        if (message.type === 'leave' && message.resign === true && room.phase === PLAYING) presence = { ...presence, goneAt: clock.now() };
         check();
       } else {
         room.heard();
@@ -939,6 +953,10 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
       if (chat) room.emit({ type: 'chat', ...chat, mine: false });
       return;
     }
+    if (AUDIENCE_TYPES.includes(message.type)) {
+      if (audience.take(message)) room.emit({ type: 'audience', watchers: audience.list() });
+      return;
+    }
     if (message.spectatorsOnly === true) return; // the full state is for the spectators only
     if (role === GUEST && message.to === id && (room.peerId === null || message.from === room.peerId)) {
       const names = namesOf(message);
@@ -1012,6 +1030,11 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
       return room.ready();
     },
 
+    // Takes this window's Ready back while the other seat is not Ready.
+    unready() {
+      return room.unready();
+    },
+
     // Requests an action for this window's player (see the actions above).
     act(action) {
       return room.act(action);
@@ -1062,15 +1085,17 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
         result: room.result,
         yourTurn: canAct,
         waiting: room.pending !== null,
+        watchers: audience.list(),
       };
     },
 
     // Leaves the room: tells a seated opponent (unless they are already
     // gone), stops all timers and closes the transport. Call it when the
-    // page closes.
-    close() {
+    // page closes. resign true (Leave match in a game): the opponent wins
+    // at once instead of after the leave countdown.
+    close({ resign = false } = {}) {
       if (room.phase === CLOSED) return;
-      if (presence && presence.goneAt === null) room.send({ type: 'leave', to: room.peerId });
+      if (presence && presence.goneAt === null) room.send({ type: 'leave', to: room.peerId, ...(resign && room.phase === PLAYING ? { resign: true } : {}) });
       room.phase = CLOSED;
       stopTimers();
       handlers.clear();

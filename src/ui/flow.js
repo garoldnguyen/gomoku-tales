@@ -18,7 +18,7 @@
 //            rematch keeps them (same characters, same sides). Online the
 //            seats live in the room, where the host decides (net/room.js).
 
-import { bothReady, createSeats, pickCharacter, setReady } from '../logic/seats.js';
+import { bothReady, createSeats, pickCharacter, setReady, setUnready } from '../logic/seats.js';
 
 export const SCREENS = Object.freeze({
   MENU: 'menu',
@@ -59,6 +59,7 @@ export const FLOW_EVENTS = Object.freeze({
   REMATCH_STARTED: 'REMATCH_STARTED',
   PICK: 'PICK', // { type, seat, character }: a local seat picks a character
   READY: 'READY', // { type, seat }: a local seat presses Ready
+  UNREADY: 'UNREADY', // { type, seat }: a local seat takes its Ready back
   WATCH: 'WATCH', // Watch a match on the menu: the spectator's room code screen
   SPECTATOR_JOINED: 'SPECTATOR_JOINED', // the relay let the spectator into the room
   ROOM_CLOSED: 'ROOM_CLOSED', // the host left or the spectator's connection closed
@@ -144,7 +145,7 @@ export function flowReducer(flow, event) {
       }
       break;
     case FLOW_EVENTS.LEAVE:
-      if (screen === SCREENS.WAITING || screen === SCREENS.STARTING || screen === SCREENS.GAMEOVER || isSelecting(flow)) {
+      if (screen === SCREENS.WAITING || screen === SCREENS.STARTING || screen === SCREENS.GAMEOVER || isSelecting(flow) || (screen === SCREENS.GAME && !isSpectating(flow))) {
         return next({ screen: SCREENS.MENU, mode: null, role: null, seats: null });
       }
       if (isSpectating(flow) || screen === SCREENS.ROOM_CLOSED) {
@@ -162,6 +163,9 @@ export function flowReducer(flow, event) {
       break;
     case FLOW_EVENTS.READY:
       if (isSelecting(flow)) return seatsResult(flow, setReady(flow.seats, event.seat));
+      break;
+    case FLOW_EVENTS.UNREADY:
+      if (isSelecting(flow)) return seatsResult(flow, setUnready(flow.seats, event.seat));
       break;
   }
   return flow;

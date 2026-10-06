@@ -7,6 +7,10 @@ export const EMPTY = null;
 export const X = 'X';
 export const O = 'O';
 export const ROCK = 'ROCK';
+// A cell under the other seat's cloud that holds a plant or a rock: only in
+// a board masked for a viewer (maskForViewer in cloud.js). Not empty, and
+// neither X, O nor a rock, so it never counts for a line.
+export const HIDDEN = 'HIDDEN';
 
 // Horizontal, vertical, diagonal down-right, diagonal down-left.
 const DIRECTIONS = [

@@ -12,9 +12,11 @@
 //
 // Design v4: a click on a skill button still runs onSkill and also opens
 // the skill detail popup (skillPopupViewModel) next to its card: title,
-// state, the full description and the hint. Escape or a press outside it
+// state, the full description and the hint (not in the slim layouts of
+// phones, where it would cover the board). Escape or a press outside it
 // closes it; neither is swallowed, so Escape still cancels a target flow
-// and a press on the board still picks the target.
+// and a press on the board still picks the target. It takes no presses
+// itself: one on it goes through to the board.
 
 import { X, O } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
@@ -149,7 +151,10 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       }
       hideTip();
       onSkill(player, slot.id);
-      openPopup(button, player, slot.id, c);
+      // The slim layouts of phones have no room beside the board: the
+      // popup would lie over the plots the skill needs (a long press still
+      // shows the tooltip, and the turn pill says the next step).
+      if (!compact) openPopup(button, player, slot.id, c);
     });
     attachTip(button, c, s);
     return button;
@@ -267,6 +272,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     const { layout: next, foldable: fits } = hudFoldLayout(window.innerWidth, window.innerHeight, { collapsed, cardHeight });
     const top = topBarLayout(window.innerWidth, window.innerHeight, next, { fullscreen: !fullscreen.hidden });
     root.classList.toggle('fs-below', top.fullscreenBelow);
+    root.classList.toggle('tools-below', top.toolsBelow); // the Leave match button too (leave-match.js)
     root.classList.toggle('no-fullscreen', fullscreen.hidden);
     compact = next.compact;
     foldable = fits;

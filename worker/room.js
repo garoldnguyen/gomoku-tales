@@ -9,6 +9,10 @@
 //   spectator  listens; it may send chat (to everyone), anything else it
 //              sends closes its socket
 //   chat       a chat message of anyone goes to every other socket
+//   audience   a spectator's watch marks its socket as watching (with its
+//              name); after a watch, and when a watching socket closes,
+//              every socket gets the audience message (src/net/audience.js).
+//              A player that connects while spectators watch gets it too.
 //
 // Each socket keeps { role, peer } with serializeAttachment (it survives
 // hibernation). peer starts as a relay id and becomes the from of the
@@ -34,7 +38,10 @@ import {
   countFrame,
   snapshotFor,
   maySend,
+  watchersOf,
 } from './pairing.js';
+import { WATCH, UNWATCH, audienceMessage } from '../src/net/audience.js';
+import { cleanName } from '../src/net/chat.js';
 
 const SOCKET_OPEN = 1; // WebSocket.READY_STATE_OPEN
 const CLOSE_NORMAL = 1000;
@@ -59,6 +66,18 @@ export class RoomRelay extends DurableObject {
       guest: this.openSockets(ROLE_GUEST).length > 0,
       spectators: this.openSockets(ROLE_SPECTATOR).length,
     };
+  }
+
+  // The audience message for the watching spectators, leaving out skip
+  // (a socket that is closing).
+  audienceText(skip = null) {
+    const attachments = this.openSockets(ROLE_SPECTATOR).filter((ws) => ws !== skip).map((ws) => ws.deserializeAttachment());
+    return JSON.stringify(audienceMessage(watchersOf(attachments)));
+  }
+
+  sendAudience(skip = null) {
+    const text = this.audienceText(skip);
+    for (const ws of this.openSockets()) if (ws !== skip) ws.send(text);
   }
 
   async loadSnapshot() {
@@ -87,6 +106,8 @@ export class RoomRelay extends DurableObject {
     }
     if (query.role === ROLE_SPECTATOR) {
       for (const text of snapshotFor(await this.loadSnapshot())) server.send(text);
+    } else if (this.openSockets(ROLE_SPECTATOR).length > 0) {
+      server.send(this.audienceText());
     }
     return new Response(null, { status: 101, webSocket: client });
   }
@@ -125,6 +146,18 @@ export class RoomRelay extends DurableObject {
       ws.serializeAttachment(attachment);
     }
 
+    if (attachment.role === ROLE_SPECTATOR && (message.type === WATCH || message.type === UNWATCH)) {
+      const watching = message.type === WATCH;
+      const name = watching ? cleanName(message.name) : null;
+      if (attachment.watching !== watching || attachment.name !== name) {
+        attachment.watching = watching;
+        attachment.name = name;
+        ws.serializeAttachment(attachment);
+        this.sendAudience();
+      }
+      return;
+    }
+
     if (forwardFrame(attachment.role, raw, message, (role) => this.openSockets(role), ws)) {
       const snapshot = await this.loadSnapshot();
       snapshot[message.type] = raw;
@@ -159,6 +192,7 @@ export class RoomRelay extends DurableObject {
         peer.send(JSON.stringify({ type: 'leave', from: attachment.peer, to }));
       }
     }
+    if (attachment?.role === ROLE_SPECTATOR && attachment.watching === true) this.sendAudience(ws);
     const left = this.ctx.getWebSockets().filter((other) => other !== ws && other.readyState === SOCKET_OPEN);
     if (left.length === 0) await this.ctx.storage.setAlarm(Date.now() + LIMITS.EMPTY_ROOM_CLEANUP_MS);
   }

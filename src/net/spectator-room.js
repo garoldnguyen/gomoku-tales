@@ -1,9 +1,10 @@
 // The spectator's side of a room (Watch a match, docs/flow-design.md
 // sections 3.8 and 3.9). Pure of the DOM, like room.js. A spectator only
 // listens to the game: the one thing it sends is chat (sendChat, section
-// 3.12). It has no seat, no presence, no heartbeat and no leave countdown,
-// and every action it is asked for is refused without a message. The host
-// never learns it is there unless it chats.
+// 3.12), and watch and unwatch, so the room knows who watches
+// (src/net/audience.js). It has no seat, no presence, no heartbeat and no
+// leave countdown, and every action it is asked for is refused without a
+// message.
 //
 // Through the relay (src/net/ws-transport.js, role spectator) it hears the
 // host's messages only: the replay of the last seats, state, start,
@@ -36,9 +37,11 @@
 //   { type: 'roomClosed' }             the host left; nothing more comes
 //   { type: 'names', names }           the players' names changed ({ host, guest })
 //   { type: 'chat', from, name, text, mine } a chat message, from anyone in the room
+//   { type: 'audience', watchers }     the other spectators changed ([{ id, name }])
 
 import { isGameOver } from '../logic/game.js';
 import { CHAT, chatOf, cleanName, namesOf } from './chat.js';
+import { AUDIENCE_TYPES, UNWATCH, WATCH, createAudience } from './audience.js';
 import { systemClock } from './clock.js';
 import { createSeats, isSeats } from '../logic/seats.js';
 import { ROOM_PHASES } from './phase.js';
@@ -68,6 +71,8 @@ export function createSpectatorRoom({ transport, code, name = null, clock = syst
     names: { host: null, guest: null }, // the players' names, from the host's messages
   };
   let closed = false; // close() was called
+  const audience = createAudience(id);
+  const watch = () => transport.send({ type: WATCH, from: id, to: null, name: myName });
 
   const emit = (event) => {
     for (const handler of [...handlers]) handler(event);
@@ -136,6 +141,7 @@ export function createSpectatorRoom({ transport, code, name = null, clock = syst
     }
     switch (message.type) {
       case 'welcome':
+        watch(); // a guest who came later learns this spectator watches
         takeSeats(isSeats(message.seats, ROOM_SEATS) ? message.seats : room.seats, true);
         if (takeState(message)) takeResult(message.result);
         break;
@@ -175,8 +181,13 @@ export function createSpectatorRoom({ transport, code, name = null, clock = syst
       if (chat) emit({ type: 'chat', ...chat, mine: false });
       return;
     }
+    if (AUDIENCE_TYPES.includes(message.type)) {
+      if (audience.take(message)) emit({ type: 'audience', watchers: audience.list() });
+      return;
+    }
     handle(message);
   });
+  watch();
 
   return {
     role: SPECTATOR,
@@ -199,6 +210,7 @@ export function createSpectatorRoom({ transport, code, name = null, clock = syst
     // Every action of a player is refused, and nothing is sent.
     pick: refused,
     ready: refused,
+    unready: refused,
     act: refused,
     place: refused,
     useSkill: refused,
@@ -235,14 +247,16 @@ export function createSpectatorRoom({ transport, code, name = null, clock = syst
         waiting: false,
         guestPresent: room.guestSeen || room.state !== null,
         names: room.names,
+        watchers: audience.list(),
       };
     },
 
-    // Stops listening and closes the transport. Sends nothing: the relay
-    // tells nobody when a spectator goes.
+    // Says unwatch, stops listening and closes the transport. (When the
+    // tab just closes, the relay tells the room instead.)
     close() {
       if (closed) return;
       closed = true;
+      transport.send({ type: UNWATCH, from: id, to: null });
       room.phase = CLOSED;
       handlers.clear();
       unsubscribe();

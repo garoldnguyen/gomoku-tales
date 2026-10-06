@@ -5,7 +5,7 @@
 // routing, the spectator room, the rooms of both players and local mode.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { EMPTY, ROCK, X, O } from '../src/logic/board.js';
+import { EMPTY, HIDDEN as TAKEN, ROCK, X, O } from '../src/logic/board.js';
 import { CLOUD_EAGLE, EARTH_BEAR, assignSides } from '../src/logic/characters.js';
 import { newGame, placeStone, useSkill } from '../src/logic/game.js';
 import { CLOUD } from '../src/logic/skills.js';
@@ -41,8 +41,10 @@ function hiddenStoneGame() {
   return ok(placeStone(state, { player: X, x: 7, y: 7 }));
 }
 
+// The plants and rocks a board shows under the cells: a covered plot that
+// is taken reads TAKEN (HIDDEN) (taken, not by what), which is no stone.
 function stonesUnder(state, cells) {
-  return cells.filter(({ x, y }) => state.board[y][x] !== EMPTY);
+  return cells.filter(({ x, y }) => [X, O, ROCK].includes(state.board[y][x]));
 }
 
 test('maskForViewer: the owner of the cloud sees everything', () => {
@@ -56,7 +58,7 @@ test('maskForViewer: the other seat sees the cloud cells covered, with no stone'
   const masked = maskForViewer(state, O);
   const cells = cloudCells(state.board, state.clouds[0]);
   assert.notEqual(masked, state);
-  assert.equal(masked.board[7][7], EMPTY);
+  assert.equal(masked.board[7][7], TAKEN, 'taken, not by what or whose');
   assert.deepEqual(masked.covered, cells);
   assert.equal(isCovered(masked, 7, 7), true);
   assert.equal(isCovered(masked, 0, 0), false);
@@ -75,7 +77,7 @@ test('maskForViewer: a rock under the cloud is covered too', () => {
   const withRock = { ...state, board, rocks: [{ x: 8, y: 6, breaksAfterTurn: 9 }, { x: 0, y: 14, breaksAfterTurn: 9 }] };
   withRock.board[14][0] = ROCK;
   const masked = maskForViewer(withRock, O);
-  assert.equal(masked.board[6][8], EMPTY);
+  assert.equal(masked.board[6][8], TAKEN, 'a rock reads taken too');
   assert.deepEqual(masked.rocks, [{ x: 0, y: 14, breaksAfterTurn: 9 }]);
   assert.equal(masked.board[14][0], ROCK);
 });
@@ -92,8 +94,8 @@ test('maskForViewer: without a cloud nothing is covered; a game over is no excep
   assert.equal(maskForViewer(plain, O), plain);
   const { state } = hiddenStoneGame();
   // The cells stay hidden until the cloud ends, also after the game ended.
-  assert.equal(maskForViewer({ ...state, winner: X }, O).board[7][7], EMPTY);
-  assert.equal(maskForViewer({ ...state, draw: true }, O).board[7][7], EMPTY);
+  assert.equal(maskForViewer({ ...state, winner: X }, O).board[7][7], TAKEN);
+  assert.equal(maskForViewer({ ...state, draw: true }, O).board[7][7], TAKEN);
   assert.equal(maskForViewer({ ...state, winner: X }, X).board[7][7], X);
   assert.equal(maskForViewer(null, O), null);
 });
@@ -132,8 +134,8 @@ test('a winning line under the other seat\'s cloud does not tell the hidden ston
   assert.ok(won.state.winLine.some(hidden), 'the true line runs under the cloud');
 
   const forO = maskForViewer(won.state, O);
-  assert.equal(forO.board[7][5], EMPTY);
-  assert.equal(forO.board[7][6], EMPTY);
+  assert.equal(forO.board[7][5], TAKEN);
+  assert.equal(forO.board[7][6], TAKEN);
   assert.equal(forO.winLine.some(hidden), false);
   assert.equal(forO.winLine.length, 3);
   const winEvent = maskEventsForViewer(forO, won.events).find((e) => e.type === 'win');
@@ -168,7 +170,7 @@ test('hostStateMessages: a masked copy for the guest, the full state for the spe
   assert.deepEqual(rest, []);
   assert.equal(guestCopy.masked, true);
   assert.equal(guestCopy.spectatorsOnly, undefined);
-  assert.equal(guestCopy.state.board[7][7], EMPTY);
+  assert.equal(guestCopy.state.board[7][7], TAKEN);
   assert.equal(guestCopy.events.some((e) => e.type === 'stonePlaced'), false);
   assert.equal(guestCopy.seq, 4);
   assert.equal(spectators.spectatorsOnly, true);
@@ -236,7 +238,7 @@ test('through the relay the guest never receives a hidden stone, and gets the re
   assert.equal(guestFrames.length, 4);
   for (const frame of guestFrames) {
     assert.notEqual(frame.spectatorsOnly, true);
-    assert.equal(frame.state.board[7][7], EMPTY);
+    assert.notEqual(frame.state.board[7][7], X, 'never the hidden stone itself');
     assert.equal(sockets.guest[0].frames.some((f) => JSON.parse(f).events.some((e) => e.type === 'stonePlaced' && e.x === 7)), false);
   }
   // The spectators have the full state, live and in the replay.
@@ -306,7 +308,7 @@ test('local mode: the cloud cells are covered while the other seat moves, the ow
   const { state } = hiddenStoneGame();
   assert.equal(state.currentPlayer, O);
   const seenByO = localViewState(state);
-  assert.equal(seenByO.board[7][7], EMPTY);
+  assert.equal(seenByO.board[7][7], TAKEN);
   assert.equal(isCovered(seenByO, 7, 7), true);
   const xTurn = ok(placeStone(state, { player: O, x: 3, y: 0 })).state;
   assert.equal(xTurn.currentPlayer, X);
@@ -343,8 +345,9 @@ test('local mode: the target preview and click read the drawn board, not the hid
   assert.equal(targetPreview(shown, O, convert, { x: 7, y: 7 }), null);
   assert.ok(targetClick(shown, O, convert, { x: 7, y: 7 }).error);
   const rock = startTargeting(TERRAIN_CREATION);
-  assert.deepEqual(targetPreview(shown, O, rock, { x: 7, y: 7 }), { type: 'rock', x: 7, y: 7 });
-  assert.deepEqual(targetClick(shown, O, rock, { x: 7, y: 7 }), { target: { x: 7, y: 7 } });
+  assert.equal(targetPreview(shown, O, rock, { x: 7, y: 7 }), null, 'a taken covered plot takes no rock');
+  assert.ok(targetClick(shown, O, rock, { x: 7, y: 7 }).error);
+  assert.deepEqual(targetPreview(shown, O, rock, { x: 6, y: 6 }), { type: 'rock', x: 6, y: 6 }, 'an empty covered plot reads empty');
 });
 
 // EVERY HOST MESSAGE TO THE GUEST is masked: a real host room (Cloud Eagle,
@@ -355,14 +358,15 @@ test('local mode: the target preview and click read the drawn board, not the hid
 const HIDDEN = { x: 8, y: 8 };
 const PUBLIC_KEYS = new Set(['clouds', 'covered', 'cells']);
 
-// Every cell under a cloud of X is empty in the message's state, and no
+// Every cell under a cloud of X is empty or TAKEN in the message's state
+// (never a plant or rock of a side), and no
 // part of the message (outside the clouds themselves) names the hidden cell.
 function assertNothingHidden(message) {
   const what = `${message.type} ${JSON.stringify(message).slice(0, 120)}`;
   const state = message.state;
   if (state?.board) {
     for (const c of (state.clouds ?? []).filter((each) => each.owner === X)) {
-      for (const { x, y } of cloudCells(state.board, c)) assert.equal(state.board[y][x], EMPTY, `${what}: (${x}, ${y}) shown`);
+      for (const { x, y } of cloudCells(state.board, c)) assert.ok(state.board[y][x] === EMPTY || state.board[y][x] === TAKEN, `${what}: (${x}, ${y}) shown`);
     }
     for (const rock of state.rocks ?? []) assert.equal((state.clouds ?? []).some((c) => c.owner === X && Math.abs(rock.x - c.x) <= 2 && Math.abs(rock.y - c.y) <= 2), false, `${what}: a rock shown`);
   }
@@ -413,7 +417,7 @@ for (const relay of [false, true]) {
     ok(ctx.host.place(HIDDEN.x, HIDDEN.y)); // the win
     for (const message of ctx.guestBound()) assertNothingHidden(message);
     assert.ok(ctx.sentOfType('state').length >= 12);
-    assert.equal(ctx.guest.state.board[HIDDEN.y][HIDDEN.x], EMPTY);
+    assert.equal(ctx.guest.state.board[HIDDEN.y][HIDDEN.x], TAKEN);
     assert.equal(ctx.host.state.board[HIDDEN.y][HIDDEN.x], X, 'the host keeps the true state');
     if (relay) assert.ok(ctx.hostTransport.sent.some((m) => m.spectatorsOnly === true && m.state.board[HIDDEN.y][HIDDEN.x] === X));
     else assert.equal(ctx.hostTransport.sent.some((m) => m.spectatorsOnly === true), false);
@@ -433,7 +437,7 @@ for (const relay of [false, true]) {
     for (const message of ctx.guestBound()) assertNothingHidden(message);
   });
 
-  test(`host messages${over}: a refused action on a covered cell says only that it is under a cloud`, () => {
+  test(`host messages${over}: a plant refused on a taken covered plot is told only that it is taken`, () => {
     const ctx = eagleRooms({ relay });
     playHiddenWin(ctx, { win: false });
     ok(ctx.host.place(HIDDEN.x, HIDDEN.y - 4)); // (8, 4): outside, the game goes on
@@ -441,8 +445,8 @@ for (const relay of [false, true]) {
     ctx.guest.onEvent((e) => e.type === 'rejected' && rejected.push(e.error));
     ok(ctx.guest.place(7, 8)); // a hidden X stone: sent, refused by the host
     const answer = ctx.sentOfType('rejected').at(-1);
-    assert.equal(answer.error, COVERED_ERROR);
-    assert.deepEqual(rejected, [COVERED_ERROR]);
+    assert.equal(answer.error, 'That cell is not empty.');
+    assert.deepEqual(rejected, ['That cell is not empty.']);
     for (const message of ctx.guestBound()) assertNothingHidden(message);
   });
 
@@ -454,7 +458,7 @@ for (const relay of [false, true]) {
     const welcome = ctx.sentOfType('welcome').at(-1);
     assert.ok('result' in welcome);
     assert.equal(welcome.masked, true);
-    assert.equal(welcome.state.board[HIDDEN.y][HIDDEN.x], EMPTY);
+    assert.equal(welcome.state.board[HIDDEN.y][HIDDEN.x], TAKEN);
     assert.equal(ctx.sentOfType('start').at(-1).masked, true);
     assert.ok(ctx.sentOfType('ping').length > 0);
     ok({ ok: ctx.guest.requestRematch() });
@@ -483,7 +487,7 @@ for (const relay of [false, true]) {
 test('maskErrorForViewer: a refusal on a covered cell does not tell what it holds', () => {
   const { state } = hiddenStoneGame(); // X stone on (7, 7) under X's cloud
   const place = (x, y) => ({ kind: 'place', x, y });
-  assert.equal(maskErrorForViewer(state, O, place(7, 7), 'That cell is taken.'), COVERED_ERROR);
+  assert.equal(maskErrorForViewer(state, O, place(7, 7), 'That cell is taken.'), 'That cell is taken.', 'a plant: the plot shows taken anyway');
   assert.equal(maskErrorForViewer(state, O, { kind: 'skill', target: { x: 6, y: 6 } }, 'x'), COVERED_ERROR);
   assert.equal(maskErrorForViewer(state, O, { kind: 'skill', target: { from: { x: 0, y: 0 }, to: { x: 8, y: 8 } } }, 'x'), COVERED_ERROR);
   assert.equal(maskErrorForViewer(state, O, place(0, 0), 'That cell is taken.'), 'That cell is taken.');
@@ -590,12 +594,12 @@ for (const relay of [false, true]) {
       if (STATE_TYPES.has(name)) {
         // The mask covered the cloud: the guest's copy is the masked one.
         assert.equal(last.masked, true);
-        assert.equal(last.state.board[8][7], EMPTY);
+        assert.equal(last.state.board[8][7], TAKEN, 'taken, not by what');
         assert.equal(isCovered(last.state, 7, 8), true);
       }
       if (name === 'win') assert.deepEqual(last.events.find((e) => e.type === 'win').line, [{ x: 10, y: 8 }]);
       if (name === 'result') assert.deepEqual(Object.keys(last.result).sort(), ['reason', 'winner']);
-      if (name === 'rejected') assert.equal(last.error, COVERED_ERROR);
+      if (name === 'rejected') assert.equal(last.error, 'That cell is not empty.', 'a taken covered plot is refused like any taken plot');
       if (name === 'new-game') {
         assert.equal(last.round, 2);
         assert.deepEqual(last.state.clouds ?? [], []);
@@ -622,45 +626,40 @@ test('hostStateMessages: events sent without a state are masked by the host\'s t
   assert.deepEqual(hostStateMessages(plain, O, true, state), [plain], 'a message with no cell goes out as it is');
 });
 
-test('coveredActionError: any action on a covered cell is refused whatever it holds, the Cloud skill excepted', () => {
+test('coveredActionError: a plant may go into the other seat\'s cloud; a skill on a covered cell is refused whatever it holds', () => {
   const { state } = hiddenStoneGame(); // X stone on (7, 7) under X's cloud, (8, 8) empty under it
-  assert.equal(coveredActionError(state, O, { kind: 'place', x: 7, y: 7 }), COVERED_ERROR);
-  assert.equal(coveredActionError(state, O, { kind: 'place', x: 8, y: 8 }), COVERED_ERROR, 'an empty covered cell answers the same');
+  assert.equal(coveredActionError(state, O, { kind: 'place', x: 7, y: 7 }), null, 'the rules answer: taken');
+  assert.equal(coveredActionError(state, O, { kind: 'place', x: 8, y: 8 }), null);
   assert.equal(coveredActionError(state, O, { kind: 'skill', skill: STONE_CONVERSION, target: { x: 6, y: 6 } }), COVERED_ERROR);
+  assert.equal(coveredActionError(state, O, { kind: 'skill', skill: STONE_CONVERSION, target: { x: 7, y: 7 } }), COVERED_ERROR);
   assert.equal(coveredActionError(state, O, { kind: 'skill', skill: CLOUD, target: { x: 7, y: 7 } }), null);
-  assert.equal(coveredActionError(state, O, { kind: 'place', x: 0, y: 1 }), null);
   assert.equal(coveredActionError(state, X, { kind: 'place', x: 8, y: 8 }), null, 'the owner plays under its own cloud');
 });
 
 for (const relay of [false, true]) {
-  test(`the guest cannot probe the cloud${relay ? ' (relay)' : ''}: an empty and a taken covered cell are refused alike`, () => {
+  test(`the guest plants into the host's cloud${relay ? ' (relay)' : ''}: an empty covered plot takes the plant, a taken one is refused as taken`, () => {
     const ctx = eagleRooms({ relay });
     playHiddenWin(ctx, { win: false });
     ok(ctx.host.place(13, 13));
     const rejected = [];
     ctx.guest.onEvent((e) => e.type === 'rejected' && rejected.push(e.error));
-    ctx.guest.place(7, 8); // a hidden X stone
-    ctx.guest.place(8, 7); // an empty covered cell
-    assert.deepEqual(rejected, [COVERED_ERROR, COVERED_ERROR]);
-    assert.equal(ctx.host.state.board[7][8], EMPTY, 'nothing was placed');
+    ctx.guest.place(7, 8); // a hidden X stone: the guest's board shows it taken
+    assert.deepEqual(rejected, ['That cell is not empty.']);
     assert.equal(ctx.host.state.currentPlayer, O, 'the guest is still to move');
-    const answers = ctx.sentOfType('rejected').slice(-2).map(({ error, reason, seq }) => ({ error, reason, seq }));
-    assert.deepEqual(answers[0], answers[1]);
-    ok(ctx.guest.place(12, 0)); // outside the cloud the game goes on
+    ok(ctx.guest.place(8, 7)); // an empty covered plot
+    assert.equal(ctx.host.state.board[7][8], O, 'the plant grows under the cloud');
+    assert.equal(ctx.guest.state.board[7][8], TAKEN, 'and the guest sees it only as taken');
+    for (const message of ctx.guestBound()) assertNothingHidden(message);
   });
 }
 
-test('local mode: the player not owning the cloud cannot place under it, whatever the cell holds', () => {
+test('local mode: the player not owning the cloud plants into its empty plots; a taken one is refused as taken', () => {
   // X's cloud on (7, 7) with an X stone under it; O is to move.
   const game = createLocalGame({ makeGame: () => hiddenStoneGame().state });
   assert.equal(game.getState().currentPlayer, O);
+  assert.equal(game.getView().state.board[7][7], TAKEN);
   assert.equal(game.click({ x: 7, y: 7 }), false); // a hidden X stone
-  const taken = game.getView().message;
-  assert.equal(game.click({ x: 8, y: 8 }), false); // an empty covered cell
-  assert.equal(game.getView().message, taken);
-  assert.equal(taken, COVERED_ERROR);
-  assert.equal(game.getState().board[8][8], EMPTY);
-  assert.equal(game.getState().currentPlayer, O);
-  assert.equal(game.click({ x: 0, y: 1 }), true); // outside the cloud
-  assert.equal(game.click({ x: 8, y: 8 }), true, 'the owner plays under its own cloud');
+  assert.equal(game.getView().message, 'That cell is not empty.');
+  assert.equal(game.click({ x: 8, y: 8 }), true); // an empty covered plot
+  assert.equal(game.getState().board[8][8], O);
 });

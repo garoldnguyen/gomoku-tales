@@ -14,9 +14,11 @@
 //
 // Messages travel as JSON text. Messages sent before the socket is open are
 // dropped: src/net/room.js resends its state through the heartbeat. A
-// spectator only listens; its send returns false and sends nothing.
+// spectator mostly listens: it sends only chat, watch and unwatch
+// (SPECTATOR_SENDS); any other send returns false and sends nothing.
 
 import { RELAY_PATH } from '../config.js';
+import { SPECTATOR_SENDS } from './audience.js';
 
 export const ROLE_HOST = 'host';
 export const ROLE_GUEST = 'guest';
@@ -99,7 +101,7 @@ export function createWebSocketTransport(roomCode, role, options = {}) {
     reachesSpectators: true,
 
     send(message) {
-      if (role === ROLE_SPECTATOR || closed) return false;
+      if (closed || (role === ROLE_SPECTATOR && !SPECTATOR_SENDS.includes(message?.type))) return false;
       if (!isOpen || socket.readyState !== OPEN) return false;
       socket.send(JSON.stringify(message));
       return true;

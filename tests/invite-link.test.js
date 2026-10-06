@@ -32,7 +32,7 @@ function makeWorld() {
   return { window };
 }
 
-test('opening the link on the menu joins the room: the guest is in, the host sees it', () => {
+test('opening the link on the menu opens Join Room with the code filled in; the player then joins', () => {
   const { window } = makeWorld();
   const host = window();
   host.playOnline();
@@ -40,18 +40,19 @@ test('opening the link on the menu joins the room: the guest is in, the host see
   assert.equal(host.getView().waiting.invite.label, STRINGS.waitingInvite, 'the host alone has the invite link');
   const guest = window();
   assert.equal(guest.getScreen(), MENU);
-  assert.equal(guest.joinFromLink('AB2C9'), true);
+  assert.equal(guest.joinFromLink('ab2c9'), true);
+  assert.equal(guest.getScreen(), JOIN, 'not joined yet: the name comes first');
+  assert.equal(guest.getView().joinPrefill, 'AB2C9');
+  guest.setPlayerName('Bo');
+  assert.equal(guest.joinRoom(guest.getView().joinPrefill), true);
   assert.equal(guest.getScreen(), WAITING_SCREEN);
+  assert.equal(guest.getView().joinPrefill, null);
   assert.equal(host.getView().waiting.invite, null, 'the room is full: no invite link');
-  assert.equal(guest.getView().waiting.invite, null);
+  assert.equal(host.getView().waiting.cards[1].label, 'Bo');
 });
 
-test('a bad code in the link stays on Join Room with its error; off the menu the link does nothing', () => {
+test('off the menu the link does nothing', () => {
   const { window } = makeWorld();
-  const guest = window();
-  assert.equal(guest.joinFromLink('!!'), false);
-  assert.equal(guest.getScreen(), JOIN);
-  assert.notEqual(guest.getView().joinError, null);
   const other = window();
   other.playOnline();
   assert.equal(other.joinFromLink('AB2C9'), false);

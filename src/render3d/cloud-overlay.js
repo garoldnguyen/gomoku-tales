@@ -11,8 +11,13 @@
 // THE CLOUD: each cloud's cells (clipped to the board) with a look:
 //   'seeThrough'  the owner and spectators: a translucent cloud with the
 //                 plants and rocks inside visible
-//   'cover'       the other seat: the area covered, nothing inside shown
+//   'cover'       the other seat: a light mist over the area; its empty
+//                 plots show through (that seat may plant there)
 // A cell under two clouds is listed once; cover wins.
+//
+// HIDDEN PUFFS: for the other seat, every covered plot that is taken (HIDDEN
+// in its masked board) gets a little cloud puff drifting over it, so the
+// plot reads taken without telling by what or whose.
 //
 // SKY WATCH: the cells of skyWatchCells for the side that plays Cloud
 // Eagle, shown as soft yellow outlines to that side and to spectators, and
@@ -24,7 +29,7 @@ import { CHARACTER_LOOK } from './character-look.js';
 import { createGrid, fillEllipse, fillRect, setPixel } from './pixel-art.js';
 import { cloudCells, cloudsOf, isCovered, skyWatchCells } from '../logic/cloud.js';
 import { isGameOver } from '../logic/game.js';
-import { O, X } from '../logic/board.js';
+import { HIDDEN, O, X } from '../logic/board.js';
 
 export const SEE_THROUGH = 'seeThrough';
 export const COVER = 'cover';
@@ -61,6 +66,14 @@ export function cloudOverlayCells(state, viewer) {
   return [...looks.keys()].sort((a, b) => a - b).map((key) => ({ x: key % size, y: Math.floor(key / size), look: looks.get(key) }));
 }
 
+// The taken covered plots of a masked state: [{ x, y }], row by row (none
+// for the cloud's owner or a spectator, whose board is not masked).
+export function hiddenPuffCells(state, viewer) {
+  if (!Array.isArray(state?.covered) || viewer === null || viewer === undefined) return NONE;
+  const cells = state.covered.filter(({ x, y }) => state.board[y]?.[x] === HIDDEN);
+  return cells.length === 0 ? NONE : cells;
+}
+
 // The Sky Watch outline cells for viewer: [{ x, y }], row by row.
 export function skyWatchOutlineCells(state, viewer) {
   const owner = cloudEagleSide(state);
@@ -72,10 +85,10 @@ export function skyWatchOutlineCells(state, viewer) {
 
 // Both overlays of a game view, worked out again only when the drawn
 // state or the viewer changes (the render loop calls it every frame).
-// Returns { clouds, skyWatch } (the two lists above); the same object
+// Returns { clouds, skyWatch, hidden } (the lists above); the same object
 // while nothing changed.
 export function createCloudOverlay() {
-  const result = { clouds: NONE, skyWatch: NONE, version: 0, state: null, viewer: undefined };
+  const result = { clouds: NONE, skyWatch: NONE, hidden: NONE, version: 0, state: null, viewer: undefined };
   const overlayFor = (state, viewer) => (state === result.state && viewer === result.viewer ? result : rebuildOverlay(result, state, viewer));
   return overlayFor;
 }
@@ -86,6 +99,7 @@ function rebuildOverlay(result, state, viewer) {
   result.viewer = viewer;
   result.clouds = cloudOverlayCells(state, viewer);
   result.skyWatch = skyWatchOutlineCells(state, viewer);
+  result.hidden = hiddenPuffCells(state, viewer);
   result.version++;
   return result;
 }
@@ -158,5 +172,21 @@ export function skyWatchPuffGrid() {
   fillEllipse(grid, 10, 15, 5, 4, CLOUD_TILE_COLOURS.base);
   fillEllipse(grid, 17, 12, 6, 5, CLOUD_TILE_COLOURS.light);
   fillEllipse(grid, 23, 15, 4, 3, CLOUD_TILE_COLOURS.light);
+  return grid;
+}
+
+// The cloud puff over a taken covered plot: a fluffy cloud of four bumps,
+// shaded underneath and lit on top, a little smaller than the plot.
+export function hiddenPuffGrid() {
+  const n = OVERLAY_TILE_PX;
+  const grid = createGrid(n, n);
+  fillEllipse(grid, 16, 21, 13, 6, CLOUD_TILE_COLOURS.shade);
+  fillEllipse(grid, 16, 19, 13, 6, CLOUD_TILE_COLOURS.base);
+  fillEllipse(grid, 9, 16, 6, 5, CLOUD_TILE_COLOURS.base);
+  fillEllipse(grid, 17, 12, 7, 6, CLOUD_TILE_COLOURS.base);
+  fillEllipse(grid, 24, 15, 5, 4, CLOUD_TILE_COLOURS.base);
+  fillEllipse(grid, 15, 10, 4, 3, CLOUD_TILE_COLOURS.light);
+  fillEllipse(grid, 9, 14, 3, 2, CLOUD_TILE_COLOURS.light);
+  fillEllipse(grid, 24, 13, 2, 2, CLOUD_TILE_COLOURS.light);
   return grid;
 }

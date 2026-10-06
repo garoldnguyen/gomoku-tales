@@ -1,0 +1,145 @@
+/* Leave match (src/ui/leave-match.js, docs/flow-design.md section 3.13):
+   a 44 px glass circle like the HUD's Fullscreen button, placed by
+   topBarLayout (hud-layout.js), and a small card that asks first. Every
+   colour is a token of the block below: the HUD glass (src/ui/hud.css)
+   and the pale gold of its accents. */
+
+#leave-match {
+  --ink: #f4f7fb;
+  --ink-2: rgba(244, 247, 251, 0.74);
+  --card-solid: rgba(14, 20, 34, 0.92);
+  --card: rgba(14, 20, 34, 0.64);
+  --panel: #121826;
+  --line: rgba(255, 255, 255, 0.18);
+  --row: rgba(255, 255, 255, 0.08);
+  --gold: #e8c77a;
+  --gold-line: rgba(232, 199, 122, 0.42);
+  --danger: #ff8f8f;
+  --danger-line: rgba(255, 143, 143, 0.55);
+  --danger-row: rgba(255, 110, 110, 0.16);
+  --shadow: rgba(10, 20, 40, 0.3);
+  --veil: rgba(8, 12, 22, 0.42);
+  --font: "Jost", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 3; /* above the HUD, under the chat */
+  pointer-events: none;
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+#leave-match[hidden],
+#leave-match [hidden] {
+  display: none !important;
+}
+
+#leave-match button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+#leave-match button:focus-visible {
+  outline: 3px solid var(--gold);
+  outline-offset: 2px;
+}
+
+#leave-match .leave-button {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-2);
+  background: var(--card);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  box-shadow: 0 8px 20px var(--shadow);
+}
+
+#leave-match .leave-button:hover,
+#leave-match .leave-button[aria-expanded="true"] {
+  color: var(--danger);
+  border-color: var(--danger-line);
+}
+
+/* The question: a small card in the middle, over a light veil. */
+#leave-match.is-asking {
+  z-index: 5;
+  background: var(--veil);
+  pointer-events: auto;
+}
+
+#leave-match .leave-confirm {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 32px));
+  padding: 22px 22px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top-color: var(--gold-line);
+  border-radius: 18px;
+  box-shadow: 0 22px 54px var(--shadow);
+  animation: leave-in 220ms var(--ease-out);
+}
+
+@keyframes leave-in {
+  from { opacity: 0; scale: 0.96; }
+}
+
+#leave-match .leave-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+#leave-match .leave-text {
+  margin: 0 0 18px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink-2);
+}
+
+#leave-match .leave-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+#leave-match .leave-actions button {
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  border-radius: 999px;
+}
+
+#leave-match .leave-stay {
+  background: var(--row);
+  border: 1px solid var(--line);
+}
+
+#leave-match .leave-go {
+  color: var(--danger);
+  background: var(--danger-row);
+  border: 1px solid var(--danger-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #leave-match .leave-confirm {
+    animation: none;
+  }
+}

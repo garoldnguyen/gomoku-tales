@@ -134,7 +134,7 @@ test('in the app: names label the seats, chat shows in the room and clears on a 
   guest.setPlayerName('  Bo ');
   host.createRoom();
   assert.equal(host.getScreen(), WAITING_SCREEN);
-  assert.deepEqual(host.getView().chat, { messages: [], name: 'Ann' });
+  assert.deepEqual(host.getView().chat, { messages: [], name: 'Ann', watchers: [] });
   guest.openJoin();
   guest.joinRoom('AB2C9');
   assert.deepEqual(host.getView().waiting.cards.map((card) => card.label), [`Ann (you)`, 'Bo']);

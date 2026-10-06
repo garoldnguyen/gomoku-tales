@@ -4,6 +4,7 @@
 
 import { isValidRoomCode } from '../src/net/room-code.js';
 import { CHAT } from '../src/net/chat.js';
+import { WATCH, UNWATCH, SPECTATOR_SENDS } from '../src/net/audience.js';
 import { ROLES, ROLE_HOST, ROLE_GUEST, ROLE_SPECTATOR } from '../src/net/ws-transport.js';
 import { LIMITS } from './limits.js';
 
@@ -38,10 +39,12 @@ const TO_EVERYONE = Object.freeze([ROLE_HOST, ROLE_GUEST, ROLE_SPECTATOR]);
 // The roles a message of a socket of role goes to: guest messages to the
 // host, host messages to the guest and the spectators, a spectatorsOnly
 // host message to the spectators only. A chat message (anyone's, the
-// spectators' too) goes to everyone else in the room. Spectators send
-// nothing else.
+// spectators' too) goes to everyone else in the room. A spectator's watch
+// and unwatch go to nobody: the relay keeps the audience itself and sends
+// it (src/net/audience.js). Spectators send nothing else.
 export function routeFor(role, message) {
   if (message?.type === CHAT) return TO_EVERYONE;
+  if (message?.type === WATCH || message?.type === UNWATCH) return TO_NOBODY;
   if (role === ROLE_GUEST) return TO_HOST;
   if (role !== ROLE_HOST) return TO_NOBODY;
   return message?.[SPECTATORS_ONLY] === true ? TO_SPECTATORS : TO_GUEST_AND_SPECTATORS;
@@ -134,7 +137,13 @@ export function snapshotFor(store) {
 }
 
 // Whether a socket of role may send this message at all: players send
-// anything, a spectator only chat.
+// anything, a spectator only chat, watch and unwatch.
 export function maySend(role, message) {
-  return role === ROLE_HOST || role === ROLE_GUEST || (role === ROLE_SPECTATOR && message?.type === CHAT);
+  return role === ROLE_HOST || role === ROLE_GUEST || (role === ROLE_SPECTATOR && SPECTATOR_SENDS.includes(message?.type));
+}
+
+// The watchers of the audience message from the attachments of the open
+// spectator sockets: those that said watch, as { id, name }.
+export function watchersOf(attachments) {
+  return attachments.filter((a) => a?.watching === true).map((a) => ({ id: a.peer, name: a.name ?? null }));
 }

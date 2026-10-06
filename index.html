@@ -87,6 +87,7 @@
   <link rel="stylesheet" href="src/ui/room.css">
   <link rel="stylesheet" href="src/ui/announce.css">
   <link rel="stylesheet" href="src/ui/chat.css">
+  <link rel="stylesheet" href="src/ui/leave-match.css">
 </head>
 <body>
   <div id="stage">
@@ -111,6 +112,8 @@
 
       <section class="card" data-screen="join" data-hud-box="join-panel">
         <h2 id="join-title"></h2>
+        <label class="name-field"><span class="name-label" id="join-name-label"></span>
+          <input id="join-name" class="name-input" maxlength="20" spellcheck="false" autocomplete="nickname" data-hud-box="join-name"></label>
         <form id="join-form" class="join-row" autocomplete="off" novalidate>
           <label for="join-code" id="join-label"></label>
           <input id="join-code" name="code" spellcheck="false" autocapitalize="characters" placeholder="ABCD5" aria-describedby="join-error" data-hud-box="join-code">
@@ -206,6 +209,8 @@
   </div>
   <!-- Glass HUD over the 3D world (docs/art-direction-v3.md section 8), built by src/ui/hud.js. -->
   <div id="hud" hidden></div>
+  <!-- Leave match on the game screen (docs/flow-design.md section 3.13), built by src/ui/leave-match.js. -->
+  <div id="leave-match" hidden></div>
   <!-- Main menu, How to Play and Settings (docs/flow-design.md section 3), built by src/ui/menu-dom.js. -->
   <div id="announce" aria-live="polite"></div>
   <!-- The room chat (docs/flow-design.md section 3.12), built by src/ui/chat-dom.js. -->

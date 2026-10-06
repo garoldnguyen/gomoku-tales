@@ -104,10 +104,11 @@ export function attachScreens(root, app, {
   // The name boxes of Play Online and Watch a match: the saved name, or
   // empty with a random name suggested (and used when it stays empty).
   // Both boxes show the same name.
-  const nameBoxes = [$('lobby-name'), $('spectate-name')];
+  const nameBoxes = [$('lobby-name'), $('join-name'), $('spectate-name')];
   const suggested = suggestName();
   $('lobby-name-label').textContent = STRINGS.nameLabel;
   $('spectate-name-label').textContent = STRINGS.nameLabel;
+  $('join-name-label').textContent = STRINGS.nameLabel;
   for (const box of nameBoxes) {
     box.value = loadName(storage) ?? '';
     box.placeholder = suggested;
@@ -117,7 +118,7 @@ export function attachScreens(root, app, {
   }
   // Before a room opens: the name it uses, saved for next time.
   const takeName = () => act('setPlayerName', chooseName(nameBoxes[0].value, storage, suggested));
-  const NAMED_ACTIONS = new Set(['createRoom', 'openJoin']);
+  const NAMED_ACTIONS = new Set(['createRoom']);
 
   for (const button of root.querySelectorAll('[data-action]')) {
     button.addEventListener('click', () => {
@@ -144,7 +145,9 @@ export function attachScreens(root, app, {
   });
   joinForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (!joinSubmit.disabled) act('joinRoom', joinInput.value);
+    if (joinSubmit.disabled) return;
+    takeName();
+    act('joinRoom', joinInput.value);
   });
 
   // The spectator's code box works like Join Room's: code characters only,
@@ -457,11 +460,13 @@ export function attachScreens(root, app, {
     button.disabled = ready.disabled;
     button.dataset.hudBox = ready.box;
     button.dataset.seat = ready.seat;
+    button.dataset.unready = ready.unready ? '1' : '';
+    button.classList.toggle('is-unready', ready.unready === true);
   };
   const waitingReady = $('waiting-ready');
   const selectReady = $('select-ready');
   for (const button of [waitingReady, selectReady]) {
-    button.addEventListener('click', () => act('ready', button.dataset.seat));
+    button.addEventListener('click', () => act(button.dataset.unready ? 'unready' : 'ready', button.dataset.seat));
   }
   const waitingCards = $('waiting-cards');
   const selectCards = $('select-cards');
@@ -519,9 +524,11 @@ export function attachScreens(root, app, {
       $('lobby-create').disabled = vm.create.disabled;
       $('lobby-error').textContent = vm.error ?? '';
     } else if (view.screen === JOIN) {
-      if (entering && !view.joining) joinInput.value = '';
+      if (entering && !view.joining) joinInput.value = view.joinPrefill ?? ''; // an invite link fills the code
       showJoin(view);
-      if (!view.joining) joinInput.focus();
+      // An invite link: the name box first (the code is filled in).
+      if (!view.joining && entering && view.joinPrefill) $('join-name').focus();
+      else if (!view.joining && !view.joinPrefill) joinInput.focus();
     } else if (view.screen === SPECTATE_SCREEN) {
       if (entering) spectateInput.value = '';
       showSpectate(view);

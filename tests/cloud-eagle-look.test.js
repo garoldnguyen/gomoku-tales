@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import {
   CLOUD_SIZE, CLOUD_TURNS, COOLDOWN_LONG, FEATHER_MAX, FEATHER_MIN, FEATHER_MS, SWIRL_MS, SWIRL_PUFF_COUNT,
 } from '../src/config.js';
-import { EMPTY, O, X } from '../src/logic/board.js';
+import { EMPTY, HIDDEN, O, X } from '../src/logic/board.js';
 import { CHARACTERS, CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT, assignSides } from '../src/logic/characters.js';
 import { maskForViewer } from '../src/logic/cloud.js';
 import { newGame, placeStone, useSkill } from '../src/logic/game.js';
@@ -18,7 +18,7 @@ import { GUEST, HOST, ROOM_SEATS } from '../src/net/room.js';
 import { boardMarks } from '../src/render3d/board-marks.js';
 import { CHARACTER_LOOK, CLOUD_SWIRL, markLookFor, particleCount, placementPlan, planDurationMs } from '../src/render3d/character-look.js';
 import {
-  COVER, OVERLAY_TILE_PX, SEE_THROUGH, SKY_WATCH_COLOUR, cloudEagleSide, cloudOverlayCells, cloudTileGrid, createCloudOverlay,
+  COVER, OVERLAY_TILE_PX, hiddenPuffCells, SEE_THROUGH, SKY_WATCH_COLOUR, cloudEagleSide, cloudOverlayCells, cloudTileGrid, createCloudOverlay,
   skyWatchOutlineCells, skyWatchOutlineGrid, viewerOf,
 } from '../src/render3d/cloud-overlay.js';
 import { createLocalGame } from '../src/ui/local-game.js';
@@ -179,15 +179,22 @@ test('the cloud overlay for the owner: a translucent cloud over its 5 by 5 area 
   assert.ok(cloudOverlayCells(state, null).every((cell) => cell.look === SEE_THROUGH));
 });
 
-test('the cloud overlay for the other seat: the area covered, nothing inside shown', () => {
+test('the cloud overlay for the other seat: a light mist over the area, a cloud puff on every taken plot, no plant shown', () => {
   let state = cloudedGame();
   state = place(state, X, 6, 6); // X plants under its own cloud, hidden from O
   const shown = maskForViewer(state, O);
   const cells = cloudOverlayCells(shown, O);
   assert.equal(cells.length, CLOUD_SIZE * CLOUD_SIZE);
   assert.ok(cells.every((cell) => cell.look === COVER));
-  for (const cell of cells) assert.equal(shown.board[cell.y][cell.x], EMPTY, `${key(cell)} shows nothing`);
-  assert.deepEqual(cells.map(key), shown.covered.map(key), 'the cover is exactly the covered cells');
+  for (const cell of cells) assert.ok(shown.board[cell.y][cell.x] === EMPTY || shown.board[cell.y][cell.x] === HIDDEN, `${key(cell)} shows no plant`);
+  assert.deepEqual(cells.map(key), shown.covered.map(key), 'the mist is exactly the covered cells');
+  const puffs = hiddenPuffCells(shown, O);
+  assert.ok(puffs.map(key).includes('6,6'), 'a puff on the plot X just took');
+  for (const cell of shown.covered) {
+    const taken = state.board[cell.y][cell.x] !== EMPTY;
+    assert.equal(puffs.some((p) => key(p) === key(cell)), taken, `${key(cell)}: a puff exactly on the taken plots`);
+  }
+  assert.deepEqual(hiddenPuffCells(state, X), [], 'the owner sees the plants, no puffs');
 });
 
 test('the cloud overlay: clipped at the edge, each cell once, cover wins where two clouds meet', () => {

@@ -169,7 +169,7 @@ export function joinViewModel({ text = '', joining = false, error = null } = {})
 // disabled and says Taken.
 export function characterSelectViewModel({ seats, labels, editable = [], you = null, absent = [], prefer = null }) {
   const open = editable.filter((seat) => !absent.includes(seat));
-  const preferred = open.includes(prefer) && !seats.ready[prefer] ? prefer : null;
+  const preferred = open.includes(prefer) ? prefer : null; // a Ready seat too: it may take its Ready back
   const active = preferred ?? open.find((seat) => !seats.ready[seat]) ?? open.at(-1) ?? null;
   const activePick = active ? seats.picks[active] : null;
   const activeReady = active ? seats.ready[active] : false;
@@ -200,7 +200,9 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
       };
     }),
     readyButton: active
-      ? { seat: active, label: STRINGS.selectReady, disabled: activeReady || activePick === null, box: `ready-${active}` }
+      ? (activeReady
+        ? { seat: active, label: STRINGS.selectUnready, disabled: false, unready: true, box: `ready-${active}` }
+        : { seat: active, label: STRINGS.selectReady, disabled: activePick === null, box: `ready-${active}` })
       : null,
     seats: seats.names.map((seat) => {
       const pick = seats.picks[seat];
@@ -215,7 +217,7 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
         label: labels[seat],
         you: seat === you,
         active: seat === active,
-        choosable: open.length > 1 && open.includes(seat) && seat !== active && !ready,
+        choosable: open.length > 1 && open.includes(seat) && seat !== active,
         youText: seat === you ? STRINGS.waitingYou : null,
         placeholder: empty,
         placeholderText: empty ? STRINGS.waitingPlaceholder : null,
@@ -241,7 +243,9 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
             };
           })
           : [],
-        readyButton: mine ? { label: STRINGS.selectReady, disabled: ready || pick === null, box: `ready-${seat}` } : null,
+        readyButton: mine
+          ? (ready ? { label: STRINGS.selectUnready, disabled: false, unready: true, box: `ready-${seat}` } : { label: STRINGS.selectReady, disabled: pick === null, box: `ready-${seat}` })
+          : null,
       };
     }),
   };

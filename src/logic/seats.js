@@ -90,6 +90,15 @@ export function setReady(seats, seat, character = undefined) {
   return { ok: true, seats: freezeSeats({ ...seats, ready: { ...seats.ready, [seat]: true } }) };
 }
 
+// Ready taken back (owner's rule): the seat may change its pick again.
+// Only while the other seat is not Ready too, since both Ready starts the
+// game at once.
+export function setUnready(seats, seat) {
+  if (!seats.names.includes(seat)) return reject(SEAT_REJECT.UNKNOWN_SEAT);
+  if (!seats.ready[seat]) return { ok: true, seats };
+  return { ok: true, seats: freezeSeats({ ...seats, ready: { ...seats.ready, [seat]: false } }) };
+}
+
 // The seat is empty again: no pick, not ready, out of the pick order.
 export function clearSeat(seats, seat) {
   if (!seats.names.includes(seat)) return seats;

@@ -252,7 +252,7 @@ test('waitingViewModel in phase starting: both seats, only the own seat can pick
   assert.equal(picked.cards[0].readyButton.disabled, false);
   assert.equal(picked.cards[0].stone, O);
   const ready = waitingViewModel(hostStarting, { code: 'ABCD5', seats: roomSeats([GUEST, EARTH_BEAR], [HOST, JADE_SERPENT], [HOST, 'ready']), seat: HOST });
-  assert.equal(ready.cards[0].readyButton.disabled, true);
+  assert.deepEqual(ready.cards[0].readyButton, { label: STRINGS.selectUnready, disabled: false, unready: true, box: 'ready-host' }, 'Ready turns into Unready');
   assert.ok(ready.cards[0].choices.every((choice) => choice.disabled), 'the pick is locked once Ready');
   assert.equal(ready.startingText, STRINGS.selectWaitingOther);
 });
@@ -487,8 +487,9 @@ test('characterSelectViewModel characters: the taken state, Ready enabled only a
   assert.equal(picked.readyButton.disabled, false, 'Ready after a pick');
   assert.equal(picked.readyButton.box, 'ready-guest');
   const ready = view(roomSeats([HOST, EARTH_BEAR], [GUEST, JADE_SERPENT], [GUEST, 'ready']));
-  assert.equal(ready.readyButton.disabled, true);
-  assert.ok(ready.characters.every((card) => card.disabled), 'the pick is locked once Ready');
+  assert.equal(ready.readyButton.unready, true, 'Unready takes it back');
+  assert.equal(ready.readyButton.label, STRINGS.selectUnready);
+  assert.ok(ready.characters.every((card) => card.disabled), 'the pick is locked while Ready');
   assert.equal(ready.characters[2].selected, true);
 });
 
@@ -521,10 +522,14 @@ test('the local select: either seat may pick first, by a press on its seat card'
   assert.equal(vm.characters[1].box, `pick-${two}-earth-bear`);
   flow = flowReducer(flow, { type: FLOW_EVENTS.PICK, seat: two, character: EARTH_BEAR });
   flow = flowReducer(flow, { type: FLOW_EVENTS.READY, seat: two });
-  vm = localSelectViewModel(flow, { seat: two });
+  vm = localSelectViewModel(flow);
   assert.equal(vm.readyButton.seat, one, 'a Ready seat hands the cards to the other');
   assert.equal(vm.characters[1].taken, true);
-  assert.deepEqual(vm.cards.map((card) => card.choosable), [false, false], 'a Ready seat is not choosable');
+  assert.deepEqual(vm.cards.map((card) => card.choosable), [false, true], 'a Ready seat stays choosable, to Unready');
+  vm = localSelectViewModel(flow, { seat: two });
+  assert.equal(vm.readyButton.seat, two, 'a press on the Ready seat takes the cards back');
+  assert.equal(vm.readyButton.unready, true);
+  assert.equal(vm.readyButton.disabled, false);
 });
 
 test('characterSelectViewModel online: one editable seat, no choosable seat card', () => {
@@ -542,7 +547,11 @@ test('the local app: chooseSeat lets Player 2 pick and get Ready first with the 
   assert.equal(vm.readyButton.seat, two);
   assert.equal(app.pick(JADE_SERPENT, vm.readyButton.seat), true);
   assert.equal(app.ready(two), true);
-  assert.equal(app.chooseSeat(two), false, 'a Ready seat cannot be chosen');
+  assert.equal(app.chooseSeat(two), true, 'a Ready seat may be chosen to take its Ready back');
+  assert.equal(app.getView().select.readyButton.unready, true);
+  assert.equal(app.unready(two), true);
+  assert.equal(app.ready(two), true);
+  assert.equal(app.chooseSeat(one), true);
   assert.equal(app.getView().select.readyButton.seat, one);
   assert.equal(app.pick(WIND_RABBIT, one), true);
   assert.equal(app.ready(one), true);

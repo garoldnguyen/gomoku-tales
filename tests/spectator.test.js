@@ -14,7 +14,8 @@ import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { SPECTATOR_ERROR, createSpectatorRoom } from '../src/net/spectator-room.js';
 import { createWebSocketTransport } from '../src/net/ws-transport.js';
-import { SNAPSHOT_TYPES, snapshotFor } from '../worker/pairing.js';
+import { SNAPSHOT_TYPES, snapshotFor, watchersOf } from '../worker/pairing.js';
+import { UNWATCH as UNWATCH_TYPE, WATCH as WATCH_TYPE, audienceMessage } from '../src/net/audience.js';
 import { GAME, MENU, ROOM_CLOSED_SCREEN, SPECTATE_SCREEN, WAITING_SCREEN, WATCH, createApp } from '../src/ui/app.js';
 import { FLOW_EVENTS, NOTICE_ROOM_CLOSED, ROLES, SCREENS } from '../src/ui/flow.js';
 import { SPECTATOR_VIEW, hudViewModel } from '../src/ui/hud-view.js';
@@ -32,7 +33,9 @@ const CODE = 'AB2C9';
 // one guest and any number of spectators per code. Host frames go to the
 // guest and every spectator, guest frames to the host only; the last host
 // frame of each SNAPSHOT_TYPES type is replayed to a new spectator; a
-// spectator frame closes that spectator (and is counted); when the host
+// spectator's watch or unwatch marks it and sends everyone the audience,
+// its chat goes to everyone, and any other spectator frame closes that
+// spectator (and is counted); when the host
 // or guest socket closes, the other side (and, for the host, every
 // spectator) gets a leave from the closed peer. Everything happens a
 // microtask later, like a real socket.
@@ -40,6 +43,11 @@ function fakeRelay() {
   const rooms = new Map(); // code -> { host, guest, spectators: [], snapshot: {} }
   const sockets = [];
   const spectatorFrames = [];
+  const watchFrames = []; // the watch and unwatch types the spectators sent
+  const sendAudience = (room) => {
+    const text = JSON.stringify(audienceMessage(watchersOf(room.spectators.map((s) => ({ watching: s.watching, peer: s.peer, name: s.name })))));
+    for (const to of [room.host, room.guest, ...room.spectators]) if (to) deliver(to, text);
+  };
   const deliver = (to, text) => queueMicrotask(() => {
     if (to.readyState !== 1) return;
     to.received.push(JSON.parse(text));
@@ -73,18 +81,32 @@ function fakeRelay() {
       this.readyState = 1;
       this.onopen?.({});
       if (this.role === 'spectator') for (const text of snapshotFor(room.snapshot)) deliver(this, text);
+      else if (room.spectators.some((s) => s.watching)) {
+        deliver(this, JSON.stringify(audienceMessage(watchersOf(room.spectators.map((s) => ({ watching: s.watching, peer: s.peer, name: s.name }))))));
+      }
     }
     send(text) {
       if (this.readyState !== 1) throw new Error('send before open');
       this.sent.push(text);
       const room = rooms.get(this.code);
+      const message = JSON.parse(text);
+      this.peer ??= message.from;
       if (this.role === 'spectator') {
+        if (message.type === WATCH_TYPE || message.type === UNWATCH_TYPE) {
+          this.watching = message.type === WATCH_TYPE;
+          this.name = message.name ?? null;
+          watchFrames.push(message.type);
+          sendAudience(room);
+          return;
+        }
+        if (message.type === 'chat') {
+          for (const to of [room.host, room.guest, ...room.spectators]) if (to && to !== this) deliver(to, text);
+          return;
+        }
         spectatorFrames.push(text);
         this.drop();
         return;
       }
-      const message = JSON.parse(text);
-      this.peer ??= message.from;
       if (this.role === 'guest') {
         if (room.host) deliver(room.host, text);
         return;
@@ -99,6 +121,7 @@ function fakeRelay() {
       if (!room) return;
       if (this.role === 'spectator') {
         room.spectators = room.spectators.filter((s) => s !== this);
+        if (this.watching) sendAudience(room);
         return;
       }
       if (room[this.role] === this) delete room[this.role];
@@ -111,7 +134,7 @@ function fakeRelay() {
       this.onclose?.({ code: 1006 });
     }
   }
-  return { FakeWebSocket, rooms, sockets, spectatorFrames };
+  return { FakeWebSocket, rooms, sockets, spectatorFrames, watchFrames };
 }
 
 const settle = async () => {
@@ -330,7 +353,7 @@ test('spectator input is ignored: no Ready, no pick, no cell clicks, no skills, 
   for (const app of [host, guest, spectator]) app.close();
 });
 
-test('a spectator never sends: not on join, input, rematch, leave or close', async () => {
+test('a spectator sends only watch and unwatch: nothing on input, rematch, leave or close', async () => {
   const relay = fakeRelay();
   const clock = createFakeClock();
   const host = await hostRoom(relay, clock);
@@ -346,7 +369,7 @@ test('a spectator never sends: not on join, input, rematch, leave or close', asy
   spectator.leaveRoom();
   await settle();
   const [socket] = spectatorSockets(relay);
-  assert.deepEqual(socket.sent, []);
+  assert.deepEqual(socket.sent.map((text) => JSON.parse(text).type), ['watch', 'watch', 'unwatch'], 'watch on join, again when the guest is welcomed, unwatch on leave');
   assert.deepEqual(relay.spectatorFrames, []);
   assert.equal(spectator.getScreen(), MENU);
   // The spectator room itself refuses every action without a message.
@@ -357,7 +380,7 @@ test('a spectator never sends: not on join, input, rematch, leave or close', asy
   }
   assert.equal(room.requestRematch(), false);
   room.close();
-  assert.deepEqual(transport.sent, []);
+  assert.deepEqual(transport.sent.map((m) => m.type), ['watch', 'unwatch']);
   // And its ws-transport drops anything sent.
   const ws = createWebSocketTransport(CODE, 'spectator', { WebSocketImpl: relay.FakeWebSocket, location: LOCATION });
   await ws.opened;
@@ -546,4 +569,34 @@ test('the watch card turns slim only where the full card does not fit', () => {
   assert.equal(tall.slim, true);
   assert.equal(tall.w, 390 - 24);
   assert.equal(tall.y + tall.h, 844 - BARS_HEIGHT - 12);
+});
+
+test('the players see who watches: names in the chat view, a quiet chat line as each comes and goes, a guest who came later too', async () => {
+  const relay = fakeRelay();
+  const clock = createFakeClock();
+  const host = await hostRoom(relay, clock);
+  const first = makeApp(relay, clock);
+  first.setPlayerName('Calm Owl');
+  first.menuEvent(FLOW_EVENTS.WATCH);
+  first.watchRoom(CODE);
+  await settle();
+  assert.deepEqual(host.getView().chat.watchers, ['Calm Owl']);
+  const line = host.getView().chat.messages.at(-1);
+  assert.equal(line.system, true);
+  assert.equal(line.text, STRINGS.audienceJoined.replace('{name}', 'Calm Owl'));
+  const guest = await joinGuest(relay, clock);
+  assert.deepEqual(guest.getView().chat.watchers, ['Calm Owl'], 'the relay tells a guest who joins later');
+  const second = await watch(relay, clock);
+  await startGame(host, guest);
+  assert.deepEqual(host.getView().chat.watchers, ['Calm Owl', STRINGS.audienceSomeone]);
+  assert.deepEqual(first.getView().chat.watchers, [STRINGS.audienceSomeone], 'a spectator sees the others, not itself');
+  first.leaveRoom();
+  await settle();
+  assert.deepEqual(guest.getView().chat.watchers, [STRINGS.audienceSomeone]);
+  assert.equal(guest.getView().chat.messages.at(-1).text, STRINGS.audienceLeft.replace('{name}', 'Calm Owl'));
+  // A closed tab sends nothing: the relay tells the room.
+  spectatorSockets(relay).at(-1).drop();
+  await settle();
+  assert.deepEqual(host.getView().chat.watchers, []);
+  for (const app of [host, guest, second]) app.close();
 });

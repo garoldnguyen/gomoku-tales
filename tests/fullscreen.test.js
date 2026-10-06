@@ -176,11 +176,31 @@ test('hudBoxes: the Fullscreen button never overlaps the other HUD boxes and sta
 
 test('hud.css: the turn pill room and the button size match hud-layout.js', async () => {
   const { readFileSync } = await import('node:fs');
-  const { TURN_SIDE_ROOM, TURN_COMPACT_RIGHT, TURN_COMPACT_RIGHT_FS } = await import('../src/ui/hud-layout.js');
+  const { TURN_SIDE_ROOM, TURN_COMPACT_RIGHT, TURN_COMPACT_RIGHT_FS, TURN_COMPACT_RIGHT_LEAVE } = await import('../src/ui/hud-layout.js');
   const css = readFileSync(new URL('../src/ui/hud.css', import.meta.url), 'utf8');
   assert.ok(css.includes(`.hud:not(.is-compact) .turn { max-width: calc(100vw - ${2 * TURN_SIDE_ROOM}px);`));
   assert.ok(css.includes(`.hud.is-compact .topbar { max-width: calc(100% - ${TURN_COMPACT_RIGHT_FS}px); }`));
-  assert.ok(css.includes(`.hud.is-compact.fs-below .topbar { max-width: calc(100% - ${TURN_COMPACT_RIGHT}px); }`));
+  assert.ok(css.includes(`.hud.is-compact.no-fullscreen .topbar { max-width: calc(100% - ${TURN_COMPACT_RIGHT_LEAVE}px); }`));
+  assert.ok(css.includes(`.hud.is-compact.tools-below .topbar { max-width: calc(100% - ${TURN_COMPACT_RIGHT}px); }`));
   assert.match(css, new RegExp(`\\.hud \\.fullscreen \\{ width: ${FULLSCREEN_SIZE}px; height: ${FULLSCREEN_SIZE}px;`));
   assert.match(css, new RegExp(`\\.hud \\.top-tools \\{[^}]*gap: ${TOOL_GAP}px;`));
+});
+
+test('hudBoxes: the Leave match button never overlaps the other HUD boxes and stays inside, with or without the Fullscreen button', () => {
+  for (const fullscreen of [true, false]) {
+    for (let w = 360; w <= 2560; w += 40) {
+      for (let h = 480; h <= 1600; h += 40) {
+        for (const collapsed of [{}, { X: true, O: true }]) {
+          const boxes = hudBoxes(w, h, { fullscreen, collapsed });
+          const button = boxes.find((b) => b.name === 'leave-match');
+          assert.ok(button, `${w}x${h}`);
+          assert.ok(inside(button, w, h), `${w}x${h} inside`);
+          for (const other of boxes) {
+            if (other !== button) assert.ok(!overlap(button, other), `${w}x${h} fs ${fullscreen} leave and ${other.name}`);
+          }
+        }
+      }
+    }
+  }
+  assert.equal(hudBoxes(1920, 1080, { leave: false }).some((b) => b.name === 'leave-match'), false, 'none for a spectator');
 });

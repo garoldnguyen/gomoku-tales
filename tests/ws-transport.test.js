@@ -131,11 +131,15 @@ test('messages sent before the socket is open are dropped, not queued', () => {
   assert.deepEqual(socket.sent, ['{"type":"after"}']);
 });
 
-test('a spectator send returns false and sends nothing', () => {
+test('a spectator sends only chat, watch and unwatch; anything else returns false and sends nothing', () => {
   const { transport, socket } = make('spectator');
   socket.serverOpen();
   assert.equal(transport.send({ type: 'move', cell: 3 }), false);
   assert.deepEqual(socket.sent, []);
+  assert.equal(transport.send({ type: 'chat', text: 'hi' }), true);
+  assert.equal(transport.send({ type: 'watch', name: 'Owl' }), true);
+  assert.equal(transport.send({ type: 'unwatch' }), true);
+  assert.equal(socket.sent.length, 3);
 });
 
 test('incoming JSON reaches every handler; unsubscribe removes one', () => {

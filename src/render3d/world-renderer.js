@@ -47,7 +47,7 @@
 // the drawn state or its viewer changes.
 
 import {
-  BOARD_SIZE, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, CLOUD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, SKY_WATCH_GLOW_OPACITY, SKY_WATCH_OPACITY, SKY_WATCH_PUFF_DRIFT, SKY_WATCH_PUFF_HEIGHT, SKY_WATCH_PUFF_MS,
+  BOARD_SIZE, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, CLOUD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, CLOUD_MIST_OPACITY, CLOUD_PUFF_BOB, CLOUD_PUFF_DRIFT, CLOUD_PUFF_DRIFT_MS, CLOUD_PUFF_HEIGHT, CLOUD_PUFF_SCALE, SKY_WATCH_GLOW_OPACITY, SKY_WATCH_OPACITY, SKY_WATCH_PUFF_DRIFT, SKY_WATCH_PUFF_HEIGHT, SKY_WATCH_PUFF_MS,
   SPRITE_STRETCH_Y,
 } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
@@ -58,7 +58,7 @@ import { artMeta, artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
 import { boardMarksInto, createBoardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
 import { placementCues } from './character-look.js';
-import { COVER, cloudTileGrid, createCloudOverlay, skyWatchGlowGrid, skyWatchOutlineGrid, skyWatchPuffGrid, viewerOf } from './cloud-overlay.js';
+import { COVER, cloudTileGrid, createCloudOverlay, hiddenPuffGrid, skyWatchGlowGrid, skyWatchOutlineGrid, skyWatchPuffGrid, viewerOf } from './cloud-overlay.js';
 import { cloudFadeAmount, cloudFormAmount, skyWatchPulse } from './effect-plans.js';
 import { createEffects3d } from './effects3d.js';
 import { enteredStage, plantedCells, plantPoseInto, STAGE_LAND, STAGE_OPEN, STAGE_REST } from './growth.js';
@@ -506,7 +506,7 @@ function createDecalLayer(world) {
 // at once, as the rules say), and the Sky Watch outlines breathe
 // (skyWatchPulse) over a plot lit in pale yellow, with a small cloud puff
 // drifting to and fro above each one so the eagle's player spots them.
-const CLOUD_ORDER = { seeThrough: 1, cover: 6, outline: 7, fading: 6, glow: 2, puff: 8 };
+const CLOUD_ORDER = { seeThrough: 1, cover: 6, outline: 7, fading: 6, glow: 2, puff: 8, hidden: 9 };
 const CLOUD_HALF = (CLOUD_SIZE - 1) / 2;
 function createCloudLayer(world) {
   const overlayFor = createCloudOverlay();
@@ -517,6 +517,7 @@ function createCloudLayer(world) {
     outline: decalMaterial(sheetCanvas([skyWatchOutlineGrid()])),
     glow: decalMaterial(sheetCanvas([skyWatchGlowGrid()])),
     puff: decalMaterial(sheetCanvas([skyWatchPuffGrid()])),
+    hidden: decalMaterial(sheetCanvas([hiddenPuffGrid()])),
   };
   looks.seeThrough.opacity = CLOUD_SEE_THROUGH_OPACITY;
   looks.outline.opacity = SKY_WATCH_OPACITY;
@@ -525,8 +526,8 @@ function createCloudLayer(world) {
   const fadeMeshes = [];
   // When the newest cloud was placed and when the last one ended (ms).
   const timing = { formStart: -Infinity, fadeStart: -Infinity, fadeShown: false };
-  const pools = { seeThrough: [], cover: [], outline: [], glow: [], puff: [] };
-  const used = { seeThrough: 0, cover: 0, outline: 0, glow: 0, puff: 0 };
+  const pools = { seeThrough: [], cover: [], outline: [], glow: [], puff: [], hidden: [] };
+  const used = { seeThrough: 0, cover: 0, outline: 0, glow: 0, puff: 0, hidden: 0 };
   const kinds = Object.keys(pools);
   let shownVersion = -1;
   const placeDecal = (kind, x, y) => {
@@ -535,6 +536,10 @@ function createCloudLayer(world) {
       mesh = createCellDecal(looks[kind]);
       mesh.renderOrder = CLOUD_ORDER[kind];
       if (kind === 'puff') mesh.position.y = SKY_WATCH_PUFF_HEIGHT;
+      if (kind === 'hidden') {
+        mesh.position.y = CLOUD_PUFF_HEIGHT;
+        mesh.scale.set(CLOUD_PUFF_SCALE, 1, CLOUD_PUFF_SCALE);
+      }
       world.scene.add(mesh);
       pools[kind].push(mesh);
     }
@@ -551,6 +556,7 @@ function createCloudLayer(world) {
   const placeOverlay = (overlay) => {
     for (const kind of kinds) used[kind] = 0;
     for (const cell of overlay.clouds) placeDecal(cell.look === COVER ? 'cover' : 'seeThrough', cell.x, cell.y);
+    for (const cell of overlay.hidden) placeDecal('hidden', cell.x, cell.y);
     for (const cell of overlay.skyWatch) {
       placeDecal('glow', cell.x, cell.y);
       placeDecal('outline', cell.x, cell.y);
@@ -598,7 +604,14 @@ function createCloudLayer(world) {
     update(time) {
       const form = cloudFormAmount(time - timing.formStart);
       looks.seeThrough.opacity = CLOUD_SEE_THROUGH_OPACITY * form;
-      looks.cover.opacity = form;
+      looks.cover.opacity = CLOUD_MIST_OPACITY * form; // the other seat: a light mist, its empty plots show through
+      looks.hidden.opacity = form;
+      const hiddenPuffs = pools.hidden;
+      for (let i = 0; i < used.hidden; i++) {
+        const phase = (time / CLOUD_PUFF_DRIFT_MS) * Math.PI * 2 + i * 2.3;
+        hiddenPuffs[i].position.x = hiddenPuffs[i].userData.baseX + CLOUD_PUFF_DRIFT * Math.sin(phase);
+        hiddenPuffs[i].position.y = CLOUD_PUFF_HEIGHT + CLOUD_PUFF_BOB * Math.sin(phase * 1.7);
+      }
       const pulse = skyWatchPulse(time);
       looks.outline.opacity = SKY_WATCH_OPACITY * pulse;
       looks.glow.opacity = SKY_WATCH_GLOW_OPACITY * pulse;

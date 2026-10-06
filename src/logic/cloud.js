@@ -11,7 +11,7 @@
 // state.clouds (missing until the first cloud).
 
 import { CLOUD_SIZE, CLOUD_TURNS, SKY_WATCH_RUN } from '../config.js';
-import { EMPTY, X, O, cloneBoard, findWinLineAt, inBounds } from './board.js';
+import { EMPTY, HIDDEN, X, O, cloneBoard, findWinLineAt, inBounds } from './board.js';
 import { CLOUD, TORNADO_ZONE } from './skills.js';
 
 export function createCloud(x, y, owner, placedTurn) {
@@ -103,8 +103,10 @@ export function skyWatchCells(state, owner) {
 // HIDDEN CLOUD CONTENTS: a stone or rock under a cloud is seen only by the
 // seat that owns the cloud (docs/design.md section 6). maskForViewer(state,
 // viewer) is the state as viewer (X or O) may see it: every cell under a
-// cloud of the other seat is covered, with no stone and no rock, and listed
-// in covered ([{ x, y }], row by row). The winning line leaves out its
+// cloud of the other seat is covered and listed in covered ([{ x, y }], row
+// by row). A covered cell that holds a plant or a rock becomes HIDDEN (the
+// viewer knows the plot is taken, not by what or whose); an empty one stays
+// empty, so the viewer may plant there (owner's rule, October 2026). The winning line leaves out its
 // covered cells too, so a win does not tell where a hidden stone is. The
 // owner of a cloud sees everything under it; any other viewer (a
 // spectator, null) sees the full state. Returns state itself when
@@ -121,7 +123,7 @@ export function maskForViewer(state, viewer) {
   const hideZone = Boolean(zone) && zone.player !== viewer && zone.hidden !== true;
   if (covered.length === 0) return hideZone ? { ...state, tornado: hiddenZone(zone) } : state;
   const board = cloneBoard(state.board);
-  for (const { x, y } of covered) board[y][x] = EMPTY;
+  for (const { x, y } of covered) board[y][x] = board[y][x] === EMPTY ? EMPTY : HIDDEN;
   const masked = { ...state, board, covered };
   if (hideZone) masked.tornado = hiddenZone(zone);
   if (Array.isArray(state.rocks)) masked.rocks = state.rocks.filter((rock) => !isCovered(masked, rock.x, rock.y));
@@ -226,6 +228,7 @@ export function localViewEvents(state, events) {
 export const COVERED_ERROR = 'That cell is under a cloud.';
 
 export function maskErrorForViewer(state, viewer, action, error) {
+  if (action?.kind === 'place') return error; // the viewer sees whether a covered plot is taken
   return namesCoveredCell(state, viewer, action) ? COVERED_ERROR : error;
 }
 
@@ -237,6 +240,7 @@ export function maskErrorForViewer(state, viewer, action, error) {
 // Returns null when the action may go to the rules.
 export function coveredActionError(state, player, action) {
   if (action?.kind === 'skill' && action.skill === CLOUD) return null;
+  if (action?.kind === 'place') return null; // planting in the other seat's cloud is allowed
   return namesCoveredCell(state, player, action) ? COVERED_ERROR : null;
 }
 

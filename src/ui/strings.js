@@ -97,6 +97,13 @@ export const STRINGS = Object.freeze({
   chatEmpty: 'Messages show here for everyone in the room. They are cleared when a new game starts or you leave.',
   chatYou: 'You',
   chatSomeone: 'Someone',
+  chatNew: 'New message', // the popup of a new message (screen readers)
+  // Who watches (section 3.9): the spectators, shown to everyone in the room.
+  audienceSomeone: 'A spectator',
+  audienceJoined: '{name} is watching',
+  audienceLeft: '{name} stopped watching',
+  audienceCount: '{count} watching', // the watchers button; {count} spectators
+  audienceTitle: 'Watching',
   lobbyJoinButton: 'Join',
   lobbyJoining: 'Joining',
   back: 'Back',
@@ -130,6 +137,7 @@ export const STRINGS = Object.freeze({
   selectPlayer1: 'Player 1',
   selectPlayer2: 'Player 2',
   selectReady: 'Ready',
+  selectUnready: 'Unready',
   selectIsReady: 'Ready',
   selectChoosing: 'Choosing',
   selectTaken: 'Taken',
@@ -174,6 +182,15 @@ export const STRINGS = Object.freeze({
   watchingForfeit: '{name} wins, the opponent left',
   roomClosed: 'Room closed',
   roomClosedDetail: 'The host left, so the room is closed.',
+
+  // Leave match on the game screen (section 3.13).
+  leaveMatch: 'Leave',
+  leaveMatchLabel: 'Leave match',
+  leaveMatchTitle: 'Leave the match?',
+  leaveMatchOnline: 'Your opponent wins this game, and the room closes.',
+  leaveMatchLocal: 'This game ends and you go back to the menu.',
+  leaveMatchConfirm: 'Leave match',
+  leaveMatchStay: 'Keep playing',
 
   // Game over (section 3.7).
   gameOverYouWin: 'You win',

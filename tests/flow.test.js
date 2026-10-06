@@ -106,7 +106,7 @@ const ALLOWED = {
     OPPONENT_LEFT: state('lobby', 'none', 'online', null, NOTICE_HOST_LEFT),
     LEAVE: MENU,
   },
-  'game/online': { GAME_OVER: state('gameover', 'none', 'online', 'guest') },
+  'game/online': { GAME_OVER: state('gameover', 'none', 'online', 'guest'), LEAVE: MENU },
   'select/empty': {
     'PICK 1 rabbit': local('game', ONE),
     'PICK 1 bear': local('game', seats(B, null, false, false, [P1])),
@@ -129,7 +129,7 @@ const ALLOWED = {
     'READY 2': local('game', ALL_READY),
     LEAVE: MENU,
   },
-  'game/local': { GAME_OVER: local('gameover', ALL_READY) },
+  'game/local': { GAME_OVER: local('gameover', ALL_READY), LEAVE: MENU },
   'gameover/online': {
     LEAVE: MENU,
     REMATCH_STARTED: state('game', 'none', 'online', 'host'),
@@ -165,7 +165,7 @@ test('the table names every screen, overlay and event of section 4', () => {
   assert.deepEqual(Object.values(E).sort(), [
     'BACK', 'CLOSE_OVERLAY', 'GAME_OVER', 'JOINED', 'LEAVE', 'OPEN_HOWTO', 'OPEN_SETTINGS', 'OPPONENT_JOINED',
     'OPPONENT_LEFT', 'PICK', 'PLAY_LOCAL', 'PLAY_ONLINE', 'READY', 'REMATCH_STARTED', 'ROOM_CLOSED', 'ROOM_CREATED',
-    'SPECTATOR_JOINED', 'START', 'WATCH',
+    'SPECTATOR_JOINED', 'START', 'UNREADY', 'WATCH',
   ]);
   // Every screen of SCREENS has a state in the table.
   for (const screen of Object.values(SCREENS)) assert.ok(Object.values(STATES).some((flow) => flow.screen === screen), screen);
@@ -196,7 +196,7 @@ test('flowReducer: every state times every event gives exactly the table result'
       if (expected) allowed++;
     }
   }
-  assert.equal(allowed, 48);
+  assert.equal(allowed, 50);
   assert.equal(flowReducer(STATES.menu, null), STATES.menu);
   assert.equal(flowReducer(STATES.menu, {}), STATES.menu);
 });

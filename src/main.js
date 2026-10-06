@@ -19,13 +19,14 @@ import { createHud } from './ui/hud.js';
 import { isCollapseKey, startCollapsed, toggleAll, withCollapsed, writeCollapsed } from './ui/hud-collapse.js';
 import { createAnnouncer } from './ui/announce.js';
 import { attachChat } from './ui/chat-dom.js';
+import { attachLeaveMatch } from './ui/leave-match.js';
 import { SPECTATOR_VIEW, hudViewModel } from './ui/hud-view.js';
 import { TOUCH_PREVIEW, attachGameInput, createTouchConfirm, hitTest, isQualityKey, shortcutKeyHandler } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
 import { watchNewGame } from './ui/new-game-watch.js';
 import { menuViewModel } from './ui/menu.js';
 import { createMenu } from './ui/menu-dom.js';
-import { loadName, randomName } from './ui/player-names.js';
+import { loadName } from './ui/player-names.js';
 import { JOIN_PARAM, joinCodeFromSearch } from './ui/room-screens.js';
 import { attachScreens } from './ui/screens.js';
 import {
@@ -333,6 +334,7 @@ function startAppMode({ local = false } = {}) {
   const app = createApp({ local, playerName: loadName(safeStorage()) });
   const screens = attachScreens(document.getElementById('screens'), app, { storage: safeStorage() });
   attachChat(document.getElementById('chat'), app, { storage: safeStorage() });
+  attachLeaveMatch(document.getElementById('leave-match'), app, { fullscreen: () => hud !== null && fullscreenSupported(document) });
   assetsLoaded.then((store) => screens.setAssets(store));
   createMenuLayer((type) => app.menuEvent(type));
   // data-screen on the body names the flow screen (menu, lobby, waiting,
@@ -349,7 +351,8 @@ function startAppMode({ local = false } = {}) {
   };
   app.onChange(showFlow);
   showFlow();
-  // An invite link (?join=CODE): straight to Join Room with the code sent.
+  // An invite link (?join=CODE): Join Room with the code filled in; the
+  // player types a name and presses Join.
   // The parameter leaves the address bar, so a reload after leaving the
   // room does not join again.
   const inviteCode = local ? null : joinCodeFromSearch(window.location.search);
@@ -357,7 +360,6 @@ function startAppMode({ local = false } = {}) {
     const url = new URL(window.location.href);
     url.searchParams.delete(JOIN_PARAM);
     window.history.replaceState(null, '', url);
-    if (!loadName(safeStorage())) app.setPlayerName(randomName()); // no name typed yet: a random one for this room
     app.joinFromLink(inviteCode);
   }
   // Tell the opponent at once when this window closes or reloads.
@@ -507,6 +509,11 @@ async function startShotMode({ scene }) {
   for (const plant of staged.growing) showEvents(planted(plant), effects, SHOT_TIME_MS - plant.ageMs, false, shotSides);
   if (staged.last) showEvents(planted(staged.last), effects, SHOT_TIME_MS - staged.last.ageMs, false, shotSides);
   hud?.show(!flow);
+  // The game's Leave match button on the field scenes (a still app: a
+  // press does nothing).
+  if (hud && !flow && !roomView && !overView && !watchView) {
+    attachLeaveMatch(document.getElementById('leave-match'), { getView: () => ({ leaveMatch: { online: true } }), onChange: () => {}, leaveMatch: () => false }, { fullscreen: () => canFullscreen });
+  }
 
   await assetsLoaded;
   await Promise.all(Array.from(document.images, (img) => (img.src ? img.decode().catch(() => {}) : null)));

@@ -92,8 +92,15 @@ export const QUALITY_COMPACT_HEIGHT = 54;
 // TURN_COMPACT_MIN px (narrow phones) the button goes under the quality
 // switch instead (fullscreenBelow), except beside the upright rail cards,
 // which start right under the switch.
+// The Leave match button (docs/flow-design.md section 3.13), a 44 px glass
+// circle like the Fullscreen button: on full cards in the top left corner,
+// in the slim layouts left of the Fullscreen button (in the row, or under
+// the switch with it on narrow phones).
+export const LEAVE_SIZE = FULLSCREEN_SIZE;
+const LEAVE_ROOM = LEAVE_SIZE + TOOL_GAP;
 export const TURN_COMPACT_RIGHT = 216;
-export const TURN_COMPACT_RIGHT_FS = TURN_COMPACT_RIGHT + FULLSCREEN_ROOM;
+export const TURN_COMPACT_RIGHT_LEAVE = TURN_COMPACT_RIGHT + LEAVE_ROOM; // no Fullscreen button: the Leave button in the row
+export const TURN_COMPACT_RIGHT_FS = TURN_COMPACT_RIGHT_LEAVE + FULLSCREEN_ROOM;
 export const TURN_COMPACT_MIN = 160;
 // Its height with the hint on one line, and on two (narrow phones).
 export const TURN_COMPACT_HEIGHT = 56;
@@ -208,7 +215,7 @@ export function hudFoldLayout(viewW, viewH, { collapsed = {}, cardHeight = CARD_
 
 // The top bar rectangles hud.css draws, in window pixels, for a layout of
 // hudLayout() (worked out here when not given): { turn, quality, fullscreen,
-// fullscreenBelow }, each box { name, x, y, w, h } (the names of their
+// leave, fullscreenBelow, toolsBelow }, each box { name, x, y, w, h } (the names of their
 // data-hud-box attributes). fullscreen is null when the button is hidden
 // (no Fullscreen API); fullscreenBelow is true when it sits under the
 // quality switch (hud.css .fs-below). The turn pill's text decides its real
@@ -219,20 +226,22 @@ export function topBarLayout(viewW, viewH, layout = hudLayout(viewW, viewH), { f
     const quality = { name: 'quality', x: viewW - QUALITY_RIGHT - QUALITY_WIDTH, y: TOP_BAR_TOP, w: QUALITY_WIDTH, h: QUALITY_HEIGHT };
     const turnW = Math.min(TURN_WIDTH, viewW - 2 * (TURN_SIDE_ROOM - FULLSCREEN_ROOM + room));
     const turn = { name: 'turn', x: (viewW - turnW) / 2, y: TOP_BAR_TOP, w: turnW, h: TURN_HEIGHT };
-    const button = fullscreen ? {
-      name: 'fullscreen', x: quality.x - TOOL_GAP - FULLSCREEN_SIZE, y: TOP_BAR_TOP + (QUALITY_HEIGHT - FULLSCREEN_SIZE) / 2, w: FULLSCREEN_SIZE, h: FULLSCREEN_SIZE,
-    } : null;
-    return { turn, quality, fullscreen: button, fullscreenBelow: false };
+    const slot = { x: quality.x - TOOL_GAP - FULLSCREEN_SIZE, y: TOP_BAR_TOP + (QUALITY_HEIGHT - FULLSCREEN_SIZE) / 2 };
+    const button = fullscreen ? { name: 'fullscreen', ...slot, w: FULLSCREEN_SIZE, h: FULLSCREEN_SIZE } : null;
+    // the top left corner, mirroring the tools (the turn pill keeps TURN_SIDE_ROOM free there)
+    const leave = { name: 'leave-match', x: QUALITY_RIGHT, y: slot.y, w: LEAVE_SIZE, h: LEAVE_SIZE };
+    return { turn, quality, fullscreen: button, leave, fullscreenBelow: false, toolsBelow: false };
   }
   const quality = {
     name: 'quality', x: viewW - COMPACT_EDGE - QUALITY_COMPACT_WIDTH, y: COMPACT_EDGE, w: QUALITY_COMPACT_WIDTH, h: QUALITY_COMPACT_HEIGHT,
   };
-  const below = fullscreen && !layout.rail && viewW - COMPACT_EDGE - TURN_COMPACT_RIGHT_FS < TURN_COMPACT_MIN;
-  const turnW = Math.min(TURN_WIDTH, viewW - COMPACT_EDGE - (below ? TURN_COMPACT_RIGHT : TURN_COMPACT_RIGHT + room));
+  // On narrow phones the buttons go under the switch (toolsBelow).
+  const below = !layout.rail && viewW - COMPACT_EDGE - (TURN_COMPACT_RIGHT_LEAVE + room) < TURN_COMPACT_MIN;
+  const turnW = Math.min(TURN_WIDTH, viewW - COMPACT_EDGE - (below ? TURN_COMPACT_RIGHT : TURN_COMPACT_RIGHT_LEAVE + room));
   const turnH = turnW >= TURN_COMPACT_ONE_LINE ? TURN_COMPACT_HEIGHT : TURN_COMPACT_HEIGHT_TALL;
   const turn = { name: 'turn', x: COMPACT_EDGE, y: COMPACT_EDGE, w: turnW, h: turnH };
   let button = null;
-  if (below) {
+  if (below && fullscreen) {
     button = {
       name: 'fullscreen', x: viewW - COMPACT_EDGE - FULLSCREEN_SIZE, y: quality.y + quality.h + TOOL_GAP, w: FULLSCREEN_SIZE, h: FULLSCREEN_SIZE,
     };
@@ -241,21 +250,31 @@ export function topBarLayout(viewW, viewH, layout = hudLayout(viewW, viewH), { f
       name: 'fullscreen', x: quality.x - TOOL_GAP - FULLSCREEN_SIZE, y: COMPACT_EDGE + (QUALITY_COMPACT_HEIGHT - FULLSCREEN_SIZE) / 2, w: FULLSCREEN_SIZE, h: FULLSCREEN_SIZE,
     };
   }
-  return { turn, quality, fullscreen: button, fullscreenBelow: below };
+  const under = quality.y + quality.h + TOOL_GAP;
+  let leave;
+  if (below) {
+    const right = button ? button.x - TOOL_GAP : quality.x + quality.w;
+    leave = { name: 'leave-match', x: right - LEAVE_SIZE, y: under, w: LEAVE_SIZE, h: LEAVE_SIZE };
+  } else {
+    leave = { name: 'leave-match', x: (button ?? quality).x - TOOL_GAP - LEAVE_SIZE, y: COMPACT_EDGE + (QUALITY_COMPACT_HEIGHT - LEAVE_SIZE) / 2, w: LEAVE_SIZE, h: LEAVE_SIZE };
+  }
+  return { turn, quality, fullscreen: button, leave, fullscreenBelow: below && fullscreen, toolsBelow: below };
 }
 
 // The HUD rectangles hud.css draws for a layout, as [{ name, x, y, w, h }]
 // in window pixels (the names of their data-hud-box attributes): the turn
 // pill, the quality switch, the Fullscreen button (unless `fullscreen` is
-// false: no Fullscreen API) and each team's card, or its pill when
+// false: no Fullscreen API), the Leave match button (unless `leave` is
+// false: a spectator) and each team's card, or its pill when
 // collapsed[team] is true and the pills fit (canFold). The slim layouts have
 // no pills: there the cards stay bars whatever is saved. For tests and the
 // screenshot check.
-export function hudBoxes(viewW, viewH, { collapsed = {}, cardHeight = CARD_HEIGHT, fullscreen = true } = {}) {
+export function hudBoxes(viewW, viewH, { collapsed = {}, cardHeight = CARD_HEIGHT, fullscreen = true, leave = true } = {}) {
   const { layout, folded: foldedTeams } = hudFoldLayout(viewW, viewH, { collapsed, cardHeight });
   const top = topBarLayout(viewW, viewH, layout, { fullscreen });
   const boxes = [top.turn, top.quality];
   if (top.fullscreen) boxes.push(top.fullscreen);
+  if (leave) boxes.push(top.leave);
   if (!layout.compact) {
     for (const [team, left] of [['x', true], ['o', false]]) {
       const folded = foldedTeams[team.toUpperCase()];

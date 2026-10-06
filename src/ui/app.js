@@ -129,6 +129,7 @@ export function createApp(options) {
   let spectateError = null; // the inline error of the spectate screen
   let gameOverTimer = null;
   let localSeat = null; // the local seat that acts on the character select (chooseSeat)
+  let joinPrefill = null; // the code of an invite link, shown in the Join box until the player sends it
   let myName = cleanName(playerName); // this window's player name for online rooms (setPlayerName)
   // The room chat (docs/flow-design.md section 3.12): the messages of this
   // room, newest last, at most CHAT_HISTORY; cleared when a rematch begins
@@ -136,6 +137,10 @@ export function createApp(options) {
   let chat = [];
   let chatSeq = 0;
   let chatUnsubscribe = null;
+  // Who watches the room (src/net/audience.js): its spectators, [{ id,
+  // name }]. A spectator coming or going also adds a line to the chat
+  // (system true), which the chat's popup shows.
+  let watchers = [];
   // The rematch state of the game over card: mine (this window asked),
   // theirs (the other player asked) and gone (the other player left, or
   // the game ended by forfeit), from onRematchStatus and onPeerGone.
@@ -232,7 +237,8 @@ export function createApp(options) {
     });
   };
 
-  const closeRoom = () => {
+  // resign: Leave match in a running game (the opponent wins at once).
+  const closeRoom = ({ resign = false } = {}) => {
     opening?.close();
     opening = null;
     connecting = false;
@@ -247,7 +253,8 @@ export function createApp(options) {
     chatUnsubscribe?.();
     chatUnsubscribe = null;
     chat = [];
-    room?.close();
+    watchers = [];
+    room?.close(resign ? { resign: true } : undefined);
     room = null;
     joiningCode = null;
   };
@@ -366,7 +373,8 @@ export function createApp(options) {
     const before = flow;
     flow = flowReducer(flow, event);
     if (flow === before) return false;
-    localSeat = event.seat;
+    // After a Ready the cards move on to the seat still choosing.
+    localSeat = event.type === FLOW_EVENTS.READY ? null : event.seat;
     if (flow.seats && bothReady(flow.seats)) startLocal();
     changed();
     return true;
@@ -446,12 +454,24 @@ export function createApp(options) {
   // room is returned (the fake one delivers at once), so a phase reached
   // meanwhile is handled as if its event had just arrived.
   // Follows the chat and the names of the room just opened.
+  const addChat = (line) => {
+    chat = [...chat, { id: ++chatSeq, ...line }].slice(-CHAT_HISTORY);
+  };
+  const watcherName = (watcher) => watcher.name ?? STRINGS.audienceSomeone;
   const watchChat = () => {
     chatUnsubscribe?.();
     chat = [];
+    watchers = room.getView().watchers ?? [];
     chatUnsubscribe = room.onEvent((event) => {
       if (event.type === 'chat') {
-        chat = [...chat, { id: ++chatSeq, name: event.name, text: event.text, mine: event.mine === true }].slice(-CHAT_HISTORY);
+        addChat({ name: event.name, text: event.text, mine: event.mine === true });
+        changed();
+      } else if (event.type === 'audience') {
+        const before = new Set(watchers.map((w) => w.id));
+        const after = new Set(event.watchers.map((w) => w.id));
+        for (const w of event.watchers) if (!before.has(w.id)) addChat({ system: true, text: STRINGS.audienceJoined.replace('{name}', watcherName(w)) });
+        for (const w of watchers) if (!after.has(w.id)) addChat({ system: true, text: STRINGS.audienceLeft.replace('{name}', watcherName(w)) });
+        watchers = event.watchers;
         changed();
       } else if (event.type === 'newGame' && chat.length > 0) {
         chat = []; // a rematch: a clean chat for the new game
@@ -563,10 +583,14 @@ export function createApp(options) {
         joining: joiningCode !== null,
         joiningCode,
         joinError,
+        joinPrefill,
         playerName: myName,
         // The room chat while this window is in an online room (the waiting
         // room, the game, the game over card, a spectator's screens).
-        chat: chatShown(screen) ? { messages: chat, name: myName } : null,
+        // watchers: the names of the room's spectators (not this window).
+        chat: chatShown(screen) ? { messages: chat, name: myName, watchers: watchers.map(watcherName) } : null,
+        // Leave match on the game screen (leave-match.js): online it is a loss.
+        leaveMatch: screen === GAME ? { online: flow.mode === MODES.ONLINE } : null,
         outcome: screen === GAME_OVER && game ? game.getOutcome() : null,
         // The game over card (game-over.js) on the Game over screen only,
         // so it never shows during a new game.
@@ -626,6 +650,15 @@ export function createApp(options) {
       return room.pick(character).ok;
     },
 
+    // Unready on the character select: the Ready of seat (local) or of this
+    // window's seat (online) is taken back while the other seat is not Ready.
+    unready(seat) {
+      if (flow.role === ROLES.SPECTATOR) return false;
+      if (screenNow() === SELECT) return localSeatEvent({ type: FLOW_EVENTS.UNREADY, seat });
+      if (screenNow() !== WAITING_SCREEN || !room) return false;
+      return room.unready().ok;
+    },
+
     // Ready on the character select, for seat (local) or this window's
     // seat (online). Local: the game starts when both seats are Ready.
     // Online: the host starts it when both are Ready.
@@ -640,7 +673,7 @@ export function createApp(options) {
     // (one of LOCAL_SEATS) now picks with the character cards and Ready,
     // so either seat may pick first. Returns true when it was taken.
     chooseSeat(seat) {
-      if (screenNow() !== SELECT || !LOCAL_SEATS.includes(seat) || flow.seats?.ready[seat]) return false;
+      if (screenNow() !== SELECT || !LOCAL_SEATS.includes(seat)) return false; // a Ready seat too: it may take it back
       localSeat = seat;
       changed();
       return true;
@@ -687,6 +720,7 @@ export function createApp(options) {
     // if the code is not a valid room code.
     joinRoom(input) {
       if (screenNow() !== JOIN || joiningCode !== null) return false;
+      joinPrefill = null;
       const code = normalizeRoomCode(input);
       if (!isValidRoomCode(code)) {
         joinError = code.length === 0 ? STRINGS.joinErrorEmpty : BAD_CODE_ERROR;
@@ -740,13 +774,15 @@ export function createApp(options) {
     },
 
     // An invite link (?join=CODE, docs/flow-design.md section 3.10) opened
-    // on the menu: Play Online, Join Room, then the join of code, each step
-    // an ordinary event of the flow. Returns true when the join was sent;
-    // a bad code stays on Join Room with its inline error.
+    // on the menu: Play Online and Join Room, each an ordinary event of the
+    // flow, with the code filled in. The player types a name and presses
+    // Join. Returns true when Join Room opened.
     joinFromLink(code) {
       if (screenNow() !== MENU || !menuEvent(FLOW_EVENTS.PLAY_ONLINE)) return false;
+      // The code first: the screens fill the box as Join Room opens.
+      joinPrefill = normalizeRoomCode(code);
       this.openJoin();
-      return this.joinRoom(code);
+      return true;
     },
 
     // Sends a chat message to everyone in the room. Returns true when sent
@@ -820,6 +856,19 @@ export function createApp(options) {
       return true;
     },
 
+    // Leave match on the game screen (after its confirm, screens.js): a
+    // running online game is lost (the opponent wins at once, room.js
+    // resign); a local game is dropped. Then the menu, as Back to Menu.
+    leaveMatch() {
+      if (screenNow() !== GAME) return false;
+      closeRoom({ resign: true });
+      localSeat = null;
+      joinError = null;
+      lobbyPanel = LOBBY;
+      send(FLOW_EVENTS.LEAVE);
+      return true;
+    },
+
     // Back from Join to the Lobby. Leaves the room if there is one. The
     // room has Leave (leaveRoom) and Game over Back to Menu (backToMenu)
     // instead.
@@ -828,6 +877,7 @@ export function createApp(options) {
       if (screen !== JOIN) return;
       closeRoom();
       joinError = null;
+      joinPrefill = null;
       lobbyPanel = LOBBY;
       changed();
     },
