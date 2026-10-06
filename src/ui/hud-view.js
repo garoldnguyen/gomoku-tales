@@ -23,17 +23,17 @@ export const QUALITY_CHOICES = Object.freeze([
 // Portrait and skill icon names in assets/manifest.json. The portrait
 // belongs to the character, whichever side it plays.
 export const PORTRAIT_ART = Object.freeze({
-  [WIND_RABBIT]: 'portrait-wind-rabbit-v3',
-  [EARTH_BEAR]: 'portrait-earth-bear-v3',
+  [WIND_RABBIT]: ART.windRabbit.hud,
+  [EARTH_BEAR]: ART.earthBear.hud,
   [JADE_SERPENT]: ART.jadeSerpent.hud,
   [CLOUD_EAGLE]: ART.cloudEagle.hud,
 });
 
 export const SKILL_ICON_ART = Object.freeze({
-  windDash: 'icon-wind-dash',
-  tornadoZone: 'icon-tornado-zone',
-  terrainCreation: 'icon-terrain-creation',
-  stoneConversion: 'icon-stone-conversion',
+  windDash: ART.windRabbit.windDashIcon,
+  tornadoZone: ART.windRabbit.tornadoZoneIcon,
+  terrainCreation: ART.earthBear.terrainCreationIcon,
+  stoneConversion: ART.earthBear.stoneConversionIcon,
   hiss: ART.jadeSerpent.hissIcon,
   venom: ART.jadeSerpent.venomIcon,
   skyWatch: ART.cloudEagle.skyWatchIcon,

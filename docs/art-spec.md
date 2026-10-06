@@ -88,6 +88,14 @@ grid (128 for the select portrait) and stored at a whole-number scale.
 | `portrait-jade-serpent.png` | 128x128 | 64 px at 2x | Jade Serpent's HUD portrait. |
 | `icon-hiss.png` | 128x128 | 64 px at 2x | Hiss: a hissing serpent and a locked skill rune. |
 | `icon-venom.png` | 128x128 | 64 px at 2x | Venom: venom drops wilting a red bud. |
+| `portrait-wind-rabbit-v5.png` | 128x128 | 64 px at 2x | Wind Rabbit's HUD portrait (the 32 px `portrait-wind-rabbit-v3` stays in the v3 pack). |
+| `icon-wind-dash-v5.png` | 128x128 | 64 px at 2x | Wind Dash: a seed riding a gust of petals between plots. |
+| `icon-tornado-zone-v5.png` | 128x128 | 64 px at 2x | Tornado Zone: a tornado of petals and leaves over 3x3 plots. |
+| `portrait-earth-bear-v5.png` | 128x128 | 64 px at 2x | Earth Bear's HUD portrait. |
+| `icon-terrain-creation-v5.png` | 128x128 | 64 px at 2x | Terrain Creation: a boulder slamming into the soil with a shockwave. |
+| `icon-stone-conversion-v5.png` | 128x128 | 64 px at 2x | Stone Conversion: a flower of no team reborn ochre brown (no team colours, since any character may be the opponent). |
+
+The 32 px `icon-*.png` skill icons in `assets/` are kept for the 2D renderer (`?render=2d`); the glass HUD uses the 64 px grid files above.
 
 ### Old 2D renderer only (`use: 2d`, `?render=2d`)
 

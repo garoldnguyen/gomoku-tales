@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { X, O } from '../src/logic/board.js';
 import { CHARACTERS, CLOUD_EAGLE, JADE_SERPENT } from '../src/logic/characters.js';
 import { createInitialState } from '../src/logic/game.js';
-import { ART, JADE_SERPENT_ART_PX, PLACEHOLDERS_3D, placeholderShape } from '../src/render3d/art-assets.js';
+import { ART, HUD_ART_PX, JADE_SERPENT_ART_PX, PLACEHOLDERS_3D, placeholderShape } from '../src/render3d/art-assets.js';
 import { PORTRAIT_ART, SKILL_ICON_ART, hudViewModel } from '../src/ui/hud-view.js';
 
 const manifest = JSON.parse(readFileSync(new URL('../assets/manifest.json', import.meta.url), 'utf8'));
@@ -36,18 +36,18 @@ test('the HUD card shows the portrait of the character playing that side', () =>
   assert.deepEqual(byPlayer[O].skills.map((skill) => skill.icon), [ART.cloudEagle.skyWatchIcon, ART.cloudEagle.cloudIcon]);
 });
 
-test('the Jade Serpent HUD files are 3D-loaded manifest entries with a placeholder of the same size', () => {
-  for (const name of Object.values(ART.jadeSerpent)) {
+test('the 64 px grid HUD files are 3D-loaded manifest entries with a placeholder of the same size', () => {
+  for (const name of [ART.jadeSerpent, ART.windRabbit, ART.earthBear].flatMap((group) => Object.values(group))) {
     const entry = manifest.assets[name];
-    const size = JADE_SERPENT_ART_PX[name];
+    const size = HUD_ART_PX;
     assert.deepEqual([entry.use, entry.width, entry.height, entry.frames], ['3d', size, size, 1], name);
     assert.ok(PLACEHOLDERS_3D[name]?.paint, `"${name}" has no placeholder`);
     assert.deepEqual(placeholderShape(name), { width: size, height: size, frames: 1 });
   }
 });
 
-test('the files of the Cloud Eagle and Jade Serpent art have the manifest sizes', () => {
-  for (const name of [...Object.values(ART.cloudEagle), ...Object.values(ART.jadeSerpent)]) {
+test('the files of the Cloud Eagle, Jade Serpent, Wind Rabbit and Earth Bear art have the manifest sizes', () => {
+  for (const name of [ART.cloudEagle, ART.jadeSerpent, ART.windRabbit, ART.earthBear].flatMap((group) => Object.values(group))) {
     const entry = manifest.assets[name];
     assert.deepEqual(pngSize(entry.file), [entry.width, entry.height], name);
   }
@@ -66,4 +66,10 @@ test('a player silenced by Hiss sees every skill row Silenced, never Ready', asy
   assert.equal(cloud.stateText, STRINGS.skillSilenced);
   assert.equal(cloud.disabled, true);
   assert.equal(eagle.skills.find((skill) => skill.id === 'skyWatch').stateText, STRINGS.skillAlwaysOn, 'a passive skill stays on');
+});
+
+test('every character\'s HUD portrait and skill icons are on the 64 px grid art', () => {
+  const grid = new Set([ART.jadeSerpent, ART.windRabbit, ART.earthBear, ART.cloudEagle].flatMap((group) => Object.values(group)));
+  for (const name of [...Object.values(PORTRAIT_ART), ...Object.values(SKILL_ICON_ART)]) assert.ok(grid.has(name), name);
+  assert.equal(JADE_SERPENT_ART_PX[ART.jadeSerpent.hud], HUD_ART_PX);
 });

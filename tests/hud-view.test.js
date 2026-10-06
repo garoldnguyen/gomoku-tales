@@ -41,7 +41,7 @@ test('my turn: Your turn on my card, Ready skills, the pill says whose turn and 
   assert.equal(mine.meta, 'Plays X, 2 planted');
   assert.equal(mine.chip, 'Your turn');
   assert.equal(mine.waiting, false);
-  assert.equal(mine.portrait, 'portrait-wind-rabbit-v3');
+  assert.equal(mine.portrait, 'portrait-wind-rabbit-v5');
   for (const id of [WIND_DASH, TORNADO_ZONE]) {
     const row = skill(vm, X, id);
     assert.equal(row.stateText, 'Ready');
@@ -52,13 +52,13 @@ test('my turn: Your turn on my card, Ready skills, the pill says whose turn and 
     assert.equal(row.cooldownProgress, 0);
   }
   assert.equal(skill(vm, X, WIND_DASH).title, 'Wind Dash');
-  assert.equal(skill(vm, X, WIND_DASH).icon, 'icon-wind-dash');
+  assert.equal(skill(vm, X, WIND_DASH).icon, 'icon-wind-dash-v5');
   assert.equal(skill(vm, X, WIND_DASH).ariaLabel, 'Wind Dash: Ready');
   const theirs = card(vm, O);
   assert.equal(theirs.side, 'right');
   assert.equal(theirs.meta, 'Plays O, 2 planted');
   assert.equal(theirs.chip, 'Waiting');
-  assert.equal(theirs.portrait, 'portrait-earth-bear-v3');
+  assert.equal(theirs.portrait, 'portrait-earth-bear-v5');
   assert.equal(vm.toast, null);
   assert.deepEqual(vm.qualityChoices.map((c) => [c.label, c.pressed]), [['Low', false], ['Medium', false], ['High', true]]);
   assert.equal(vm.quality, 'high');

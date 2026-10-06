@@ -75,6 +75,12 @@
     "portrait-jade-serpent": { "file": "3d/v5/portrait-jade-serpent.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
     "icon-hiss": { "file": "3d/v5/icon-hiss.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
     "icon-venom": { "file": "3d/v5/icon-venom.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "portrait-wind-rabbit-v5": { "file": "3d/v5/portrait-wind-rabbit-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "icon-wind-dash-v5": { "file": "3d/v5/icon-wind-dash-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "icon-tornado-zone-v5": { "file": "3d/v5/icon-tornado-zone-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "portrait-earth-bear-v5": { "file": "3d/v5/portrait-earth-bear-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "icon-terrain-creation-v5": { "file": "3d/v5/icon-terrain-creation-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "icon-stone-conversion-v5": { "file": "3d/v5/icon-stone-conversion-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
 
     "forest-wall-pine": { "file": "3d/v3/forest-wall-pine.png", "use": "3d", "width": 192, "height": 64, "frames": 1, "frameMs": 0 },
     "forest-wall-round": { "file": "3d/v3/forest-wall-round.png", "use": "3d", "width": 192, "height": 56, "frames": 1, "frameMs": 0 },

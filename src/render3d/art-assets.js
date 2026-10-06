@@ -43,6 +43,19 @@ export const ART = {
     hissIcon: 'icon-hiss',
     venomIcon: 'icon-venom',
   },
+  // Wind Rabbit's and Earth Bear's HUD portraits and skill icons on the
+  // same 64 px grid as the Jade Serpent ones (the 32 px icon-* and
+  // portrait-*-v3 files stay for the 2D renderer).
+  windRabbit: {
+    hud: 'portrait-wind-rabbit-v5',
+    windDashIcon: 'icon-wind-dash-v5',
+    tornadoZoneIcon: 'icon-tornado-zone-v5',
+  },
+  earthBear: {
+    hud: 'portrait-earth-bear-v5',
+    terrainCreationIcon: 'icon-terrain-creation-v5',
+    stoneConversionIcon: 'icon-stone-conversion-v5',
+  },
   // Farmland v3 pack in assets/3d/v3/ (docs/art-direction-v3.md section 2).
   // Tuning data for these names is in assets/v3-meta.json (v3-meta.js).
   v3: {
@@ -156,13 +169,12 @@ export const CLOUD_EAGLE_ART_PX = Object.freeze({
   [ART.cloudEagle.cloudIcon]: 128,
 });
 
-// Frame size of each Jade Serpent HUD file (one square frame each); its
-// placeholder is a block in Jade Serpent's mark colour.
-export const JADE_SERPENT_ART_PX = Object.freeze({
-  [ART.jadeSerpent.hud]: 128,
-  [ART.jadeSerpent.hissIcon]: 128,
-  [ART.jadeSerpent.venomIcon]: 128,
-});
+// Frame size of each 64 px grid HUD file of Jade Serpent, Wind Rabbit
+// and Earth Bear (one square frame each, stored at 2x); its placeholder is
+// a block in that character's mark colour.
+export const HUD_ART_PX = 128;
+const HUD_ART_CHARACTERS = Object.freeze({ jadeSerpent: JADE_SERPENT, windRabbit: WIND_RABBIT, earthBear: EARTH_BEAR });
+export const JADE_SERPENT_ART_PX = Object.freeze(Object.fromEntries(artNames(ART.jadeSerpent).map((name) => [name, HUD_ART_PX])));
 
 // Manifest names whose files the owner has not sent yet. The game asks for
 // them like any other art; a missing one only warns and draws its
@@ -259,15 +271,12 @@ export const PLACEHOLDERS_3D = {
       paint: blockSheetPainter({ width: size, height: size, frames: 1, colors: [CHARACTER_LOOK[CLOUD_EAGLE].colour] }),
     }];
   })),
-  ...Object.fromEntries(artNames(ART.jadeSerpent).map((name) => {
-    const size = JADE_SERPENT_ART_PX[name];
-    return [name, {
-      width: size,
-      height: size,
-      frames: 1,
-      paint: blockSheetPainter({ width: size, height: size, frames: 1, colors: [CHARACTER_LOOK[JADE_SERPENT].colour] }),
-    }];
-  })),
+  ...Object.fromEntries(Object.entries(HUD_ART_CHARACTERS).flatMap(([group, id]) => artNames(ART[group]).map((name) => [name, {
+    width: HUD_ART_PX,
+    height: HUD_ART_PX,
+    frames: 1,
+    paint: blockSheetPainter({ width: HUD_ART_PX, height: HUD_ART_PX, frames: 1, colors: [CHARACTER_LOOK[id].colour] }),
+  }]))),
 };
 
 // Placeholder for a name that has none: a small pink square.
