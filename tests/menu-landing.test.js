@@ -85,7 +85,7 @@ function cssBlocks(text) {
   return new Map([...clean.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => [m[1].trim(), m[2]]));
 }
 
-test('menu.css uses the MENU_LAYOUT sizes, the gold focus mark of the Ivory look and the wash', () => {
+test('menu.css uses the MENU_LAYOUT sizes, the gold focus line and the wash', () => {
   const blocks = cssBlocks(read('src/ui/menu.css'));
   const px = (selector, property) => {
     const match = blocks.get(selector)?.match(new RegExp(`(?:^|[;\\s])${property}:\\s*([\\d\\s]+?)px`));
@@ -102,13 +102,11 @@ test('menu.css uses the MENU_LAYOUT sizes, the gold focus mark of the Ivory look
   assert.equal(px('#flow .menu-button', 'height'), String(L.buttonHeight));
   assert.equal(px('#flow .menu-buttons', 'gap'), String(L.buttonGap));
   assert.equal(px('#flow .menu-keys', 'height'), String(L.hintHeight));
-  // The focused choice (the keyboard starts on the first one) shows a gold
-  // wash across its line and a gold diamond either side of its label.
-  assert.match(blocks.get('#flow .menu-button:focus,\n#flow .menu-button:focus-visible'), /background: linear-gradient\(90deg, transparent, var\(--row-hover\), transparent\)/);
-  const marks = [...blocks.keys()].find((selector) => selector.includes('.menu-button:focus .menu-label::before'));
-  assert.ok(marks, 'the focus diamonds');
-  assert.match(blocks.get(marks), /background: var\(--gold\)/);
-  assert.match(blocks.get(marks), /transform: rotate\(45deg\)/);
+  // The focused choice (the keyboard starts on the first one) turns to
+  // full ink and grows a short gold line under its label.
+  assert.match(blocks.get('#flow .menu-label::after'), /background: var\(--gold\)/);
+  assert.match(blocks.get('#flow .menu-label::after'), /transform: scaleX\(0\)/);
+  assert.match(blocks.get('#flow .menu-button:focus .menu-label::after,\n#flow .menu-button:hover .menu-label::after'), /transform: scaleX\(1\)/);
   assert.match(blocks.get('#flow .scrim'), /backdrop-filter: blur\(var\(--scrim-blur\)\)/);
   assert.match(blocks.get('#flow .scrim'), /var\(--wash\), var\(--scrim\)/);
   assert.match(blocks.get('#flow.is-solid .scrim'), /background: var\(--scrim\)/);

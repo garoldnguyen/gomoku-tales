@@ -1,7 +1,7 @@
 /* The turn banner and the first-game hint card over the game
    (src/ui/announce.js, docs/flow-design.md section 3.10): the dark glass
-   of the HUD with the Ivory accents (a gold hairline, Cormorant names,
-   Cinzel capitals). Every colour is a token of the block below, each one
+   of the HUD with the Ivory accents (a gold hairline, Jost names and
+   spaced capitals). Every colour is a token of the block below, each one
    a HUD glass colour (src/ui/hud.css) or the Ivory gold (src/ui/screens.css).
    Only opacity and transform move, and nothing moves with reduced motion. */
 
@@ -13,51 +13,39 @@
   --hair: rgba(255, 255, 255, 0.14);
   --gold: #e8c77a;
   --shadow: rgba(10, 20, 40, 0.3);
-  --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-  --caps: "Cinzel", "Cormorant Garamond", Georgia, serif;
+  --display: "Jost", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --label: "Jost", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --gold-line: rgba(232, 199, 122, 0.42);
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
   position: fixed;
   inset: 0;
   z-index: 2; /* above the HUD, under the game over card and the menus */
   pointer-events: none;
-  font-family: "Nunito", "DM Sans", system-ui, sans-serif;
+  font-family: var(--display);
   color: var(--ink);
 }
 
-/* The turn banner: a dark band across the middle, gold hairlines above and
-   below, the character's name in its colour. It fades and slides in,
-   holds, then fades out (TURN_BANNER_MS). */
+/* The turn banner: a small dark glass pill under the turn pill, a gold
+   hairline round it, "To play" and the character's name in its colour on
+   one line. It slides in from the right, holds, and slides on out to the
+   left (TURN_BANNER_MS), never over the middle of the board and never
+   taking a click. */
 #announce .turn-banner {
   position: absolute;
-  left: 0;
-  right: 0;
-  top: 50%;
+  left: 50%;
+  top: 88px;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 14px 16px 16px;
-  transform: translateY(-50%);
-  background: linear-gradient(90deg, transparent, var(--card-solid) 22%, var(--card-solid) 78%, transparent);
+  align-items: baseline;
+  gap: 12px;
+  padding: 8px 20px 9px;
+  transform: translateX(-50%);
+  background: var(--card-solid);
+  border: 1px solid var(--gold-line);
+  border-radius: 999px;
+  box-shadow: 0 10px 28px var(--shadow);
+  white-space: nowrap;
   opacity: 0;
-}
-
-#announce .turn-banner::before,
-#announce .turn-banner::after {
-  content: "";
-  position: absolute;
-  left: 20%;
-  right: 20%;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--gold), transparent);
-}
-
-#announce .turn-banner::before {
-  top: 0;
-}
-
-#announce .turn-banner::after {
-  bottom: 0;
 }
 
 #announce .turn-banner[hidden] {
@@ -65,32 +53,31 @@
 }
 
 #announce .turn-banner.is-shown {
-  animation: turn-banner 1300ms var(--ease-out) both;
+  animation: turn-banner 1300ms linear both;
 }
 
 @keyframes turn-banner {
-  0% { opacity: 0; transform: translateY(-50%) scaleX(0.92); }
-  18% { opacity: 1; transform: translateY(-50%) scaleX(1); }
-  78% { opacity: 1; transform: translateY(-50%) scaleX(1); }
-  100% { opacity: 0; transform: translateY(-50%) scaleX(1.02); }
+  0% { opacity: 0; translate: 72px 0; animation-timing-function: var(--ease-out); }
+  20% { opacity: 1; translate: 0 0; }
+  80% { opacity: 1; translate: 0 0; animation-timing-function: var(--ease-in); }
+  100% { opacity: 0; translate: -72px 0; }
 }
 
 #announce .turn-banner-kicker {
-  font-family: var(--caps);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.42em;
+  font-family: var(--label);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.32em;
   text-transform: uppercase;
   color: var(--gold);
 }
 
 #announce .turn-banner-name {
-  font-family: var(--serif);
-  font-size: clamp(34px, 6vw, 60px);
-  font-weight: 600;
-  line-height: 1.05;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1.2;
   color: var(--banner-colour, var(--ink));
-  text-shadow: 0 2px 18px var(--shadow);
 }
 
 /* The hint card: under the turn pill, in the HUD's glass with a gold
@@ -98,7 +85,7 @@
 #announce .hint-card {
   position: absolute;
   left: 50%;
-  top: 92px;
+  top: 136px; /* under the turn banner */
   width: min(440px, calc(100vw - 24px));
   box-sizing: border-box;
   padding: 14px 18px 12px;
@@ -131,9 +118,9 @@
 
 #announce .hint-title {
   margin: 0 0 4px;
-  font-family: var(--serif);
-  font-size: 22px;
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 500;
   color: var(--gold);
 }
 
@@ -147,9 +134,9 @@
 #announce .hint-close {
   min-height: 44px;
   padding: 0 16px;
-  font-family: var(--caps);
+  font-family: var(--label);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink);
@@ -168,10 +155,15 @@
   outline-offset: 2px;
 }
 
-/* Phones: the hint sits under the quality switch and Fullscreen button. */
+/* Phones: the banner and the hint sit under the quality switch and the
+   Fullscreen button. */
 @media (max-width: 600px) {
+  #announce .turn-banner {
+    top: 132px;
+  }
+
   #announce .hint-card {
-    top: 136px;
+    top: 180px;
   }
 }
 

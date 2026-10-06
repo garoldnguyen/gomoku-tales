@@ -33,11 +33,19 @@ test('hud.css declares Nunito once, weights 200 to 900, swap, from assets/fonts'
   assert.match(read('index.html'), /href="src\/ui\/hud\.css"/, 'the game loads hud.css');
 });
 
-test('Nunito is the first font of every DOM font token', () => {
+test('Jost is the first font of every DOM font token, Nunito its fallback', () => {
   for (const path of ['src/ui/hud.css', 'src/ui/menu.css']) {
-    assert.match(read(path), /--font: "Nunito", /, path);
+    assert.match(read(path), /--font: "Jost", "Nunito", /, path);
   }
-  assert.match(read('src/ui/screens.css'), /font: 500 [^;]*\/ 1\.35 "Nunito", /);
+  assert.match(read('src/ui/screens.css'), /font: 400 [^;]*\/ 1\.4 "Jost", "Nunito", /);
+  const ivory = read('src/ui/ivory.css');
+  for (const style of ['normal', 'italic']) {
+    const face = ivory.match(new RegExp(`@font-face \\{[^}]*font-family: "Jost";[^}]*font-style: ${style};[^}]*\\}`))?.[0];
+    assert.ok(face, `Jost ${style}`);
+    assert.match(face, /font-weight: 100 900;/);
+    const src = face.match(/url\("([^"]+)"\)/)[1];
+    assert.ok(existsSync(new URL(src, url('src/ui/ivory.css'))), src);
+  }
 });
 
 test('no canvas text uses monospace; the canvas font is bold Nunito', () => {

@@ -5,8 +5,8 @@
 // change) and draws over the board.
 //
 //   turn banner   on this computer, every time the turn passes (and at the
-//                 start), the name of the character to move in a dark glass
-//                 band with gold hairlines, for TURN_BANNER_MS
+//                 start), the name of the character to move in a small glass
+//                 pill that slides by under the turn pill, for TURN_BANNER_MS
 //   hints         short tips in a small glass card, each once (stored under
 //                 HINT_STORAGE_KEY): five in a row wins (the first game),
 //                 what a skill does (the first time it is picked), tap again

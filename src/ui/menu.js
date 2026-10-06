@@ -31,17 +31,17 @@ export const MENU_BUTTONS = Object.freeze([
 // the place pill), the buttons and the hint bar, `gap` apart.
 export const MENU_LAYOUT = Object.freeze({
   flowPadding: 16, // #flow padding around the card
-  cardWidth: 560,
+  cardWidth: 520,
   cardPadTop: 28,
   cardPadBottom: 20,
   cardPadX: 32,
   cardBorder: 1, // the card's (transparent) edge
-  gap: 34, // between the head, the choices and the hint (the gold diamond rule sits in the first gap)
-  titleHeight: 96, // line height of the title
-  headGap: 10, // place to title
+  gap: 40, // between the head, the choices and the hint (the short gold line sits in the first gap)
+  titleHeight: 72, // line height of the title
+  headGap: 14, // place to title
   pillHeight: 22, // the place line above the title
-  buttonHeight: 64,
-  buttonGap: 0, // the choices are divided by hairlines instead
+  buttonHeight: 52,
+  buttonGap: 4,
   hintHeight: 36,
 });
 

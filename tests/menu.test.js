@@ -206,7 +206,7 @@ test('menu.css: no colour literal outside the token block, and every token colou
   }
 });
 
-test('menu.css: menu buttons at least 240 by 44 px, divided by hairlines; panels 720 px wide, 80 percent high, 44 px Close', () => {
+test('menu.css: menu buttons at least 240 by 44 px, single words with air between them; panels 720 px wide, 80 percent high, 44 px Close', () => {
   const blocks = new Map(cssBlocks(read('src/ui/menu.css')).map(([selector, body]) => [selector, body]));
   const px = (selector, property) => {
     const match = blocks.get(selector)?.match(new RegExp(`(?:^|[;\\s])${property}:\\s*(\\d+)px`));
@@ -217,8 +217,9 @@ test('menu.css: menu buttons at least 240 by 44 px, divided by hairlines; panels
   assert.ok(px('#flow .menu-card', 'width') - 2 * 32 >= 240);
   assert.ok(px('#flow .menu-button', 'min-height') >= 44);
   assert.ok(px('#flow button', 'min-height') >= 44);
-  assert.equal(px('#flow .menu-buttons', 'gap'), 0);
-  assert.match(blocks.get('#flow .menu-button'), /border-bottom: 1px solid var\(--hair\)/, 'a hairline under every choice');
+  assert.ok(px('#flow .menu-buttons', 'gap') > 0, 'air between the choices');
+  assert.match(blocks.get('#flow .menu-button'), /border: 0;/, 'no rule between the choices');
+  assert.match(blocks.get('#flow .menu-hint'), /clip-path: inset\(50%\)/, 'the hint is for screen readers only');
   assert.match(blocks.get('#flow .menu-buttons'), /flex-direction: column/);
   assert.match(blocks.get('#flow .panel'), /width: min\(720px/);
   assert.match(blocks.get('#flow .panel'), /max-height: 80vh/);

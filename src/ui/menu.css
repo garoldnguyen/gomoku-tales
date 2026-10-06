@@ -1,16 +1,16 @@
 /* Main menu, How to Play and Settings (docs/flow-design.md sections 3.1 to
    3.3) in the Ivory look: a warm ivory wash over the softly blurred farm,
-   a large Cormorant Garamond title, Cinzel capitals for the choices, gold
-   hairlines and diamonds, built by src/ui/menu-dom.js (fonts:
+   a large light Jost title, spaced capitals for the choices and short gold
+   lines, built by src/ui/menu-dom.js (font:
    src/ui/ivory.css). Every colour is a token of the block below, and every
    token colour is one of the Ivory palette (src/ui/screens.css): a test
    reads this file and fails on a colour literal outside the token block.
    Sizes are CSS pixels, so buttons keep 44 px at every window size. */
 
 #flow {
-  --font: "Nunito", "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-  --caps: "Cinzel", "Cormorant Garamond", Georgia, serif;
+  --font: "Jost", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --display: "Jost", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --label: "Jost", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --ink: #1c1913;
   --ink-2: rgba(28, 25, 19, 0.72);
   --ink-3: rgba(28, 25, 19, 0.62);
@@ -75,7 +75,7 @@
 
 #flow button {
   min-height: 44px;
-  font-family: var(--caps);
+  font-family: var(--label);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.18em;
@@ -97,8 +97,8 @@
 }
 
 /* --- the menu: the ivory wash over the scene, then the title, the place
-   above it in gold capitals, a gold diamond rule, five choices divided by
-   hairlines and the keys hint. The px sizes are MENU_LAYOUT of
+   above it in gold capitals, a short gold line, five single-word choices
+   with air between them and the keys hint. The px sizes are MENU_LAYOUT of
    src/ui/menu.js (a test compares them). --- */
 
 #flow .scrim {
@@ -122,8 +122,8 @@
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 34px;
-  width: 560px;
+  gap: 40px;
+  width: 520px;
   max-width: 100%;
   padding: 28px 32px 20px;
   border: 1px solid transparent;
@@ -152,46 +152,36 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 14px;
   animation: flow-rise 560ms var(--ease-out) 60ms backwards;
 }
 
-/* The gold diamond rule under the title, in the gap above the choices. */
+/* A short gold line under the title, in the gap above the choices. */
 #flow .menu-head::after {
   content: "";
   position: absolute;
   left: 50%;
   bottom: -21px;
-  width: 9px;
-  height: 9px;
-  border: 1px solid var(--gold);
-  transform: translateX(-50%) rotate(45deg);
-}
-
-#flow .menu-head::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  bottom: -17px;
-  width: 200px;
+  width: 40px;
   height: 1px;
+  background: var(--gold);
   transform: translateX(-50%);
-  background: linear-gradient(90deg, transparent, var(--gold) 30%, transparent 44%, transparent 56%, var(--gold) 70%, transparent);
 }
 
 #flow .menu-title {
   margin: 0;
-  font-family: var(--serif);
-  font-size: 104px;
-  font-weight: 600;
-  line-height: 96px;
-  letter-spacing: -0.01em;
+  font-family: var(--display);
+  font-size: 64px;
+  font-weight: 300;
+  line-height: 72px;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
+/* The last word in gold, the same light weight. */
 #flow .menu-title em {
-  font-weight: 500;
-  font-style: italic;
+  font-style: normal;
+  color: var(--gold);
 }
 
 #flow .menu-place {
@@ -200,20 +190,20 @@
   align-items: center;
   height: 22px;
   margin: 0;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 500;
   letter-spacing: 0.5em;
   text-transform: uppercase;
   color: var(--gold);
   white-space: nowrap;
 }
 
+/* Five words and air between them: no rules, no second line. */
 #flow .menu-buttons {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 0px;
-  border-top: 1px solid var(--hair);
+  gap: 4px;
 }
 
 #flow .menu-button {
@@ -222,43 +212,44 @@
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 64px;
-  min-height: 64px;
+  height: 52px;
+  min-height: 52px;
   padding: 0 14px;
   text-align: center;
   text-transform: none;
   letter-spacing: 0;
   border: 0;
-  border-bottom: 1px solid var(--hair);
+  background: none;
   animation: flow-rise 460ms var(--ease-out) backwards;
   animation-delay: calc(160ms + var(--i, 0) * 60ms); /* staggered, --i from menu-dom.js */
 }
 
-/* The chosen line: a gold wash across it and a gold diamond either side of
-   its label, for the pointer and for the keyboard (the focus starts on the
-   first choice). */
+/* The chosen line (pointer or keyboard; the focus starts on the first
+   choice): its label turns to full ink and a short gold line grows under
+   it. */
 #flow .menu-button:focus,
-#flow .menu-button:focus-visible {
-  outline: none;
-  background: linear-gradient(90deg, transparent, var(--row-hover), transparent);
-}
-
+#flow .menu-button:focus-visible,
 #flow .menu-button:hover {
-  background: linear-gradient(90deg, transparent, var(--row-hover), transparent);
+  outline: none;
+  background: none;
 }
 
-#flow .menu-button:focus .menu-label::before,
-#flow .menu-button:focus .menu-label::after,
-#flow .menu-button:hover .menu-label::before,
-#flow .menu-button:hover .menu-label::after {
+#flow .menu-label::after {
   content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin: 0 18px;
-  vertical-align: 4px;
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  width: 28px;
+  height: 1px;
+  margin-left: -14px;
   background: var(--gold);
-  transform: rotate(45deg);
+  transform: scaleX(0);
+  transition: transform 220ms var(--ease-out);
+}
+
+#flow .menu-button:focus .menu-label::after,
+#flow .menu-button:hover .menu-label::after {
+  transform: scaleX(1);
 }
 
 #flow .menu-icon,
@@ -280,18 +271,20 @@
   flex: 1;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
   min-width: 0;
 }
 
 #flow .menu-label {
-  font-family: var(--caps);
-  font-size: 21px;
-  font-weight: 600;
-  line-height: 26px;
-  letter-spacing: 0.2em;
+  position: relative;
+  padding-left: 0.3em; /* balances the spacing after the last letter */
+  font-family: var(--label);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--ink-2);
+  transition: color 180ms var(--ease-out);
 }
 
 #flow .menu-button:focus .menu-label,
@@ -299,17 +292,15 @@
   color: var(--ink);
 }
 
+/* The hint stays for screen readers only (it is part of the button's
+   name); on screen the choices are single words. */
 #flow .menu-hint {
+  position: absolute;
+  width: 1px;
+  height: 1px;
   overflow: hidden;
-  font-family: var(--serif);
-  font-size: 18px;
-  font-style: italic;
-  font-weight: 500;
-  line-height: 20px;
-  letter-spacing: 0;
-  color: var(--ink-3);
+  clip-path: inset(50%);
   white-space: nowrap;
-  text-overflow: ellipsis;
 }
 
 #flow .menu-keys {
@@ -318,8 +309,8 @@
   justify-content: center;
   height: 36px;
   margin: 0;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 500;
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--ink-3);
@@ -357,7 +348,7 @@
 
 #flow .panel-head h2 {
   margin: 0;
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 34px;
   font-weight: 600;
   line-height: 1.1;
@@ -483,7 +474,7 @@
 }
 
 #flow .name {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 28px;
   font-weight: 600;
 }
@@ -491,7 +482,7 @@
 #flow .stone {
   padding: 2px 10px;
   border-radius: 0;
-  font-family: var(--caps);
+  font-family: var(--label);
   font-size: 13px;
   font-weight: 600;
   color: var(--team-ink);
@@ -517,7 +508,7 @@
 }
 
 #flow .skill-title {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 21px;
   font-weight: 600;
 }
@@ -562,7 +553,7 @@
 }
 
 #flow .segment-label {
-  font-family: var(--caps);
+  font-family: var(--label);
   font-size: 15px;
   font-weight: 600;
   letter-spacing: 0.16em;
@@ -608,58 +599,47 @@
    lower choices and tighter gaps, so the whole menu fits. */
 @media (max-height: 680px) {
   #flow .menu-card {
-    gap: 24px;
+    gap: 28px;
     padding-top: 12px;
     padding-bottom: 8px;
   }
 
   #flow .menu-title {
-    font-size: 72px;
-    line-height: 70px;
+    font-size: 54px;
+    line-height: 60px;
+  }
+
+  #flow .menu-head::after {
+    bottom: -15px;
+  }
+
+  #flow .menu-button {
+    height: 48px;
+    min-height: 48px;
+  }
+}
+
+/* Phones and narrow windows: a smaller title and tighter spacing, so
+   nothing runs past the edges (the 1280 by 720 layout of MENU_LAYOUT is
+   unchanged). */
+@media (max-width: 600px) {
+  #flow .menu-card {
+    gap: 30px;
+    padding: 20px 8px 12px;
+  }
+
+  #flow .menu-title {
+    font-size: 44px;
+    line-height: 52px;
+    letter-spacing: 0.02em;
   }
 
   #flow .menu-head::after {
     bottom: -16px;
   }
 
-  #flow .menu-head::before {
-    bottom: -12px;
-  }
-
-  #flow .menu-button {
-    height: 56px;
-    min-height: 56px;
-  }
-}
-
-/* Phones and narrow windows: a smaller title and choices on one line each,
-   so nothing runs past the edges (the 1280 by 720 layout of MENU_LAYOUT is
-   unchanged). */
-@media (max-width: 600px) {
-  #flow .menu-card {
-    gap: 26px;
-    padding: 20px 8px 12px;
-  }
-
-  #flow .menu-title {
-    font-size: 58px;
-    line-height: 62px;
-  }
-
-  #flow .menu-head::before {
-    width: 150px;
-  }
-
-  #flow .menu-head::after {
-    bottom: -17px;
-  }
-
-  #flow .menu-head::before {
-    bottom: -13px;
-  }
-
   #flow .menu-place {
-    letter-spacing: 0.32em;
+    letter-spacing: 0.36em;
   }
 
   #flow .menu-button {
@@ -667,28 +647,24 @@
   }
 
   #flow .menu-label {
-    font-size: 15px;
-    letter-spacing: 0.12em;
+    font-size: 13px;
+    letter-spacing: 0.22em;
     white-space: nowrap;
-  }
-
-  #flow .menu-hint {
-    font-size: 15px;
-  }
-
-  #flow .menu-button:focus .menu-label::before,
-  #flow .menu-button:focus .menu-label::after,
-  #flow .menu-button:hover .menu-label::before,
-  #flow .menu-button:hover .menu-label::after {
-    margin: 0 10px;
   }
 
   #flow .menu-keys {
     height: auto;
     min-height: 36px;
-    font-size: 10px;
-    letter-spacing: 0.18em;
+    font-size: 9px;
+    letter-spacing: 0.2em;
     text-align: center;
+  }
+}
+
+/* Touch screens have no arrow keys: no keys line. */
+@media (pointer: coarse) {
+  #flow .menu-keys {
+    display: none;
   }
 }
 

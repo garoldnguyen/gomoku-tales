@@ -261,9 +261,9 @@
 }
 
 #screens .select-card h2 {
-  font-family: var(--serif);
-  font-size: calc(var(--u) * 36);
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: calc(var(--u) * 30);
+  font-weight: 400;
 }
 
 /* Copied or Press Ctrl+C beside the code, so the row stays centred. */
@@ -314,9 +314,9 @@
 }
 
 #screens .select-lead {
-  font-family: var(--serif);
-  font-size: calc(var(--u) * 14);
-  font-style: italic;
+  font-family: var(--display);
+  font-size: calc(var(--u) * 13);
+  font-style: normal;
   color: var(--ink-2);
 }
 
@@ -483,9 +483,9 @@
   min-width: calc(var(--u) * 24);
   height: calc(var(--u) * 18);
   padding: 0 calc(var(--u) * 2);
-  font-family: var(--caps);
+  font-family: var(--label);
   font-size: calc(var(--u) * 9);
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.18em;
   color: var(--c-ink);
   border: 0;
@@ -508,18 +508,18 @@
 }
 
 #screens .character-name {
-  font-family: var(--serif);
-  font-size: calc(var(--u) * 21);
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: calc(var(--u) * 18);
+  font-weight: 500;
   line-height: 1.05;
   white-space: nowrap;
 }
 
 #screens .character .taken {
   padding: 0 calc(var(--u) * 5);
-  font-family: var(--caps);
+  font-family: var(--label);
   font-size: calc(var(--u) * 8);
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink-2);
@@ -527,9 +527,9 @@
 }
 
 #screens .tagline {
-  font-family: var(--serif);
-  font-size: calc(var(--u) * 13);
-  font-style: italic;
+  font-family: var(--display);
+  font-size: calc(var(--u) * 12);
+  font-style: normal;
   color: var(--ink-2);
 }
 
@@ -601,9 +601,9 @@
 }
 
 #screens .select-tip-title {
-  font-family: var(--serif);
-  font-size: 19px;
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 500;
 }
 
 #screens .select-tip .rest {
@@ -616,9 +616,9 @@
 }
 
 #screens .skill-name {
-  font-family: var(--serif);
-  font-size: calc(var(--u) * 15);
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: calc(var(--u) * 13);
+  font-weight: 400;
   line-height: 1.15;
 }
 
@@ -739,9 +739,9 @@
   width: calc(var(--u) * 26);
   height: calc(var(--u) * 26);
   border-radius: 50%;
-  font-family: var(--caps);
+  font-family: var(--label);
   font-size: calc(var(--u) * 12);
-  font-weight: 600;
+  font-weight: 500;
   color: var(--team-ink);
   background: var(--team-tile);
 }
@@ -769,18 +769,18 @@
 
 #screens .seat-name {
   overflow: hidden;
-  font-family: var(--serif);
-  font-size: calc(var(--u) * 16);
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: calc(var(--u) * 15);
+  font-weight: 500;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 #screens .seat-status {
   flex-shrink: 0;
-  font-family: var(--serif);
-  font-size: calc(var(--u) * 13);
-  font-style: italic;
+  font-family: var(--display);
+  font-size: calc(var(--u) * 12);
+  font-style: normal;
   color: var(--ink-3);
 }
 

@@ -17,7 +17,7 @@ test('the DOM screens and the glass HUD have no wood and use the one UI font', (
     const css = read(path);
     assert.doesNotMatch(css, WOOD, `${path} has a wood colour`);
     assert.doesNotMatch(css, /monospace/, `${path} uses another font`);
-    assert.match(css, /"DM Sans"/, `${path} uses DM Sans`);
+    assert.match(css, /"Jost"/, `${path} uses Jost`);
   }
 });
 

@@ -69,7 +69,7 @@ test('the screen CSS animates only opacity and transforms, stops for reduced mot
     const css = read(path);
     for (const [, body] of css.matchAll(/@keyframes [\w-]+ \{([\s\S]*?)\n\}/g)) {
       for (const [, property] of body.matchAll(/([\w-]+):/g)) {
-        assert.ok(['opacity', 'translate', 'scale', 'transform', 'content'].includes(property), `${path}: ${property} in a keyframe`);
+        assert.ok(['opacity', 'translate', 'scale', 'transform', 'content', 'animation-timing-function'].includes(property), `${path}: ${property} in a keyframe`);
       }
     }
     assert.match(css, /@media \(prefers-reduced-motion: reduce\)[^@]*animation: none/, `${path}: off for reduced motion`);

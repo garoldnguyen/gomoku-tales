@@ -1,7 +1,7 @@
 /* Lobby and room screens drawn as DOM over the canvas, in the Ivory look
    of the menu (src/ui/menu.css): ivory paper cards with a hairline border
-   and a soft warm shadow, Cormorant Garamond titles, Cinzel capitals on the
-   buttons (src/ui/ivory.css), Nunito text and no wood. This block also
+   and a soft warm shadow, light Jost titles, spaced Jost capitals on the
+   buttons (src/ui/ivory.css), Jost text and no wood. This block also
    holds the Ivory palette that menu.css and room.css take their token
    colours from. The cards need no backdrop blur, because on Medium and
    High the world behind the screens is already blurred (index.html
@@ -37,8 +37,8 @@
   --ready: #3d7a52;
   --gold-tile: rgba(168, 130, 58, 0.14);
   --highlight: rgba(255, 253, 248, 0.9);
-  --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-  --caps: "Cinzel", "Cormorant Garamond", Georgia, serif;
+  --display: "Jost", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --label: "Jost", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   position: absolute;
@@ -48,7 +48,7 @@
   justify-content: center;
   padding-top: calc(var(--u) * 70);
   box-sizing: border-box;
-  font: 500 calc(var(--u) * 15) / 1.35 "Nunito", "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font: 400 calc(var(--u) * 15) / 1.4 "Jost", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
   z-index: 2; /* above the glass HUD (hud.css) */
@@ -86,9 +86,9 @@
 
 #screens .card h2 {
   margin: 0;
-  font-family: var(--serif);
-  font-size: calc(var(--u) * 30);
-  font-weight: 600;
+  font-family: var(--display);
+  font-size: calc(var(--u) * 26);
+  font-weight: 400;
   line-height: 1.1;
 }
 
@@ -97,9 +97,9 @@
 }
 
 #screens .card .lead {
-  font-family: var(--serif);
-  font-size: calc(var(--u) * 18);
-  font-style: italic;
+  font-family: var(--display);
+  font-size: calc(var(--u) * 14);
+  font-style: normal;
   color: var(--ink-2);
 }
 
@@ -108,9 +108,9 @@
   min-height: 44px;
   padding: calc(var(--u) * 8) calc(var(--u) * 16);
   font: inherit;
-  font-family: var(--caps);
+  font-family: var(--label);
   font-size: max(12px, calc(var(--u) * 12));
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink);
@@ -196,8 +196,8 @@
   padding: calc(var(--u) * 6) calc(var(--u) * 8);
   font: inherit;
   font-size: calc(var(--u) * 20);
-  font-family: var(--caps);
-  font-weight: 600;
+  font-family: var(--label);
+  font-weight: 500;
   letter-spacing: calc(var(--u) * 3);
   text-align: center;
   text-transform: uppercase;
@@ -239,9 +239,9 @@
 
 .code {
   padding: calc(var(--u) * 4) calc(var(--u) * 12);
-  font-family: var(--caps);
+  font-family: var(--label);
   font-size: calc(var(--u) * 36);
-  font-weight: 600;
+  font-weight: 400;
   letter-spacing: calc(var(--u) * 6);
   color: var(--ink);
   background: none;
