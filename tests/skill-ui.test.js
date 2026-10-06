@@ -264,19 +264,19 @@ test('Wind Dash failure is reported when the target is taken', () => {
   assert.equal(game.getView().message, 'Wind Dash failed: the target cell is taken.');
 });
 
-test('Tornado Zone end to end: the overlay data and the storm with injected random', () => {
+test('Tornado Zone end to end: on one screen the zone is hidden, and a seed planted in it is thrown with injected random', () => {
   const game = createLocalGame({ random: () => 0 });
   game.clickSkill(X, TORNADO_ZONE);
   game.click({ x: 7, y: 7 });
   assert.equal(game.getState().tornado.cells.length, 9);
-  assert.equal(game.getView().message, 'Tornado Zone! The storm blows after the next turn.');
+  assert.equal(game.getView().message, 'Tornado Zone! Somewhere a storm is waiting.', 'O is to move and must not see it');
 
   game.click({ x: 7, y: 7 }); // O inside the zone; random 0 picks the first empty plot outside, (0, 0)
   const state = game.getState();
   assert.equal(state.board[7][7], null);
   assert.equal(state.board[0][0], O);
   assert.equal(state.tornado, null);
-  assert.equal(game.getView().message, 'The dandelion storm blew 1 plant away!');
+  assert.equal(game.getView().message, 'The dandelion storm threw the stone away!');
 });
 
 test('Terrain Creation end to end: a rock appears and later crumbles', () => {

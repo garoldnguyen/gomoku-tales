@@ -1,0 +1,259 @@
+/* The room chat (src/ui/chat-dom.js, docs/flow-design.md section 3.12):
+   the HUD's dark glass in the lower left, over the game and the room
+   screens. Folded it is a round Chat button with an unread count; open it
+   is a panel the player can resize from its corner. Every colour is a token
+   of the block below: HUD glass colours (src/ui/hud.css) and the pale gold
+   of its accents. */
+
+#chat {
+  --ink: #f4f7fb;
+  --ink-2: rgba(244, 247, 251, 0.74);
+  --ink-3: rgba(244, 247, 251, 0.6);
+  --card-solid: rgba(14, 20, 34, 0.92);
+  --panel: #121826; /* the open panel: opaque, so the room screen behind never shows through its text */
+  --line: rgba(255, 255, 255, 0.18);
+  --hair: rgba(255, 255, 255, 0.14);
+  --row: rgba(255, 255, 255, 0.08);
+  --gold: #e8c77a;
+  --gold-line: rgba(232, 199, 122, 0.42);
+  --shadow: rgba(10, 20, 40, 0.3);
+  --font: "Jost", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  position: fixed;
+  left: 12px;
+  bottom: 12px;
+  z-index: 4; /* above the room screens and the HUD */
+  font-family: var(--font);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+#chat[hidden],
+#chat [hidden] {
+  display: none !important;
+}
+
+#chat button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+#chat button:focus-visible,
+#chat .chat-input:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}
+
+/* Folded: a round button with the unread count. */
+#chat .chat-toggle {
+  position: relative;
+  min-width: 88px;
+  min-height: 44px;
+  padding: 10px 20px;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  background: var(--card-solid);
+  border: 1px solid var(--gold-line);
+  border-radius: 999px;
+  box-shadow: 0 10px 28px var(--shadow);
+}
+
+#chat .chat-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  box-sizing: border-box;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 22px;
+  color: var(--card-solid);
+  background: var(--gold);
+  border-radius: 999px;
+}
+
+/* Open: the panel, resizable from its lower right corner. */
+#chat .chat-panel {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  width: 320px;
+  height: 260px;
+  min-width: 240px;
+  min-height: 180px;
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px);
+  resize: both;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-top-color: var(--gold-line);
+  border-radius: 16px;
+  box-shadow: 0 18px 44px var(--shadow);
+  animation: chat-in 240ms var(--ease-out);
+}
+
+@keyframes chat-in {
+  from { opacity: 0; translate: 0 10px; }
+}
+
+#chat .chat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px 4px 14px;
+  border-bottom: 1px solid var(--hair);
+}
+
+#chat .chat-title {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+#chat .chat-hide {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: none;
+  border: 0;
+  border-radius: 50%;
+}
+
+#chat .chat-hide::before {
+  content: "";
+  position: absolute;
+  left: 15px;
+  right: 15px;
+  top: 21px;
+  height: 2px;
+  background: var(--ink-2);
+}
+
+#chat .chat-hide:hover {
+  background: var(--row);
+}
+
+#chat .chat-log {
+  flex: 1;
+  margin: 0;
+  padding: 8px 14px;
+  overflow-y: auto;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+#chat .chat-line + .chat-line {
+  margin-top: 4px;
+}
+
+#chat .chat-name {
+  margin-right: 8px;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+#chat .chat-line.is-mine .chat-name {
+  color: var(--ink-3);
+}
+
+#chat .chat-text {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+#chat .chat-empty {
+  flex: 1;
+  margin: 0;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--ink-3);
+}
+
+#chat .chat-form {
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  border-top: 1px solid var(--hair);
+}
+
+#chat .chat-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--row);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+#chat .chat-input::placeholder {
+  color: var(--ink-3);
+}
+
+#chat .chat-send {
+  min-width: 72px;
+  min-height: 44px;
+  padding: 0 14px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  background: none;
+  border: 1px solid var(--gold-line);
+  border-radius: 10px;
+}
+
+#chat .chat-send:hover {
+  background: var(--row);
+}
+
+/* Phones: the HUD bars fill the bottom, so the chat sits at the top
+   right, under the Fullscreen button in the game (and in the corner of the
+   waiting room, beside its title); the open panel spans the width. */
+@media (max-width: 600px) {
+  #chat {
+    left: auto;
+    right: 12px;
+    bottom: auto;
+    top: 132px;
+  }
+
+  #chat[data-screen="waiting"] {
+    top: 8px;
+    right: 8px;
+  }
+
+  #chat .chat-toggle {
+    min-width: 44px;
+    padding: 10px 14px;
+    letter-spacing: 0.12em;
+  }
+
+  #chat .chat-panel {
+    width: calc(100vw - 24px);
+    height: 40vh;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #chat .chat-panel {
+    animation: none;
+  }
+}

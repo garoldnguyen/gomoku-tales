@@ -213,6 +213,49 @@
   outline-offset: 2px;
 }
 
+/* The player's name for online rooms (section 3.12): a small spaced
+   label over a wide box, the random suggestion as its placeholder. */
+.name-field {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(var(--u) * 6);
+  margin: calc(var(--u) * 4) 0 calc(var(--u) * 8);
+}
+
+.name-label {
+  font-family: var(--label);
+  font-size: max(11px, calc(var(--u) * 11));
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.name-input {
+  width: calc(var(--u) * 240);
+  max-width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: calc(var(--u) * 6) calc(var(--u) * 12);
+  font: inherit;
+  font-size: calc(var(--u) * 18);
+  text-align: center;
+  color: var(--ink);
+  background: var(--card-solid);
+  border: 1px solid var(--line);
+  border-radius: 2px;
+}
+
+.name-input::placeholder {
+  color: var(--ink-3);
+}
+
+.name-input:focus {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
 #screens .join-row button {
   min-width: calc(var(--u) * 90);
 }

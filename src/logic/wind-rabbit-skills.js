@@ -4,7 +4,7 @@
 // `changed` is the cell whose stone changed (for the win check), or null.
 
 import { TORNADO_SIZE } from '../config.js';
-import { EMPTY, O, X, cloneBoard, inBounds, isEmptyCell } from './board.js';
+import { EMPTY, cloneBoard, inBounds, isEmptyCell } from './board.js';
 
 // WIND DASH: announce a move of one of the player's stones to an empty
 // cell. Nothing moves now; the dash resolves at the end of the opponent's
@@ -44,9 +44,9 @@ export function resolveDash(board, dash) {
 }
 
 // TORNADO ZONE: a TORNADO_SIZE square zone around any cell on the board,
-// clipped by the board edges. It gathers through the opponent's next turn
-// and then blows every plant in it away (blowZone, run by finishTurn in
-// game.js).
+// clipped by the board edges. It lasts through the opponent's next turn: a
+// stone they plant inside is thrown (throwStone). Only the rabbit's player
+// sees where it is (maskForViewer in cloud.js hides it from the other).
 export function tornadoZone(state, player, target) {
   const { x, y } = target ?? {};
   if (!inBounds(state.board, x, y)) return { error: 'Choose a zone centre on the board.' };
@@ -75,43 +75,28 @@ export function inTornado(tornado, x, y) {
   return tornado.cells.some((cell) => cell.x === x && cell.y === y);
 }
 
-// The storm of a Tornado Zone (docs/design.md section 5.1), after the
-// opponent's next turn: every plant in the zone, of either player and the
-// one just planted there too, is blown to a random empty plot outside the
-// zone. Plants go in row order, each to a plot still empty when its turn
-// comes, so two never share one. A plant with no empty plot left outside
-// the zone stays where it is. Rocks stay. random() returns a number in
-// [0, 1) like Math.random. Returns { board, events, moves } where moves is
-// [{ player, from, to }] for the plants that flew.
-export function blowZone(board, tornado, random) {
-  const next = cloneBoard(board);
-  const zone = new Set(tornado.cells.map((cell) => `${cell.x},${cell.y}`));
-  const plants = tornado.cells.filter((cell) => next[cell.y][cell.x] === X || next[cell.y][cell.x] === O);
-  const lifted = plants.map((cell) => ({ player: next[cell.y][cell.x], from: { x: cell.x, y: cell.y } }));
-  for (const cell of plants) next[cell.y][cell.x] = EMPTY;
-  const events = [];
-  const moves = [];
-  for (const plant of lifted) {
-    const options = [];
-    for (let y = 0; y < next.length; y++) {
-      for (let x = 0; x < next[y].length; x++) {
-        if (next[y][x] === EMPTY && !zone.has(`${x},${y}`)) options.push({ x, y });
-      }
+// The Tornado Zone throw (docs/design.md section 5.1): the stone the
+// opponent planted at (x, y) inside the zone is blown by a dandelion storm
+// to a random empty plot anywhere on the board outside the zone. random()
+// returns a number in [0, 1) like Math.random (the host's). With no such
+// plot the stone stays. Returns { board, events, changed } with `changed`
+// the cell where the stone ends up.
+export function throwStone(board, x, y, tornado, random) {
+  const player = board[y][x];
+  const storm = { type: 'tornadoStorm', player: tornado.player, x, y };
+  const options = [];
+  for (let cy = 0; cy < board.length; cy++) {
+    for (let cx = 0; cx < board[cy].length; cx++) {
+      if (board[cy][cx] === EMPTY && !inTornado(tornado, cx, cy)) options.push({ x: cx, y: cy });
     }
-    if (options.length === 0) {
-      next[plant.from.y][plant.from.x] = plant.player;
-      events.push({ type: 'throwBlocked', player: plant.player, x: plant.from.x, y: plant.from.y });
-      continue;
-    }
-    const index = Math.min(options.length - 1, Math.max(0, Math.floor(random() * options.length)));
-    const to = options[index];
-    next[to.y][to.x] = plant.player;
-    moves.push({ player: plant.player, from: plant.from, to });
-    events.push({ type: 'stoneThrown', player: plant.player, from: plant.from, to });
   }
-  return {
-    board: next,
-    moves,
-    events: [{ type: 'tornadoStorm', player: tornado.player, x: tornado.x, y: tornado.y, cells: tornado.cells, count: lifted.length }, ...events],
-  };
+  if (options.length === 0) {
+    return { board, events: [storm, { type: 'throwBlocked', player, x, y }], changed: { x, y } };
+  }
+  const index = Math.min(options.length - 1, Math.max(0, Math.floor(random() * options.length)));
+  const to = options[index];
+  const next = cloneBoard(board);
+  next[y][x] = EMPTY;
+  next[to.y][to.x] = player;
+  return { board: next, events: [storm, { type: 'stoneThrown', player, from: { x, y }, to }], changed: to };
 }

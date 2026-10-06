@@ -25,6 +25,9 @@ import { dropOffsetPx, STAGE_DROP, STAGE_LAND, STAGE_REST, STAGE_SPROUT } from '
 //                                         petals along a curve to the target and regrows there from Land
 //   { kind: 'dashFizzle', from, to }      a failed dash: the mark ends with a puff
 //   { kind: 'tornado', x, y, cells }      the swirl of petals and leaves over the zone, until it ends
+//   { kind: 'tornadoHidden' }             the zone of the other seat: only a gust of dandelion fluff
+//                                         drifting across the whole field, never where the zone is
+//   { kind: 'storm', x, y, cells }        the dandelion storm bursting from the plot of a thrown stone
 //   { kind: 'tornadoEnd' }
 //   { kind: 'throw', from, to, player }   a seed thrown in an arc, landing with a soil puff, then regrowing from Land
 //   { kind: 'throwBlocked', x, y }        a gust around a plant with nowhere to go
@@ -84,10 +87,11 @@ export function visualsForEvents(events) {
         specs.push({ kind: 'dashFizzle', from: event.from, to: event.to });
         break;
       case 'tornadoAnnounced':
-        specs.push({ kind: 'tornado', x: event.x, y: event.y, cells: event.cells });
+        // The opponent of the rabbit only sees that a zone was cast.
+        specs.push(event.hidden ? { kind: 'tornadoHidden' } : { kind: 'tornado', x: event.x, y: event.y, cells: event.cells });
         break;
       case 'tornadoStorm':
-        specs.push({ kind: 'storm', x: event.x, y: event.y, cells: event.cells });
+        specs.push({ kind: 'storm', x: event.x, y: event.y, cells: [{ x: event.x, y: event.y }] });
         break;
       case 'tornadoEnded':
         specs.push({ kind: 'tornadoEnd' });

@@ -6,8 +6,10 @@
 import { X, O, isEmptyCell } from '../logic/board.js';
 import { CHARACTERS, characterForStone } from '../logic/characters.js';
 import { isGameOver } from '../logic/game.js';
+import { seatStone } from '../logic/seats.js';
 import { COUNTDOWN } from '../net/presence.js';
 import { describeEvents, panelView, skillLockReason } from './local-game.js';
+import { createPlayersByStone } from './player-names.js';
 import { needsTarget, startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
 
 // takeEvents' answer when nothing happened, shared so the render loop makes
@@ -15,6 +17,7 @@ import { needsTarget, startTargeting, targetClick, targetPreview, targetPrompt }
 const NO_EVENTS = Object.freeze([]);
 
 export function createOnlineGame(room) {
+  const playersOf = createPlayersByStone(seatStone); // the players' names by stone (HUD)
   let hover = null; // board cell under the pointer
   let hoverSkill = null; // { player, skillId } of the button under the pointer
   let targeting = null; // skill target flow in progress, see targeting.js
@@ -181,6 +184,7 @@ export function createOnlineGame(room) {
         status: statusLine({ state, you: player, result: view.result, targeting: canAct ? targeting : null, yourTurn: view.yourTurn, peerCountdown }),
         message: peerCountdown !== null && targeting ? targetPrompt(targeting) : message,
         peerCountdown,
+        players: playersOf(view),
       };
     },
 

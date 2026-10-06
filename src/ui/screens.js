@@ -20,10 +20,11 @@ import {
 import { TIP_CLOSED, selectTipReducer, selectTipViewModel, tipDelay } from './select-tooltip.js';
 import { tooltipPosition } from './tooltip-position.js';
 import { createFader } from './motion.js';
+import { chooseName, loadName, randomName } from './player-names.js';
 import { STRINGS } from './strings.js';
 
 export function attachScreens(root, app, {
-  clipboard = globalThis.navigator?.clipboard, location = globalThis.location,
+  clipboard = globalThis.navigator?.clipboard, location = globalThis.location, storage = null, suggestName = randomName,
 } = {}) {
   const $ = (id) => root.querySelector(`#${id}`);
   const act = (name, ...args) => app[name]?.(...args);
@@ -100,8 +101,29 @@ export function attachScreens(root, app, {
   $('room-closed-detail').textContent = closed.detail;
   $('room-closed-menu').textContent = closed.back.label;
 
+  // The name boxes of Play Online and Watch a match: the saved name, or
+  // empty with a random name suggested (and used when it stays empty).
+  // Both boxes show the same name.
+  const nameBoxes = [$('lobby-name'), $('spectate-name')];
+  const suggested = suggestName();
+  $('lobby-name-label').textContent = STRINGS.nameLabel;
+  $('spectate-name-label').textContent = STRINGS.nameLabel;
+  for (const box of nameBoxes) {
+    box.value = loadName(storage) ?? '';
+    box.placeholder = suggested;
+    box.addEventListener('input', () => {
+      for (const other of nameBoxes) if (other !== box) other.value = box.value;
+    });
+  }
+  // Before a room opens: the name it uses, saved for next time.
+  const takeName = () => act('setPlayerName', chooseName(nameBoxes[0].value, storage, suggested));
+  const NAMED_ACTIONS = new Set(['createRoom', 'openJoin']);
+
   for (const button of root.querySelectorAll('[data-action]')) {
-    button.addEventListener('click', () => act(button.dataset.action));
+    button.addEventListener('click', () => {
+      if (NAMED_ACTIONS.has(button.dataset.action)) takeName();
+      act(button.dataset.action);
+    });
   }
 
   // The code box keeps only code characters, in upper case and at most
@@ -144,7 +166,9 @@ export function attachScreens(root, app, {
   });
   spectateForm.addEventListener('submit', (event) => {
     event.preventDefault();
-    if (!spectateSubmit.disabled) act('watchRoom', spectateInput.value);
+    if (spectateSubmit.disabled) return;
+    takeName();
+    act('watchRoom', spectateInput.value);
   });
 
   const clearCopy = () => {

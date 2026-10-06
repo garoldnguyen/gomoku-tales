@@ -16,7 +16,10 @@ not need it.
   API). Host messages go to the guest and every spectator, guest messages go
   to the host only, and a spectator that sends anything is closed. When the
   host or the guest closes, the other side gets
-  `{ type: 'leave', from: <closed peer id>, to }`. The last `seats`, `state`,
+  `{ type: 'leave', from: <closed peer id>, to }`. A chat message
+  (`{ type: 'chat' }`, docs/flow-design.md section 3.12) of anyone goes to
+  every other socket of the room; a spectator may send chat and nothing
+  else (any other message closes its socket). The last `seats`, `state`,
   `start`, `result`, `new-game` and `rematch-status` messages of the host are
   kept in storage and replayed, in that order, to each new spectator.
 - `worker/pairing.js`: the pure rules, tested by `tests/worker.test.js`:

@@ -1,8 +1,9 @@
 // The spectator's side of a room (Watch a match, docs/flow-design.md
 // sections 3.8 and 3.9). Pure of the DOM, like room.js. A spectator only
-// listens: it never calls transport.send, has no seat, no presence, no
-// heartbeat and no leave countdown, and every action it is asked for is
-// refused without a message. The host never learns it is there.
+// listens to the game: the one thing it sends is chat (sendChat, section
+// 3.12). It has no seat, no presence, no heartbeat and no leave countdown,
+// and every action it is asked for is refused without a message. The host
+// never learns it is there unless it chats.
 //
 // Through the relay (src/net/ws-transport.js, role spectator) it hears the
 // host's messages only: the replay of the last seats, state, start,
@@ -33,11 +34,15 @@
 //   { type: 'newGame', round }         a rematch began with a fresh board
 //   { type: 'result', result }         the leave result changed
 //   { type: 'roomClosed' }             the host left; nothing more comes
+//   { type: 'names', names }           the players' names changed ({ host, guest })
+//   { type: 'chat', from, name, text, mine } a chat message, from anyone in the room
 
 import { isGameOver } from '../logic/game.js';
+import { CHAT, chatOf, cleanName, namesOf } from './chat.js';
+import { systemClock } from './clock.js';
 import { createSeats, isSeats } from '../logic/seats.js';
 import { ROOM_PHASES } from './phase.js';
-import { CLOSED, ROOM_SEATS } from './room.js';
+import { CLOSED, ROOM_SEATS, makePeerId, sendChatMessage } from './room.js';
 
 export const SPECTATOR = 'spectator';
 export const SPECTATOR_ERROR = 'Spectators only watch.';
@@ -47,7 +52,9 @@ const HOST_ONLY = Object.freeze(['welcome', 'seats', 'start', 'state', 'new-game
 
 const refused = () => ({ ok: false, error: SPECTATOR_ERROR });
 
-export function createSpectatorRoom({ transport, code }) {
+export function createSpectatorRoom({ transport, code, name = null, clock = systemClock, id = makePeerId() }) {
+  const myName = cleanName(name);
+  let lastChatAt = -Infinity;
   const handlers = new Set();
   const room = {
     phase: ROOM_PHASES.WAITING,
@@ -58,6 +65,7 @@ export function createSpectatorRoom({ transport, code }) {
     result: null,
     hostId: null, // the host's peer id, from its first message
     guestSeen: false, // a guest sits in the room: welcomed, pinged, picked or named by seats
+    names: { host: null, guest: null }, // the players' names, from the host's messages
   };
   let closed = false; // close() was called
 
@@ -121,6 +129,11 @@ export function createSpectatorRoom({ transport, code }) {
     const message = heard.masked === true ? { ...heard, state: null } : heard;
     if (HOST_ONLY.includes(message.type) && room.hostId === null) room.hostId = message.from;
     if (room.hostId !== null && message.from !== room.hostId) return; // not the host (a guest heard on a shared channel)
+    const names = namesOf(message);
+    if (names && (names.host !== room.names.host || names.guest !== room.names.guest)) {
+      room.names = names;
+      emit({ type: 'names', names });
+    }
     switch (message.type) {
       case 'welcome':
         takeSeats(isSeats(message.seats, ROOM_SEATS) ? message.seats : room.seats, true);
@@ -156,7 +169,12 @@ export function createSpectatorRoom({ transport, code }) {
 
   const unsubscribe = transport.onMessage((message) => {
     if (room.phase === CLOSED) return;
-    if (!message || typeof message.type !== 'string' || typeof message.from !== 'string') return;
+    if (!message || typeof message.type !== 'string' || typeof message.from !== 'string' || message.from === id) return;
+    if (message.type === CHAT) {
+      const chat = chatOf(message);
+      if (chat) emit({ type: 'chat', ...chat, mine: false });
+      return;
+    }
     handle(message);
   });
 
@@ -186,6 +204,16 @@ export function createSpectatorRoom({ transport, code }) {
     useSkill: refused,
     requestRematch: () => false,
 
+    get names() {
+      return room.names;
+    },
+
+    // A chat message to everyone in the room, as for a player (room.js).
+    sendChat(text) {
+      if (room.phase === CLOSED) return false;
+      return sendChatMessage({ transport, clock, id, name: myName, text, emit, lastAt: lastChatAt, sent: (at) => { lastChatAt = at; } });
+    },
+
     // The same shape as a player's room view (room.js getView), with no
     // seat, no stone and no presence: a spectator is never in the
     // countdown and it is never its turn.
@@ -206,6 +234,7 @@ export function createSpectatorRoom({ transport, code }) {
         yourTurn: false,
         waiting: false,
         guestPresent: room.guestSeen || room.state !== null,
+        names: room.names,
       };
     },
 

@@ -60,7 +60,7 @@ import {
   CLOUD_PUFFS, CLOUD_SIZE, CONVERT_SPARK_RATE, DASH_SWIRL_RATE, DASH_TRAIL_RATE, HISS_MIST, HISS_RING_DOTS,
   HISS_RING_GAP_MS, HISS_RING_MS, HISS_RING_TO, HISS_RINGS, HISS_WOBBLE, HISS_WOBBLE_WAVES, MARK_FADE_MS,
   PLACE_DUST_COUNT, PLACEMENT_SLOTS, PLANT_OPEN_SPARKLES, PX_WORLD, RING_DOT_PX, RING_LIGHTEN, RING_MAX_DOTS, RING_SLOTS,
-  DASH_GHOST_OPACITY, DASH_WIND_RATE, DASH_WIND_SPEED, SHAKE3D_LIGHT, SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, STORM_BURST_COUNT, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
+  DASH_GHOST_OPACITY, DASH_WIND_RATE, DASH_WIND_SPEED, FIELD_GUST_COUNT, SHAKE3D_LIGHT, SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, STORM_BURST_COUNT, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
   TORNADO_PARTICLE_RATE, TORNADO_SIZE, VENOM_BUBBLE_RATE, VENOM_TINT, VINE_POINT_PX, VINE_POINTS, WIN_RING_DOTS,
   WIN_RING_MS, WIN_RING_TO, WIN_SPARKLES, WIN_STAGGER_MS,
 } from '../config.js';
@@ -386,9 +386,8 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     }
   }
 
-  // The storm itself (Tornado Zone, after the opponent's turn): a burst of
-  // dandelion fluff and petals spinning up and outward from the zone, and a
-  // little gust on every plot of it.
+  // The storm itself (a stone planted in a Tornado Zone): a burst of
+  // dandelion fluff and petals spinning up and outward from its plot.
   function dandelionStorm(spec) {
     cellToWorldInto(spec.x, spec.y, at);
     const count = scaledCount(STORM_BURST_COUNT, frame.scale);
@@ -415,6 +414,32 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     for (let i = 0; i < cells.length; i++) {
       cellToWorldInto(cells[i].x, cells[i].y, at);
       petalGust(at.x, at.z, 6);
+    }
+  }
+
+  // A Tornado Zone the viewer may not see: a gust of dandelion fluff
+  // drifting with the wind over the whole field, so the cast shows but not
+  // where it is.
+  function fieldGust() {
+    const count = scaledCount(FIELD_GUST_COUNT, frame.scale);
+    for (let i = 0; i < count; i++) {
+      random.fill(u);
+      cellToWorldInto(Math.floor(u[0] * BOARD_SIZE), Math.floor(u[1] * BOARD_SIZE), at);
+      sp.x = at.x - 0.5 + u[2];
+      sp.y = 0.1 + u[3] * 0.5;
+      sp.z = at.z - 0.5 + u[4];
+      sp.vx = 0.5 + u[5] * 0.6; // the wind: towards the lower right
+      sp.vy = 0.05 + u[6] * 0.2;
+      sp.vz = 0.3 + u[7] * 0.4;
+      sp.gravity = 0;
+      sp.drag = 0.4;
+      sp.life = 1.2 + u[8] * 1;
+      sp.size = (2 + u[9] * 1.5) * PX;
+      sp.grow = 0.3;
+      sp.color = u[10] < 0.2 ? PETALS[2] : COLORS.dandelion;
+      sp.alpha = 0.9;
+      sp.shape = u[11] < 0.7 ? SHAPE_PLUS : SHAPE_SQUARE;
+      pool.spawnFall(sp);
     }
   }
 
@@ -915,6 +940,9 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       }
       case 'tornado':
         swirl.show(spec);
+        break;
+      case 'tornadoHidden':
+        fieldGust();
         break;
       case 'storm':
         dandelionStorm(spec);

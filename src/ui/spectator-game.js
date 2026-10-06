@@ -7,7 +7,9 @@
 
 import { O, X } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
+import { seatStone } from '../logic/seats.js';
 import { panelView } from './local-game.js';
+import { createPlayersByStone } from './player-names.js';
 import { STRINGS, fillText } from './strings.js';
 
 // takeEvents' answer when nothing happened, shared so the render loop makes
@@ -44,6 +46,7 @@ export function spectatorStatus(state, result = null) {
 }
 
 export function createSpectatorGame(room) {
+  const playersOf = createPlayersByStone(seatStone); // the players' names by stone (HUD)
   let pendingEvents = [];
 
   const unsubscribe = room.onEvent((event) => {
@@ -103,6 +106,7 @@ export function createSpectatorGame(room) {
         status: spectatorStatus(state, view.result),
         message: null,
         peerCountdown: null,
+        players: playersOf(view),
       };
     },
 

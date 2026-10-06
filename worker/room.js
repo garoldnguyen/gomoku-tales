@@ -6,7 +6,9 @@
 //              message marked spectatorsOnly goes to the spectators only
 //              (the full game state, while the guest gets a masked copy)
 //   guest      its messages go to the host only
-//   spectator  only listens; any message it sends closes its socket
+//   spectator  listens; it may send chat (to everyone), anything else it
+//              sends closes its socket
+//   chat       a chat message of anyone goes to every other socket
 //
 // Each socket keeps { role, peer } with serializeAttachment (it survives
 // hibernation). peer starts as a relay id and becomes the from of the
@@ -31,6 +33,7 @@ import {
   checkFrame,
   countFrame,
   snapshotFor,
+  maySend,
 } from './pairing.js';
 
 const SOCKET_OPEN = 1; // WebSocket.READY_STATE_OPEN
@@ -90,8 +93,8 @@ export class RoomRelay extends DurableObject {
 
   async webSocketMessage(ws, raw) {
     const attachment = ws.deserializeAttachment();
-    if (!attachment || attachment.role === ROLE_SPECTATOR) {
-      ws.close(CLOSE_POLICY, 'spectators only listen');
+    if (!attachment) {
+      ws.close(CLOSE_POLICY, 'unknown socket');
       return;
     }
 
@@ -112,13 +115,17 @@ export class RoomRelay extends DurableObject {
     }
 
     const message = JSON.parse(raw);
+    if (!maySend(attachment.role, message)) {
+      ws.close(CLOSE_POLICY, 'spectators only chat');
+      return;
+    }
     if (!attachment.learned && typeof message.from === 'string') {
       attachment.peer = message.from;
       attachment.learned = true;
       ws.serializeAttachment(attachment);
     }
 
-    if (forwardFrame(attachment.role, raw, message, (role) => this.openSockets(role))) {
+    if (forwardFrame(attachment.role, raw, message, (role) => this.openSockets(role), ws)) {
       const snapshot = await this.loadSnapshot();
       snapshot[message.type] = raw;
       await this.ctx.storage.put(SNAPSHOT_KEY, snapshot);

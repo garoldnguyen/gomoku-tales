@@ -269,7 +269,7 @@ export function waitingViewModel(flow, room, { config = CONFIG } = {}) {
   const other = you === HOST ? GUEST : HOST;
   const select = characterSelectViewModel({
     seats,
-    labels: { [you]: STRINGS.waitingYou, [other]: STRINGS.waitingOpponent },
+    labels: seatLabels(room?.names, you, other),
     editable: [you],
     you,
     absent: starting ? [] : [GUEST],
@@ -293,6 +293,16 @@ export function waitingViewModel(flow, room, { config = CONFIG } = {}) {
   };
 }
 
+// The labels of the two seats in the waiting room: the players' names
+// (yours marked) once known, else You and Opponent.
+function seatLabels(names, you, other) {
+  const mine = names?.[you] ?? null;
+  return {
+    [you]: mine ? fillText(STRINGS.waitingYouNamed, { name: mine }) : STRINGS.waitingYou,
+    [other]: names?.[other] ?? STRINGS.waitingOpponent,
+  };
+}
+
 // The waiting room a spectator sees (spectate-waiting): the host's seats,
 // nothing editable, no Ready. The guest seat is a placeholder until a
 // guest is known (room.guestPresent of net/spectator-room.js).
@@ -300,7 +310,7 @@ function spectatorWaitingViewModel(room) {
   const seats = room?.seats ?? createSeats(ROOM_SEATS);
   const select = characterSelectViewModel({
     seats,
-    labels: { [HOST]: STRINGS.spectateHost, [GUEST]: STRINGS.spectateGuest },
+    labels: { [HOST]: room?.names?.host ?? STRINGS.spectateHost, [GUEST]: room?.names?.guest ?? STRINGS.spectateGuest },
     editable: [],
     absent: room?.guestPresent ? [] : [GUEST],
   });

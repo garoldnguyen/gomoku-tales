@@ -30,6 +30,10 @@ export const RELAY_PATH = '/ws';
 // Relay server limits (worker/limits.js reads these, so they are typed once).
 export const MAX_FRAME_BYTES = 8192; // a larger WebSocket frame closes the socket
 export const MAX_FRAMES_PER_SECOND = 30; // more frames from one socket within a second close it
+export const NAME_MAX_LENGTH = 20; // characters of a player's name in online rooms (src/net/chat.js)
+export const CHAT_MAX_LENGTH = 200; // characters of one chat message
+export const CHAT_MIN_INTERVAL_MS = 700; // one chat message at most this often from a window (keeps it well under MAX_FRAMES_PER_SECOND)
+export const CHAT_HISTORY = 100; // chat messages kept on screen; older ones drop off
 export const SPECTATOR_LIMIT = 20; // spectators per room
 export const EMPTY_ROOM_CLEANUP_MS = 60000; // a room with no socket forgets its snapshot after this
 
@@ -352,6 +356,7 @@ export const DASH_WIND_SPEED = 1.6; // world units per second of that drift
 export const DASH_GHOST_OPACITY = 0.45; // the see-through plant standing on a dash target until the dash resolves
 export const DASH_SWIRL_RATE = 40; // petals per second circling a dash source
 export const MARK_FADE_MS = 300; // the Wind Dash marks and the Tornado Zone fade out this fast when they end
+export const FIELD_GUST_COUNT = 90; // dandelion fluff blown across the field when the other seat casts a hidden Tornado Zone (High; scaled)
 export const STORM_BURST_COUNT = 110; // dandelion fluff and petals in the Tornado Zone storm burst (High; scaled per level)
 export const TORNADO_PARTICLE_RATE = 110; // petals and leaves per second rising in a Tornado Zone swirl
 export const TORNADO_BEND_PX = 3; // plants inside a Tornado Zone lean their tops this many art pixels towards it (High)
@@ -415,6 +420,7 @@ export const FEATHER_STAGGER_MS = 120; // the feathers lift off this far apart
 // its CLOUD_SIZE by CLOUD_SIZE area and the Sky Watch outlines.
 export const CLOUD_SEE_THROUGH_OPACITY = 0.42; // the owner's (and spectators') translucent cloud
 export const CLOUD_PREVIEW_OPACITY = 0.3; // the cloud being placed, under the pointer
+export const SKY_WATCH_RUN = 4; // Sky Watch marks every empty plot where the opponent would make this many in a row with one more plant
 export const SKY_WATCH_GLOW_OPACITY = 0.42; // the pale yellow light on a Sky Watch plot, under its outline (breathes with it)
 export const SKY_WATCH_PUFF_HEIGHT = 0.38; // world units above the ground of the small cloud drifting over a Sky Watch plot
 export const SKY_WATCH_PUFF_DRIFT = 0.22; // how far (world units) that cloud drifts either side of the plot

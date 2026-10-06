@@ -3,6 +3,7 @@
 // Cloudflare or WebSocket APIs, so node --test runs them.
 
 import { isValidRoomCode } from '../src/net/room-code.js';
+import { CHAT } from '../src/net/chat.js';
 import { ROLES, ROLE_HOST, ROLE_GUEST, ROLE_SPECTATOR } from '../src/net/ws-transport.js';
 import { LIMITS } from './limits.js';
 
@@ -32,11 +33,15 @@ const TO_HOST = Object.freeze([ROLE_HOST]);
 const TO_GUEST_AND_SPECTATORS = Object.freeze([ROLE_GUEST, ROLE_SPECTATOR]);
 const TO_SPECTATORS = Object.freeze([ROLE_SPECTATOR]);
 const TO_NOBODY = Object.freeze([]);
+const TO_EVERYONE = Object.freeze([ROLE_HOST, ROLE_GUEST, ROLE_SPECTATOR]);
 
 // The roles a message of a socket of role goes to: guest messages to the
 // host, host messages to the guest and the spectators, a spectatorsOnly
-// host message to the spectators only. Spectators send nothing.
+// host message to the spectators only. A chat message (anyone's, the
+// spectators' too) goes to everyone else in the room. Spectators send
+// nothing else.
 export function routeFor(role, message) {
+  if (message?.type === CHAT) return TO_EVERYONE;
   if (role === ROLE_GUEST) return TO_HOST;
   if (role !== ROLE_HOST) return TO_NOBODY;
   return message?.[SPECTATORS_ONLY] === true ? TO_SPECTATORS : TO_GUEST_AND_SPECTATORS;
@@ -49,11 +54,12 @@ export function keepsSnapshot(role, message) {
 }
 
 // Passes the frame raw (the text of message) of a socket of role to the
-// open sockets of the roles routeFor names; socketsOf(role) lists them.
+// open sockets of the roles routeFor names; socketsOf(role) lists them;
 // Returns true when the frame is kept for the spectator replay.
-export function forwardFrame(role, raw, message, socketsOf) {
+// sender is the socket the frame came from: it never gets its own frame back.
+export function forwardFrame(role, raw, message, socketsOf, sender = null) {
   for (const to of routeFor(role, message)) {
-    for (const peer of socketsOf(to)) peer.send(raw);
+    for (const peer of socketsOf(to)) if (peer !== sender) peer.send(raw);
   }
   return keepsSnapshot(role, message);
 }
@@ -125,4 +131,10 @@ export function snapshotFor(store) {
     if (store && typeof store[type] === 'string') list.push(store[type]);
   }
   return list;
+}
+
+// Whether a socket of role may send this message at all: players send
+// anything, a spectator only chat.
+export function maySend(role, message) {
+  return role === ROLE_HOST || role === ROLE_GUEST || (role === ROLE_SPECTATOR && message?.type === CHAT);
 }

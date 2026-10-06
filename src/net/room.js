@@ -149,10 +149,11 @@
 //                                         'opponentLeft' }, or null when a guest's claim
 //                                         was dropped because the game ended by the rules
 
-import { HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS } from '../config.js';
+import { CHAT_MIN_INTERVAL_MS, HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS } from '../config.js';
 import { isGameOver, newGame, placeStone, useSkill } from '../logic/game.js';
 import { coveredActionError, maskErrorForViewer, maskEventsForViewer, maskForViewer } from '../logic/cloud.js';
 import { bothReady, clearSeat, createSeats, isSeats, pickCharacter, seatSides, seatStone, setReady } from '../logic/seats.js';
+import { CHAT, chatOf, cleanChatText, cleanName, namesOf } from './chat.js';
 import { systemClock } from './clock.js';
 import { ROOM_PHASES } from './phase.js';
 import { CONNECTED, GONE, checkPresence, countdownStart, createPresence, markHeard, markLeft } from './presence.js';
@@ -196,9 +197,10 @@ export function createHostRoom(options) {
     random = Math.random,
     makeGame = newGame,
     id = makePeerId(),
+    name = null,
   } = options;
 
-  const room = createRoomCore({ role: HOST, transport, code, clock, id });
+  const room = createRoomCore({ role: HOST, transport, code, clock, id, name });
   room.phase = WAITING;
   room.state = null; // made at the start from the picks
 
@@ -214,8 +216,9 @@ export function createHostRoom(options) {
   });
 
   // An accepted join: seat the guest. The character select begins.
-  const seat = (peerId) => {
+  const seat = (peerId, guestName) => {
     room.peerId = peerId;
+    room.setNames({ ...room.names, guest: guestName });
     room.phase = STARTING;
     room.send(welcome());
     room.startLink();
@@ -273,6 +276,7 @@ export function createHostRoom(options) {
     room.stopLink();
     room.peerId = null;
     room.phase = WAITING;
+    room.setNames({ ...room.names, guest: null });
     const emptied = clearSeat(room.seats, GUEST);
     if (emptied !== room.seats) {
       room.seats = emptied;
@@ -332,11 +336,12 @@ export function createHostRoom(options) {
     if (message.type === 'join') {
       if (message.from === room.peerId) {
         room.heard();
+        room.setNames({ ...room.names, guest: cleanName(message.name) });
         room.send(welcome()); // the guest asked again; seat it again
         if (room.round > 1) room.send(newGameMessage()); // and the rematch it missed
         else if (room.round > 0) room.send(startMessage()); // or the start
       } else if (room.phase === WAITING) {
-        seat(message.from);
+        seat(message.from, cleanName(message.name));
       } else {
         room.send({ type: 'full', to: message.from });
       }
@@ -399,8 +404,9 @@ export function createHostRoom(options) {
 // JOIN_TIMEOUT_MS the phase becomes NO_ROOM. After welcome the guest is in
 // phase starting (the character select) until the host's start arrives.
 export function createGuestRoom(options) {
-  const { transport, code, clock = systemClock, id = makePeerId(), joinTimeoutMs = JOIN_TIMEOUT_MS } = options;
-  const room = createRoomCore({ role: GUEST, transport, code, clock, id });
+  const { transport, code, clock = systemClock, id = makePeerId(), joinTimeoutMs = JOIN_TIMEOUT_MS, name = null } = options;
+  const room = createRoomCore({ role: GUEST, transport, code, clock, id, name });
+  const joinMessage = () => (room.myName ? { type: 'join', name: room.myName } : { type: 'join' });
   room.phase = JOINING;
   let requestId = 0;
   let askedRematch = false; // this guest asked for a rematch of the current round
@@ -442,7 +448,7 @@ export function createGuestRoom(options) {
     room.refreshRematch();
   };
 
-  const joinRetry = room.addTimer(clock.setInterval(() => room.send({ type: 'join' }), HEARTBEAT_INTERVAL_MS), 'interval');
+  const joinRetry = room.addTimer(clock.setInterval(() => room.send(joinMessage()), HEARTBEAT_INTERVAL_MS), 'interval');
   const joinTimer = room.addTimer(clock.setTimeout(() => {
     if (room.phase !== JOINING) return;
     clock.clearInterval(joinRetry);
@@ -541,7 +547,7 @@ export function createGuestRoom(options) {
     } else if (message.type === 'ping' && (message.seq > room.seq || (room.phase === STARTING && message.round > 0) || laterRound) && !(laterRound && room.rematchGone)) {
       // A state, start or new-game message was lost; the host answers with a fresh welcome (and start or new-game).
       // A guest that lost the host in over takes no later round, so it does not ask.
-      room.send({ type: 'join' });
+      room.send(joinMessage());
     } else if (message.type === 'ping' && room.pending && !(message.handled >= room.pending.requestId)) {
       room.send({ type: 'action', to: room.peerId, ...room.pending }); // the request or its answer was lost
     }
@@ -613,7 +619,7 @@ export function createGuestRoom(options) {
     return true;
   };
 
-  room.send({ type: 'join' });
+  room.send(joinMessage());
   return room.api;
 }
 
@@ -661,13 +667,13 @@ export function hostStateMessages(message, guestStone, withSpectators, current =
 // Runs a room action through the game rules.
 function runAction(state, player, action, random) {
   if (action?.kind === 'place') return placeStone(state, { player, x: action.x, y: action.y }, { random });
-  if (action?.kind === 'skill') return useSkill(state, { player, skill: action.skill, target: action.target ?? null }, { random });
+  if (action?.kind === 'skill') return useSkill(state, { player, skill: action.skill, target: action.target ?? null });
   return { ok: false, error: 'Unknown action.' };
 }
 
 // What host and guest share: sending, events, heartbeat and leave
 // detection, the view and closing.
-function createRoomCore({ role, transport, code, clock, id }) {
+function createRoomCore({ role, transport, code, clock, id, name = null }) {
   const handlers = new Set();
   const timers = []; // [{ id, kind }]
   let presence = null;
@@ -677,10 +683,13 @@ function createRoomCore({ role, transport, code, clock, id }) {
   let peerGoneReported = false; // the peer was reported gone (or forfeited) on this link
   let unsubscribe = null;
 
+  let lastChatAt = -Infinity; // when this window last sent a chat message
   const room = {
     role,
     code,
     id,
+    myName: cleanName(name), // this window's player name (null: none given)
+    names: { host: role === HOST ? cleanName(name) : null, guest: role === GUEST ? cleanName(name) : null },
     phase: null,
     seats: createSeats(ROOM_SEATS), // the character select (host: its own; guest: as the host sent them)
     character: null, // this window's character, from the start
@@ -715,11 +724,20 @@ function createRoomCore({ role, transport, code, clock, id }) {
 
     // Every host message goes out as the guest may see it
     // (hostStateMessages), and over the relay in full for the spectators.
+    // The host's messages carry the names of both seats (once one is known).
     send(message) {
       const all = role === HOST && message.masked !== true && message.spectatorsOnly !== true
         ? hostStateMessages(message, room.peerStone, transport.reachesSpectators === true, room.state)
         : [message];
-      for (const each of all) transport.send({ ...each, from: id });
+      const named = role === HOST && (room.names.host || room.names.guest) ? { names: room.names } : {};
+      for (const each of all) transport.send({ ...each, ...named, from: id });
+    },
+
+    // New names of the seats: reported when they changed.
+    setNames(next) {
+      if (next.host === room.names.host && next.guest === room.names.guest) return;
+      room.names = { host: next.host ?? null, guest: next.guest ?? null };
+      room.emit({ type: 'names', names: room.names });
     },
 
     emit(event) {
@@ -915,7 +933,17 @@ function createRoomCore({ role, transport, code, clock, id }) {
   unsubscribe = transport.onMessage((message) => {
     if (room.phase === CLOSED) return;
     if (!message || typeof message.type !== 'string' || typeof message.from !== 'string' || message.from === id) return;
+    if (message.type === CHAT) {
+      // Chat from anyone in the room: the other player or a spectator.
+      const chat = chatOf(message);
+      if (chat) room.emit({ type: 'chat', ...chat, mine: false });
+      return;
+    }
     if (message.spectatorsOnly === true) return; // the full state is for the spectators only
+    if (role === GUEST && message.to === id && (room.peerId === null || message.from === room.peerId)) {
+      const names = namesOf(message);
+      if (names) room.setNames({ host: names.host, guest: room.myName ?? names.guest });
+    }
     room.handle(message);
   });
 
@@ -997,6 +1025,18 @@ function createRoomCore({ role, transport, code, clock, id }) {
       return room.act({ kind: 'skill', skill, target });
     },
 
+    // The names of both seats: { host, guest }, null for one not known.
+    get names() {
+      return room.names;
+    },
+
+    // Sends a chat message to everyone in the room (the other player and
+    // the spectators) and reports it here too. At most one every
+    // CHAT_MIN_INTERVAL_MS; returns false for an empty text or one too soon.
+    sendChat(text) {
+      return sendChatMessage({ transport, clock, id, name: room.myName, text, emit: room.emit, lastAt: lastChatAt, sent: (at) => { lastChatAt = at; } });
+    },
+
     // Everything the screens need. seats is the character select and seat
     // this window's seat name (HOST or GUEST); character and you are known
     // from the start. peer is null until both players are in;
@@ -1016,6 +1056,7 @@ function createRoomCore({ role, transport, code, clock, id }) {
         character: room.character ?? room.seats.picks[room.role] ?? null,
         hostCharacter: room.hostCharacter,
         you: room.stone,
+        names: room.names,
         state: shownState(),
         peer,
         result: room.result,
@@ -1039,4 +1080,17 @@ function createRoomCore({ role, transport, code, clock, id }) {
   };
 
   return room;
+}
+
+// Sends one chat message for a room or a spectator room: cleaned, not
+// sooner than CHAT_MIN_INTERVAL_MS after the last one (lastAt), then
+// emitted here as mine. sent(at) records the time. Returns true when sent.
+export function sendChatMessage({ transport, clock, id, name, text, emit, lastAt, sent }) {
+  const words = cleanChatText(text);
+  const now = clock.now();
+  if (words === null || now - lastAt < CHAT_MIN_INTERVAL_MS) return false;
+  sent(now);
+  transport.send({ type: CHAT, from: id, to: null, name, text: words });
+  emit({ type: 'chat', from: id, name, text: words, mine: true });
+  return true;
 }

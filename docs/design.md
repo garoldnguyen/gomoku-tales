@@ -42,7 +42,7 @@ Which screen is shown is decided only by the flow reducer in src/ui/flow.js (scr
 - Board 15x15. Wind Rabbit uses X stones and always moves first. Earth Bear uses O stones. The room creator picks which character they play; the joiner gets the other one.
 - On your turn you do exactly one thing: place a stone on an empty cell, or use an available skill. Using a skill uses your whole turn.
 - A cell is empty if it holds no stone and no rock.
-- Win: five or more stones of your colour in an unbroken horizontal, vertical or diagonal line. Check for a win for the acting player after every placement and after every skill effect that changes stones (Wind Dash landing, the Tornado Zone storm, Stone Conversion). Rocks count for neither colour and break lines.
+- Win: five or more stones of your colour in an unbroken horizontal, vertical or diagonal line. Check for a win for the acting player after every placement and after every skill effect that changes stones (Wind Dash landing, Tornado throw, Stone Conversion). Rocks count for neither colour and break lines.
 - If the board is full and nobody has won, it is a draw.
 
 ## 5. Characters and skills
@@ -69,9 +69,9 @@ WIND DASH (short cooldown). Uses your turn.
 
 TORNADO ZONE (long cooldown). Uses your turn.
 - Choose the centre of a 3x3 zone. The zone is clipped by the board edges. A swirling wind overlay covers the zone.
-- A dandelion storm gathers over the zone through the opponent's next turn (they may plant, inside or outside the zone, or use a skill). At the end of that turn, before any win check, the storm blows away EVERY plant inside the zone: both players' plants, including one planted there that turn. Plants go in row order; each lands on a random empty plot outside the zone that is still empty when its turn comes, so two never share a plot. A plant with no empty plot left outside the zone stays. Rocks stay. The host picks the random plots (owner's rule, October 2026; it replaced the older throw of only the new stone to a neighbouring cell).
-- Then the win check runs on the acting player's plot (where its plant landed, if it flew) and on every landing plot. A five made by the storm counts for whoever owns it, even on the other player's turn; fives for both players at once are a draw. A plant planted in the zone never wins where it was planted, and a five outside that needed a plant from the zone is broken first.
-- The zone disappears with the storm. A Wind Dash that resolves on the same turn lands after the storm and is not blown away.
+- The zone is SECRET (owner's rule, October 2026): only the player who cast it sees where it is. The other seat only learns that a Tornado Zone was cast (a gust of dandelion fluff over the whole field and the banner); its state and events carry no centre and no cells (maskForViewer and maskEventsForViewer in src/logic/cloud.js; the host sends the guest a masked copy, spectators see everything). On one screen the zone is hidden too, since the player to move is the opponent.
+- The zone lasts through the opponent's next turn only. If the opponent plants a seed inside it on that turn, a dandelion storm bursts from that plot and throws the stone to a random empty plot anywhere on the board outside the zone (the host picks it). If no such plot is empty, the stone stays. Then the win check runs where the stone landed. Stones already in the zone, the rabbit's own stones, rocks, Wind Dash landings and Stone Conversion are not affected.
+- The zone disappears at the end of the opponent's turn.
 - Visual: a whirlwind icon tossing small stones, and a translucent whirlwind over the 3x3 area.
 
 ### 5.2 Earth Bear
@@ -109,7 +109,7 @@ Look: a proud pale yellow and white pixel eagle with a little cloud under its wi
 Art slots (assets/manifest.json, use 3d, ART.cloudEagle in src/render3d/art-assets.js): cloud-eagle-avatar 512x512, cloud-eagle-hud 256x256, sky-watch-icon 128x128 and cloud-icon 128x128, one still frame each. The select card shows cloud-eagle-avatar (a 128 px grid at 4x) and the HUD card cloud-eagle-hud. A missing file only warns in the console and shows a pale yellow placeholder of the same size.
 
 SKY WATCH (passive, no cooldown). Never uses a turn and is never clicked.
-- Always on for the side that plays Cloud Eagle: every empty cell where the opponent would make five in a row with one more stone is outlined in soft yellow (skyWatchCells in src/logic/cloud.js, by the normal win rule on the full board).
+- Always on for the side that plays Cloud Eagle: every empty cell where the opponent would make four or more in a row with one more stone (SKY_WATCH_RUN; owner's rule, October 2026: a three about to become a four, not only a four about to become five) glows pale yellow under a soft outline with a little cloud drifting over it (skyWatchCells in src/logic/cloud.js, on the full board; rocks break a line).
 - Only the Cloud Eagle side and spectators see the outlines; the opponent never does. Cells the viewer cannot see (under the opponent's cloud) are left out. No outlines once the game is over.
 
 CLOUD (long cooldown, COOLDOWN_LONG = 6). Uses your turn. Places no stone.
@@ -173,7 +173,7 @@ What a human checks by eye (tests cannot judge the look). Open http://localhost:
 - The character colours: Wind Rabbit blue #3b8cff, Earth Bear ochre red #c9703a, Jade Serpent jade green #2fbf7a, Cloud Eagle pale yellow #fff2a8. Play each character on X and on O: the shape follows the side (X the four-petal cross bloom, O the round bloom), the colour follows the character, for the plants, the last-move ring, the hover ring and the selection decal. The pale yellow plants and rings stay readable on the tilled soil.
 - The cloud swirl: a planted Cloud Eagle seed plays puffs circling the plot and white feathers drifting toward the lower right with the one wind; on Low no particles.
 - The cloud: a 5x5 cloud (smaller at the edges) sits over the plots. Seen by the owner and by a spectator it is translucent and the plants and rocks inside show; seen by the opponent it is a solid cover with nothing inside and no hint of what it hides. While Cloud is being aimed a faint cloud follows the pointer. After the owner's next two turns the cloud is gone and the plots show again.
-- Sky Watch: soft yellow outlines on exactly the empty plots where the opponent would make five with one more plant, shown to the Cloud Eagle side and spectators only, never on a covered plot and never after the game is over.
+- Sky Watch: a glow, an outline and a drifting cloud on exactly the empty plots where the opponent would make four or more in a row with one more plant, shown to the Cloud Eagle side and spectators only, never on a covered plot and never after the game is over.
 - The HUD and the character select: Cloud Eagle's card shows its cloud emblem until its art arrives; Sky Watch reads Always on and Cloud shows its rest turns (6). The console warns once per missing Cloud Eagle file and nothing crashes.
 
 ## 10. Config values (src/config.js)

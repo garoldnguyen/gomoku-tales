@@ -262,7 +262,7 @@ function drawSelectRing(ctx, x, y) {
 // Announced skills that are still waiting: the Tornado Zone and a pending
 // Wind Dash.
 function drawAnnouncements(ctx, state, time) {
-  if (state.tornado) drawZone(ctx, state.tornado.cells, time);
+  if (state.tornado?.cells) drawZone(ctx, state.tornado.cells, time); // a hidden zone has no cells
   if (state.pendingDash) {
     drawDashTarget(ctx, state.pendingDash.to.x, state.pendingDash.to.y);
     drawWhirl(ctx, state.pendingDash.from.x, state.pendingDash.from.y);

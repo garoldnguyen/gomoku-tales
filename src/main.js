@@ -18,16 +18,18 @@ import {
 import { createHud } from './ui/hud.js';
 import { isCollapseKey, startCollapsed, toggleAll, withCollapsed, writeCollapsed } from './ui/hud-collapse.js';
 import { createAnnouncer } from './ui/announce.js';
+import { attachChat } from './ui/chat-dom.js';
 import { SPECTATOR_VIEW, hudViewModel } from './ui/hud-view.js';
 import { TOUCH_PREVIEW, attachGameInput, createTouchConfirm, hitTest, isQualityKey, shortcutKeyHandler } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
 import { watchNewGame } from './ui/new-game-watch.js';
 import { menuViewModel } from './ui/menu.js';
 import { createMenu } from './ui/menu-dom.js';
+import { loadName, randomName } from './ui/player-names.js';
 import { JOIN_PARAM, joinCodeFromSearch } from './ui/room-screens.js';
 import { attachScreens } from './ui/screens.js';
 import {
-  parseShotParams, setUpShotScene, SHOT_GAME_OVER, shotFlow, shotGameOverView, shotRoomView, shotWatchView, stillRoomApp,
+  parseShotParams, setUpShotScene, SHOT_GAME_OVER, SHOT_NAME, shotFlow, shotGameOverView, shotRoomView, shotWatchView, stillRoomApp,
 } from './ui/shot-mode.js';
 
 const canvas = document.getElementById('game');
@@ -254,7 +256,7 @@ function attachQualityKey() {
 // makes nothing.
 const hudInputs = {
   state: null, targeting: null, status: null, message: null, peerCountdown: null, winner: null, quality: null, hint: null,
-  collapsed: null,
+  collapsed: null, players: null,
 };
 let hudPlayer = null;
 let hudShown = false;
@@ -262,10 +264,11 @@ function showHud(game, view, localPlayer, winner, hint) {
   const targeting = game.getTargeting();
   const peerCountdown = view.peerCountdown ?? null;
   const quality = renderer.quality;
+  const players = view.players ?? null; // the online players' names by stone (a kept object)
   if (hudShown && hudInputs.state === view.state && hudInputs.targeting === targeting && hudInputs.status === view.status
     && hudInputs.message === view.message && hudInputs.peerCountdown === peerCountdown && hudInputs.winner === winner
     && hudInputs.quality === quality && hudInputs.hint === hint && hudInputs.collapsed === hudCollapsed
-    && hudPlayer === localPlayer) return;
+    && hudInputs.players === players && hudPlayer === localPlayer) return;
   hudShown = true;
   hudPlayer = localPlayer;
   hudInputs.state = view.state;
@@ -277,6 +280,7 @@ function showHud(game, view, localPlayer, winner, hint) {
   hudInputs.quality = quality;
   hudInputs.hint = hint;
   hudInputs.collapsed = hudCollapsed;
+  hudInputs.players = players;
   hud.render(hudViewModel(view.state, hudInputs, localPlayer));
   // The turn banner (one screen) and the first-game hints, on the same changes.
   announcer?.onHud(view.state, targeting, localPlayer === null, localPlayer === SPECTATOR_VIEW);
@@ -326,8 +330,9 @@ function showEvents(events, effects, time, resumed, characters) {
 // src/render3d/quality.js). Every new game (a start, a rematch, a local
 // restart) clears the old game's visuals (watchNewGame).
 function startAppMode({ local = false } = {}) {
-  const app = createApp({ local });
-  const screens = attachScreens(document.getElementById('screens'), app);
+  const app = createApp({ local, playerName: loadName(safeStorage()) });
+  const screens = attachScreens(document.getElementById('screens'), app, { storage: safeStorage() });
+  attachChat(document.getElementById('chat'), app, { storage: safeStorage() });
   assetsLoaded.then((store) => screens.setAssets(store));
   createMenuLayer((type) => app.menuEvent(type));
   // data-screen on the body names the flow screen (menu, lobby, waiting,
@@ -352,6 +357,7 @@ function startAppMode({ local = false } = {}) {
     const url = new URL(window.location.href);
     url.searchParams.delete(JOIN_PARAM);
     window.history.replaceState(null, '', url);
+    if (!loadName(safeStorage())) app.setPlayerName(randomName()); // no name typed yet: a random one for this room
     app.joinFromLink(inviteCode);
   }
   // Tell the opponent at once when this window closes or reloads.
@@ -489,7 +495,7 @@ async function startShotMode({ scene }) {
   const hudWinner = overView ? SHOT_GAME_OVER.winner : null;
   let shotScreens = null;
   if (roomView || overView || watchView) {
-    shotScreens = attachScreens(document.getElementById('screens'), stillRoomApp(roomView ?? overView ?? watchView));
+    shotScreens = attachScreens(document.getElementById('screens'), stillRoomApp(roomView ?? overView ?? watchView), { suggestName: () => SHOT_NAME });
     assetsLoaded.then((store) => shotScreens.setAssets(store));
   } else if (flow) {
     createMenuLayer(() => {});

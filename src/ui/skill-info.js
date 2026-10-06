@@ -13,7 +13,7 @@
 // Bear, who plays O in the two character lobby, has it, so it only ever
 // turns X into O there). Venom also takes only an opponent's plant.
 
-import { CLOUD_SIZE, CLOUD_TURNS, ROCK_LIFETIME_TURNS, TORNADO_SIZE } from '../config.js';
+import { CLOUD_SIZE, CLOUD_TURNS, ROCK_LIFETIME_TURNS, SKY_WATCH_RUN, TORNADO_SIZE } from '../config.js';
 import {
   CLOUD, HISS, SKY_WATCH, STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, VENOM, WIND_DASH, getSkill,
 } from '../logic/skills.js';
@@ -28,7 +28,7 @@ export const SKILL_INFO = Object.freeze({
   ),
   [TORNADO_ZONE]: info(
     TORNADO_ZONE,
-    `Pick the centre of a ${TORNADO_SIZE} by ${TORNADO_SIZE} zone. A dandelion storm gathers there, and after the opponent's next turn it blows every plant in the zone away, yours too and any planted there that turn, each to a random empty plot elsewhere on the field.`,
+    `Secretly pick the centre of a ${TORNADO_SIZE} by ${TORNADO_SIZE} zone; your opponent never sees where. On their next turn, a seed they plant inside is blown by a dandelion storm to a random empty plot anywhere on the field.`,
     'Click to select, then choose the zone centre',
   ),
   [TERRAIN_CREATION]: info(
@@ -53,7 +53,7 @@ export const SKILL_INFO = Object.freeze({
   ),
   [SKY_WATCH]: info(
     SKY_WATCH,
-    'Always on. Soft yellow outlines show every empty plot where the opponent would make five in a row with one more plant.',
+    `Always on. Glowing plots with a little cloud show every empty plot where the opponent would make ${SKY_WATCH_RUN} or more in a row with one more plant, so you see a three before it becomes a four.`,
     'Always on, nothing to click',
   ),
   [CLOUD]: info(

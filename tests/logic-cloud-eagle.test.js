@@ -2,7 +2,7 @@
 // section 5).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BOARD_SIZE, CLOUD_SIZE, CLOUD_TURNS, COOLDOWN_LONG } from '../src/config.js';
+import { BOARD_SIZE, CLOUD_SIZE, CLOUD_TURNS, COOLDOWN_LONG, SKY_WATCH_RUN } from '../src/config.js';
 import { EMPTY, ROCK, X, O } from '../src/logic/board.js';
 import { ALL_CHARACTERS, CHARACTERS, CLOUD_EAGLE, EARTH_BEAR, assignSides } from '../src/logic/characters.js';
 import { canUseSkill, newGame, placeStone, skillCooldown, useSkill } from '../src/logic/game.js';
@@ -170,14 +170,23 @@ test('skyWatchCells finds the cells where the opponent makes five with one move'
   assert.deepEqual(skyWatchCells(state, O), []);
 });
 
-test('skyWatchCells returns nothing when there is no threat, and clouds hide nothing from it', () => {
+test('skyWatchCells marks where the opponent would make four (SKY_WATCH_RUN) or more, and clouds hide nothing from it', () => {
   let state = eagleGame();
+  assert.equal(SKY_WATCH_RUN, 4);
   assert.deepEqual(skyWatchCells(state, X), []);
   const board = state.board.map((row) => row.slice());
-  for (const x of [3, 4, 5]) board[5][x] = O; // three only
+  for (const x of [3, 4]) board[5][x] = O; // two only: nothing yet
   assert.deepEqual(skyWatchCells({ ...state, board }, X), []);
-  for (const y of [10, 11, 12, 13]) board[y][14] = O; // four down the edge column
-  state = { ...state, board, clouds: [createCloud(14, 12, O, 1)] };
-  assert.deepEqual(skyWatchCells(state, X), [{ x: 14, y: 9 }, { x: 14, y: 14 }]);
+  board[5][5] = O; // three: both ends would make four
+  assert.deepEqual(skyWatchCells({ ...state, board }, X), [{ x: 2, y: 5 }, { x: 6, y: 5 }]);
+  board[5][6] = ROCK; // a rock breaks the line on that side
+  assert.deepEqual(skyWatchCells({ ...state, board }, X), [{ x: 2, y: 5 }]);
+  const split = state.board.map((row) => row.slice());
+  for (const x of [3, 4, 6]) split[9][x] = O; // a broken three: the gap makes four
+  assert.deepEqual(skyWatchCells({ ...state, board: split }, X), [{ x: 5, y: 9 }]);
+  for (const y of [10, 11, 12, 13]) split[y][14] = O; // four down the edge column
+  state = { ...state, board: split, clouds: [createCloud(14, 12, O, 1)] };
+  const cells = skyWatchCells(state, X);
+  assert.ok(cells.some((c) => c.x === 14 && c.y === 9) && cells.some((c) => c.x === 14 && c.y === 14), 'a four still shows, under a cloud too');
   assert.equal(state.board[9][14], EMPTY);
 });

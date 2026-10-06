@@ -86,6 +86,7 @@
   <link rel="stylesheet" href="src/ui/menu.css">
   <link rel="stylesheet" href="src/ui/room.css">
   <link rel="stylesheet" href="src/ui/announce.css">
+  <link rel="stylesheet" href="src/ui/chat.css">
 </head>
 <body>
   <div id="stage">
@@ -98,6 +99,9 @@
       <section class="card" data-screen="lobby" data-hud-box="lobby-panel">
         <h2 id="lobby-title"></h2>
         <p class="lead" id="lobby-lead"></p>
+        <!-- The player's name for online rooms (docs/flow-design.md section 3.12). -->
+        <label class="name-field"><span class="name-label" id="lobby-name-label"></span>
+          <input id="lobby-name" class="name-input" maxlength="20" spellcheck="false" autocomplete="nickname" data-hud-box="lobby-name"></label>
         <button type="button" id="lobby-create" data-action="createRoom" data-hud-box="lobby-create"></button>
         <button type="button" id="lobby-join" data-action="openJoin" data-hud-box="lobby-join"></button>
         <p class="error" id="lobby-error" aria-live="polite"></p>
@@ -120,6 +124,8 @@
       <section class="card" data-screen="spectate" data-hud-box="spectate-panel">
         <h2 id="spectate-title"></h2>
         <p class="lead" id="spectate-lead"></p>
+        <label class="name-field"><span class="name-label" id="spectate-name-label"></span>
+          <input id="spectate-name" class="name-input" maxlength="20" spellcheck="false" autocomplete="nickname" data-hud-box="spectate-name"></label>
         <form id="spectate-form" class="join-row" autocomplete="off" novalidate>
           <label for="spectate-code" id="spectate-label"></label>
           <input id="spectate-code" name="code" spellcheck="false" autocapitalize="characters" placeholder="ABCD5" aria-describedby="spectate-error" data-hud-box="spectate-code">
@@ -202,6 +208,8 @@
   <div id="hud" hidden></div>
   <!-- Main menu, How to Play and Settings (docs/flow-design.md section 3), built by src/ui/menu-dom.js. -->
   <div id="announce" aria-live="polite"></div>
+  <!-- The room chat (docs/flow-design.md section 3.12), built by src/ui/chat-dom.js. -->
+  <aside id="chat" hidden></aside>
   <div id="flow" hidden></div>
   <script type="module" src="src/main.js"></script>
 </body>

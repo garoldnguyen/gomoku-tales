@@ -18,6 +18,9 @@ import { localSelectViewModel, roomClosedViewModel, spectateViewModel, waitingVi
 import { SHOT_FIELD } from './shot-position.js';
 import { STRINGS } from './strings.js';
 
+// The name the empty name boxes suggest in the pictures (a random one in play).
+export const SHOT_NAME = 'Sweet Ant';
+
 export const SHOT_SCENES = Object.freeze([
   'field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting', 'select', 'gameover', 'gameover-pending',
   'spectate', 'spectate-game', 'room-closed',

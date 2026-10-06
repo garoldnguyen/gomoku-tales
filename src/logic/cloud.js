@@ -1,6 +1,6 @@
 // Cloud Eagle (docs/design.md section 5). Two skills:
 // - SKY WATCH (passive): the cells where the opponent would make five in a
-//   row with one move (skyWatchCells).
+//   row (SKY_WATCH_RUN, four) with one move (skyWatchCells).
 // - CLOUD: a cloud on any cell of the board, stone and rock cells too. It
 //   places no stone and uses the owner's turn. It covers CLOUD_SIZE by
 //   CLOUD_SIZE cells centred on the chosen cell, clipped to the board, and
@@ -10,9 +10,9 @@
 // A cloud is { x, y, owner, turnsLeft, placedTurn }; the game keeps them in
 // state.clouds (missing until the first cloud).
 
-import { CLOUD_SIZE, CLOUD_TURNS } from '../config.js';
+import { CLOUD_SIZE, CLOUD_TURNS, SKY_WATCH_RUN } from '../config.js';
 import { EMPTY, X, O, cloneBoard, findWinLineAt, inBounds } from './board.js';
-import { CLOUD } from './skills.js';
+import { CLOUD, TORNADO_ZONE } from './skills.js';
 
 export function createCloud(x, y, owner, placedTurn) {
   return { x, y, owner, turnsLeft: CLOUD_TURNS, placedTurn };
@@ -73,19 +73,28 @@ export function tickClouds(clouds, player, turn) {
   return { clouds: kept, events };
 }
 
-// SKY WATCH: the empty cells where the opponent of owner would make five in
-// a row with one move, by the game's win rule on the full board (clouds do
-// not hide anything here). Row by row, as [{ x, y }].
+// SKY WATCH (owner's rule, October 2026): the empty cells where the
+// opponent of owner would make SKY_WATCH_RUN (four) or more in a row with
+// one move, across, down or diagonally, on the full board (clouds do not
+// hide anything here), so the eagle sees a three about to become a four,
+// and a four about to become five too. Rocks break a line. Row by row, as
+// [{ x, y }].
+const RUN_DIRECTIONS = Object.freeze([[1, 0], [0, 1], [1, 1], [1, -1]]);
 export function skyWatchCells(state, owner) {
   const opponent = owner === X ? O : X;
-  const board = cloneBoard(state.board);
+  const { board } = state;
+  const same = (x, y) => inBounds(board, x, y) && board[y][x] === opponent;
   const cells = [];
   for (let y = 0; y < board.length; y++) {
     for (let x = 0; x < board[y].length; x++) {
       if (board[y][x] !== EMPTY) continue;
-      board[y][x] = opponent;
-      if (findWinLineAt(board, x, y)) cells.push({ x, y });
-      board[y][x] = EMPTY;
+      const makesRun = RUN_DIRECTIONS.some(([dx, dy]) => {
+        let run = 1;
+        for (let k = 1; same(x + dx * k, y + dy * k); k++) run++;
+        for (let k = 1; same(x - dx * k, y - dy * k); k++) run++;
+        return run >= SKY_WATCH_RUN;
+      });
+      if (makesRun) cells.push({ x, y });
     }
   }
   return cells;
@@ -101,13 +110,20 @@ export function skyWatchCells(state, owner) {
 // spectator, null) sees the full state. Returns state itself when
 // nothing is covered. The host keeps the true state; this is only what is
 // shown and sent.
+//
+// HIDDEN TORNADO ZONE (owner's rule): only the player who cast a Tornado
+// Zone may see where it is. For the other seat the zone becomes
+// { player, hidden: true } with no centre and no cells.
 export function maskForViewer(state, viewer) {
   if (!state || (viewer !== X && viewer !== O)) return state;
   const covered = coveredCells(state, viewer);
-  if (covered.length === 0) return state;
+  const zone = state.tornado;
+  const hideZone = Boolean(zone) && zone.player !== viewer && zone.hidden !== true;
+  if (covered.length === 0) return hideZone ? { ...state, tornado: hiddenZone(zone) } : state;
   const board = cloneBoard(state.board);
   for (const { x, y } of covered) board[y][x] = EMPTY;
   const masked = { ...state, board, covered };
+  if (hideZone) masked.tornado = hiddenZone(zone);
   if (Array.isArray(state.rocks)) masked.rocks = state.rocks.filter((rock) => !isCovered(masked, rock.x, rock.y));
   if (Array.isArray(state.winLine)) masked.winLine = uncoveredOf(masked, state.winLine);
   const dash = state.pendingDash;
@@ -115,6 +131,11 @@ export function maskForViewer(state, viewer) {
     masked.pendingDash = null;
   }
   return masked;
+}
+
+// A Tornado Zone as the other seat sees it: that one was cast, not where.
+function hiddenZone(zone) {
+  return { player: zone.player, hidden: true, endsAfterTurn: zone.endsAfterTurn };
 }
 
 // The cells under the clouds of the seat other than viewer, row by row,
@@ -151,11 +172,18 @@ export function isCovered(state, x, y) {
 // the cloud skill always stay. A win stays, but its line leaves out the
 // covered cells. Returns events itself when nothing is changed.
 export function maskEventsForViewer(masked, events) {
-  if (!masked?.covered || !Array.isArray(events)) return events;
+  const zoneHidden = masked?.tornado?.hidden === true;
+  if ((!masked?.covered && !zoneHidden) || !Array.isArray(events)) return events;
   let changed = false;
   const kept = [];
   for (const event of events) {
-    if (hidesEvent(masked, event)) {
+    if (zoneHidden && event?.type === 'skillUsed' && event.skill === TORNADO_ZONE) {
+      changed = true; // the cast shows, not where
+      kept.push({ ...event, target: null });
+    } else if (zoneHidden && event?.type === 'tornadoAnnounced') {
+      changed = true;
+      kept.push({ type: 'tornadoAnnounced', player: event.player, hidden: true });
+    } else if (masked.covered && hidesEvent(masked, event)) {
       changed = true;
     } else if (event?.type === 'win' && Array.isArray(event.line)) {
       const line = uncoveredOf(masked, event.line);

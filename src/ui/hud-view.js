@@ -79,7 +79,7 @@ export const SPECTATOR_VIEW = 'spectator';
 export function hudViewModel(gameState, uiState = {}, localPlayer = null) {
   const {
     targeting = null, status = null, message = null, peerCountdown = null, quality = 'medium', hint = null,
-    collapsed = ALL_EXPANDED,
+    collapsed = ALL_EXPANDED, players = null,
   } = uiState;
   const winner = uiState.winner !== undefined && uiState.winner !== null ? uiState.winner : gameState.winner;
   const over = Boolean(winner) || isGameOver(gameState);
@@ -87,7 +87,7 @@ export function hudViewModel(gameState, uiState = {}, localPlayer = null) {
   const leaving = !over && peerCountdown !== null && peerCountdown !== undefined;
 
   const cards = [X, O].map((player) => cardView(gameState, player, {
-    over, winner, toMove, localPlayer, collapsed: Boolean(collapsed?.[player]),
+    over, winner, toMove, localPlayer, collapsed: Boolean(collapsed?.[player]), playerName: players?.[player] ?? null,
     targeting: player === toMove && (localPlayer === null || localPlayer === player) ? targeting : null,
   }));
 
@@ -130,7 +130,7 @@ function turnView(state, { over, winner, toMove, leaving, peerCountdown, targeti
   return { player: toMove, team: teamOf(toMove), who: `${nameOf(state, toMove)}'s turn`, hint, countdown: null };
 }
 
-function cardView(state, player, { over, winner, toMove, localPlayer, targeting, collapsed }) {
+function cardView(state, player, { over, winner, toMove, localPlayer, targeting, collapsed, playerName = null }) {
   const character = characterOf(state, player);
   const isWinner = winner === player;
   const active = player === toMove;
@@ -144,7 +144,8 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
     side: player === X ? 'left' : 'right',
     name: character.name,
     portrait: PORTRAIT_ART[character.id],
-    meta: `Plays ${player}, ${countStones(state.board, player)} planted`,
+    // Online the player's name leads the line (players of uiState).
+    meta: `${playerName ? `${playerName} · ` : ''}Plays ${player}, ${countStones(state.board, player)} planted`,
     chip,
     waiting: !isWinner && !active,
     winner: isWinner,

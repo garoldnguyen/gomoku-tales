@@ -297,8 +297,8 @@ test('a full game between two windows with all four skills ends on the Game over
   // Turn 7: Tornado Zone, the guest's skill flow runs through the host.
   assert.equal(rabbit.clickSkill(X, TORNADO_ZONE), true);
   assert.equal(rabbit.click({ x: 5, y: 5 }), true);
-  assert.ok(bear.getView().state.tornado);
-  same();
+  assert.equal(rabbit.getView().state.tornado.cells.length, 9, 'the rabbit sees its zone');
+  assert.deepEqual(Object.keys(bear.getView().state.tornado).sort(), ['endsAfterTurn', 'hidden', 'player'], 'the bear never sees where');
 
   // Turn 8: the bear places inside the zone and the host throws the stone.
   assert.equal(bear.click({ x: 5, y: 5 }), true);

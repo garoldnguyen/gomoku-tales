@@ -41,7 +41,7 @@
 // Room closed notice, whose button goes back to the menu.
 
 import * as CONFIG from '../config.js';
-import { GAME_OVER_DELAY_MS } from '../config.js';
+import { CHAT_HISTORY, GAME_OVER_DELAY_MS } from '../config.js';
 import { bothReady, seatSides } from '../logic/seats.js';
 import { systemClock } from '../net/clock.js';
 import { generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../net/room-code.js';
@@ -60,6 +60,7 @@ import {
   lobbyViewModel, localSelectViewModel, roomClosedViewModel, spectateViewModel, waitingViewModel, watchViewModel,
 } from './room-screens.js';
 import { createSpectatorGame } from './spectator-game.js';
+import { cleanName } from '../net/chat.js';
 import { STRINGS, withCode } from './strings.js';
 
 // Screens.
@@ -111,6 +112,7 @@ export function createApp(options) {
     makeCode = () => generateRoomCode(),
     local = false,
     localRandom = Math.random,
+    playerName = null,
   } = options;
 
   let flow = initialFlow({ local });
@@ -127,6 +129,13 @@ export function createApp(options) {
   let spectateError = null; // the inline error of the spectate screen
   let gameOverTimer = null;
   let localSeat = null; // the local seat that acts on the character select (chooseSeat)
+  let myName = cleanName(playerName); // this window's player name for online rooms (setPlayerName)
+  // The room chat (docs/flow-design.md section 3.12): the messages of this
+  // room, newest last, at most CHAT_HISTORY; cleared when a rematch begins
+  // and when the room is left.
+  let chat = [];
+  let chatSeq = 0;
+  let chatUnsubscribe = null;
   // The rematch state of the game over card: mine (this window asked),
   // theirs (the other player asked) and gone (the other player left, or
   // the game ended by forfeit), from onRematchStatus and onPeerGone.
@@ -235,6 +244,9 @@ export function createApp(options) {
     game = null;
     roomUnsubscribe?.();
     roomUnsubscribe = null;
+    chatUnsubscribe?.();
+    chatUnsubscribe = null;
+    chat = [];
     room?.close();
     room = null;
     joiningCode = null;
@@ -433,8 +445,26 @@ export function createApp(options) {
   // Starts listening to a new room. A transport may answer before the
   // room is returned (the fake one delivers at once), so a phase reached
   // meanwhile is handled as if its event had just arrived.
+  // Follows the chat and the names of the room just opened.
+  const watchChat = () => {
+    chatUnsubscribe?.();
+    chat = [];
+    chatUnsubscribe = room.onEvent((event) => {
+      if (event.type === 'chat') {
+        chat = [...chat, { id: ++chatSeq, name: event.name, text: event.text, mine: event.mine === true }].slice(-CHAT_HISTORY);
+        changed();
+      } else if (event.type === 'newGame' && chat.length > 0) {
+        chat = []; // a rematch: a clean chat for the new game
+        changed();
+      } else if (event.type === 'names') {
+        changed();
+      }
+    });
+  };
+
   const openRoom = (made) => {
     room = made;
+    watchChat();
     const unsubscribers = [room.onEvent(onRoomEvent), room.onRematchStatus(onRematchStatus), room.onPeerGone(onPeerGone)];
     roomUnsubscribe = () => unsubscribers.forEach((off) => off());
     if (room.phase === STARTING || room.phase === PLAYING) onRoomEvent({ type: 'joined' });
@@ -442,6 +472,9 @@ export function createApp(options) {
     else if (room.phase === FULL) onRoomEvent({ type: 'full' });
     else if (room.phase === NO_ROOM) onRoomEvent({ type: 'noRoom' });
   };
+
+  const CHAT_SCREENS = [WAITING_SCREEN, GAME, GAME_OVER, WATCH];
+  const chatShown = (screen) => room !== null && flow.mode === MODES.ONLINE && CHAT_SCREENS.includes(screen);
 
   const menuEvent = (type) => {
     if (!MENU_EVENTS.includes(type)) return false;
@@ -530,6 +563,10 @@ export function createApp(options) {
         joining: joiningCode !== null,
         joiningCode,
         joinError,
+        playerName: myName,
+        // The room chat while this window is in an online room (the waiting
+        // room, the game, the game over card, a spectator's screens).
+        chat: chatShown(screen) ? { messages: chat, name: myName } : null,
         outcome: screen === GAME_OVER && game ? game.getOutcome() : null,
         // The game over card (game-over.js) on the Game over screen only,
         // so it never shows during a new game.
@@ -635,7 +672,7 @@ export function createApp(options) {
       whenOpen(transport, () => {
         connecting = false;
         flow = flowReducer(flow, FLOW_EVENTS.ROOM_CREATED);
-        openRoom(createHostRoom({ transport, code, clock, random }));
+        openRoom(createHostRoom({ transport, code, clock, random, name: myName }));
         changed();
       }, () => {
         connecting = false;
@@ -660,7 +697,7 @@ export function createApp(options) {
       joiningCode = code;
       changed();
       const transport = openTransport(code, ROLE_GUEST);
-      whenOpen(transport, () => openRoom(createGuestRoom({ transport, code, clock })), () => {
+      whenOpen(transport, () => openRoom(createGuestRoom({ transport, code, clock, name: myName })), () => {
         // The relay refused the guest: no room with this code.
         joinError = withCode(STRINGS.joinErrorNotFound, joiningCode);
         joiningCode = null;
@@ -687,8 +724,9 @@ export function createApp(options) {
       const transport = openSpectatorTransport(code);
       whenOpen(transport, () => {
         spectateConnecting = false;
-        room = createSpectatorRoom({ transport, code });
+        room = createSpectatorRoom({ transport, code, name: myName });
         roomUnsubscribe = room.onEvent(onSpectatorEvent);
+        watchChat();
         send(FLOW_EVENTS.SPECTATOR_JOINED);
         // The relay replays the room as soon as it opens: a game already
         // running shows at once.
@@ -709,6 +747,20 @@ export function createApp(options) {
       if (screenNow() !== MENU || !menuEvent(FLOW_EVENTS.PLAY_ONLINE)) return false;
       this.openJoin();
       return this.joinRoom(code);
+    },
+
+    // Sends a chat message to everyone in the room. Returns true when sent
+    // (false: no room, an empty text, or sooner than CHAT_MIN_INTERVAL_MS).
+    sendChat(text) {
+      if (!room?.sendChat || !chatShown(screenNow())) return false;
+      return room.sendChat(text);
+    },
+
+    // The name this window plays and chats under in online rooms (the name
+    // box of Play Online and Watch a match, player-names.js). Takes effect
+    // for the next room.
+    setPlayerName(text) {
+      myName = cleanName(text);
     },
 
     // The spectator typed in the code box: the inline error goes away.

@@ -9,7 +9,7 @@ import { X, O, cloneBoard, createBoard, inBounds, isBoardFull, isEmptyCell, find
 import { DEFAULT_SIDES, FIRST_PLAYER, assignSides, characterForStone } from './characters.js';
 import { cooldownTurns, getSkill, isPassiveSkill, TERRAIN_CREATION, STONE_CONVERSION, WIND_DASH, TORNADO_ZONE, HISS, VENOM, CLOUD } from './skills.js';
 import { breakRocks, stoneConversion, terrainCreation } from './earth-bear-skills.js';
-import { blowZone, inTornado, resolveDash, tornadoZone, windDash } from './wind-rabbit-skills.js';
+import { inTornado, resolveDash, throwStone, tornadoZone, windDash } from './wind-rabbit-skills.js';
 import { hiss, isSkillLocked, venom } from './jade-serpent-skills.js';
 import { cloud, tickClouds } from './cloud.js';
 
@@ -82,10 +82,10 @@ export function canUseSkill(state, player, skillId) {
   return !isGameOver(state) && player === state.currentPlayer && checkSkill(state, player, skillId) === null;
 }
 
-// Places a stone for the acting player. A Tornado Zone of the opponent's
-// that ends with this turn then blows away every plant inside it, this one
-// too if it lies there; options.random (default Math.random) picks where
-// they land, so only the host runs it and tests can inject it.
+// Places a stone for the acting player. A stone placed inside the
+// opponent's active Tornado Zone is thrown by a dandelion storm to a random
+// empty plot anywhere outside the zone; options.random (default
+// Math.random) picks it, so only the host runs it and tests can inject it.
 export function placeStone(state, action, options = {}) {
   const { random = Math.random } = options;
   const { player, x, y } = action;
@@ -97,16 +97,19 @@ export function placeStone(state, action, options = {}) {
   const board = cloneBoard(state.board);
   board[y][x] = player;
   const events = [{ type: 'stonePlaced', player, x, y }];
-  return finishTurn({ ...state, board }, player, events, { x, y }, null, random);
+  const { tornado } = state;
+  if (tornado && tornado.player !== player && inTornado(tornado, x, y)) {
+    const thrown = throwStone(board, x, y, tornado, random);
+    return finishTurn({ ...state, board: thrown.board }, player, [...events, ...thrown.events], thrown.changed);
+  }
+  return finishTurn({ ...state, board }, player, events, { x, y });
 }
 
 // Uses one of the acting player's skills. Using a skill uses the whole
 // turn. action = { player, skill, target } where target is whatever the
 // skill needs: { from: { x, y }, to: { x, y } } for Wind Dash and a cell
-// { x, y } for the other skills (Hiss needs none). options.random is as for
-// placeStone (a Tornado Zone ending with this turn).
-export function useSkill(state, action, options = {}) {
-  const { random = Math.random } = options;
+// { x, y } for the other skills (Hiss needs none).
+export function useSkill(state, action) {
   const { player, skill: skillId, target = null } = action;
   if (isGameOver(state)) return fail('The game is over.');
   if (player !== state.currentPlayer) return fail('It is not your turn.');
@@ -116,7 +119,7 @@ export function useSkill(state, action, options = {}) {
   const { error: effectError, events: effectEvents, changed, ...updates } = SKILL_EFFECTS[skillId](state, player, target);
   if (effectError) return fail(effectError);
   const events = [{ type: 'skillUsed', player, skill: skillId, target }, ...effectEvents];
-  return finishTurn({ ...state, ...updates }, player, events, changed, skillId, random);
+  return finishTurn({ ...state, ...updates }, player, events, changed, skillId);
 }
 
 function checkSkill(state, player, skillId) {
@@ -143,39 +146,7 @@ function checkSkill(state, player, skillId) {
 // a pending dash never resolves and is dropped, and so is a Tornado Zone
 // (it only lasts through this turn), so neither is still shown as coming;
 // a Hiss lock is dropped too.
-function finishTurn(state, player, events, changed, usedSkillId = null, random = Math.random) {
-  const { tornado } = state;
-  if (tornado && tornado.endsAfterTurn <= state.turn) {
-    // The storm first: every plant in the zone flies, then the win check
-    // runs on the acting player's cell (where it landed, if it flew) and on
-    // every landing plot. A five made by the storm counts for whoever owns
-    // it; fives for both players at once are a draw.
-    const storm = blowZone(state.board, tornado, random);
-    state = { ...state, board: storm.board, tornado: null };
-    events = [...events, ...storm.events, { type: 'tornadoEnded', player: tornado.player, x: tornado.x, y: tornado.y }];
-    const cells = storm.moves.map((move) => move.to);
-    if (changed) {
-      const moved = storm.moves.find((move) => move.from.x === changed.x && move.from.y === changed.y);
-      if (!moved || !inTornado(tornado, changed.x, changed.y)) cells.unshift(moved ? moved.to : changed);
-    }
-    const lines = {};
-    for (const cell of cells) {
-      const owner = state.board[cell.y][cell.x];
-      if (lines[owner]) continue;
-      const line = findWinLineAt(state.board, cell.x, cell.y);
-      if (line) lines[owner] = line;
-    }
-    if (lines[X] && lines[O]) {
-      return done({ ...state, draw: true, pendingDash: null, skillLock: null }, [...events, { type: 'draw' }]);
-    }
-    const stormWinner = lines[X] ? X : lines[O] ? O : null;
-    if (stormWinner) {
-      const ended = { ...state, winner: stormWinner, winLine: lines[stormWinner], pendingDash: null, skillLock: null };
-      return done(ended, [...events, { type: 'win', player: stormWinner, line: lines[stormWinner] }]);
-    }
-    changed = null; // checked above
-  }
-
+function finishTurn(state, player, events, changed, usedSkillId = null) {
   const winLine = changed ? findWinLineAt(state.board, changed.x, changed.y) : null;
   if (winLine) {
     const ended = { ...state, winner: player, winLine, pendingDash: null, tornado: null, skillLock: null };
@@ -191,6 +162,12 @@ function finishTurn(state, player, events, changed, usedSkillId = null, random =
     if (dashLine) {
       return done({ ...state, winner: dash.player, winLine: dashLine, skillLock: null }, [...events, { type: 'win', player: dash.player, line: dashLine }]);
     }
+  }
+
+  const { tornado } = state;
+  if (tornado && tornado.endsAfterTurn <= state.turn) {
+    state = { ...state, tornado: null };
+    events = [...events, { type: 'tornadoEnded', player: tornado.player }];
   }
 
   const { skillLock } = state;
