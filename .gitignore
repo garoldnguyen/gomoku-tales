@@ -3,3 +3,6 @@
 shots/
 __pycache__/
 .wrangler/
+
+# Windows download markers
+*:Zone.Identifier
