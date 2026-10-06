@@ -17,7 +17,7 @@ const X_WON = Object.freeze({ winner: X, reason: 'five' });
 const O_WON = Object.freeze({ winner: O, reason: 'five' });
 const DRAWN = Object.freeze({ winner: null, reason: 'draw' });
 
-// options.random is passed to placeStone for the Tornado Zone throw;
+// options.random is passed to placeStone and useSkill for the Tornado Zone storm;
 // options.onApplied() is called after every applied action (the app checks
 // whether the game ended); options.characters are the sides of the
 // character select ({ X, O }, the first pick plays X; default DEFAULT_SIDES);
@@ -129,7 +129,7 @@ export function createLocalGame(options = {}) {
         return false;
       }
       if (refusedCovered(player, { kind: 'skill', skill: targeting.skill, target: step.target })) return false;
-      return apply(useSkill(state, { player, skill: targeting.skill, target: step.target }));
+      return apply(useSkill(state, { player, skill: targeting.skill, target: step.target }, { random }));
     },
 
     // A skill button click: starts that skill's target flow, or cancels it
@@ -146,7 +146,7 @@ export function createLocalGame(options = {}) {
         message = reason;
         return false;
       }
-      if (!needsTarget(skillId)) return apply(useSkill(state, { player, skill: skillId }));
+      if (!needsTarget(skillId)) return apply(useSkill(state, { player, skill: skillId }, { random }));
       targeting = startTargeting(skillId);
       message = null;
       return true;
@@ -258,11 +258,12 @@ function describeEvent(event) {
     case 'dashFailed':
       return event.reason === 'targetTaken' ? 'Wind Dash failed: the target cell is taken.' : 'Wind Dash failed: the stone is gone.';
     case 'tornadoAnnounced':
-      return 'Tornado Zone! It lasts through the next turn.';
-    case 'stoneThrown':
-      return 'The tornado threw the stone!';
+      return 'Tornado Zone! The storm blows after the next turn.';
+    case 'tornadoStorm':
+      if (event.count === 0) return 'The dandelion storm found no plants.';
+      return event.count === 1 ? 'The dandelion storm blew 1 plant away!' : `The dandelion storm blew ${event.count} plants away!`;
     case 'throwBlocked':
-      return 'The tornado had nowhere to throw the stone.';
+      return 'A plant had nowhere to fly and stayed.';
     case 'rockPlaced':
       return 'Terrain Creation! A rock fell.';
     case 'rockBroken':

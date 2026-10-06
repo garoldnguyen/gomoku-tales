@@ -135,3 +135,28 @@ export function skyWatchOutlineGrid() {
   for (const [x, y] of [[a + 1, a + 1], [b - 1, a + 1], [a + 1, b - 1], [b - 1, b - 1]]) setPixel(grid, x, y, SKY_WATCH_COLOUR);
   return grid;
 }
+
+// Under each Sky Watch outline: the plot lit in Cloud Eagle's pale yellow,
+// brightest in the middle (three nested squares), so the cell glows.
+export const SKY_WATCH_GLOW = Object.freeze({ outer: '#fff2b8', mid: '#ffe98a', core: '#ffe066' });
+export function skyWatchGlowGrid() {
+  const n = OVERLAY_TILE_PX;
+  const grid = createGrid(n, n);
+  fillRect(grid, 2, 2, n - 4, n - 4, SKY_WATCH_GLOW.outer);
+  fillRect(grid, 7, 7, n - 14, n - 14, SKY_WATCH_GLOW.mid);
+  fillRect(grid, 11, 11, n - 22, n - 22, SKY_WATCH_GLOW.core);
+  return grid;
+}
+
+// A small cloud puff that drifts to and fro above a Sky Watch plot: three
+// soft bumps on a flat base, light on top, a little shade underneath.
+export function skyWatchPuffGrid() {
+  const n = OVERLAY_TILE_PX;
+  const grid = createGrid(n, n);
+  fillEllipse(grid, 16, 18, 11, 5, CLOUD_TILE_COLOURS.shade);
+  fillEllipse(grid, 16, 17, 11, 4, CLOUD_TILE_COLOURS.base);
+  fillEllipse(grid, 10, 15, 5, 4, CLOUD_TILE_COLOURS.base);
+  fillEllipse(grid, 17, 12, 6, 5, CLOUD_TILE_COLOURS.light);
+  fillEllipse(grid, 23, 15, 4, 3, CLOUD_TILE_COLOURS.light);
+  return grid;
+}

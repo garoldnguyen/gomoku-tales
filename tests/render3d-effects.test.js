@@ -104,10 +104,10 @@ test('a failed Wind Dash fizzles and ends the marks', () => {
   assert.equal(regrowCell(specs[1], STAGES), null);
 });
 
-test('Tornado Zone: the swirl shows over the zone and a thrown seed flies in an arc, then regrows', () => {
+test('Tornado Zone: the swirl shows over the zone; after the next turn the storm blows every plant there away in arcs', () => {
   const results = play([
     { skill: TORNADO_ZONE, target: { x: 7, y: 7 } },
-    [7, 7], // the bear places inside the zone; random 0 throws it to (6, 6)
+    [7, 7], // the bear plants inside the zone; the storm takes it to the first empty plot outside, (0, 0)
   ], { random: () => 0 });
   const announced = visualsForEvents(results[0].events);
   assert.deepEqual(announced[0], { kind: 'castRing', x: 7, y: 7, player: X });
@@ -115,12 +115,13 @@ test('Tornado Zone: the swirl shows over the zone and a thrown seed flies in an 
   assert.equal(announced[1].cells.length, 9);
   assert.deepEqual([announced[1].x, announced[1].y], [7, 7]);
 
-  const thrown = visualsForEvents(results[1].events);
-  assert.deepEqual(kinds(thrown), ['place', 'throw', 'tornadoEnd', 'banner']);
-  assert.deepEqual(thrown[1], { kind: 'throw', from: { x: 7, y: 7 }, to: { x: 6, y: 6 }, player: O });
-  assert.deepEqual(heldCell(thrown[1], STAGES), { x: 6, y: 6, ms: THROW_DELAY_MS + THROW_MS });
-  assert.deepEqual(regrowCell(thrown[1], STAGES), { x: 6, y: 6, player: O, startMs: THROW_DELAY_MS + THROW_MS - STAGES[STAGE_LAND] });
-  assert.equal(shakeStrength(thrown[1]), 0);
+  const storm = visualsForEvents(results[1].events);
+  assert.deepEqual(kinds(storm), ['place', 'storm', 'throw', 'tornadoEnd', 'banner']);
+  assert.deepEqual([storm[1].x, storm[1].y, storm[1].cells.length], [7, 7, 9]);
+  assert.deepEqual(storm[2], { kind: 'throw', from: { x: 7, y: 7 }, to: { x: 0, y: 0 }, player: O });
+  assert.deepEqual(heldCell(storm[2], STAGES), { x: 0, y: 0, ms: THROW_DELAY_MS + THROW_MS });
+  assert.deepEqual(regrowCell(storm[2], STAGES), { x: 0, y: 0, player: O, startMs: THROW_DELAY_MS + THROW_MS - STAGES[STAGE_LAND] });
+  assert.equal(shakeStrength(storm[2]), 0);
 });
 
 test('Terrain Creation: the rock falls with a light shake and crumbles when it breaks', () => {

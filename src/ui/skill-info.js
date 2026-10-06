@@ -28,7 +28,7 @@ export const SKILL_INFO = Object.freeze({
   ),
   [TORNADO_ZONE]: info(
     TORNADO_ZONE,
-    `Pick the centre of a ${TORNADO_SIZE} by ${TORNADO_SIZE} zone. On the opponent's next turn, a swirl of petals and leaves throws a seed they plant inside off its plot.`,
+    `Pick the centre of a ${TORNADO_SIZE} by ${TORNADO_SIZE} zone. A dandelion storm gathers there, and after the opponent's next turn it blows every plant in the zone away, yours too and any planted there that turn, each to a random empty plot elsewhere on the field.`,
     'Click to select, then choose the zone centre',
   ),
   [TERRAIN_CREATION]: info(

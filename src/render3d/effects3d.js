@@ -60,7 +60,7 @@ import {
   CLOUD_PUFFS, CLOUD_SIZE, CONVERT_SPARK_RATE, DASH_SWIRL_RATE, DASH_TRAIL_RATE, HISS_MIST, HISS_RING_DOTS,
   HISS_RING_GAP_MS, HISS_RING_MS, HISS_RING_TO, HISS_RINGS, HISS_WOBBLE, HISS_WOBBLE_WAVES, MARK_FADE_MS,
   PLACE_DUST_COUNT, PLACEMENT_SLOTS, PLANT_OPEN_SPARKLES, PX_WORLD, RING_DOT_PX, RING_LIGHTEN, RING_MAX_DOTS, RING_SLOTS,
-  SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
+  DASH_GHOST_OPACITY, DASH_WIND_RATE, DASH_WIND_SPEED, SHAKE3D_LIGHT, SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, STORM_BURST_COUNT, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
   TORNADO_PARTICLE_RATE, TORNADO_SIZE, VENOM_BUBBLE_RATE, VENOM_TINT, VINE_POINT_PX, VINE_POINTS, WIN_RING_DOTS,
   WIN_RING_MS, WIN_RING_TO, WIN_SPARKLES, WIN_STAGGER_MS,
 } from '../config.js';
@@ -157,7 +157,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     // Every emitter calls random.fill(u) per particle and reads u[0],
     // u[1], ... in [0, 1). For looks only; it never touches the game.
     random: effectRandom(0x2545f491),
-    u: new Float64Array(10),
+    u: new Float64Array(12),
     // This frame's numbers: time (ms), dtS (seconds since the last frame),
     // scale (particle scale of the quality level), pointScale (particle
     // world size to screen pixels at depth 1). last is NaN until the first
@@ -195,7 +195,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
   const held = new Float64Array(BOARD_SIZE * BOARD_SIZE); // cell index -> time its plant shows again
   const timelines = [];
   for (let i = 0; i < TIMELINE_SLOTS; i++) timelines.push(newTimeline());
-  const dashMark = createDashMark(fx);
+  const dashMark = createDashMark(fx, actors);
   const swirl = createTornadoSwirl(fx);
   // The camera shake: when it started and how strong it is; shakeOffset3d
   // reads ageMs and strength and writes the offset x and y.
@@ -360,6 +360,61 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       sp.alpha = alpha;
       sp.shape = SHAPE_SQUARE;
       pool.spawnFall(sp);
+    }
+  }
+
+  // The dandelion fluff a plant blown by the storm trails behind it at
+  // `at`: white seed puffs (plus-shaped) that drift up and away on the wind.
+  function fluffTrail(count) {
+    for (let i = 0; i < count; i++) {
+      random.fill(u);
+      sp.x = at.x - 0.1 + u[0] * 0.2;
+      sp.y = at.y - 0.05 + u[1] * 0.15;
+      sp.z = at.z - 0.1 + u[2] * 0.2;
+      sp.vx = 0.15 + u[3] * 0.35; // with the wind: towards the lower right
+      sp.vy = 0.1 + u[4] * 0.3;
+      sp.vz = 0.1 + u[5] * 0.3;
+      sp.gravity = -0.05; // fluff floats
+      sp.drag = 1.2;
+      sp.life = 0.7 + u[6] * 0.5;
+      sp.size = (2 + u[7] * 1.5) * PX;
+      sp.grow = 0.4;
+      sp.color = u[8] < 0.2 ? PETALS[2] : COLORS.dandelion;
+      sp.alpha = 0.9;
+      sp.shape = u[9] < 0.7 ? SHAPE_PLUS : SHAPE_SQUARE;
+      pool.spawnFall(sp);
+    }
+  }
+
+  // The storm itself (Tornado Zone, after the opponent's turn): a burst of
+  // dandelion fluff and petals spinning up and outward from the zone, and a
+  // little gust on every plot of it.
+  function dandelionStorm(spec) {
+    cellToWorldInto(spec.x, spec.y, at);
+    const count = scaledCount(STORM_BURST_COUNT, frame.scale);
+    for (let i = 0; i < count; i++) {
+      random.fill(u);
+      sp.x = at.x;
+      sp.y = 0.02 + u[0] * 0.3;
+      sp.z = at.z;
+      sp.radius = 0.15 + u[1] * 0.9;
+      sp.angle = u[2] * TWO_PI;
+      sp.spin = 6 + u[3] * 4;
+      sp.rise = 1.4 + u[4] * 1.2;
+      sp.widen = 1.1 + u[5] * 1.1;
+      sp.life = 1.1 + u[6] * 0.7;
+      sp.size = (2 + u[7] * 1.8) * PX;
+      sp.grow = 0.3;
+      const fluff = u[8] < 0.7;
+      sp.color = fluff ? COLORS.dandelion : u[9] < 0.5 ? PETALS[2] : COLORS.leaf;
+      sp.alpha = 0.95;
+      sp.shape = fluff ? SHAPE_PLUS : SHAPE_SQUARE;
+      pool.spawnSpiral(sp);
+    }
+    const cells = spec.cells;
+    for (let i = 0; i < cells.length; i++) {
+      cellToWorldInto(cells[i].x, cells[i].y, at);
+      petalGust(at.x, at.z, 6);
     }
   }
 
@@ -758,7 +813,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
         a.setShadow(1 - (0.5 * pose.height) / THROW_ARC_HEIGHT);
         if (pose.progress > 0) {
           at.y = 0.15 + pose.height;
-          petalTrail(emit(record, DASH_TRAIL_RATE * 0.4 * frame.scale, frame.dtS), 0.7);
+          fluffTrail(emit(record, DASH_TRAIL_RATE * 0.6 * frame.scale, frame.dtS));
         }
         if (pose.done) {
           soilPuff(record.tx, record.tz, PLACE_DUST_COUNT, 1.3);
@@ -842,7 +897,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     switch (spec.kind) {
       // 'place': the plant grows in the piece layer, which calls the cues below.
       case 'dashMark':
-        dashMark.show(spec.from, spec.to);
+        dashMark.show(spec.from, spec.to, spec.player);
         break;
       case 'dashStreak': {
         dashMark.resolve(); // the marks stay until the seed lands
@@ -860,6 +915,10 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       }
       case 'tornado':
         swirl.show(spec);
+        break;
+      case 'storm':
+        dandelionStorm(spec);
+        startShake(SHAKE3D_LIGHT);
         break;
       case 'tornadoEnd':
         swirl.end();
@@ -1165,7 +1224,7 @@ function markFade(mark, time) {
 // (decal-dash-target-v3) on the target plot, from 'dashAnnounced' until the
 // dash's seed lands (resolve(), then end()), the dash fails or the game
 // ends.
-function createDashMark({ world, pool, sp, random, u, frame }) {
+function createDashMark({ world, pool, sp, random, u, frame }, actors) {
   const make = (art, order) => {
     const mesh = createCellDecal(decalMaterial(artSource(art)));
     mesh.renderOrder = order;
@@ -1175,32 +1234,82 @@ function createDashMark({ world, pool, sp, random, u, frame }) {
   const target = make(ART.v3.decal.dashTarget, 4);
   const source = make(ART.v3.decal.select, 5);
   // endStart is NaN while the mark shows; resolving stops the petals while
-  // the seed flies; carry is the emission remainder.
-  const mark = { active: false, resolving: false, endStart: NaN, x: 0.5, z: 0.5, carry: 0.5 };
+  // the seed flies; carry is the emission remainder. The
+  // wind runs from the source (x, z) to the target (tx, tz): dx, dz is its
+  // direction, len its length in world units.
+  const mark = {
+    active: false, resolving: false, endStart: NaN, x: 0.5, z: 0.5, tx: 0.5, tz: 0.5, dx: 0.5, dz: 0.5, len: 0.5,
+    carry: 0.5,
+  };
+  const windEmitter = { carry: 0.5 }; // the wind's own emission remainder
+  // The ghost: a see-through copy of the dashing plant standing on the
+  // target plot, so the player sees where it will land.
+  let ghost = null;
+  let ghostAlphaTest = 0.5; // the plant material's own cut-out level, put back on release
+
+  const dropGhost = () => {
+    if (!ghost) return;
+    const { material } = ghost;
+    material.transparent = false;
+    material.opacity = 1;
+    material.alphaTest = ghostAlphaTest;
+    material.depthWrite = true;
+    material.needsUpdate = true;
+    actors.release(ghost);
+    ghost = null;
+  };
 
   const hide = () => {
     mark.active = false;
     mark.endStart = NaN;
     target.visible = false;
     source.visible = false;
+    dropGhost();
   };
 
+  // Only when a dash is announced (an event, never a plain frame).
+  function showGhost(player, to) {
+    ghost = actors.acquire(player, to);
+    const { material } = ghost;
+    ghostAlphaTest = material.alphaTest;
+    // The cut-out test reads the alpha after the opacity, so a lower one
+    // keeps the see-through plant from being cut away.
+    material.alphaTest = DASH_GHOST_OPACITY * ghostAlphaTest * 0.5;
+    material.transparent = true;
+    material.depthWrite = false;
+    material.opacity = DASH_GHOST_OPACITY;
+    material.emissiveIntensity = 0.35;
+    material.needsUpdate = true;
+    ghost.setShadow(0.4);
+  }
+
   return {
-    show(from, to) {
+    show(from, to, player) {
       placeOnCell(target, to.x, to.y);
       placeOnCell(source, from.x, from.y);
       mark.x = source.position.x;
       mark.z = source.position.z;
+      mark.tx = target.position.x;
+      mark.tz = target.position.z;
+      const dx = mark.tx - mark.x;
+      const dz = mark.tz - mark.z;
+      mark.len = Math.max(1e-6, Math.hypot(dx, dz));
+      mark.dx = dx / mark.len;
+      mark.dz = dz / mark.len;
       mark.carry = 0;
+      windEmitter.carry = 0;
       target.visible = true;
       source.visible = true;
       mark.active = true;
       mark.resolving = false;
       mark.endStart = NaN;
+      dropGhost();
+      if (player === X || player === O) showGhost(player, to);
     },
 
     resolve() {
       mark.resolving = true;
+      dropGhost(); // the real seed is on its way
     },
 
     end() {
@@ -1214,8 +1323,10 @@ function createDashMark({ world, pool, sp, random, u, frame }) {
         hide();
         return;
       }
+      const pulse = 0.5 + 0.5 * Math.sin(frame.time / 260);
       target.material.opacity = fade * (0.75 + 0.25 * Math.sin(frame.time / 180));
       source.material.opacity = fade;
+      if (ghost) ghost.material.opacity = fade * DASH_GHOST_OPACITY * (0.75 + 0.25 * pulse);
       if (fade < 1 || mark.resolving) return; // no new petals
       const count = emit(mark, DASH_SWIRL_RATE * frame.scale, frame.dtS);
       for (let i = 0; i < count; i++) {
@@ -1235,6 +1346,30 @@ function createDashMark({ world, pool, sp, random, u, frame }) {
         sp.alpha = 0.85;
         sp.shape = SHAPE_SQUARE;
         pool.spawnSpiral(sp);
+      }
+      // The wind: dandelion fluff and pale streaks drifting from the plant
+      // to its target plot along the ground, so the path reads at a glance.
+      const wind = emit(windEmitter, DASH_WIND_RATE * frame.scale, frame.dtS);
+      for (let i = 0; i < wind; i++) {
+        random.fill(u);
+        const side = (u[0] - 0.5) * 0.18;
+        sp.x = mark.x - mark.dz * side;
+        sp.y = 0.06 + u[1] * 0.18;
+        sp.z = mark.z + mark.dx * side;
+        const speed = DASH_WIND_SPEED * (0.85 + u[2] * 0.3);
+        sp.vx = mark.dx * speed;
+        sp.vy = 0.02 + u[3] * 0.06;
+        sp.vz = mark.dz * speed;
+        sp.gravity = 0;
+        sp.drag = 0;
+        sp.life = mark.len / speed;
+        sp.size = (2 + u[4] * 1.4) * PX;
+        sp.grow = 0;
+        const fluff = u[5] < 0.6;
+        sp.color = fluff ? COLORS.dandelion : COLORS.windStreak;
+        sp.alpha = fluff ? 0.95 : 0.6;
+        sp.shape = fluff ? SHAPE_PLUS : SHAPE_SQUARE;
+        pool.spawnFall(sp);
       }
     },
 
@@ -1310,8 +1445,10 @@ function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
       const count = emit(mark, TORNADO_PARTICLE_RATE * frame.scale, frame.dtS);
       for (let i = 0; i < count; i++) {
         random.fill(u);
-        // Petals of every colour, with leaves caught up among them.
-        const leaf = u[0] < 0.3;
+        // A gathering dandelion storm: white seed fluff with yellow
+        // dandelion petals and a few leaves caught up among it.
+        const leaf = u[0] < 0.12;
+        const fluff = !leaf && u[10] < 0.65;
         sp.x = mark.x;
         sp.y = 0.02 + u[1] * 0.23;
         sp.z = mark.z;
@@ -1323,9 +1460,9 @@ function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
         sp.life = 1.3 + u[7] * 0.7;
         sp.size = (2 + u[8]) * PX;
         sp.grow = 0;
-        sp.color = leaf ? (u[9] < 0.5 ? COLORS.leaf : COLORS.leafDark) : PETALS[Math.floor(u[9] * 4)];
-        sp.alpha = 0.6; // translucent: the plants show through the swirl
-        sp.shape = SHAPE_SQUARE;
+        sp.color = leaf ? (u[9] < 0.5 ? COLORS.leaf : COLORS.leafDark) : fluff ? COLORS.dandelion : u[9] < 0.6 ? PETALS[2] : PETALS[1];
+        sp.alpha = 0.7; // translucent: the plants show through the swirl
+        sp.shape = fluff ? SHAPE_PLUS : SHAPE_SQUARE;
         pool.spawnSpiral(sp);
       }
     },

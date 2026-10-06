@@ -347,8 +347,12 @@ export const DASH_STREAK_MS = 420; // a resolved Wind Dash seed rides its gust t
 export const DASH_CURVE = 0.22; // the gust bows sideways by this share of the way's length
 export const DASH_LIFT = 0.35; // world units the seed rises halfway along the gust
 export const DASH_TRAIL_RATE = 160; // petals per second in the gust behind a dashing seed
+export const DASH_WIND_RATE = 26; // dandelion fluff and wind streaks per second drifting from a dash source to its target
+export const DASH_WIND_SPEED = 1.6; // world units per second of that drift
+export const DASH_GHOST_OPACITY = 0.45; // the see-through plant standing on a dash target until the dash resolves
 export const DASH_SWIRL_RATE = 40; // petals per second circling a dash source
 export const MARK_FADE_MS = 300; // the Wind Dash marks and the Tornado Zone fade out this fast when they end
+export const STORM_BURST_COUNT = 110; // dandelion fluff and petals in the Tornado Zone storm burst (High; scaled per level)
 export const TORNADO_PARTICLE_RATE = 110; // petals and leaves per second rising in a Tornado Zone swirl
 export const TORNADO_BEND_PX = 3; // plants inside a Tornado Zone lean their tops this many art pixels towards it (High)
 export const THROW_DELAY_MS = 180; // a seed planted in a zone drops onto its plot this long before it is thrown
@@ -361,7 +365,7 @@ export const ROCK_CRUMBLE_MS = 380; // a breaking rock sinks into soil crumbs an
 export const CONVERT_SPARK_MS = 320; // Stone Conversion: the spark runs through the soil this long after the wilt
 export const CONVERT_SPARK_RATE = 70; // spark twinkles per second left in the soil
 export const SHAKE3D_MS = 240; // camera shake length
-export const SHAKE3D_LIGHT = 0.04; // world units at the start of a light shake (a rock landing, the only shake)
+export const SHAKE3D_LIGHT = 0.04; // world units at the start of a light shake (a rock landing, the Tornado Zone storm)
 export const SHAKE3D_HEAVY = 0.13; // a strong shake (unused by the farm visuals)
 export const BANNER_3D_Y = 84; // top of the skill banner on the 3D HUD, under the title and hint
 
@@ -411,6 +415,10 @@ export const FEATHER_STAGGER_MS = 120; // the feathers lift off this far apart
 // its CLOUD_SIZE by CLOUD_SIZE area and the Sky Watch outlines.
 export const CLOUD_SEE_THROUGH_OPACITY = 0.42; // the owner's (and spectators') translucent cloud
 export const CLOUD_PREVIEW_OPACITY = 0.3; // the cloud being placed, under the pointer
+export const SKY_WATCH_GLOW_OPACITY = 0.42; // the pale yellow light on a Sky Watch plot, under its outline (breathes with it)
+export const SKY_WATCH_PUFF_HEIGHT = 0.38; // world units above the ground of the small cloud drifting over a Sky Watch plot
+export const SKY_WATCH_PUFF_DRIFT = 0.22; // how far (world units) that cloud drifts either side of the plot
+export const SKY_WATCH_PUFF_MS = 3200; // one drift to and fro
 export const SKY_WATCH_OPACITY = 0.8; // the soft yellow outlines
 
 // Skill effects of every character (src/render3d/effects3d.js and the pure

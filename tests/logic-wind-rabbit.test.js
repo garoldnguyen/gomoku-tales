@@ -169,12 +169,12 @@ test('a Wind Dash landing that does not make five lets the game go on', () => {
   assert.equal(result.state.currentPlayer, X);
 });
 
-test('a Wind Dash landing inside a Tornado Zone is not thrown', () => {
+test('a Wind Dash landing inside a Tornado Zone is not blown away: the storm comes first', () => {
   const state = announcedDash();
   state.tornado = { player: X, x: 6, y: 3, cells: tornadoCells(state.board, 6, 3), endsAfterTurn: state.turn };
   const result = placeStone(state, { player: O, x: 10, y: 10 }, { random: noRandom });
   assert.equal(result.state.board[3][6], X);
-  assert.deepEqual(types(result.events), ['stonePlaced', 'dashResolved', 'tornadoEnded', 'turnEnded']);
+  assert.deepEqual(types(result.events), ['stonePlaced', 'tornadoStorm', 'tornadoEnded', 'dashResolved', 'turnEnded']);
 });
 
 // --- TORNADO ZONE: announce ---
@@ -217,131 +217,137 @@ test('Tornado Zone needs a centre on the board', () => {
   assertSkillRejected(state, { player: X, skill: TORNADO_ZONE }, /on the board/);
 });
 
-// --- TORNADO ZONE: throw ---
+// --- TORNADO ZONE: the storm ---
 
 // Wind Rabbit puts a zone centred on (7, 7) on turn 1; Earth Bear is to move.
 function activeTornado(cells = [], centre = { x: 7, y: 7 }) {
   return skillResult(stateWith(cells), X, TORNADO_ZONE, centre).state;
 }
 
-test('a stone placed in the zone is thrown to the neighbour picked by the injected random', () => {
-  // Neighbours are listed in row order: (6,6) first, (8,8) last.
-  const first = placeResult(activeTornado(), O, 7, 7, () => 0);
-  assert.equal(first.state.board[7][7], EMPTY);
-  assert.equal(first.state.board[6][6], O);
-  assert.deepEqual(first.events, [
-    { type: 'stonePlaced', player: O, x: 7, y: 7 },
-    { type: 'stoneThrown', player: O, from: { x: 7, y: 7 }, to: { x: 6, y: 6 } },
-    { type: 'tornadoEnded', player: X, x: 7, y: 7 },
-    { type: 'turnEnded', player: O, turn: 2 },
+// The empty plots outside the zone in row order (the storm's choices).
+function outsideEmpty(board, zone) {
+  const cells = [];
+  for (let y = 0; y < board.length; y++) {
+    for (let x = 0; x < board[y].length; x++) {
+      if (board[y][x] === EMPTY && !zone.some((c) => c.x === x && c.y === y)) cells.push({ x, y });
+    }
+  }
+  return cells;
+}
+
+test('after the opponent\'s turn every plant in the zone, of both sides and the new one, flies to a random empty plot outside', () => {
+  const state = activeTornado([[6, 6, X], [8, 8, O]]);
+  const zone = state.tornado.cells;
+  const result = placeResult(state, O, 7, 7, () => 0);
+  // Row order: (6,6) X, (7,7) O, (8,8) O; each takes the first empty plot outside the zone.
+  const firsts = outsideEmpty(state.board, zone);
+  assert.deepEqual(result.events.filter((e) => e.type === 'stoneThrown').map((e) => [e.player, e.from, e.to]), [
+    [X, { x: 6, y: 6 }, firsts[0]],
+    [O, { x: 7, y: 7 }, firsts[1]],
+    [O, { x: 8, y: 8 }, firsts[2]],
   ]);
-  assert.equal(first.state.tornado, null);
-
-  const last = placeResult(activeTornado(), O, 7, 7, () => 0.999);
-  assert.equal(last.state.board[8][8], O);
-
-  const middle = placeResult(activeTornado(), O, 7, 7, () => 0.5); // index 4 of 8: (8, 7)
-  assert.equal(middle.state.board[7][8], O);
+  for (const cell of zone) assert.equal(result.state.board[cell.y][cell.x], EMPTY, `${cell.x},${cell.y} cleared`);
+  assert.equal(result.state.board[firsts[0].y][firsts[0].x], X);
+  assert.equal(result.state.board[firsts[2].y][firsts[2].x], O);
+  assert.deepEqual(types(result.events), ['stonePlaced', 'tornadoStorm', 'stoneThrown', 'stoneThrown', 'stoneThrown', 'tornadoEnded', 'turnEnded']);
+  assert.deepEqual(result.events[1], { type: 'tornadoStorm', player: X, x: 7, y: 7, cells: zone, count: 3 });
+  assert.equal(result.state.tornado, null);
+  assert.equal(result.state.currentPlayer, X);
 });
 
-test('the throw only picks empty neighbours: stones, rocks and off-board cells are skipped', () => {
-  // Zone at the corner; the stone lands on (0, 0). Of its neighbours (1, 0)
-  // holds a stone and (0, 1) a rock, so (1, 1) is the only choice.
-  const state = activeTornado([[1, 0, X], [0, 1, ROCK]], { x: 0, y: 0 });
-  for (const r of [0, 0.5, 0.999]) {
-    const result = placeResult(state, O, 0, 0, () => r);
-    assert.deepEqual(result.events[1].to, { x: 1, y: 1 });
-    assert.equal(result.state.board[1][1], O);
-    assert.equal(result.state.board[0][1], X);
-    assert.equal(result.state.board[1][0], ROCK);
+test('the storm also comes when the opponent uses a skill or plants outside; rocks stay', () => {
+  const skillTurn = skillResult(activeTornado([[6, 6, X], [8, 6, ROCK]]), O, TERRAIN_CREATION, { x: 7, y: 7 });
+  assert.equal(skillTurn.state.board[7][7], ROCK, 'the new rock stays');
+  assert.equal(skillTurn.state.board[6][8], ROCK);
+  assert.equal(skillTurn.state.board[6][6], EMPTY, 'the plant flew');
+  assert.equal(skillTurn.state.tornado, null);
+
+  const outside = placeResult(activeTornado([[6, 7, X]]), O, 12, 12, () => 0.999);
+  assert.equal(outside.state.board[12][12], O, 'a plant outside the zone stays');
+  assert.equal(outside.state.board[7][6], EMPTY);
+});
+
+test('the random picks the landing plot; plants never share one, and none lands in the zone', () => {
+  for (const r of [0, 0.37, 0.999]) {
+    const result = placeResult(activeTornado([[6, 6, X], [7, 6, X], [8, 6, O]]), O, 7, 7, () => r);
+    const landed = result.events.filter((e) => e.type === 'stoneThrown').map((e) => `${e.to.x},${e.to.y}`);
+    assert.equal(new Set(landed).size, 4);
+    for (const key of landed) {
+      const [x, y] = key.split(',').map(Number);
+      assert.ok(Math.abs(x - 7) > 1 || Math.abs(y - 7) > 1, `${key} is outside the zone`);
+    }
   }
 });
 
-test('a stone with no empty neighbour stays where it was placed', () => {
-  const around = [];
-  for (let y = 6; y <= 8; y++) for (let x = 6; x <= 8; x++) if (x !== 7 || y !== 7) around.push([x, y, (x + y) % 2 ? X : ROCK]);
-  const result = placeStone(activeTornado(around), { player: O, x: 7, y: 7 }, { random: noRandom });
-  assert.equal(result.ok, true);
+test('a plant with no empty plot outside the zone stays where it is', () => {
+  const state = activeTornado();
+  for (let y = 0; y < BOARD_SIZE; y++) for (let x = 0; x < BOARD_SIZE; x++) {
+    if (Math.abs(x - 7) > 1 || Math.abs(y - 7) > 1) state.board[y][x] = ROCK;
+  }
+  const result = placeStone(state, { player: O, x: 7, y: 7 }, { random: noRandom });
   assert.equal(result.state.board[7][7], O);
-  assert.deepEqual(types(result.events), ['stonePlaced', 'throwBlocked', 'tornadoEnded', 'turnEnded']);
+  assert.deepEqual(types(result.events).slice(0, 3), ['stonePlaced', 'tornadoStorm', 'throwBlocked']);
 });
 
-test('a thrown stone is never thrown again, even if it lands inside the zone', () => {
-  let calls = 0;
-  const result = placeResult(activeTornado(), O, 7, 7, () => {
-    calls++;
-    return 0;
-  });
-  assert.equal(calls, 1);
-  assert.deepEqual(result.events[1].to, { x: 6, y: 6 }, 'landed inside the zone');
-  assert.equal(result.events.filter((e) => e.type === 'stoneThrown').length, 1);
-  assert.equal(result.state.board[6][6], O);
-});
-
-test('a stone placed outside the zone is not thrown', () => {
-  const result = placeStone(activeTornado(), { player: O, x: 9, y: 7 }, { random: noRandom });
-  assert.equal(result.state.board[7][9], O);
-  assert.deepEqual(types(result.events), ['stonePlaced', 'tornadoEnded', 'turnEnded']);
-});
-
-test('the zone lasts through the opponent\'s next turn only', () => {
-  // Earth Bear uses a skill on that turn: the rock is not thrown, and the
-  // zone disappears at the end of the turn anyway.
-  const skillTurn = skillResult(activeTornado(), O, TERRAIN_CREATION, { x: 7, y: 7 });
-  assert.equal(skillTurn.state.board[7][7], ROCK);
-  assert.equal(skillTurn.state.tornado, null);
-  assert.deepEqual(types(skillTurn.events), ['skillUsed', 'rockPlaced', 'tornadoEnded', 'turnEnded']);
-
-  // Two turns later a stone placed in the old zone stays.
+test('two turns later the old zone is plain soil again', () => {
+  const skillTurn = skillResult(activeTornado(), O, TERRAIN_CREATION, { x: 0, y: 0 });
   const xTurn = placeResult(skillTurn.state, X, 0, 14).state;
   const later = placeStone(xTurn, { player: O, x: 6, y: 6 }, { random: noRandom });
   assert.equal(later.state.board[6][6], O);
 });
 
-test('the zone does not affect Stone Conversion', () => {
-  const result = skillResult(activeTornado([[7, 7, X]]), O, STONE_CONVERSION, { x: 7, y: 7 });
-  assert.equal(result.state.board[7][7], O);
-  assert.deepEqual(types(result.events), ['skillUsed', 'stoneConverted', 'tornadoEnded', 'turnEnded']);
-});
-
-test('without an injected random the throw still lands on an empty neighbour', () => {
-  const result = placeResult(activeTornado(), O, 7, 7);
-  const { to } = result.events[1];
-  assert.equal(Math.abs(to.x - 7) <= 1 && Math.abs(to.y - 7) <= 1, true);
-  assert.equal(result.state.board[to.y][to.x], O);
-  assert.equal(result.state.board[7][7], EMPTY);
+test('without an injected random the storm still lands every plant on an empty plot outside', () => {
+  const result = placeResult(activeTornado([[6, 6, X]]), O, 7, 7);
+  for (const event of result.events.filter((e) => e.type === 'stoneThrown')) {
+    assert.ok(Math.abs(event.to.x - 7) > 1 || Math.abs(event.to.y - 7) > 1);
+    assert.equal(result.state.board[event.to.y][event.to.x], event.player);
+  }
   assert.deepEqual(JSON.parse(JSON.stringify(result.state)), result.state);
 });
 
-// --- TORNADO ZONE: win check after the throw ---
+// --- TORNADO ZONE: win check after the storm ---
 
-test('a thrown stone that lands to make five in a row wins for the player who placed it', () => {
-  // O O O O at (2..5, 6); O places (6, 7) in the zone and random throws it to (6, 6).
-  const cells = [2, 3, 4, 5].map((x) => [x, 6, O]);
-  const result = placeResult(activeTornado(cells), O, 6, 7, () => 0); // first empty neighbour of (6,7) is (6,6)
-  assert.deepEqual(result.events[1].to, { x: 6, y: 6 });
-  assert.equal(result.state.winner, O);
-  assert.deepEqual(result.state.winLine, [2, 3, 4, 5, 6].map((x) => ({ x, y: 6 })));
-  assert.deepEqual(types(result.events), ['stonePlaced', 'stoneThrown', 'win']);
-});
-
-test('a placement that would make five is not a win if the stone is thrown away', () => {
-  // O O O O at (2..5, 7); O places (6, 7), completing five, but it is thrown to (5, 6).
+test('a placement in the zone that would make five is not a win: it is blown away', () => {
   const cells = [2, 3, 4, 5].map((x) => [x, 7, O]);
   const result = placeResult(activeTornado(cells), O, 6, 7, () => 0);
-  assert.deepEqual(result.events[1].to, { x: 5, y: 6 });
   assert.equal(result.state.board[7][6], EMPTY);
   assert.equal(result.state.winner, null);
-  assert.equal(result.state.currentPlayer, X);
 });
 
-test('a stone that cannot be thrown still wins if it makes five where it was placed', () => {
-  const cells = [2, 3, 4, 5].map((x) => [x, 7, O]);
-  for (let y = 6; y <= 8; y++) for (let x = 5; x <= 7; x++) if (y !== 7) cells.push([x, y, ROCK]);
-  cells.push([7, 7, ROCK]);
-  const result = placeStone(activeTornado(cells), { player: O, x: 6, y: 7 }, { random: noRandom });
-  assert.equal(result.state.winner, O);
-  assert.deepEqual(types(result.events), ['stonePlaced', 'throwBlocked', 'win']);
+test('plants blown away break a five that used the zone, and a plant outside that needed them does not win', () => {
+  // O O O O at (8..11, 7) with (7, 7) in the zone: O plants (12, 7) but the
+  // storm takes (8, 7) away first, so there is no five.
+  const cells = [[8, 7, O], [9, 7, O], [10, 7, O], [11, 7, O]];
+  const result = placeResult(activeTornado(cells), O, 12, 7, () => 0.999);
+  assert.equal(result.state.board[7][8], EMPTY);
+  assert.equal(result.state.winner, null);
+});
+
+test('a plant the storm drops into a five wins for its owner', () => {
+  // X X X X at (0..3, 0): the first empty plot outside the zone is (4, 0),
+  // so the X at (6, 6) lands there and makes five for X, on O's turn.
+  const cells = [0, 1, 2, 3].map((x) => [x, 0, X]).concat([[6, 6, X]]);
+  const result = placeResult(activeTornado(cells), O, 12, 12, () => 0);
+  assert.equal(result.state.winner, X);
+  assert.deepEqual(result.state.winLine, [0, 1, 2, 3, 4].map((x) => ({ x, y: 0 })));
+  assert.equal(result.events.at(-1).type, 'win');
+});
+
+test('fives for both players from one storm are a draw', () => {
+  // X X X X at (0..3, 0) and O O O O at (0..3, 1); rocks fill the rest of
+  // row 0, so in row order the X from (6, 6) lands on (4, 0) and the O from
+  // (8, 8) on (4, 1): both make five at once.
+  const cells = [0, 1, 2, 3].map((x) => [x, 0, X]);
+  for (let x = 5; x < BOARD_SIZE; x++) cells.push([x, 0, ROCK]);
+  for (let x = 0; x < 4; x++) cells.push([x, 1, O]);
+  cells.push([6, 6, X], [8, 8, O]);
+  const result = placeResult(activeTornado(cells), O, 14, 14, () => 0);
+  assert.equal(result.state.board[0][4], X);
+  assert.equal(result.state.board[1][4], O);
+  assert.equal(result.state.draw, true);
+  assert.equal(result.state.winner, null);
+  assert.equal(result.events.at(-1).type, 'draw');
+  assert.equal(isGameOver(result.state), true);
 });
 
 test('the zone is gone once the opponent wins on its turn', () => {

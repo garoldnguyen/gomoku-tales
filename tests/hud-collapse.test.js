@@ -136,11 +136,11 @@ test('SKILL_INFO: the numbers are the config constants and the text matches the 
   const strings = source.slice(source.indexOf('export const SKILL_INFO'));
   assert.doesNotMatch(strings.replace(/\$\{[^}]*\}/g, ''), /'[^'\n]*\d[^'\n]*'|`[^`\n]*\d[^`\n]*`/);
   // Accuracy (src/logic): Wind Dash needs an empty target and lands after
-  // the opponent's turn; Tornado Zone throws only a seed planted inside it
-  // on the opponent's next turn; Terrain Creation needs an empty plot;
+  // the opponent's turn; Tornado Zone's storm blows away every plant in the
+  // zone, of both sides, after the opponent's next turn; Terrain Creation needs an empty plot;
   // Stone Conversion takes only an opponent's plant.
   assert.match(SKILL_INFO[WIND_DASH].description, /empty target plot\. After the opponent's next turn/);
-  assert.match(SKILL_INFO[TORNADO_ZONE].description, /On the opponent's next turn, .* a seed they plant inside/);
+  assert.match(SKILL_INFO[TORNADO_ZONE].description, /after the opponent's next turn it blows every plant in the zone away, yours too/);
   assert.match(SKILL_INFO[TERRAIN_CREATION].description, /on an empty plot/);
   assert.match(SKILL_INFO[STONE_CONVERSION].description, /^Pick one of the opponent's plants\./);
   // Only Earth Bear (O) has Stone Conversion, so it never turns O into X.

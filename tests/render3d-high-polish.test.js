@@ -455,7 +455,7 @@ const FRAME_PATH = {
     'shakeLeft', 'shakeOffset3d', 'shakeStrength', 'skyWatchPulse', 'snapToStep', 'sparkPathInto',
     'throwPose', 'venomPose', 'venomWiltMs', 'worldUnitsPerPixel'],
   'render3d/effects3d.js': ['bendAt', 'bloomSparkles', 'colourSparkles', 'crumbs', 'drawBanner', 'drawRings', 'drawVines', 'end',
-    'endTimeline', 'hide', 'holds', 'markFade', 'moveAlong', 'openSparkles', 'petalGust', 'petalTrail', 'release', 'setShadow',
+    'dropGhost', 'endTimeline', 'hide', 'holds', 'markFade', 'moveAlong', 'fluffTrail', 'openSparkles', 'petalGust', 'petalTrail', 'release', 'setShadow',
     'show', 'soilPixels', 'soilPuff', 'sparkTrail', 'startShake', 'stepTimeline', 'sync', 'update', 'venomBubbles', 'venomSmoke'],
   'render3d/skill-rings.js': ['ringAlpha', 'ringDotsInto', 'ringProgress', 'ringRadius', 'stepRings'],
   'render3d/fps.js': ['fps', 'lowest', 'tick'],
@@ -499,6 +499,7 @@ const NOT_EACH_FRAME = {
   'render3d/world.js applyViewSize': 'only when the window size or pixel ratio changes',
   'render3d/world-renderer.js applyMarkTints': 'only when a match starts (new sides) or the quality level changes',
   'render3d/effects3d.js dropStaleActor': 'only for a flying plant made before the marks were re-tinted',
+  'render3d/effects3d.js showGhost': 'only when a Wind Dash is announced (its see-through plant on the target)',
   // Pools and caches grow the first time they need more, then are reused.
   'render3d/board-marks.js newDecal': 'a decal record pool that grows on a miss (??)',
   'render3d/world-renderer.js plantLook': 'built once per player on a miss (??)',

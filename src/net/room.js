@@ -661,7 +661,7 @@ export function hostStateMessages(message, guestStone, withSpectators, current =
 // Runs a room action through the game rules.
 function runAction(state, player, action, random) {
   if (action?.kind === 'place') return placeStone(state, { player, x: action.x, y: action.y }, { random });
-  if (action?.kind === 'skill') return useSkill(state, { player, skill: action.skill, target: action.target ?? null });
+  if (action?.kind === 'skill') return useSkill(state, { player, skill: action.skill, target: action.target ?? null }, { random });
   return { ok: false, error: 'Unknown action.' };
 }
 

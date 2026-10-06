@@ -42,7 +42,7 @@ Which screen is shown is decided only by the flow reducer in src/ui/flow.js (scr
 - Board 15x15. Wind Rabbit uses X stones and always moves first. Earth Bear uses O stones. The room creator picks which character they play; the joiner gets the other one.
 - On your turn you do exactly one thing: place a stone on an empty cell, or use an available skill. Using a skill uses your whole turn.
 - A cell is empty if it holds no stone and no rock.
-- Win: five or more stones of your colour in an unbroken horizontal, vertical or diagonal line. Check for a win for the acting player after every placement and after every skill effect that changes stones (Wind Dash landing, Tornado throw, Stone Conversion). Rocks count for neither colour and break lines.
+- Win: five or more stones of your colour in an unbroken horizontal, vertical or diagonal line. Check for a win for the acting player after every placement and after every skill effect that changes stones (Wind Dash landing, the Tornado Zone storm, Stone Conversion). Rocks count for neither colour and break lines.
 - If the board is full and nobody has won, it is a draw.
 
 ## 5. Characters and skills
@@ -69,8 +69,9 @@ WIND DASH (short cooldown). Uses your turn.
 
 TORNADO ZONE (long cooldown). Uses your turn.
 - Choose the centre of a 3x3 zone. The zone is clipped by the board edges. A swirling wind overlay covers the zone.
-- The zone lasts through the opponent's next turn only. If the opponent places a stone inside the zone on that turn, then after placing it the stone is thrown to a random empty cell among the (up to 8) cells next to where it was placed. A cell is not valid if it holds a stone or a rock or is off the board. If no neighbouring cell is valid, the stone stays. A thrown stone is never thrown again. Then the win check runs. The host picks the random cell.
-- The zone disappears at the end of the opponent's turn. It does not affect Wind Dash landings, rocks or Stone Conversion.
+- A dandelion storm gathers over the zone through the opponent's next turn (they may plant, inside or outside the zone, or use a skill). At the end of that turn, before any win check, the storm blows away EVERY plant inside the zone: both players' plants, including one planted there that turn. Plants go in row order; each lands on a random empty plot outside the zone that is still empty when its turn comes, so two never share a plot. A plant with no empty plot left outside the zone stays. Rocks stay. The host picks the random plots (owner's rule, October 2026; it replaced the older throw of only the new stone to a neighbouring cell).
+- Then the win check runs on the acting player's plot (where its plant landed, if it flew) and on every landing plot. A five made by the storm counts for whoever owns it, even on the other player's turn; fives for both players at once are a draw. A plant planted in the zone never wins where it was planted, and a five outside that needed a plant from the zone is broken first.
+- The zone disappears with the storm. A Wind Dash that resolves on the same turn lands after the storm and is not blown away.
 - Visual: a whirlwind icon tossing small stones, and a translucent whirlwind over the 3x3 area.
 
 ### 5.2 Earth Bear

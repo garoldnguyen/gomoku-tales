@@ -86,6 +86,9 @@ export function visualsForEvents(events) {
       case 'tornadoAnnounced':
         specs.push({ kind: 'tornado', x: event.x, y: event.y, cells: event.cells });
         break;
+      case 'tornadoStorm':
+        specs.push({ kind: 'storm', x: event.x, y: event.y, cells: event.cells });
+        break;
       case 'tornadoEnded':
         specs.push({ kind: 'tornadoEnd' });
         break;
