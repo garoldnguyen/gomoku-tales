@@ -35,7 +35,10 @@ export const EMPTY_ROOM_CLEANUP_MS = 60000; // a room with no socket forgets its
 
 // Screen timings not listed in docs/design.md section 10.
 export const GAME_OVER_DELAY_MS = 1500; // time to see the final board before the Game over screen
+export const LEAVE_MS = 200; // how long a menu, panel or screen card takes to fade out (src/ui/motion.js); the CSS leave animations are no longer
+export const ENTER_STAGGER_MS = 900; // how long a new screen card's character cards and seats may still play their staggered entrance (src/ui/screens.js)
 export const COPY_FEEDBACK_MS = 1500; // how long Copied shows after the room code was copied
+export const INVITE_LINK_SHOW_MS = 8000; // how long the invite link shows to copy by hand when the clipboard is refused
 export const SELECT_PORTRAIT_SCALE = 2; // whole-number scale of the 128 px portraits on the character cards (sharp pixels)
 // The Ivory character select (src/ui/room.css, room-screens.js
 // selectGlassStyle): how opaque the ivory paper of the panel (none: the
@@ -438,6 +441,10 @@ export const CLOUD_FORM_MS = 650; // a new cloud thickens from nothing this long
 export const CLOUD_FADE_MS = 700; // an ended cloud thins away this long
 export const CLOUD_PUFFS = 22; // cloud puffs rolling in or drifting away (particles)
 export const SKY_WATCH_PULSE_MS = 1400; // the Sky Watch outlines breathe once in this long
+// The turn banner of a game on one screen and the first-game hints
+// (src/ui/announce.js).
+export const TURN_BANNER_MS = 1300; // the banner stays this long (it fades in and out within it)
+export const HINT_MS = 9000; // a hint card hides by itself after this long (Got it hides it at once)
 export const SKY_WATCH_PULSE_LOW = 0.6; // share of SKY_WATCH_OPACITY at the faintest
 export const WIN_STAGGER_MS = 110; // the winning plants celebrate one after another this far apart
 export const WIN_RING_MS = 700;

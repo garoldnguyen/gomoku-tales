@@ -166,10 +166,10 @@ test('room.css: the portrait has no tile or frame, only a soft glow that fades i
   assert.doesNotMatch(css, /border: 2px/, 'no 2 px borders left');
 });
 
-test('room.css: on phones a card with a missing portrait puts its skill rows under the text, not over it', () => {
+test('room.css: on phones the four cards sit two by two, the portrait over the text, and the game over card clears the Fullscreen button', () => {
   const css = read('src/ui/room.css');
-  const rule = css.match(/#screens \.character:not\(:has\(\.emblem-tile\.has-portrait\)\) \.skill-list \{([^}]*)\}/);
-  assert.ok(rule, 'the missing-portrait fallback rule exists');
-  assert.match(rule[1], /grid-row: 2;/);
-  assert.match(rule[1], /align-self: start;/);
+  const phone = css.slice(css.indexOf('@media (max-width: 600px) {\n  #screens.picking'));
+  assert.match(phone, /#screens \.characters \{\s*grid-template-columns: repeat\(2, minmax\(0, 1fr\)\);/);
+  assert.doesNotMatch(phone.slice(0, phone.indexOf('@media (prefers-reduced-motion')), /grid-template-columns: var\(--stage-w\)/, 'no side by side stage on phones');
+  assert.match(css, /@media \(max-width: 600px\) \{\s*#screens\.over \{\s*padding-top: 136px;/);
 });

@@ -9,7 +9,7 @@
    button at least 44 px. */
 
 #screens {
-  --ink-3: rgba(28, 25, 19, 0.45);
+  --ink-3: rgba(28, 25, 19, 0.62);
   --ink-dark: #fffdf8;
   --hair: rgba(28, 25, 19, 0.14);
   --blue: #3b8cff;
@@ -20,9 +20,9 @@
   --red-ink: #8a4a24;
   --jade: #2fbf7a;
   --ready: #3d7a52;
-  --gold: #a8823a;
+  --gold: #86642a;
   --gold-tile: rgba(168, 130, 58, 0.14);
-  --gold-ink: #a8823a;
+  --gold-ink: #86642a;
   --eagle: #fff2a8;
   --card-solid: #fffdf8;
   --highlight: rgba(255, 253, 248, 0.9);
@@ -91,6 +91,14 @@
    like the HUD, so the card is the same at every window size. */
 #screens.over {
   padding-top: 96px;
+}
+
+/* Phones: the Fullscreen button sits under the quality switch
+   (hud-layout.js fullscreenBelow), so the card starts below it. */
+@media (max-width: 600px) {
+  #screens.over {
+    padding-top: 136px;
+  }
 }
 
 #screens .card.over-card {
@@ -268,6 +276,19 @@
   left: 100%;
   margin-left: calc(var(--u) * 12);
   white-space: nowrap;
+}
+
+/* The invite link, shown to copy by hand when the clipboard is refused:
+   under the row, wrapping, selectable at one click. */
+#screens .select-card .code-row .status.is-link {
+  left: 0;
+  right: 0;
+  top: 100%;
+  margin: calc(var(--u) * 6) 0 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: calc(var(--u) * 12);
+  user-select: all;
 }
 
 /* The room's title and code share one row, the hint and the lead the
@@ -801,11 +822,28 @@
   #screens .card.select-card {
     width: 100%;
     gap: 12px;
-    padding: 20px 14px;
+    padding: 12px 14px;
   }
 
   #screens .select-card h2 {
     font-size: 24px;
+  }
+
+  /* The code and Copy on one line, Copy invite link under them. */
+  #screens .select-card .code-row {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 4px 10px;
+  }
+
+  #screens .select-card .code-row .code {
+    padding-block: 0;
+  }
+
+  #screens .select-card .code-row #copy-invite {
+    flex-basis: 100%;
+    min-height: 44px;
+    padding-block: 4px;
   }
 
   #screens .select-card .code-row .status {
@@ -815,56 +853,25 @@
     margin-left: 0;
   }
 
+  /* Two by two: each card the portrait over its name, tagline and skill
+     rows, so the four cards, the seats and the buttons fit a phone screen
+     without scrolling. */
   #screens .characters {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
   }
 
-  /* The skill rows sit beside the stage, under the name and tagline: the
-     pick spans both columns and the skill list shares its row in the
-     second column, so a card is no taller than its stage. */
   #screens .character {
-    --stage-w: 72px;
-    display: grid;
-    grid-template-columns: var(--stage-w) minmax(0, 1fr);
-    column-gap: 12px;
-  }
-
-  #screens .character:has(.emblem-tile.has-portrait) {
-    --stage-w: calc(var(--portrait-px) + 8px);
+    gap: 4px;
+    padding: 8px 8px 6px;
   }
 
   #screens .character-pick {
-    grid-column: 1 / -1;
-    grid-row: 1;
-    flex-direction: row;
-    align-items: flex-start;
-    gap: 12px;
-  }
-
-  #screens .character-pick .character-body {
-    padding-top: 10px;
-  }
-
-  #screens .skill-list {
-    grid-column: 2;
-    grid-row: 1;
-    align-self: end;
-    gap: 2px;
-    padding-bottom: 10px;
-  }
-
-  /* Missing portrait: the 72 px emblem stage is too short to share its row,
-     so the skill rows go under the name and tagline instead of over them. */
-  #screens .character:not(:has(.emblem-tile.has-portrait)) .skill-list {
-    grid-row: 2;
-    align-self: start;
-    padding-bottom: 0;
+    gap: 4px;
   }
 
   #screens .emblem-tile {
     flex-shrink: 0;
-    width: 72px;
     height: 72px;
   }
 
@@ -874,36 +881,50 @@
   }
 
   #screens .emblem-tile.has-portrait {
-    width: calc(var(--portrait-px) + 8px);
-    height: calc(var(--portrait-px) + 8px);
+    height: var(--portrait-px);
   }
 
   #screens .seal {
     top: 3px;
     right: 3px;
     min-width: 20px;
-    height: 20px;
-    font-size: 9px;
+    height: 16px;
+    font-size: 8px;
   }
 
   #screens .character-body {
-    flex: 1 1 auto;
-    gap: 2px;
+    gap: 1px;
+  }
+
+  #screens .character-name {
+    font-size: 19px;
+  }
+
+  #screens .tagline {
+    font-size: 13px;
+  }
+
+  #screens .character .taken {
+    font-size: 8px;
   }
 
   #screens .skill-row {
-    justify-content: flex-start;
-    padding: 0;
-    background: none;
+    padding: 3px 0;
   }
 
   #screens .skill-row .skill-name {
-    font-weight: 600;
-    color: var(--ink-2);
+    font-size: 14px;
+    color: var(--ink);
+  }
+
+  #screens .rest {
+    font-size: 8px;
+    letter-spacing: 0.12em;
   }
 
   #screens .select-actions {
     flex-wrap: wrap;
+    gap: 8px;
   }
 
   /* Narrow seats show their state only once Ready. */
@@ -917,13 +938,14 @@
   }
 
   #screens .select-ready {
-    order: 1;
-    flex: 1 1 100%;
+    order: 2;
+    flex: 1 1 0;
   }
 
   #screens .select-back {
-    order: 2;
-    flex: 1 1 100%;
+    order: 1;
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 

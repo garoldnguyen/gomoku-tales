@@ -104,6 +104,8 @@ export const STRINGS = Object.freeze({
   waitingYou: 'You',
   waitingCopy: 'Copy',
   waitingCopied: 'Copied',
+  waitingInvite: 'Copy invite link',
+  waitingLinkCopied: 'Link copied',
   waitingPressCtrlC: 'Press Ctrl+C',
   waitingLeave: 'Leave',
   waitingMovesFirst: 'Moves first',
@@ -127,6 +129,14 @@ export const STRINGS = Object.freeze({
   selectTaglineCloudEagle: 'Sees far, hides much.',
   skillAlwaysOn: 'Always on', // a passive skill (Sky Watch): no rest turns, no timer
   skillSilenced: 'Silenced by Hiss', // a skill the opponent's Hiss locks for this turn
+  // The turn banner of a game on one screen and the first-game hints (src/ui/announce.js).
+  turnBannerKicker: 'To play',
+  hintWinTitle: 'Five in a row wins',
+  hintWinText: 'Plant five of your flowers in an unbroken line: across, down or diagonally.',
+  hintTouchTitle: 'Tap again to plant',
+  hintTouchText: 'The first tap only shows where your seed would go, so a slip of the finger never costs a move.',
+  hintCancel: 'Choose it again, press Esc or right click to cancel.',
+  hintGotIt: 'Got it',
   cloudTargetPrompt: 'Cloud: choose the cloud centre', // the target step of Cloud Eagle's Cloud
 
   // Watch a match (sections 3.8 and 3.9): the spectator's room code

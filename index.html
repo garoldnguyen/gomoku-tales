@@ -85,6 +85,7 @@
   <link rel="stylesheet" href="src/ui/hud.css">
   <link rel="stylesheet" href="src/ui/menu.css">
   <link rel="stylesheet" href="src/ui/room.css">
+  <link rel="stylesheet" href="src/ui/announce.css">
 </head>
 <body>
   <div id="stage">
@@ -136,6 +137,7 @@
           <div class="code-row">
             <output class="code" id="room-code" data-hud-box="waiting-code"></output>
             <button type="button" id="copy-code" data-hud-box="waiting-copy"></button>
+            <button type="button" class="secondary" id="copy-invite" data-hud-box="waiting-invite"></button>
             <p class="status" id="copy-status" aria-live="polite"></p>
           </div>
         </div>
@@ -196,6 +198,7 @@
   <!-- Glass HUD over the 3D world (docs/art-direction-v3.md section 8), built by src/ui/hud.js. -->
   <div id="hud" hidden></div>
   <!-- Main menu, How to Play and Settings (docs/flow-design.md section 3), built by src/ui/menu-dom.js. -->
+  <div id="announce" aria-live="polite"></div>
   <div id="flow" hidden></div>
   <script type="module" src="src/main.js"></script>
 </body>

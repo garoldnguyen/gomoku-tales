@@ -286,6 +286,9 @@ export function waitingViewModel(flow, room, { config = CONFIG } = {}) {
     characters: select.characters,
     readyButton: select.readyButton,
     copy: { label: STRINGS.waitingCopy, enabled: true, box: 'waiting-copy' },
+    // The invite link only while the host waits alone: the room is full
+    // once the guest is in.
+    invite: starting ? null : { label: STRINGS.waitingInvite, box: 'waiting-invite' },
     leave: { label: STRINGS.waitingLeave, enabled: true, box: 'waiting-leave' },
   };
 }
@@ -313,6 +316,7 @@ function spectatorWaitingViewModel(room) {
     characters: select.characters,
     readyButton: null,
     copy: { label: STRINGS.waitingCopy, enabled: true, box: 'waiting-copy' },
+    invite: null,
     leave: { label: STRINGS.spectateLeave, enabled: true, box: 'waiting-leave' },
   };
 }
@@ -400,7 +404,34 @@ export async function copyRoomCode(code, clipboard) {
   }
 }
 
+// The invite link of a room (docs/flow-design.md section 3.10): this page
+// with ?join=CODE, the other parameters kept (a test page's ?local=1 and a
+// stale join dropped). Opening it goes to Join Room with the code sent.
+export const JOIN_PARAM = 'join';
+export function inviteLink(href, code) {
+  const url = new URL(href);
+  url.searchParams.delete('local');
+  url.searchParams.set(JOIN_PARAM, code);
+  url.hash = '';
+  return url.toString();
+}
+
+// The room code of an invite link's query (location.search), normalised,
+// or null when there is none.
+export function joinCodeFromSearch(search) {
+  const value = new URLSearchParams(search).get(JOIN_PARAM);
+  if (value === null) return null;
+  const code = normalizeRoomCode(value);
+  return code.length > 0 ? code : null;
+}
+
 // The text shown after a copy result of copyRoomCode.
 export function copyFeedbackText(result) {
   return result === 'copied' ? STRINGS.waitingCopied : STRINGS.waitingPressCtrlC;
+}
+
+// The text shown after copying the invite link: Link copied, or the link
+// itself to copy by hand.
+export function inviteFeedbackText(result, link) {
+  return result === 'copied' ? STRINGS.waitingLinkCopied : link;
 }

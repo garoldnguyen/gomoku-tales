@@ -12,8 +12,8 @@
 #screens {
   /* The Ivory palette (also the token colours of menu.css and room.css). */
   --ink: #1c1913;
-  --ink-2: rgba(28, 25, 19, 0.62);
-  --ink-3: rgba(28, 25, 19, 0.45);
+  --ink-2: rgba(28, 25, 19, 0.72);
+  --ink-3: rgba(28, 25, 19, 0.62);
   --ink-dark: #fffdf8;
   --card: rgba(255, 253, 248, 0.94);
   --card-solid: #fffdf8;
@@ -24,7 +24,7 @@
   --shadow: rgba(60, 45, 20, 0.16);
   --scrim: rgba(250, 246, 237, 0.72);
   --wash: rgba(250, 246, 237, 0.93);
-  --gold: #a8823a;
+  --gold: #86642a;
   --error: #9b3a2a;
   /* team and character tints on ivory (menu.css, room.css) */
   --blue-ink: #2f63b0;
@@ -39,6 +39,8 @@
   --highlight: rgba(255, 253, 248, 0.9);
   --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
   --caps: "Cinzel", "Cormorant Garamond", Georgia, serif;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
   position: absolute;
   inset: 0;
   display: flex;
@@ -268,4 +270,64 @@
   25% { content: '.'; }
   50% { content: '..'; }
   75% { content: '...'; }
+}
+
+/* --- Motion (docs/flow-design.md section 3.11): only opacity and
+   transforms move. A card that appears fades and rises in; the one it
+   replaces is pinned where it stood (screens.js) and fades out in
+   LEAVE_MS, so the two cross. On a new screen the character cards, then
+   the seats, come in one after another (--i from screens.js). The whole
+   layer fades out when the game begins. --- */
+#screens > [data-screen] {
+  animation: screen-in 420ms var(--ease-out) backwards;
+}
+
+#screens > [data-screen].is-leaving {
+  position: absolute;
+  margin: 0;
+  animation: screen-leave 180ms var(--ease-in) forwards;
+  pointer-events: none;
+}
+
+#screens.is-leaving {
+  animation: screen-fade-out 200ms var(--ease-in) forwards;
+  pointer-events: none;
+}
+
+#screens.is-leaving * {
+  pointer-events: none;
+}
+
+#screens .is-entering .characters > * {
+  animation: screen-rise 460ms var(--ease-out) backwards;
+  animation-delay: calc(120ms + var(--i, 0) * 70ms);
+}
+
+#screens .is-entering .seats > * {
+  animation: screen-rise 460ms var(--ease-out) backwards;
+  animation-delay: calc(380ms + var(--i, 0) * 80ms);
+}
+
+@keyframes screen-in {
+  from { opacity: 0; translate: 0 16px; scale: 0.985; }
+}
+
+@keyframes screen-rise {
+  from { opacity: 0; translate: 0 18px; }
+}
+
+@keyframes screen-leave {
+  to { opacity: 0; translate: 0 -8px; scale: 0.985; }
+}
+
+@keyframes screen-fade-out {
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #screens,
+  #screens * {
+    animation: none !important;
+    transition: none !important;
+  }
 }

@@ -701,6 +701,16 @@ export function createApp(options) {
       return true;
     },
 
+    // An invite link (?join=CODE, docs/flow-design.md section 3.10) opened
+    // on the menu: Play Online, Join Room, then the join of code, each step
+    // an ordinary event of the flow. Returns true when the join was sent;
+    // a bad code stays on Join Room with its inline error.
+    joinFromLink(code) {
+      if (screenNow() !== MENU || !menuEvent(FLOW_EVENTS.PLAY_ONLINE)) return false;
+      this.openJoin();
+      return this.joinRoom(code);
+    },
+
     // The spectator typed in the code box: the inline error goes away.
     clearSpectateError() {
       if (spectateError === null) return;

@@ -12,6 +12,7 @@
 import { MENU_SCRIM_BLUR_PX } from '../config.js';
 import { FLOW_EVENTS, OVERLAYS } from './flow.js';
 import { OVERLAY_OPENER, menuKeyAction } from './menu.js';
+import { createFader } from './motion.js';
 
 const SVG = 'http://www.w3.org/2000/svg';
 
@@ -29,6 +30,7 @@ const CHEVRON = ['M9 6l6 6l-6 6'];
 export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
   let assets = null;
   let shown = null; // the last view model drawn
+  const fader = createFader(); // the menu and its panels fade out (motion.js)
   const images = [];
 
   const el = (tag, className, parent) => {
@@ -126,6 +128,7 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
     for (const item of vm.buttons) {
       const node = button('menu-button', list, '', item.box);
       node.dataset.menu = item.id;
+      node.style.setProperty('--i', String(menuOrder.length)); // its place in the staggered entrance (menu.css)
       const badge = el('span', 'menu-icon', node);
       icon('menu-glyph', badge, MENU_ICONS[item.id] ?? []);
       const text = el('span', 'menu-text', node);
@@ -228,13 +231,13 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
       const before = shown;
       shown = vm;
       if (menuButtons.size === 0) buildMenu(vm);
-      root.hidden = !vm.visible;
+      fader.set(root, vm.visible);
       if (!vm.visible) return;
 
       menu.classList.toggle('is-covered', vm.overlay !== OVERLAYS.NONE);
       menu.setAttribute('aria-hidden', String(vm.overlay !== OVERLAYS.NONE));
-      howto.node.hidden = vm.overlay !== OVERLAYS.HOWTO;
-      settings.node.hidden = vm.overlay !== OVERLAYS.SETTINGS;
+      fader.set(howto.node, vm.overlay === OVERLAYS.HOWTO);
+      fader.set(settings.node, vm.overlay === OVERLAYS.SETTINGS);
       if (vm.howto && !howtoBuilt) {
         buildHowTo(vm.howto);
         howtoBuilt = true;

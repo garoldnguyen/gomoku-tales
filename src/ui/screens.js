@@ -9,19 +9,22 @@
 // app is the app of app.js, or in shot mode a still stand-in with the same
 // getView, getScreen and onChange (its actions may be missing).
 
-import { COPY_FEEDBACK_MS } from '../config.js';
+import { COPY_FEEDBACK_MS, ENTER_STAGGER_MS, INVITE_LINK_SHOW_MS } from '../config.js';
 import { AVATAR_PX } from '../render3d/art-assets.js';
 import { watchCardBox } from './hud-layout.js';
 import { GAME, GAME_OVER, JOIN, LOBBY, ROOM_CLOSED_SCREEN, SELECT, SPECTATE_SCREEN, WAITING_SCREEN, WATCH } from './app.js';
 import {
-  characterStage, copyFeedbackText, portraitScale, copyRoomCode, joinViewModel, lobbyViewModel, roomClosedViewModel,
+  characterStage, copyFeedbackText, portraitScale, copyRoomCode, inviteFeedbackText, inviteLink, joinViewModel, lobbyViewModel, roomClosedViewModel,
   selectGlassStyle, spectateViewModel,
 } from './room-screens.js';
 import { TIP_CLOSED, selectTipReducer, selectTipViewModel, tipDelay } from './select-tooltip.js';
 import { tooltipPosition } from './tooltip-position.js';
+import { createFader } from './motion.js';
 import { STRINGS } from './strings.js';
 
-export function attachScreens(root, app, { clipboard = globalThis.navigator?.clipboard } = {}) {
+export function attachScreens(root, app, {
+  clipboard = globalThis.navigator?.clipboard, location = globalThis.location,
+} = {}) {
   const $ = (id) => root.querySelector(`#${id}`);
   const act = (name, ...args) => app[name]?.(...args);
   const sections = [...root.querySelectorAll('[data-screen]')];
@@ -30,6 +33,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   const joinSubmit = $('join-submit');
   const copyStatus = $('copy-status');
   const roomCode = $('room-code');
+  const copyInvite = $('copy-invite');
   const leave = $('waiting-leave');
   const overRematch = $('over-rematch');
   const overMenu = $('over-menu');
@@ -38,6 +42,24 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
   const spectateSubmit = $('spectate-submit');
   let shown = null;
   let copyTimer = null;
+  // Motion (docs/flow-design.md section 3.11): a card that leaves is pinned
+  // where it stood while it fades, so the next card can rise in its place;
+  // the new card's lists enter one item after another (is-entering) for
+  // ENTER_STAGGER_MS.
+  const PINNED = ['left', 'top', 'width'];
+  const fader = createFader({
+    beforeLeave(node) {
+      if (node === root) return;
+      node.style.left = `${node.offsetLeft}px`;
+      node.style.top = `${node.offsetTop}px`;
+      node.style.width = `${node.offsetWidth}px`;
+    },
+    afterLeave(node) {
+      if (node === root) return;
+      for (const property of PINNED) node.style.removeProperty(property);
+    },
+  });
+  let enteringTimer = null;
   let assets = null; // the asset store (render/assets.js), see setAssets
   const warned = new Set(); // portrait keys already warned about
   let frosted = null; // see setFrosted
@@ -116,6 +138,7 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     clearTimeout(copyTimer);
     copyTimer = null;
     copyStatus.textContent = '';
+    copyStatus.classList.remove('is-link');
   };
   $('copy-code').addEventListener('click', async () => {
     const result = await copyRoomCode(roomCode.textContent, clipboard);
@@ -130,6 +153,16 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     clearTimeout(copyTimer);
     copyStatus.textContent = copyFeedbackText(result);
     copyTimer = setTimeout(clearCopy, COPY_FEEDBACK_MS);
+  });
+  // Copy invite link: this page with ?join=CODE. Where the clipboard is
+  // refused the link itself shows, selectable, to copy by hand.
+  copyInvite.addEventListener('click', async () => {
+    const link = inviteLink(location.href, roomCode.textContent);
+    const result = await copyRoomCode(link, clipboard);
+    clearTimeout(copyTimer);
+    copyStatus.textContent = inviteFeedbackText(result, link);
+    copyStatus.classList.toggle('is-link', result !== 'copied');
+    copyTimer = setTimeout(clearCopy, result === 'copied' ? COPY_FEEDBACK_MS : INVITE_LINK_SHOW_MS);
   });
   leave.addEventListener('click', () => act('leaveRoom'));
 
@@ -233,6 +266,8 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     const focusBox = focused?.dataset.hudBox ?? null;
     container.replaceChildren();
     for (const item of list) build(item, container);
+    // Each item's place in the staggered entrance (screens.css).
+    [...container.children].forEach((child, i) => child.style.setProperty('--i', String(i)));
     if (focusBox) {
       const again = container.querySelector(`[data-hud-box="${focusBox}"]`);
       (again && !again.disabled ? again : container.querySelector('button:not(:disabled)'))?.focus();
@@ -422,11 +457,19 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
     const entering = view.screen !== shown;
     shown = view.screen;
 
-    root.hidden = view.screen === GAME;
+    fader.set(root, view.screen !== GAME);
     root.classList.toggle('over', view.screen === GAME_OVER || view.screen === WATCH);
     root.classList.toggle('watching', view.screen === WATCH);
     root.classList.toggle('picking', view.screen === WAITING_SCREEN || view.screen === SELECT);
-    for (const section of sections) section.hidden = section.dataset.screen !== view.screen;
+    for (const section of sections) {
+      const now = section.dataset.screen === view.screen;
+      if (entering && now) {
+        section.classList.add('is-entering');
+        clearTimeout(enteringTimer);
+        enteringTimer = setTimeout(() => section.classList.remove('is-entering'), ENTER_STAGGER_MS);
+      }
+      fader.set(section, now);
+    }
     if (entering) tipEvent({ type: 'escape' });
 
     if (view.screen === LOBBY) {
@@ -462,6 +505,8 @@ export function attachScreens(root, app, { clipboard = globalThis.navigator?.cli
       $('waiting-lead').textContent = vm.lead;
       $('waiting-starting').textContent = vm.startingText ?? '';
       leave.disabled = !vm.leave.enabled;
+      copyInvite.hidden = vm.invite === null;
+      if (vm.invite) copyInvite.textContent = vm.invite.label;
       showSeats(waitingCards, vm.cards);
       showCharacters(waitingCharacters, vm.characters, vm.readyButton?.seat);
       showReady(waitingReady, vm.readyButton);

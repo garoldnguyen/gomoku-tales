@@ -12,8 +12,8 @@
   --serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
   --caps: "Cinzel", "Cormorant Garamond", Georgia, serif;
   --ink: #1c1913;
-  --ink-2: rgba(28, 25, 19, 0.62);
-  --ink-3: rgba(28, 25, 19, 0.45);
+  --ink-2: rgba(28, 25, 19, 0.72);
+  --ink-3: rgba(28, 25, 19, 0.62);
   --ink-dark: #fffdf8;
   --card: rgba(255, 253, 248, 0.94);
   --card-solid: #fffdf8;
@@ -24,7 +24,7 @@
   --shadow: rgba(60, 45, 20, 0.16);
   --scrim: rgba(250, 246, 237, 0.72);
   --wash: rgba(250, 246, 237, 0.93);
-  --gold: #a8823a;
+  --gold: #86642a;
   --blue: #3b8cff;
   --blue-tile: rgba(59, 140, 255, 0.16);
   --blue-ink: #2f63b0;
@@ -34,6 +34,8 @@
   --ready: #3d7a52;
   --blur: 18px;
   --scrim-blur: 0px; /* MENU_SCRIM_BLUR_PX on the frosted levels, set by menu-dom.js */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
 }
 
 #flow {
@@ -106,6 +108,7 @@
   -webkit-backdrop-filter: blur(var(--scrim-blur));
   backdrop-filter: blur(var(--scrim-blur));
   pointer-events: none;
+  animation: flow-fade 420ms var(--ease-out) backwards;
 }
 
 #flow.is-solid .scrim {
@@ -125,6 +128,7 @@
   padding: 28px 32px 20px;
   border: 1px solid transparent;
   pointer-events: auto;
+  transition: opacity 260ms var(--ease-out);
 }
 
 /* No box: the menu lies on the wash itself. */
@@ -139,6 +143,8 @@
 
 #flow .menu-card.is-covered {
   visibility: hidden; /* an overlay is open: the menu is neither seen nor focused */
+  opacity: 0;
+  transition: opacity 160ms var(--ease-in), visibility 0s linear 160ms;
 }
 
 #flow .menu-head {
@@ -147,6 +153,7 @@
   flex-direction: column;
   align-items: center;
   gap: 10px;
+  animation: flow-rise 560ms var(--ease-out) 60ms backwards;
 }
 
 /* The gold diamond rule under the title, in the gap above the choices. */
@@ -223,6 +230,8 @@
   letter-spacing: 0;
   border: 0;
   border-bottom: 1px solid var(--hair);
+  animation: flow-rise 460ms var(--ease-out) backwards;
+  animation-delay: calc(160ms + var(--i, 0) * 60ms); /* staggered, --i from menu-dom.js */
 }
 
 /* The chosen line: a gold wash across it and a gold diamond either side of
@@ -314,6 +323,7 @@
   letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--ink-3);
+  animation: flow-fade 480ms var(--ease-out) 520ms backwards;
 }
 
 /* --- How to Play and Settings panels --- */
@@ -329,6 +339,7 @@
   max-height: 80vh;
   border-radius: 2px;
   overflow: hidden;
+  animation: flow-panel-in 340ms var(--ease-out) backwards;
 }
 
 #flow .settings-panel {
@@ -681,7 +692,39 @@
   }
 }
 
+/* --- Motion (docs/flow-design.md section 3.11): only opacity and
+   transforms move. The menu fades in over the farm, its title rises, then
+   its buttons one after another (--i from menu-dom.js); a panel grows in
+   while the menu fades behind it. Leaving (class is-leaving from
+   src/ui/motion.js, LEAVE_MS) is shorter and eases in. --- */
+#flow.is-leaving,
+#flow .panel.is-leaving {
+  animation: flow-leave 180ms var(--ease-in) forwards;
+  pointer-events: none;
+}
+
+#flow.is-leaving * {
+  pointer-events: none;
+}
+
+@keyframes flow-fade {
+  from { opacity: 0; }
+}
+
+@keyframes flow-rise {
+  from { opacity: 0; translate: 0 14px; }
+}
+
+@keyframes flow-panel-in {
+  from { opacity: 0; scale: 0.96; }
+}
+
+@keyframes flow-leave {
+  to { opacity: 0; scale: 0.985; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  #flow,
   #flow * {
     transition: none !important;
     animation: none !important;

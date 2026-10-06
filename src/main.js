@@ -17,12 +17,14 @@ import {
 } from './ui/fullscreen.js';
 import { createHud } from './ui/hud.js';
 import { isCollapseKey, startCollapsed, toggleAll, withCollapsed, writeCollapsed } from './ui/hud-collapse.js';
+import { createAnnouncer } from './ui/announce.js';
 import { SPECTATOR_VIEW, hudViewModel } from './ui/hud-view.js';
-import { attachGameInput, hitTest, isQualityKey, shortcutKeyHandler } from './ui/input.js';
+import { TOUCH_PREVIEW, attachGameInput, createTouchConfirm, hitTest, isQualityKey, shortcutKeyHandler } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
 import { watchNewGame } from './ui/new-game-watch.js';
 import { menuViewModel } from './ui/menu.js';
 import { createMenu } from './ui/menu-dom.js';
+import { JOIN_PARAM, joinCodeFromSearch } from './ui/room-screens.js';
 import { attachScreens } from './ui/screens.js';
 import {
   parseShotParams, setUpShotScene, SHOT_GAME_OVER, shotFlow, shotGameOverView, shotRoomView, shotWatchView, stillRoomApp,
@@ -93,6 +95,19 @@ const pointerCanvas = renderer === RENDERER_2D ? canvas : worldCanvas;
 // renderer draws its own panels on the canvas. The game modes set the
 // handlers below.
 const hudHandlers = { onSkill: () => {}, onCancel: () => {} };
+// The turn banner and first-game hints (src/ui/announce.js); hints is the
+// same layer, named for the touch preview tip.
+let announcer = null;
+let hints = null;
+
+// window.localStorage, or null where the browser blocks it.
+function safeStorage() {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
 const hud = renderer === RENDERER_2D ? null : createHud(document.getElementById('hud'), {
   onSkill: (player, skillId) => hudHandlers.onSkill(player, skillId),
   onQuality: (level) => setQuality(level),
@@ -263,6 +278,8 @@ function showHud(game, view, localPlayer, winner, hint) {
   hudInputs.hint = hint;
   hudInputs.collapsed = hudCollapsed;
   hud.render(hudViewModel(view.state, hudInputs, localPlayer));
+  // The turn banner (one screen) and the first-game hints, on the same changes.
+  announcer?.onHud(view.state, targeting, localPlayer === null, localPlayer === SPECTATOR_VIEW);
 }
 
 // The game view with this frame's time, effects and hint, for the
@@ -315,12 +332,28 @@ function startAppMode({ local = false } = {}) {
   createMenuLayer((type) => app.menuEvent(type));
   // data-screen on the body names the flow screen (menu, lobby, waiting,
   // starting, game, gameover) for the end to end check (tools/flow_e2e.py).
+  // The turn banner and the first-game hints, never in shot mode.
+  const announceRoot = document.getElementById('announce');
+  if (announceRoot && !shot) announcer = createAnnouncer(announceRoot, { storage: safeStorage() });
+  hints = announcer;
   const showFlow = () => {
     document.body.dataset.screen = app.getFlow().screen;
     showMenu(app.getFlow());
+    const screen = app.getFlow().screen;
+    if (screen !== SCREENS.GAME && screen !== SCREENS.GAMEOVER) announcer?.reset();
   };
   app.onChange(showFlow);
   showFlow();
+  // An invite link (?join=CODE): straight to Join Room with the code sent.
+  // The parameter leaves the address bar, so a reload after leaving the
+  // room does not join again.
+  const inviteCode = local ? null : joinCodeFromSearch(window.location.search);
+  if (inviteCode !== null) {
+    const url = new URL(window.location.href);
+    url.searchParams.delete(JOIN_PARAM);
+    window.history.replaceState(null, '', url);
+    app.joinFromLink(inviteCode);
+  }
   // Tell the opponent at once when this window closes or reloads.
   window.addEventListener('pagehide', () => app.close());
 
@@ -328,6 +361,7 @@ function startAppMode({ local = false } = {}) {
   // the same way but never gets a hover, a click or a skill.
   const playing = () => (app.getScreen() === GAME ? app.getGame() : null);
 
+  const touchConfirm = createTouchConfirm();
   attachGameInput(pointerCanvas, {
     onHover: (point) => {
       const game = playing();
@@ -336,14 +370,27 @@ function startAppMode({ local = false } = {}) {
       game.setHover(hit?.cell ?? null);
       game.setHoverSkill(hit?.skill ?? null);
     },
-    onClick: ({ px, py }) => {
+    onClick: ({ px, py, pointerType }) => {
       const game = playing();
       if (!game) return;
       const hit = renderer.hitTest(px, py, game.getView().state.characters);
-      if (hit?.skill) game.clickSkill(hit.skill.player, hit.skill.skillId);
-      else if (hit?.cell) game.click(hit.cell);
+      if (hit?.skill) {
+        touchConfirm.clear();
+        game.clickSkill(hit.skill.player, hit.skill.skillId);
+      } else if (hit?.cell) {
+        // On a touch screen the first tap previews the cell, the second plants.
+        if (touchConfirm.decide(pointerType, hit.cell) === TOUCH_PREVIEW) {
+          game.setHover(hit.cell);
+          hints?.touchPreview();
+          return;
+        }
+        game.click(hit.cell);
+      }
     },
-    onCancel: () => playing()?.cancel(),
+    onCancel: () => {
+      touchConfirm.clear();
+      playing()?.cancel();
+    },
     onRestart: () => app.restartLocal(), // local mode only
   });
   hudHandlers.onSkill = (player, skillId) => playing()?.clickSkill(player, skillId);
@@ -354,6 +401,7 @@ function startAppMode({ local = false } = {}) {
   const newGame = watchNewGame(() => {
     effects?.clear();
     renderer.reset?.();
+    announcer?.reset();
   });
   let blurred = false;
   // The hint line, made again only when the room or seat changes.

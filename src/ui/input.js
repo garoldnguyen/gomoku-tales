@@ -76,6 +76,38 @@ export function skillHitTest(px, py, layout, sides = undefined) {
   return null;
 }
 
+// Two taps to plant on a touch screen: a board cell is small under a
+// finger, and a wrong plant can lose the game. The first tap on a cell
+// only previews it (the hover ring and the faint plant), a second tap on
+// the same cell acts; a tap on another cell moves the preview there. A
+// mouse or pen click acts at once. Pure: decide(pointerType, cell) returns
+// 'act' or 'preview'; clear() forgets the preview (a cancel, a new game).
+export const TOUCH_PREVIEW = 'preview';
+export const TOUCH_ACT = 'act';
+export function createTouchConfirm() {
+  let pending = null;
+  return {
+    decide(pointerType, cell) {
+      if (pointerType !== 'touch' || !cell) {
+        pending = null;
+        return TOUCH_ACT;
+      }
+      if (pending && pending.x === cell.x && pending.y === cell.y) {
+        pending = null;
+        return TOUCH_ACT;
+      }
+      pending = { x: cell.x, y: cell.y };
+      return TOUCH_PREVIEW;
+    },
+    clear() {
+      pending = null;
+    },
+    get pending() {
+      return pending;
+    },
+  };
+}
+
 // Handlers get internal points { px, py } (onHover gets null when the
 // pointer leaves the canvas). A right click or Escape calls onCancel. R
 // calls onRestart; leave it out where there is no restart, so R still
@@ -86,11 +118,23 @@ export function attachGameInput(canvas, { onHover, onClick, onCancel, onRestart 
     return toInternalPoint(rect, canvas.width, canvas.height, event.clientX, event.clientY);
   };
 
-  const handlePointerMove = (event) => onHover(pointFromEvent(event));
-  const handlePointerLeave = () => onHover(null);
+  // The kind of pointer of the last press ('mouse', 'pen' or 'touch'),
+  // passed with the click (createTouchConfirm).
+  let pointerType = 'mouse';
+  const handlePointerDown = (event) => {
+    pointerType = event.pointerType || 'mouse';
+  };
+  const handlePointerMove = (event) => {
+    if (event.pointerType === 'touch') return; // a finger previews by its first tap
+    onHover(pointFromEvent(event));
+  };
+  const handlePointerLeave = (event) => {
+    if (event.pointerType === 'touch') return;
+    onHover(null);
+  };
   const handleClick = (event) => {
     if (event.button !== 0) return;
-    onClick(pointFromEvent(event));
+    onClick({ ...pointFromEvent(event), pointerType: event.pointerType || pointerType });
   };
   const handleContextMenu = (event) => {
     event.preventDefault();
@@ -106,6 +150,7 @@ export function attachGameInput(canvas, { onHover, onClick, onCancel, onRestart 
     }
   };
 
+  canvas.addEventListener('pointerdown', handlePointerDown);
   canvas.addEventListener('pointermove', handlePointerMove);
   canvas.addEventListener('pointerleave', handlePointerLeave);
   canvas.addEventListener('click', handleClick);
@@ -113,6 +158,7 @@ export function attachGameInput(canvas, { onHover, onClick, onCancel, onRestart 
   window.addEventListener('keydown', handleKeyDown);
 
   return () => {
+    canvas.removeEventListener('pointerdown', handlePointerDown);
     canvas.removeEventListener('pointermove', handlePointerMove);
     canvas.removeEventListener('pointerleave', handlePointerLeave);
     canvas.removeEventListener('click', handleClick);
