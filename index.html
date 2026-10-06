@@ -184,7 +184,7 @@
       </section>
 
       <!-- Game over card (docs/flow-design.md section 3.7): top centre, the finished board stays visible. -->
-      <section class="card over-card" data-screen="gameOver" data-hud-box="gameover-card" aria-labelledby="over-title">
+      <section class="card over-card result-card" data-screen="gameOver" data-hud-box="gameover-card" aria-labelledby="over-title">
         <h2 id="over-title"></h2>
         <p id="over-detail"></p>
         <div class="over-actions">
@@ -192,6 +192,9 @@
           <button type="button" class="secondary" id="over-menu" data-action="backToMenu" data-hud-box="gameover-menu"></button>
         </div>
         <p class="status" id="over-hint" aria-live="polite"></p>
+        <!-- View board folds the card into the small Show result pill, so the finished board shows. -->
+        <button type="button" class="over-view" id="over-view" data-hud-box="gameover-view"></button>
+        <button type="button" class="over-show" id="over-show" data-hud-box="gameover-show"></button>
       </section>
     </div>
   </div>

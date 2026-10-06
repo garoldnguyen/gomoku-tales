@@ -177,4 +177,6 @@ export const STRINGS = Object.freeze({
   rematchSentHint: 'Your request was sent',
   rematchTheirsHint: 'Opponent wants a rematch',
   rematchGoneHint: 'Opponent left',
+  gameOverViewBoard: 'View board',
+  gameOverShowResult: 'Show result',
 });

@@ -172,6 +172,125 @@
 }
 
 
+/* The game over card (section 3.7): a large, airy ivory card in the middle
+   of the window, the result in a big light title, a short gold line, two
+   wide buttons and View board under them. View board folds it into the
+   small Show result pill at the top (screens.js), so the finished board
+   can be read; a new game over opens it again. */
+#screens.result {
+  align-items: center;
+}
+
+#screens .card.result-card {
+  width: min(640px, calc(100vw - 24px));
+  max-width: 640px;
+  gap: 14px;
+  padding: 44px 56px 26px;
+  border-radius: 24px;
+  box-shadow: 0 30px 80px var(--shadow);
+}
+
+#screens .result-card h2 {
+  font-size: 48px;
+  font-weight: 300;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+}
+
+#screens .result-card p {
+  font-size: 17px;
+}
+
+#screens .result-card .over-actions {
+  gap: 20px;
+  margin-top: 26px;
+}
+
+#screens .result-card .over-actions::before {
+  top: -18px;
+  width: 48px;
+  margin-left: -24px;
+}
+
+#screens .result-card .over-actions button {
+  min-height: 56px;
+  font-size: 13px;
+  letter-spacing: 0.24em;
+}
+
+#screens .result-card .over-view,
+#screens .result-card .over-show {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 18px;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  color: var(--ink-3);
+  background: none;
+  border-color: transparent;
+}
+
+#screens .result-card .over-view {
+  margin-top: 6px;
+}
+
+#screens .result-card .over-view:hover,
+#screens .result-card .over-show:hover {
+  color: var(--ink);
+  background: none;
+}
+
+#screens .result-card .over-show {
+  display: none;
+}
+
+/* Folded: only the pill shows, at the top under the turn pill. */
+#screens .card.result-card.is-folded {
+  align-self: flex-start;
+  width: auto;
+  padding: 0;
+  background: none;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+#screens .result-card.is-folded > :not(.over-show) {
+  display: none;
+}
+
+#screens .result-card.is-folded .over-show {
+  display: block;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  box-shadow: 0 10px 30px var(--shadow);
+}
+
+@media (max-width: 600px) {
+  #screens .card.result-card {
+    gap: 10px;
+    padding: 28px 20px 18px;
+  }
+
+  #screens .result-card h2 {
+    font-size: 36px;
+  }
+
+  /* The two buttons one above the other, so the longer labels fit. */
+  #screens .result-card .over-actions {
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 20px;
+  }
+
+  #screens .result-card .over-actions button {
+    min-height: 50px;
+    font-size: 11px;
+    letter-spacing: 0.12em;
+  }
+}
+
 /* --- the watched game (section 3.9) --- */
 /* The spectator's card stays up the whole game, so it is small and sits
    in the lower left, where it never lies over the plots: screens.js places

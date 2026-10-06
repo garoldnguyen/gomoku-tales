@@ -118,6 +118,8 @@ In local mode (Play on this computer and ?local=1) the game screen opens on the 
   - gone (the other left, or the game ended by forfeit): label Rematch, disabled, hint "Opponent left". Gone beats every other state.
   - local mode: always idle, and pressing it starts the new game at once.
 
+- Large card (owner's choice, October 2026): the card is about 640 px wide and centred in the window, with the result in a big light title, a short gold line, two wide buttons and a small View board button under them. View board folds the card into a small Show result pill under the turn pill (this window only; it is not a flow screen), so the finished board and the winning line can be read; Show result opens it again, and every new game over starts open. On phones the two buttons stack. The screenshot check allows the card up to 60 percent of the window height (GAMEOVER_MAX_HEIGHT_SHARE in tools/shots.py).
+
 ### 3.8 Watch a match: the room code screen (flow screen spectate)
 ```
 +--------------------------------------+

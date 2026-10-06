@@ -37,6 +37,19 @@ export function attachScreens(root, app, {
   const leave = $('waiting-leave');
   const overRematch = $('over-rematch');
   const overMenu = $('over-menu');
+  const overCard = root.querySelector('.result-card');
+  const overView = $('over-view');
+  const overShow = $('over-show');
+  overView.textContent = STRINGS.gameOverViewBoard;
+  overShow.textContent = STRINGS.gameOverShowResult;
+  // View board folds the game over card into the Show result pill (this
+  // window only, not a screen of the flow); a new game over opens it again.
+  const foldResult = (folded) => {
+    overCard.classList.toggle('is-folded', folded);
+    (folded ? overShow : overRematch.disabled ? overMenu : overRematch).focus();
+  };
+  overView.addEventListener('click', () => foldResult(true));
+  overShow.addEventListener('click', () => foldResult(false));
   const spectateForm = $('spectate-form');
   const spectateInput = $('spectate-code');
   const spectateSubmit = $('spectate-submit');
@@ -459,6 +472,8 @@ export function attachScreens(root, app, {
 
     fader.set(root, view.screen !== GAME);
     root.classList.toggle('over', view.screen === GAME_OVER || view.screen === WATCH);
+    root.classList.toggle('result', view.screen === GAME_OVER);
+    if (entering && view.screen === GAME_OVER) overCard.classList.remove('is-folded');
     root.classList.toggle('watching', view.screen === WATCH);
     root.classList.toggle('picking', view.screen === WAITING_SCREEN || view.screen === SELECT);
     for (const section of sections) {

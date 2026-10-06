@@ -77,10 +77,10 @@ FLOW_SCENES = (
 FLOW_SHAPES = ("fhd", "hd")
 MIN_BUTTON_SIDE = 44
 # The game over card (docs/flow-design.md section 3.7): in these scenes the box GAMEOVER_CARD must be
-# there and at most GAMEOVER_MAX_HEIGHT_SHARE of the window height, so the finished board stays visible.
+# there and at most GAMEOVER_MAX_HEIGHT_SHARE of the window height (View board folds it to read the board).
 GAMEOVER_SCENES = ("gameover", "gameover-pending")
 GAMEOVER_CARD = "gameover-card"
-GAMEOVER_MAX_HEIGHT_SHARE = 0.24
+GAMEOVER_MAX_HEIGHT_SHARE = 0.6  # the large centred card (owner's choice); View board folds it away
 
 EDGE_BAND_PX = 4
 NEAR_BLACK = 16

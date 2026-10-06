@@ -360,6 +360,17 @@ test('index.html: the game over card, its two buttons with data-hud-box names an
   assert.match(html, /id="over-rematch"[^>]*data-action="rematch"[^>]*data-hud-box="gameover-rematch"/);
   assert.match(html, /id="over-menu"[^>]*data-action="backToMenu"[^>]*data-hud-box="gameover-menu"/);
   assert.match(html, /id="over-hint" aria-live="polite"/);
+  assert.match(html, /id="over-view"[^>]*data-hud-box="gameover-view"/);
+  assert.match(html, /id="over-show"[^>]*data-hud-box="gameover-show"/);
+});
+
+test('room.css: the game over card is large and centred, and View board folds it to the Show result pill', () => {
+  const css = readFileSync(new URL('../src/ui/room.css', import.meta.url), 'utf8');
+  assert.match(css, /#screens\.result \{\s*align-items: center;/);
+  assert.match(css, /#screens \.card\.result-card \{[^}]*width: min\(640px/);
+  assert.match(css, /#screens \.result-card\.is-folded > :not\(\.over-show\) \{\s*display: none;/);
+  const screens = readFileSync(new URL('../src/ui/screens.js', import.meta.url), 'utf8');
+  assert.match(screens, /if \(entering && view\.screen === GAME_OVER\) overCard\.classList\.remove\('is-folded'\)/, 'a new game over opens it again');
 });
 
 test('room.css: the card sits 96 px from the top, at most 520 px wide, buttons at least 44 px high', () => {
