@@ -412,7 +412,7 @@ export function attachScreens(root, app, {
   };
 
   // The four character cards of the active seat (characterSelectViewModel
-  // characters): portrait (or emblem) with the seal, name, tagline and one
+  // characters): portrait (or emblem), name, tagline and one
   // row per skill with its rest turns. The pick button holds the portrait,
   // name and tagline; the skill rows under it take keyboard focus for
   // their tooltip, and a click anywhere on an enabled card picks it.
@@ -430,7 +430,6 @@ export function attachScreens(root, app, {
       button.setAttribute('aria-pressed', String(card.selected));
       const tile = el('span', 'emblem-tile', button);
       showStage(card, tile);
-      el('span', 'seal', tile).textContent = card.seal;
       const body = el('span', 'character-body', button);
       const head = el('span', 'character-head', body);
       el('span', 'character-name', head).textContent = card.name;

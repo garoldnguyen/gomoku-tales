@@ -441,13 +441,13 @@ test('room.css: the room code at least 40 px, the pulse 0.6 to 1 over 1.6 s and 
 
 // --- the character select look (Game v5 part 3, docs/reference/v5) ---
 
-test('characterSelectViewModel characters: four cards with emblem, seal, tagline and skill rest turns from COOLDOWN_SHORT and COOLDOWN_LONG', () => {
+test('characterSelectViewModel characters: four cards with emblem, tagline, no initials and skill rest turns from COOLDOWN_SHORT and COOLDOWN_LONG', () => {
   const labels = { [HOST]: 'A', [GUEST]: 'B' };
   const vm = characterSelectViewModel({ seats: createSeats(ROOM_SEATS), labels, editable: [HOST], you: HOST });
   assert.equal(vm.active, HOST);
   assert.equal(vm.characters.length, 4);
   assert.deepEqual(vm.characters.map((card) => card.character), [WIND_RABBIT, EARTH_BEAR, JADE_SERPENT, CLOUD_EAGLE]);
-  assert.deepEqual(vm.characters.map((card) => card.seal), ['GH', 'MB', 'JS', 'CE']);
+  assert.ok(vm.characters.every((card) => !('seal' in card)), 'no seal initials on the cards (owner)');
   assert.deepEqual(vm.characters.map((card) => card.emblem), ['cross', 'bloom', 'leaf', 'cloud']);
   assert.deepEqual(vm.characters.map((card) => card.colour), ['blue', 'red', 'jade', 'gold']);
   assert.deepEqual(vm.characters.map((card) => card.box), [
@@ -462,7 +462,6 @@ test('characterSelectViewModel characters: four cards with emblem, seal, tagline
     assert.equal(card.name, CHARACTERS[card.character].name);
     assert.equal(card.tagline, CHARACTER_LOOKS[card.character].tagline);
     assert.ok(card.tagline.length > 0);
-    assert.match(card.seal, /^[A-Z]{2}$/, 'Latin initials, no Chinese characters');
     assert.deepEqual(card.skills.map((skill) => skill.rest), [COOLDOWN_SHORT, COOLDOWN_LONG]);
     assert.deepEqual(card.skills.map((skill) => skill.restText), [`${COOLDOWN_SHORT} turns`, `${COOLDOWN_LONG} turns`]);
     assert.deepEqual(card.skills.map((skill) => skill.id), CHARACTERS[card.character].skills);

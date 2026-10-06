@@ -29,21 +29,20 @@ export const SELECT_CHARACTERS = Object.freeze(Object.keys(CHARACTERS));
 // glass token of room.css), the owner's pixel portrait (its asset key, the
 // one place the select names it), the emblem shown while the portrait is
 // missing (the blue four-petal cross, the red round bloom, the jade circle
-// with a leaf, the pale yellow cloud with a feather), the seal initials and
-// the tagline of strings.js. A card shows its emblem while the portrait
+// with a leaf, the pale yellow cloud with a feather) and the tagline of strings.js. A card shows its emblem while the portrait
 // file is missing.
 export const CHARACTER_LOOKS = Object.freeze({
   [WIND_RABBIT]: Object.freeze({
-    colour: 'blue', portrait: ART.avatar[WIND_RABBIT], emblem: 'cross', seal: 'GH', tagline: STRINGS.selectTaglineWindRabbit,
+    colour: 'blue', portrait: ART.avatar[WIND_RABBIT], emblem: 'cross', tagline: STRINGS.selectTaglineWindRabbit,
   }),
   [EARTH_BEAR]: Object.freeze({
-    colour: 'red', portrait: ART.avatar[EARTH_BEAR], emblem: 'bloom', seal: 'MB', tagline: STRINGS.selectTaglineEarthBear,
+    colour: 'red', portrait: ART.avatar[EARTH_BEAR], emblem: 'bloom', tagline: STRINGS.selectTaglineEarthBear,
   }),
   [JADE_SERPENT]: Object.freeze({
-    colour: 'jade', portrait: ART.avatar[JADE_SERPENT], emblem: 'leaf', seal: 'JS', tagline: STRINGS.selectTaglineJadeSerpent,
+    colour: 'jade', portrait: ART.avatar[JADE_SERPENT], emblem: 'leaf', tagline: STRINGS.selectTaglineJadeSerpent,
   }),
   [CLOUD_EAGLE]: Object.freeze({
-    colour: 'gold', portrait: ART.cloudEagle.avatar, emblem: 'cloud', seal: 'CE', tagline: STRINGS.selectTaglineCloudEagle,
+    colour: 'gold', portrait: ART.cloudEagle.avatar, emblem: 'cloud', tagline: STRINGS.selectTaglineCloudEagle,
   }),
 });
 
@@ -164,7 +163,7 @@ export function joinViewModel({ text = '', joining = false, error = null } = {})
 // not Ready, else the first seat that is not Ready yet. So either local
 // seat may pick first. A local seat card that is not active and not Ready
 // is choosable: pressing it makes that seat the active one. Each card
-// has the portrait key (characterStage: the emblem while it is missing), the seal, the tagline and one row per skill with its
+// has the portrait key (characterStage: the emblem while it is missing), the tagline and one row per skill with its
 // rest turns and its SKILL_INFO description (the skill row's tooltip, the
 // same text as the in-game HUD); a card taken by the other seat is
 // disabled and says Taken.
@@ -189,7 +188,6 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
         colour: look.colour,
         portrait: look.portrait,
         emblem: look.emblem,
-        seal: look.seal,
         skills: CHARACTERS[id].skills.map((skillId) => {
           const rest = cooldownTurns(skillId);
           const info = SKILL_INFO[skillId];

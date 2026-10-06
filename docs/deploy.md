@@ -41,6 +41,7 @@ not need it.
 - `wrangler.toml`: the Worker, the static assets of the repo root (binding
   `ASSETS`, the Worker runs first only for `/ws`), the Durable Object binding
   `ROOM` and the migration `v1` (`new_sqlite_classes = ["RoomRelay"]`).
+- `_headers` (repo root): every static file is served with `Cache-Control: no-cache`, so browsers check for a newer file on each load (304 when unchanged) and a deploy is seen at once.
 - `.assetsignore` (repo root, gitignore syntax): keeps `worker/`, `tests/`,
   `docs/`, `tools/`, `shots/`, `.millstone/`, `.git/`, `node_modules/`,
   `.wrangler/`, `wrangler.toml`, `package.json`, `package-lock.json`,

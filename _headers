@@ -1,0 +1,6 @@
+# Cache rules for the static game files (Cloudflare Workers static assets,
+# docs/deploy.md). Every file is checked again on each visit (an unchanged
+# one answers 304 Not Modified at once), so a new deploy reaches every
+# player on their next load instead of an old cached module.
+/*
+  Cache-Control: no-cache
