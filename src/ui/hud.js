@@ -165,7 +165,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     card.dataset.hudBox = `card-${team}`;
     const whoRow = el('div', 'who-row', card);
     const tile = el('div', 'tile', whoRow);
-    artImage(tile, PORTRAIT_ART[player], character.name[0]);
+    const portrait = artImage(tile, PORTRAIT_ART[character.id], character.name[0]);
     el('span', 'turn-dot', tile);
     const text = el('div', 'who-text', whoRow);
     const name = el('div', 'name', text);
@@ -224,7 +224,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
         slot, icon, picon, button, ico, ring, count, title, state, pill, arc, pcount, look: null, progress: null, view: null,
       };
     });
-    return { card, team, text, pillSkills, chevron, body, name, meta, chip, skills, folded: false, collapsed: false };
+    return { card, team, portrait, text, pillSkills, chevron, body, name, meta, chip, skills, folded: false, collapsed: false };
   });
 
   const toast = el('div', 'toast glass', root);
@@ -490,6 +490,14 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
 
       vm.cards.forEach((card, c) => {
         const dom = cards[c];
+        // The portrait of the character playing this side (a new game may
+        // seat other characters).
+        if (dom.portrait.name !== card.portrait) {
+          dom.portrait.name = card.portrait;
+          dom.portrait.initial.textContent = card.name[0];
+          dom.portrait.img.removeAttribute('src');
+          showArt();
+        }
         setText(dom.name, card.name);
         setText(dom.meta, card.meta);
         setText(dom.chip, card.chip);

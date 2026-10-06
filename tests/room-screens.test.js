@@ -15,6 +15,7 @@ import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { ROOM_CODE_ALPHABET, isValidRoomCode, normalizeRoomCode } from '../src/net/room-code.js';
 import { CLOSED, GUEST, HOST, NO_ROOM, ROOM_SEATS, createGuestRoom } from '../src/net/room.js';
 import { onlineSameBrowserOnly } from '../src/net/transport.js';
+import { ART } from '../src/render3d/art-assets.js';
 import { GAME, JOIN, LOBBY, MENU, SELECT, WAITING_SCREEN, createApp } from '../src/ui/app.js';
 import { FLOW_EVENTS, LOCAL_SEATS, ROLES, SCREENS, flowReducer, initialFlow } from '../src/ui/flow.js';
 import { PORTRAIT_ART } from '../src/ui/hud-view.js';
@@ -218,7 +219,7 @@ test('waitingViewModel in phase waiting: title, code, hint, the guest seat a Wai
   assert.equal(mine.youText, 'You');
   assert.equal(mine.character, WIND_RABBIT);
   assert.equal(mine.stone, X);
-  assert.equal(mine.portrait, PORTRAIT_ART[X]);
+  assert.equal(mine.portrait, PORTRAIT_ART[WIND_RABBIT], 'the portrait of the picked character');
   assert.equal(mine.choices.length, SELECT_CHARACTERS.length, 'the host may pick before the guest comes');
   assert.equal(other.box, 'card-guest');
   assert.equal(other.placeholder, true);
@@ -456,7 +457,7 @@ test('characterSelectViewModel characters: four cards with emblem, seal, tagline
   const eagle = vm.characters[3];
   assert.deepEqual(eagle.skills.map((skill) => skill.rest), [0, COOLDOWN_LONG]);
   assert.deepEqual(eagle.skills.map((skill) => skill.restText), [STRINGS.skillAlwaysOn, `${COOLDOWN_LONG} turns`]);
-  assert.equal(eagle.portrait, null, 'no portrait art yet: the emblem shows');
+  assert.equal(eagle.portrait, ART.cloudEagle.avatar);
   for (const card of vm.characters.slice(0, 3)) {
     assert.equal(card.name, CHARACTERS[card.character].name);
     assert.equal(card.tagline, CHARACTER_LOOKS[card.character].tagline);

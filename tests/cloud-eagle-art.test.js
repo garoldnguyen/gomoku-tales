@@ -43,7 +43,7 @@ test('the Cloud Eagle manifest keys exist with their sizes, one still frame each
 
 test('the 3D loader table names the Cloud Eagle slots and has a placeholder of the same size for each', () => {
   assert.deepEqual(Object.values(ART.cloudEagle).sort(), Object.keys(SLOTS).sort());
-  assert.deepEqual([...ART_SLOTS].sort(), Object.keys(SLOTS).sort());
+  assert.deepEqual([...ART_SLOTS], [], 'every Cloud Eagle file has arrived');
   assert.ok(Object.keys(SLOTS).every((name) => artNames().includes(name)));
   for (const [name, size] of Object.entries(SLOTS)) {
     assert.equal(CLOUD_EAGLE_ART_PX[name], size, name);

@@ -30,8 +30,8 @@ export const SELECT_CHARACTERS = Object.freeze(Object.keys(CHARACTERS));
 // one place the select names it), the emblem shown while the portrait is
 // missing (the blue four-petal cross, the red round bloom, the jade circle
 // with a leaf, the pale yellow cloud with a feather), the seal initials and
-// the tagline of strings.js. Cloud Eagle has no portrait yet (null): its
-// card shows the emblem until the owner sends the art.
+// the tagline of strings.js. A card shows its emblem while the portrait
+// file is missing.
 export const CHARACTER_LOOKS = Object.freeze({
   [WIND_RABBIT]: Object.freeze({
     colour: 'blue', portrait: ART.avatar[WIND_RABBIT], emblem: 'cross', seal: 'GH', tagline: STRINGS.selectTaglineWindRabbit,
@@ -43,7 +43,7 @@ export const CHARACTER_LOOKS = Object.freeze({
     colour: 'jade', portrait: ART.avatar[JADE_SERPENT], emblem: 'leaf', seal: 'JS', tagline: STRINGS.selectTaglineJadeSerpent,
   }),
   [CLOUD_EAGLE]: Object.freeze({
-    colour: 'gold', portrait: null, emblem: 'cloud', seal: 'CE', tagline: STRINGS.selectTaglineCloudEagle,
+    colour: 'gold', portrait: ART.cloudEagle.avatar, emblem: 'cloud', seal: 'CE', tagline: STRINGS.selectTaglineCloudEagle,
   }),
 });
 
@@ -223,7 +223,7 @@ export function characterSelectViewModel({ seats, labels, editable = [], you = n
         name: pick ? CHARACTERS[pick].name : null,
         stone,
         team: stone === X ? 'blue' : stone === O ? 'red' : null,
-        portrait: stone ? PORTRAIT_ART[stone] : null,
+        portrait: stone && pick ? PORTRAIT_ART[pick] : null,
         note: stone === X ? STRINGS.waitingMovesFirst : null,
         ready,
         statusText: empty ? null : ready ? STRINGS.selectIsReady : STRINGS.selectChoosing,

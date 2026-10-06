@@ -36,6 +36,13 @@ export const ART = {
     skyWatchIcon: 'sky-watch-icon',
     cloudIcon: 'cloud-icon',
   },
+  // Jade Serpent's HUD portrait and its two skill icons, drawn by the glass
+  // HUD (src/ui/hud-view.js) like the Cloud Eagle ones.
+  jadeSerpent: {
+    hud: 'portrait-jade-serpent',
+    hissIcon: 'icon-hiss',
+    venomIcon: 'icon-venom',
+  },
   // Farmland v3 pack in assets/3d/v3/ (docs/art-direction-v3.md section 2).
   // Tuning data for these names is in assets/v3-meta.json (v3-meta.js).
   v3: {
@@ -149,10 +156,18 @@ export const CLOUD_EAGLE_ART_PX = Object.freeze({
   [ART.cloudEagle.cloudIcon]: 128,
 });
 
+// Frame size of each Jade Serpent HUD file (one square frame each); its
+// placeholder is a block in Jade Serpent's mark colour.
+export const JADE_SERPENT_ART_PX = Object.freeze({
+  [ART.jadeSerpent.hud]: 128,
+  [ART.jadeSerpent.hissIcon]: 128,
+  [ART.jadeSerpent.venomIcon]: 128,
+});
+
 // Manifest names whose files the owner has not sent yet. The game asks for
 // them like any other art; a missing one only warns and draws its
-// placeholder.
-export const ART_SLOTS = Object.freeze(artNames(ART.cloudEagle));
+// placeholder. Every slot has its file now.
+export const ART_SLOTS = Object.freeze([]);
 
 // Placeholder colours of the v3 upright sprites and strips, one per frame
 // (cycled). Plants keep the team colours of section 2.
@@ -242,6 +257,15 @@ export const PLACEHOLDERS_3D = {
       height: size,
       frames: 1,
       paint: blockSheetPainter({ width: size, height: size, frames: 1, colors: [CHARACTER_LOOK[CLOUD_EAGLE].colour] }),
+    }];
+  })),
+  ...Object.fromEntries(artNames(ART.jadeSerpent).map((name) => {
+    const size = JADE_SERPENT_ART_PX[name];
+    return [name, {
+      width: size,
+      height: size,
+      frames: 1,
+      paint: blockSheetPainter({ width: size, height: size, frames: 1, colors: [CHARACTER_LOOK[JADE_SERPENT].colour] }),
     }];
   })),
 };

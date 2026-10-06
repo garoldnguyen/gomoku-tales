@@ -118,7 +118,7 @@ export function howToViewModel(config = CONFIG) {
         name: character.name,
         stone,
         team: stone === X ? 'blue' : 'red',
-        portrait: PORTRAIT_ART[stone],
+        portrait: PORTRAIT_ART[id],
         skills: character.skills.map((skillId) => {
           const turns = getSkill(skillId).cooldownClass === LONG ? config.COOLDOWN_LONG : config.COOLDOWN_SHORT;
           return {

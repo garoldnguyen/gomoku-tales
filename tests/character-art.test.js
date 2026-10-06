@@ -1,0 +1,54 @@
+// The HUD art of every character: the portrait follows the character, not
+// the side, every skill has its icon, and the files the owner sent have the
+// sizes the manifest names (docs/design.md section 5.3 and 5.4).
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { X, O } from '../src/logic/board.js';
+import { CHARACTERS, CLOUD_EAGLE, JADE_SERPENT } from '../src/logic/characters.js';
+import { createInitialState } from '../src/logic/game.js';
+import { ART, JADE_SERPENT_ART_PX, PLACEHOLDERS_3D, placeholderShape } from '../src/render3d/art-assets.js';
+import { PORTRAIT_ART, SKILL_ICON_ART, hudViewModel } from '../src/ui/hud-view.js';
+
+const manifest = JSON.parse(readFileSync(new URL('../assets/manifest.json', import.meta.url), 'utf8'));
+
+// Width and height from the PNG header (IHDR).
+function pngSize(file) {
+  const bytes = readFileSync(new URL(`../assets/${file}`, import.meta.url));
+  assert.equal(bytes.toString('latin1', 1, 4), 'PNG', `${file} is a PNG`);
+  return [bytes.readUInt32BE(16), bytes.readUInt32BE(20)];
+}
+
+test('every character has a HUD portrait and every skill has an icon', () => {
+  for (const [id, character] of Object.entries(CHARACTERS)) {
+    assert.ok(manifest.assets[PORTRAIT_ART[id]], `${character.name} has no portrait`);
+    for (const skillId of character.skills) assert.ok(manifest.assets[SKILL_ICON_ART[skillId]], `${skillId} has no icon`);
+  }
+});
+
+test('the HUD card shows the portrait of the character playing that side', () => {
+  const state = createInitialState(undefined, { [X]: JADE_SERPENT, [O]: CLOUD_EAGLE });
+  const vm = hudViewModel(state);
+  const byPlayer = Object.fromEntries(vm.cards.map((card) => [card.player, card]));
+  assert.equal(byPlayer[X].portrait, ART.jadeSerpent.hud);
+  assert.equal(byPlayer[O].portrait, ART.cloudEagle.hud);
+  assert.deepEqual(byPlayer[X].skills.map((skill) => skill.icon), [ART.jadeSerpent.hissIcon, ART.jadeSerpent.venomIcon]);
+  assert.deepEqual(byPlayer[O].skills.map((skill) => skill.icon), [ART.cloudEagle.skyWatchIcon, ART.cloudEagle.cloudIcon]);
+});
+
+test('the Jade Serpent HUD files are 3D-loaded manifest entries with a placeholder of the same size', () => {
+  for (const name of Object.values(ART.jadeSerpent)) {
+    const entry = manifest.assets[name];
+    const size = JADE_SERPENT_ART_PX[name];
+    assert.deepEqual([entry.use, entry.width, entry.height, entry.frames], ['3d', size, size, 1], name);
+    assert.ok(PLACEHOLDERS_3D[name]?.paint, `"${name}" has no placeholder`);
+    assert.deepEqual(placeholderShape(name), { width: size, height: size, frames: 1 });
+  }
+});
+
+test('the files of the Cloud Eagle and Jade Serpent art have the manifest sizes', () => {
+  for (const name of [...Object.values(ART.cloudEagle), ...Object.values(ART.jadeSerpent)]) {
+    const entry = manifest.assets[name];
+    assert.deepEqual(pngSize(entry.file), [entry.width, entry.height], name);
+  }
+});

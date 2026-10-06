@@ -4,9 +4,10 @@
 // src/ui/hud.js only renders it.
 
 import { X, O } from '../logic/board.js';
-import { characterForStone } from '../logic/characters.js';
+import { CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT, characterForStone } from '../logic/characters.js';
 import { characterOf, isGameOver, skillCooldown } from '../logic/game.js';
 import { cooldownTurns, getSkill, isPassiveSkill } from '../logic/skills.js';
+import { ART } from '../render3d/art-assets.js';
 import { ALL_EXPANDED } from './hud-collapse.js';
 import { skillInfo } from './skill-info.js';
 import { STRINGS } from './strings.js';
@@ -18,14 +19,24 @@ export const QUALITY_CHOICES = Object.freeze([
   Object.freeze({ level: 'high', label: 'High' }),
 ]);
 
-// Portrait and skill icon names in assets/manifest.json.
-export const PORTRAIT_ART = Object.freeze({ [X]: 'portrait-wind-rabbit-v3', [O]: 'portrait-earth-bear-v3' });
+// Portrait and skill icon names in assets/manifest.json. The portrait
+// belongs to the character, whichever side it plays.
+export const PORTRAIT_ART = Object.freeze({
+  [WIND_RABBIT]: 'portrait-wind-rabbit-v3',
+  [EARTH_BEAR]: 'portrait-earth-bear-v3',
+  [JADE_SERPENT]: ART.jadeSerpent.hud,
+  [CLOUD_EAGLE]: ART.cloudEagle.hud,
+});
 
 export const SKILL_ICON_ART = Object.freeze({
   windDash: 'icon-wind-dash',
   tornadoZone: 'icon-tornado-zone',
   terrainCreation: 'icon-terrain-creation',
   stoneConversion: 'icon-stone-conversion',
+  hiss: ART.jadeSerpent.hissIcon,
+  venom: ART.jadeSerpent.venomIcon,
+  skyWatch: ART.cloudEagle.skyWatchIcon,
+  cloud: ART.cloudEagle.cloudIcon,
 });
 
 // Skill row looks, matching the classes of src/ui/hud.css.
@@ -131,7 +142,7 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
     player,
     side: player === X ? 'left' : 'right',
     name: character.name,
-    portrait: PORTRAIT_ART[player],
+    portrait: PORTRAIT_ART[character.id],
     meta: `Plays ${player}, ${countStones(state.board, player)} planted`,
     chip,
     waiting: !isWinner && !active,

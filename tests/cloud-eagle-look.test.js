@@ -1,6 +1,7 @@
 // Cloud Eagle part 3: the look, the character select and the HUD
 // (character-look.js, room-screens.js, hud-view.js, skill-info.js and the
 // cloud and Sky Watch overlay of cloud-overlay.js).
+import { ART } from '../src/render3d/art-assets.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -79,7 +80,7 @@ test('the character select shows four cards in a row: Wind Rabbit, Earth Bear, J
   assert.equal(eagle.tagline, STRINGS.selectTaglineCloudEagle);
   assert.equal(eagle.box, 'pick-host-cloud-eagle');
   assert.equal(eagle.emblem, 'cloud');
-  assert.equal(eagle.portrait, null, 'a placeholder until the owner sends the portrait');
+  assert.equal(eagle.portrait, ART.cloudEagle.avatar, 'the owner\'s portrait (the emblem only while the file is missing)');
   assert.deepEqual(eagle.skills.map((skill) => skill.name), [SKILL_INFO[SKY_WATCH].title, SKILL_INFO[CLOUD].title]);
   assert.deepEqual(eagle.skills.map((skill) => skill.restText), [STRINGS.skillAlwaysOn, `${COOLDOWN_LONG} turns`]);
   // No More soon slot: every card is a character.

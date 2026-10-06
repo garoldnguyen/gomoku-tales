@@ -90,6 +90,8 @@ STONE CONVERSION (long cooldown). Uses your turn.
 ### 5.3 Jade Serpent
 Look: a slim jade green pixel serpent with a leaf on its head.
 
+Art (assets/manifest.json, use 3d, ART.jadeSerpent in src/render3d/art-assets.js): portrait-jade-serpent (its HUD portrait), icon-hiss and icon-venom, 128x128 each (drawn on a 64 px grid, shown at 64 CSS px), one still frame each. The select card uses avatar-jade-serpent.
+
 HISS (short cooldown, COOLDOWN_SHORT). Uses your turn. No target.
 - On the opponent's next turn they cannot use any skill. They can still place a stone.
 - The lock ends at the end of that turn. It is not a cooldown: the opponent's cooldowns do not change.
@@ -103,7 +105,7 @@ VENOM (long cooldown, COOLDOWN_LONG). Uses your turn.
 ### 5.4 Cloud Eagle
 Look: a proud pale yellow and white pixel eagle with a little cloud under its wings.
 
-Art slots (assets/manifest.json, use 3d, ART.cloudEagle in src/render3d/art-assets.js): cloud-eagle-avatar 512x512, cloud-eagle-hud 256x256, sky-watch-icon 128x128 and cloud-icon 128x128, one still frame each. Until the owner sends the files, each missing file only warns in the console and shows a pale yellow placeholder of the same size.
+Art slots (assets/manifest.json, use 3d, ART.cloudEagle in src/render3d/art-assets.js): cloud-eagle-avatar 512x512, cloud-eagle-hud 256x256, sky-watch-icon 128x128 and cloud-icon 128x128, one still frame each. The select card shows cloud-eagle-avatar (a 128 px grid at 4x) and the HUD card cloud-eagle-hud. A missing file only warns in the console and shows a pale yellow placeholder of the same size.
 
 SKY WATCH (passive, no cooldown). Never uses a turn and is never clicked.
 - Always on for the side that plays Cloud Eagle: every empty cell where the opponent would make five in a row with one more stone is outlined in soft yellow (skyWatchCells in src/logic/cloud.js, by the normal win rule on the full board).

@@ -44,8 +44,7 @@ test('the 3D loader table names the three portraits, each with a 128 px placehol
 test('the character data names each portrait once, and the select view model passes it on', () => {
   for (const [id, key] of Object.entries(KEYS)) assert.equal(CHARACTER_LOOKS[id].portrait, key);
   const cards = selectView().characters;
-  // Cloud Eagle has no portrait art yet (null): its card shows the emblem.
-  assert.deepEqual(cards.map((card) => card.portrait), [KEYS[WIND_RABBIT], KEYS[EARTH_BEAR], KEYS[JADE_SERPENT], null]);
+  assert.deepEqual(cards.map((card) => card.portrait), [KEYS[WIND_RABBIT], KEYS[EARTH_BEAR], KEYS[JADE_SERPENT], ART.cloudEagle.avatar]);
   // Screen code never names a portrait key itself.
   const screens = readFileSync(new URL('../src/ui/screens.js', import.meta.url), 'utf8');
   for (const key of Object.values(KEYS)) assert.ok(!screens.includes(key), `screens.js names "${key}"`);

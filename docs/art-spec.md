@@ -73,6 +73,22 @@ Drawn by the 2D canvas panels and by the 3D game's glass HUD (src/ui/hud.js).
 | `icon-terrain-creation.png` | 32x32 | 1 | - | 32x32 | Terrain Creation: a grey boulder falling onto a board cell with dust. |
 | `icon-stone-conversion.png` | 32x32 | 1 | - | 32x32 | Stone Conversion: a sprout turning into a flower bud, with a curved arrow and a golden glow. |
 
+### Character portraits and skill icons of the glass HUD (`use: 3d`, `assets/3d/v5/`)
+
+The HUD card portrait belongs to the character, whichever side it plays
+(`PORTRAIT_ART` in `src/ui/hud-view.js`). These files are drawn on a 64 px
+grid (128 for the select portrait) and stored at a whole-number scale.
+
+| File | Size | Grid | Notes |
+|---|---|---|---|
+| `cloud-eagle-avatar.png` | 512x512 | 128 px at 4x | Cloud Eagle on its select card. |
+| `cloud-eagle-hud.png` | 256x256 | 64 px at 4x | Cloud Eagle's HUD portrait. |
+| `sky-watch-icon.png` | 128x128 | 64 px at 2x | Sky Watch: an eagle eye over the field grid. |
+| `cloud-icon.png` | 128x128 | 64 px at 2x | Cloud: a cloud over the field and a feather. |
+| `portrait-jade-serpent.png` | 128x128 | 64 px at 2x | Jade Serpent's HUD portrait. |
+| `icon-hiss.png` | 128x128 | 64 px at 2x | Hiss: a hissing serpent and a locked skill rune. |
+| `icon-venom.png` | 128x128 | 64 px at 2x | Venom: venom drops wilting a red bud. |
+
 ### Old 2D renderer only (`use: 2d`, `?render=2d`)
 
 | File | Frame size | Frames | Frame time | Sheet | Notes |
