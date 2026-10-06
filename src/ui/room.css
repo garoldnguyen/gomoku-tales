@@ -595,8 +595,10 @@
 }
 
 #screens .skill-name {
-  font-size: calc(var(--u) * 12);
+  font-family: var(--serif);
+  font-size: calc(var(--u) * 15);
   font-weight: 600;
+  line-height: 1.15;
 }
 
 #screens .rest {
