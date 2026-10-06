@@ -50,11 +50,12 @@ export const RAIL_WIDTH_STACKED = 108;
 const RAIL_WIDTH_MAX = 180;
 
 // A collapsed card (docs/art-direction-v3-1.md section 4.1, hud.css
-// .is-collapsed): one pill at the card's anchor. Padding 8, gap 8: the 72 px
-// portrait tile, two 72 px skill buttons, the 44 px chevron (4 px more space
-// before it) and a 1 px border.
+// .is-collapsed): one pill at the card's anchor. Padding 8, gap 8: the 56 px
+// portrait tile, two 56 px skill buttons, the 44 px chevron (4 px more space
+// before it) and a 1 px border. (72 px tiles before the owner asked for a
+// smaller pill.)
 export const PILL_PAD = 8;
-export const PILL_TILE = 72;
+export const PILL_TILE = 56;
 export const CHEVRON_SIZE = 44;
 export const PILL_WIDTH = 2 * PILL_PAD + 3 * PILL_TILE + 3 * PILL_PAD + 4 + CHEVRON_SIZE + 2;
 export const PILL_HEIGHT = 2 * PILL_PAD + PILL_TILE + 2;

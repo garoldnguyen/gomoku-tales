@@ -13,7 +13,7 @@ import {
   startCollapsed, toggleAll, withCollapsed, writeCollapsed,
 } from '../src/ui/hud-collapse.js';
 import {
-  CARD_SIDE, CARD_TOP, CARD_WIDTH, CHEVRON_SIZE, MIN_PILL_SCALE, PILL_HEIGHT, PILL_WIDTH, boardScreenRect, chevronSize,
+  CARD_SIDE, CARD_TOP, CARD_WIDTH, CHEVRON_SIZE, MIN_PILL_SCALE, PILL_HEIGHT, PILL_TILE, PILL_WIDTH, boardScreenRect, chevronSize,
   canFold, hudBoxes, hudFoldLayout, hudLayout, pillScale,
 } from '../src/ui/hud-layout.js';
 import { STATE_COOLING, STATE_READY, STATE_SELECTED, STATE_WAITING, hudViewModel } from '../src/ui/hud-view.js';
@@ -325,15 +325,15 @@ test('hud-layout: no overlaps and everything inside, collapsed and expanded', ()
   for (const [w, h] of [[1680, 720], [1024, 768], [720, 1280]]) checkBoxes(w, h, ALL_COLLAPSED);
 });
 
-test('hud-layout: at 1920x1080 the pill is at most 320 by 96 and sits at the card anchor', () => {
-  assert.ok(PILL_WIDTH <= 320 && PILL_WIDTH >= 280, `width ${PILL_WIDTH}`);
-  assert.ok(PILL_HEIGHT <= 96 && PILL_HEIGHT >= 80, `height ${PILL_HEIGHT}`);
+test('hud-layout: at 1920x1080 the pill is at most 280 by 80 and sits at the card anchor', () => {
+  assert.ok(PILL_WIDTH <= 280 && PILL_WIDTH >= 240, `width ${PILL_WIDTH}`);
+  assert.ok(PILL_HEIGHT <= 80 && PILL_HEIGHT >= 64, `height ${PILL_HEIGHT}`);
   const open = hudBoxes(1920, 1080, { collapsed: ALL_EXPANDED });
   const folded = hudBoxes(1920, 1080, { collapsed: ALL_COLLAPSED });
   for (const team of ['x', 'o']) {
     const cardBox = open.find((b) => b.name === `card-${team}`);
     const pill = folded.find((b) => b.name === `pill-${team}`);
-    assert.ok(pill.w <= 320 && pill.h <= 96);
+    assert.ok(pill.w <= 280 && pill.h <= 80);
     assert.equal(pill.y, cardBox.y);
     assert.equal(pill.y, CARD_TOP);
     if (team === 'x') assert.equal(pill.x, cardBox.x);
@@ -350,13 +350,13 @@ test('hud-layout: pills keep 44 px skill buttons and stay off the board', () => 
       if (layout.compact) continue;
       const board = boardScreenRect(w, h);
       for (const pill of hudBoxes(w, h, { collapsed: ALL_COLLAPSED }).filter((b) => b.name.startsWith('pill'))) {
-        assert.ok(pill.h * (72 / PILL_HEIGHT) >= 44 - 1e-9, `${w}x${h} button height`);
+        assert.ok(pill.h * (PILL_TILE / PILL_HEIGHT) >= 44 - 1e-9, `${w}x${h} button height`);
         const clear = pill.x + pill.w <= board.left || pill.x >= board.right || pill.y + pill.h <= board.top;
         assert.ok(clear, `${w}x${h} ${pill.name} off the plots`);
       }
     }
   }
-  assert.ok(MIN_PILL_SCALE * 72 >= 44 - 1e-9);
+  assert.ok(MIN_PILL_SCALE * PILL_TILE >= 44 - 1e-9);
 });
 
 test('hud-layout: the chevron stays a 44 px touch target at every card and pill scale', () => {

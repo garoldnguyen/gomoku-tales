@@ -195,11 +195,11 @@
 .hud:not(.is-compact) .card { animation: hud-fold-b 180ms ease-out; }
 .hud:not(.is-compact) .card.is-collapsed { animation-name: hud-fold-a; }
 /* The collapsed pill: portrait tile, the two skill buttons, the chevron. */
-.hud .card.is-collapsed { width: auto; padding: 8px; gap: 8px; border-radius: 32px; flex-direction: row; align-items: center; }
+.hud .card.is-collapsed { width: auto; padding: 8px; gap: 8px; border-radius: 26px; flex-direction: row; align-items: center; }
 .hud .card.left.is-collapsed { transform: scale(var(--pill-scale, 1)); }
 .hud .card.right.is-collapsed { transform: scale(var(--pill-scale, 1)); }
 .hud .card.is-collapsed .who-row { gap: 8px; }
-.hud .card.is-collapsed .tile { position: relative; width: 72px; height: 72px; border-radius: 22px; }
+.hud .card.is-collapsed .tile { position: relative; width: 56px; height: 56px; border-radius: 17px; }
 .hud .card.is-collapsed .chevron { margin-left: 4px; width: var(--chevron-pill, 44px); height: var(--chevron-pill, 44px); }
 .hud .turn-dot { display: none; position: absolute; right: -2px; top: -2px; width: 16px; height: 16px; border-radius: 50%; background: var(--team); border: 3px solid var(--card-solid); }
 .hud .card.is-collapsed.is-active .turn-dot { display: block; }
@@ -207,9 +207,9 @@
 .hud[data-quality="low"] .card.is-collapsed.is-active { box-shadow: 0 0 0 2px var(--team-ring); }
 .hud .card.is-collapsed.is-waiting { opacity: 0.55; }
 .hud .pill-skills { display: flex; gap: 8px; }
-.hud .pskill { position: relative; width: 72px; height: 72px; padding: 0; border-radius: 20px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
-.hud .pskill .ico { position: relative; width: 64px; height: 64px; }
-.hud .pskill .ico img { width: 64px; height: 64px; image-rendering: pixelated; border-radius: var(--r-icon); display: block; }
+.hud .pskill { position: relative; width: 56px; height: 56px; padding: 0; border-radius: 16px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; }
+.hud .pskill .ico { position: relative; width: 50px; height: 50px; }
+.hud .pskill .ico img { width: 50px; height: 50px; image-rendering: pixelated; border-radius: var(--r-icon); display: block; }
 .hud .pskill .ready-dot { display: none; position: absolute; right: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: var(--ready); border: 3px solid var(--card-solid); }
 .hud .pskill[data-state="ready"] .ready-dot { display: block; }
 .hud .pskill.is-selected { border: 3px solid var(--team); background: color-mix(in srgb, var(--team) 28%, transparent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--team) 32%, transparent), 0 0 22px color-mix(in srgb, var(--team) 55%, transparent); }
@@ -221,7 +221,7 @@
 .hud .pskill .pring circle { fill: none; stroke-width: 4; }
 .hud .pskill .pring .track { stroke: rgba(255, 255, 255, 0.22); }
 .hud .pskill .pring .arc { stroke: var(--ready); stroke-linecap: round; }
-.hud .pskill .count { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 30px; font-weight: 600; color: var(--ink); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); }
+.hud .pskill .count { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; color: var(--ink); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); }
 .hud .pskill.is-cooling .count { display: flex; }
 .hud .pskill[aria-disabled="true"] { cursor: not-allowed; }
 /* A long touch press shows the tooltip: no text selection or callout. */
@@ -284,9 +284,9 @@
 .hud.is-compact .skill { overflow: visible; }
 .hud.is-compact .skill .ico { border-radius: var(--r-icon); overflow: visible; }
 .hud.is-compact .skill .ico img { border-radius: var(--r-icon); }
-.hud .card.is-collapsed .tile img { width: 64px; height: 64px; }
+.hud .card.is-collapsed .tile img { width: 50px; height: 50px; }
 /* The collapsed pill's skill buttons: the icon fills the whole button. */
-.hud .pskill .ico { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 19px; overflow: hidden; }
+.hud .pskill .ico { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 15px; overflow: hidden; }
 .hud .pskill.is-selected .ico { border-radius: 17px; }
 .hud .pskill .ico img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
 /* The skill detail popup, opened by a click on a skill button (hud.js),

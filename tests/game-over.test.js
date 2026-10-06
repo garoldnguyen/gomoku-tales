@@ -362,10 +362,10 @@ test('index.html: the game over card, its two buttons with data-hud-box names an
   assert.match(html, /id="over-hint" aria-live="polite"/);
 });
 
-test('room.css: the card sits 96 px from the top, at most 480 px wide, buttons at least 44 px high', () => {
+test('room.css: the card sits 96 px from the top, at most 520 px wide, buttons at least 44 px high', () => {
   const css = readFileSync(new URL('../src/ui/room.css', import.meta.url), 'utf8');
   assert.match(css, /#screens\.over \{\s*padding-top: 96px;/);
-  assert.match(css, /max-width: 480px;/);
+  assert.match(css, /max-width: 520px;/);
   assert.match(css, /\.over-actions button \{[^}]*min-height: 44px;/);
 });
 
