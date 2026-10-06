@@ -52,7 +52,10 @@ storage is blocked. Switching never resets the game.
 
 Tone mapping is on at every level. When the average frame time stays above
 `TARGET_FRAME_MS` for 3 seconds, the window steps down one level by itself and the corner
-shows "(auto)"; an automatic step down is not saved. Every switch lives in ONE table in
+shows "(auto)"; an automatic step down is not saved. This happens only while the browser
+has no saved choice: once a player picks a level (Q, the HUD switch or Settings), the game
+never changes it again. The level is per browser (localStorage), never sent to the other
+player. Every switch lives in ONE table in
 `src/render3d/quality.js` (docs/art-direction-v3.md section 5); the camera and timings are
 in `src/config.js`.
 

@@ -377,6 +377,9 @@ Hidden tabs get no animation frames, but the room keeps running on timers.
 
 ### 10.7 Slow frames step down
 
+- [ ] Only a browser with no saved choice steps down: first clear the saved level
+      (DevTools, Application, Local Storage, delete the quality key). A level picked by
+      hand (Q, the HUD switch, Settings) is never changed by the game, however slow.
 - [ ] Make A slow: put it on high on a weak laptop, or in DevTools open the Performance
       tab, click the gear icon and set CPU to "6x slowdown" (if that is not enough to drop
       the FPS, also make the window full screen on a large monitor). Whenever the FPS stays

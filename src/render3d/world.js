@@ -64,11 +64,15 @@ const COLORS = {
 // `quality` is the level to start with (default: the one saved in
 // `storage`, else medium); `storage` is localStorage or null. `fx` are the
 // URL switches for the High-only effects (parseFxSwitches in quality.js),
-// read from the page's URL by default. `createRenderer(canvas)` makes the
+// read from the page's URL by default. `autoStepDown` lets slow frames step
+// the level down (default: only while this browser has no saved choice; a
+// level chosen by hand, now or on an earlier visit, is never changed by
+// the game). `createRenderer(canvas)` makes the
 // WebGL renderer (tests pass a stand-in, as Node has no WebGL).
 export function createWorld(canvas, {
   storage = browserStorage(),
   quality: startLevel = loadSavedQuality(storage) ?? QUALITY_FALLBACK,
+  autoStepDown = loadSavedQuality(storage) === null,
   assets = createAssetStore(),
   meta,
   warn = () => {},
@@ -149,6 +153,7 @@ export function createWorld(canvas, {
   let quality = null;
   let features = null; // the quality table row of `quality`, with the URL switches (fxFeatures)
   let autoStepped = false; // true after the last change was an automatic step down
+  let stepsDown = autoStepDown; // false once the player chose a level by hand
 
   // The drawing buffer follows the canvas's CSS box and this window's
   // devicePixelRatio (capped by the level's pixelRatioCap), and the camera
@@ -221,8 +226,10 @@ export function createWorld(canvas, {
   }
   applyQuality(startLevel, false);
 
-  // A choice made by hand (the Q key, ?quality=): applied and saved.
+  // A choice made by hand (the Q key, the HUD switch, Settings, ?quality=):
+  // applied and saved, and from then on never stepped down automatically.
   function setQuality(level) {
+    stepsDown = false; // the player's choice stays until they change it
     applyQuality(level, false);
     saveQuality(storage, quality);
   }
@@ -326,7 +333,7 @@ export function createWorld(canvas, {
     render(now) {
       resize();
       fpsMeter.tick(now);
-      if (slowFrames.tick(now) && quality !== lowerQuality(quality)) applyQuality(lowerQuality(quality), true);
+      if (stepsDown && slowFrames.tick(now) && quality !== lowerQuality(quality)) applyQuality(lowerQuality(quality), true);
       // Clamp the step so a hidden tab does not make everything jump on return.
       const dtMs = lastNow === null ? 0 : Math.min(now - lastNow, 100);
       lastNow = now;
