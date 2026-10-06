@@ -209,7 +209,7 @@ test('waitingViewModel in phase waiting: title, code, hint, the guest seat a Wai
   const vm = waitingViewModel(hostWaiting, { code: 'ABCD5', seats, seat: HOST });
   assert.equal(vm.title, 'Waiting for opponent');
   assert.equal(vm.code, 'ABCD5');
-  assert.equal(vm.hint, STRINGS.waitingHint);
+  assert.equal(vm.hint, STRINGS.waitingHintRelay, 'the relay of ONLINE_TRANSPORT websocket');
   assert.equal(vm.lead, 'The first to pick plays X and moves first.');
   assert.equal(vm.starting, false);
   assert.equal(vm.startingText, null);

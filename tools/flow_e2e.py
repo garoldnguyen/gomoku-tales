@@ -92,7 +92,9 @@ def open_game(context, base, errors, label):
     page = context.new_page()
     page.on("console", lambda msg: msg.type == "error" and errors.append("%s console: %s" % (label, clip(msg.text))))
     page.on("pageerror", lambda exc: errors.append("%s page error: %s" % (label, clip(exc))))
-    page.goto("%s/index.html?quality=%s" % (base, QUALITY))
+    # transport=broadcast: the pages talk over BroadcastChannel whatever
+    # ONLINE_TRANSPORT says (the parameter works only on localhost).
+    page.goto("%s/index.html?quality=%s&transport=broadcast" % (base, QUALITY))
     wait_screen(page, "menu", LOAD_TIMEOUT_MS)
     return page
 

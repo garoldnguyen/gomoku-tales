@@ -71,9 +71,12 @@ different renderers can play in the same room.
 
 ### Play online (two windows)
 
-In version 1 a room links two windows of the same browser profile (a BroadcastChannel),
-so open http://localhost:8000 in two windows of the same Chrome profile and keep both
-visible (hidden tabs slow their timers, which can start a false leave countdown).
+The deployed game links players on different computers through the relay server
+(docs/deploy.md, `npx wrangler deploy`). Served by `python3 -m http.server` there is no
+relay, so open http://localhost:8000/?transport=broadcast in two windows of the same
+Chrome profile instead (a BroadcastChannel), or run `npx wrangler dev` and open
+http://localhost:8787. Keep both windows visible (hidden tabs slow their timers, which
+can start a false leave countdown).
 
 1. In the first window click Create Room and pick Wind Rabbit or Earth Bear. The Waiting
    screen shows the 5 character room code; Copy puts it on the clipboard.

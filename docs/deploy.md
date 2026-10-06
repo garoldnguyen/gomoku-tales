@@ -40,8 +40,9 @@ not need it.
   `ROOM` and the migration `v1` (`new_sqlite_classes = ["RoomRelay"]`).
 - `.assetsignore` (repo root, gitignore syntax): keeps `worker/`, `tests/`,
   `docs/`, `tools/`, `shots/`, `.millstone/`, `.git/`, `node_modules/`,
-  `.wrangler/`, `wrangler.toml`, `package.json` and `package-lock.json` out
-  of the public site.
+  `.wrangler/`, `wrangler.toml`, `package.json`, `package-lock.json`,
+  `CLAUDE.md`, `AGENTS.md`, `README.md` and `hd2d-lab.html` out of the
+  public site.
 
 ## Local test
 
@@ -105,5 +106,9 @@ wrangler). No Cloudflare account is needed for `wrangler dev`.
 ## Deploy
 
 From the owner's machine: `npx wrangler deploy` (asks to log in to
-Cloudflare the first time). Online rooms use the relay only once
-`ONLINE_TRANSPORT` in `src/config.js` is `'websocket'`.
+Cloudflare the first time). `ONLINE_TRANSPORT` in `src/config.js` is
+`'websocket'`, so online rooms go through the relay. This is a Worker with a
+Durable Object, deployed with wrangler; Cloudflare Pages alone cannot run the
+relay. Served by `python3 -m http.server` the online rooms need the relay
+too: open `http://localhost:8000/?transport=broadcast` to play them across
+windows of one browser instead (the end to end check does this).

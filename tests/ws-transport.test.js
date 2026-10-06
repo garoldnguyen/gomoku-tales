@@ -184,8 +184,8 @@ test('close before the socket opens rejects opened', async () => {
 });
 
 test('chooseTransport returns the configured value', () => {
-  assert.equal(config.ONLINE_TRANSPORT, TRANSPORT_BROADCAST);
-  assert.equal(chooseTransport(config), TRANSPORT_BROADCAST);
+  assert.equal(config.ONLINE_TRANSPORT, TRANSPORT_WEBSOCKET, 'the deployed game plays through the relay');
+  assert.equal(chooseTransport(config), TRANSPORT_WEBSOCKET);
   assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'websocket' }), TRANSPORT_WEBSOCKET);
   assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'broadcast' }), TRANSPORT_BROADCAST);
   assert.equal(chooseTransport({ ONLINE_TRANSPORT: 'carrier-pigeon' }), TRANSPORT_BROADCAST);
