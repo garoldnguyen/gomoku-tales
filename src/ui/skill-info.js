@@ -17,12 +17,14 @@ import {
   CLOUD_SIZE, CLOUD_TURNS, HISS_LOCK_TURNS, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, SKY_WATCH_RUN, TORNADO_ARM, TORNADO_TURNS, VENOM_TURNS,
   VENOM_ZONE_SIZE, WIND_DASH_RANGE,
 } from '../config.js';
+import { cloudReach } from '../logic/cloud.js';
 import {
   CLOUD, HISS, MUD_TRAP, PETRIFICATION, SKY_WATCH, TORNADO_ZONE, VENOM, WIND_DASH, getSkill,
 } from '../logic/skills.js';
 
 const turns = (count) => `${count} ${count === 1 ? 'turn' : 'turns'}`;
 const plots = (count) => `${count} ${count === 1 ? 'plot' : 'plots'}`;
+const CLOUD_REACH = cloudReach(CLOUD_SIZE);
 const info = (skillId, description, hint) => Object.freeze({ title: getSkill(skillId).name, description, hint });
 
 export const SKILL_INFO = Object.freeze({
@@ -63,8 +65,8 @@ export const SKILL_INFO = Object.freeze({
   ),
   [CLOUD]: info(
     CLOUD,
-    `Pick the centre of a ${CLOUD_SIZE} by ${CLOUD_SIZE} cloud on any plot. For your next ${CLOUD_TURNS} turns the opponent cannot see the plants or rocks under it; you still can. It plants no seed.`,
-    'Click to select, then choose the cloud centre',
+    `Pick any plot for a ${CLOUD_SIZE} by ${CLOUD_SIZE} cloud: it covers ${plots(CLOUD_REACH.lo)} up and left of the plot you pick, that plot, and ${plots(CLOUD_REACH.hi)} down and right of it, cut at the edge of the field. For your next ${CLOUD_TURNS} turns the opponent cannot see the plants or rocks under it; you still can. It plants no seed.`,
+    'Click to select, then choose where the cloud goes',
   ),
 });
 

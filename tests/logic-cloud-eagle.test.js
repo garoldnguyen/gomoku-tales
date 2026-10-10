@@ -7,7 +7,7 @@ import { EMPTY, ROCK, X, O } from '../src/logic/board.js';
 import { ALL_CHARACTERS, CHARACTERS, CLOUD_EAGLE, EARTH_BEAR, assignSides } from '../src/logic/characters.js';
 import { canUseSkill, newGame, placeStone, skillCooldown, useSkill } from '../src/logic/game.js';
 import { CLOUD, LONG, PASSIVE, SKILLS, SKY_WATCH, cooldownTurns, getSkill, isPassiveSkill } from '../src/logic/skills.js';
-import { cloudCells, cloudsOf, createCloud, inCloud, skyWatchCells, tickClouds } from '../src/logic/cloud.js';
+import { cloudCells, cloudReach, cloudsOf, createCloud, inCloud, skyWatchCells, tickClouds } from '../src/logic/cloud.js';
 import { skillTurn } from './skill-turn.js';
 
 function ok(result) {
@@ -31,7 +31,7 @@ function eagleGame() {
 }
 
 test('the config numbers of the cloud', () => {
-  assert.equal(CLOUD_SIZE, 5);
+  assert.equal(CLOUD_SIZE, 4); // Free Action part 5: the 4 by 4 cloud (was 5)
   assert.equal(CLOUD_TURNS, 2);
 });
 
@@ -101,21 +101,24 @@ test('a cloud off the board is refused', () => {
 });
 
 test('the cloud covers CLOUD_SIZE by CLOUD_SIZE cells and is clipped at the board edge', () => {
+  // Free Action part 5: the 4 by 4 cloud has no centre cell; it covers x - lo to x + hi (lo 1, hi 2).
   const { board } = eagleGame();
-  const half = Math.floor(CLOUD_SIZE / 2);
+  const { lo, hi } = cloudReach();
+  assert.deepEqual([lo, hi], [1, 2]);
   const centre = createCloud(7, 7, X, 1);
   assert.equal(cloudCells(board, centre).length, CLOUD_SIZE * CLOUD_SIZE);
-  assert.equal(inCloud(centre, 7 + half, 7 - half), true);
-  assert.equal(inCloud(centre, 7 + half + 1, 7), false);
+  assert.equal(inCloud(centre, 7 + hi, 7 - lo), true);
+  assert.equal(inCloud(centre, 7 + hi + 1, 7), false);
+  assert.equal(inCloud(centre, 7 - lo - 1, 7), false);
 
   const corner = createCloud(0, 0, X, 1);
   const cells = cloudCells(board, corner);
-  assert.equal(cells.length, (half + 1) * (half + 1));
-  assert.ok(cells.every(({ x, y }) => x >= 0 && y >= 0 && x <= half && y <= half));
+  assert.equal(cells.length, (hi + 1) * (hi + 1), 'the corner cloud keeps x 0 to 2 and y 0 to 2');
+  assert.ok(cells.every(({ x, y }) => x >= 0 && y >= 0 && x <= hi && y <= hi));
 
   const edge = createCloud(BOARD_SIZE - 1, 7, X, 1);
   const edgeCells = cloudCells(board, edge);
-  assert.equal(edgeCells.length, (half + 1) * CLOUD_SIZE);
+  assert.equal(edgeCells.length, (lo + 1) * CLOUD_SIZE, 'the right edge cloud keeps x 13 and 14 only');
   assert.ok(edgeCells.every(({ x }) => x < BOARD_SIZE));
 });
 

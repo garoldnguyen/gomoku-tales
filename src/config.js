@@ -14,7 +14,7 @@ export const TORNADO_TURNS = 2; // a Tornado Zone trap waits this many turns aft
 export const HISS_LOCK_TURNS = 1; // a Hiss keeps the opponent from using skills for this many of their turns
 export const VENOM_ZONE_SIZE = 3; // a Venom poison zone is this many by this many cells around the target plant
 export const VENOM_TURNS = 2; // a Venom zone lasts this many turns after the cast turn (the opponent's next, then the caster's next)
-export const CLOUD_SIZE = 5; // Cloud Eagle's cloud covers this many by this many cells
+export const CLOUD_SIZE = 4; // Cloud Eagle's cloud covers this many by this many cells (an even size has no centre cell, see cloudReach in src/logic/cloud.js)
 export const CLOUD_TURNS = 2; // a cloud lasts this many turns of its owner
 export const CELL_PX = 24;
 export const INTERNAL_WIDTH = 960;
@@ -432,7 +432,7 @@ export const FEATHER_STAGGER_MS = 120; // the feathers lift off this far apart
 // its CLOUD_SIZE by CLOUD_SIZE area and the Sky Watch outlines.
 export const CLOUD_SEE_THROUGH_OPACITY = 0.42; // the owner's (and spectators') translucent cloud
 export const CLOUD_PREVIEW_OPACITY = 0.3; // the cloud being placed, under the pointer
-export const CLOUD_MIST_OPACITY = 0.42; // the other seat's view of a cloud: a light mist over its 3 by 3 plots, empty ones showing through
+export const CLOUD_MIST_OPACITY = 0.42; // the other seat's view of a cloud: a light mist over its CLOUD_SIZE by CLOUD_SIZE plots, empty ones showing through
 export const CLOUD_PUFF_HEIGHT = 0.42; // world units above the ground of the puff over a taken covered plot
 export const CLOUD_PUFF_SCALE = 1.15; // that puff's size, in plots
 export const CLOUD_PUFF_DRIFT = 0.08; // how far (world units) it drifts either side of its plot

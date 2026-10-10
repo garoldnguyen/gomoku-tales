@@ -9,7 +9,7 @@ import { EMPTY, HIDDEN as TAKEN, ROCK, X, O } from '../src/logic/board.js';
 import { CLOUD_EAGLE, EARTH_BEAR, assignSides } from '../src/logic/characters.js';
 import { newGame, placeStone, useSkill } from '../src/logic/game.js';
 import { CLOUD } from '../src/logic/skills.js';
-import { COVERED_ERROR, cloudCells, coveredActionError, isCovered, localViewEvents, localViewState, maskErrorForViewer, maskEventsForViewer, maskForViewer } from '../src/logic/cloud.js';
+import { COVERED_ERROR, cloudCells, coveredActionError, inCloud, isCovered, localViewEvents, localViewState, maskErrorForViewer, maskEventsForViewer, maskForViewer } from '../src/logic/cloud.js';
 import { LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS } from '../src/config.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
@@ -122,7 +122,9 @@ test('maskEventsForViewer leaves out the move under the cloud, never the cloud i
 });
 
 // X wins with a line of five whose cells (5, 7) and (6, 7) lie under X's
-// cloud on (7, 7): the win does not tell O where the hidden stones are.
+// cloud on (6, 7) (the 4 by 4 cloud covers x 5 to 8, y 6 to 9; the cloud
+// on (7, 7) would cover only (6, 7) of them): the win does not tell O where
+// the hidden stones are.
 function hiddenWinGame() {
   let state = cloudThenPlant(eagleGame(), X).state;
   for (const [ox, x] of [[0, 2], [2, 3], [4, 5], [6, 6]]) {
@@ -135,12 +137,12 @@ function hiddenWinGame() {
 test('a winning line under the other seat\'s cloud does not tell the hidden stones', () => {
   let state = hiddenWinGame();
   // Two turns of X ticked the cloud away; put it back for the winning move.
-  state = { ...state, clouds: [{ x: 7, y: 7, owner: X, turnsLeft: 2, placedTurn: state.turn }] };
+  state = { ...state, clouds: [{ x: 6, y: 7, owner: X, turnsLeft: 2, placedTurn: state.turn }] };
   state = ok(placeStone(state, { player: O, x: 8, y: 0 })).state;
   const won = ok(placeStone(state, { player: X, x: 4, y: 7 }));
   assert.equal(won.state.winner, X);
   assert.equal(won.state.winLine.length, 5);
-  const hidden = (cell) => cell.x >= 5 && cell.x <= 9 && cell.y >= 5 && cell.y <= 9;
+  const hidden = (cell) => inCloud(state.clouds[0], cell.x, cell.y);
   assert.ok(won.state.winLine.some(hidden), 'the true line runs under the cloud');
 
   const forO = maskForViewer(won.state, O);
@@ -158,9 +160,10 @@ test('a winning line under the other seat\'s cloud does not tell the hidden ston
   // The guest copy carries neither; the spectators get the full line.
   const message = { type: 'state', to: 'guest', state: won.state, events: won.events, seq: 9 };
   const [guestCopy, spectators] = hostStateMessages(message, O, true);
-  // covered names every cloud cell (the cloud is no secret); nothing else
-  // may name a hidden stone.
-  const sent = JSON.stringify({ ...guestCopy, state: { ...guestCopy.state, covered: null } });
+  // covered names every cloud cell and clouds the cell the cloud was put on
+  // (the cloud is no secret, and here it is put on (6, 7), a hidden cell
+  // too); nothing else may name a hidden stone.
+  const sent = JSON.stringify({ ...guestCopy, state: { ...guestCopy.state, covered: null, clouds: null } });
   assert.equal(guestCopy.state.winLine.some(hidden), false);
   assert.equal(guestCopy.events.find((e) => e.type === 'win').line.some(hidden), false);
   assert.ok(!sent.includes('"x":5,"y":7') && !sent.includes('"x":6,"y":7'), 'no hidden cell is named anywhere');
@@ -379,7 +382,7 @@ function assertNothingHidden(message) {
     for (const c of (state.clouds ?? []).filter((each) => each.owner === X)) {
       for (const { x, y } of cloudCells(state.board, c)) assert.ok(state.board[y][x] === EMPTY || state.board[y][x] === TAKEN, `${what}: (${x}, ${y}) shown`);
     }
-    for (const rock of state.rocks ?? []) assert.equal((state.clouds ?? []).some((c) => c.owner === X && Math.abs(rock.x - c.x) <= 2 && Math.abs(rock.y - c.y) <= 2), false, `${what}: a rock shown`);
+    for (const rock of state.rocks ?? []) assert.equal((state.clouds ?? []).some((c) => c.owner === X && inCloud(c, rock.x, rock.y)), false, `${what}: a rock shown`);
   }
   const walk = (value) => {
     if (!value || typeof value !== 'object') return;

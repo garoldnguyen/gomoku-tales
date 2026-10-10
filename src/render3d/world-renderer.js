@@ -47,11 +47,12 @@
 // the drawn state or its viewer changes.
 
 import {
-  BOARD_SIZE, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, CLOUD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, CLOUD_MIST_OPACITY, CLOUD_PUFF_BOB, CLOUD_PUFF_DRIFT, CLOUD_PUFF_DRIFT_MS, CLOUD_PUFF_HEIGHT, CLOUD_PUFF_SCALE, SKY_WATCH_GLOW_OPACITY, SKY_WATCH_OPACITY, SKY_WATCH_PUFF_DRIFT, SKY_WATCH_PUFF_HEIGHT, SKY_WATCH_PUFF_MS,
+  BOARD_SIZE, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, CLOUD_MIST_OPACITY, CLOUD_PUFF_BOB, CLOUD_PUFF_DRIFT, CLOUD_PUFF_DRIFT_MS, CLOUD_PUFF_HEIGHT, CLOUD_PUFF_SCALE, SKY_WATCH_GLOW_OPACITY, SKY_WATCH_OPACITY, SKY_WATCH_PUFF_DRIFT, SKY_WATCH_PUFF_HEIGHT, SKY_WATCH_PUFF_MS,
   SPRITE_STRETCH_Y, MUD_OPACITY, POISON_OPACITY, POISON_PREVIEW_OPACITY, SUNK_DEPTH_PX, SUNK_DIM,
 } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
 import { DEFAULT_SIDES } from '../logic/characters.js';
+import { cloudBox } from '../logic/cloud.js';
 import { createInitialState, isGameOver } from '../logic/game.js';
 import { drawText } from '../render/game-renderer.js';
 import { artMeta, artSource } from './art.js';
@@ -541,7 +542,6 @@ function createDecalLayer(world) {
 // (skyWatchPulse) over a plot lit in pale yellow, with a small cloud puff
 // drifting to and fro above each one so the eagle's player spots them.
 const CLOUD_ORDER = { seeThrough: 1, cover: 6, outline: 7, fading: 6, glow: 2, puff: 8, hidden: 9 };
-const CLOUD_HALF = (CLOUD_SIZE - 1) / 2;
 function createCloudLayer(world) {
   const overlayFor = createCloudOverlay();
   const cloudTile = sheetCanvas([cloudTileGrid()]);
@@ -598,12 +598,12 @@ function createCloudLayer(world) {
     }
     for (const kind of kinds) hideFrom(kind, used[kind]);
   };
-  // The cells of the cloud that ended at (cx, cy), clipped by the board.
+  // The cells of the cloud that ended on the chosen cell (cx, cy), clipped by the board.
   const placeFading = (cx, cy) => {
     let n = 0;
-    for (let y = cy - CLOUD_HALF; y <= cy + CLOUD_HALF; y++) {
-      for (let x = cx - CLOUD_HALF; x <= cx + CLOUD_HALF; x++) {
-        if (x < 0 || y < 0 || x >= BOARD_SIZE || y >= BOARD_SIZE) continue;
+    const box = cloudBox({ x: cx, y: cy }, BOARD_SIZE);
+    for (let y = box.y0; y <= box.y1; y++) {
+      for (let x = box.x0; x <= box.x1; x++) {
         let mesh = fadeMeshes[n];
         if (!mesh) {
           mesh = createCellDecal(fading);

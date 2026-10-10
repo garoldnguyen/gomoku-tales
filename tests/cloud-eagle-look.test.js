@@ -208,9 +208,12 @@ test('the cloud overlay: clipped at the edge, each cell once, cover wins where t
   const two = { ...state, clouds: [...state.clouds, { x: 2, y: 2, owner: O, turnsLeft: 2, placedTurn: state.turn }] };
   const cells = cloudOverlayCells(two, X);
   assert.equal(new Set(cells.map(key)).size, cells.length);
+  // The 4 by 4 cloud of O on (2, 2) covers x - 1 to x + 2 = 1 to 4 (the 5 by 5 one covered 0 to 4):
+  // (0, 0) is under X's own cloud only, so X sees it see-through, no longer covered.
   assert.equal(cells.find((c) => c.x === 1 && c.y === 1).look, COVER);
-  assert.equal(cells.find((c) => c.x === 0 && c.y === 0).look, COVER);
+  assert.equal(cells.find((c) => c.x === 0 && c.y === 0).look, SEE_THROUGH);
   assert.equal(cells.find((c) => c.x === 4 && c.y === 4).look, COVER);
+  assert.equal(cells.some((c) => c.x === 5 || c.y === 5), false, 'nothing beyond x + 2 of the cloud on (2, 2)');
   assert.deepEqual(cloudOverlayCells(eagleGame(), X), []);
 });
 

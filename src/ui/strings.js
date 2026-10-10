@@ -173,7 +173,7 @@ export const STRINGS = Object.freeze({
   hintTouchText: 'The first tap only shows where your seed would go, so a slip of the finger never costs a move.',
   hintCancel: 'Choose it again, press Esc or right click to cancel.',
   hintGotIt: 'Got it',
-  cloudTargetPrompt: 'Cloud: choose the cloud centre', // the target step of Cloud Eagle's Cloud
+  cloudTargetPrompt: 'Cloud: choose where the cloud goes', // the target step of Cloud Eagle's Cloud
   tornadoTargetPrompt: 'Tornado Zone: choose the trap centre', // the target step of Wind Rabbit's Tornado Zone
   venomTargetPrompt: `Venom: choose an opponent's plant to poison the ${VENOM_ZONE_SIZE} by ${VENOM_ZONE_SIZE} square around it`, // the target step of Jade Serpent's Venom
   windDashTooFarError: DASH_TOO_FAR_ERROR, // the rules' refusal of a Wind Dash target out of range, shown on the click

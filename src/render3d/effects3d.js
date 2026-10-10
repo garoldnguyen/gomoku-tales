@@ -61,7 +61,7 @@
 import * as THREE from 'three';
 import {
   BANNER_3D_Y, BOARD_SIZE, CAMERA_FOV, CAST_RING_DOTS, CAST_RING_FROM, CAST_RING_MS, CAST_RING_TO, CAST_SPARKLES,
-  CLOUD_PUFFS, CLOUD_SIZE, CONVERT_SPARK_RATE, DASH_SWIRL_RATE, DASH_TRAIL_RATE, HISS_MIST, HISS_RING_DOTS,
+  CLOUD_PUFFS, CONVERT_SPARK_RATE, DASH_SWIRL_RATE, DASH_TRAIL_RATE, HISS_MIST, HISS_RING_DOTS,
   HISS_RING_GAP_MS, HISS_RING_MS, HISS_RING_TO, HISS_RINGS, HISS_WOBBLE, HISS_WOBBLE_WAVES, MARK_FADE_MS,
   PLACE_DUST_COUNT, PLACEMENT_SLOTS, PLANT_OPEN_SPARKLES, PX_WORLD, RING_DOT_PX, RING_LIGHTEN, RING_MAX_DOTS, RING_SLOTS,
   DASH_GHOST_OPACITY, DASH_WIND_RATE, DASH_WIND_SPEED, FIELD_GUST_COUNT, SHAKE3D_LIGHT, SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, STORM_BURST_COUNT, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
@@ -70,6 +70,7 @@ import {
 } from '../config.js';
 import { O, X } from '../logic/board.js';
 import { DEFAULT_SIDES } from '../logic/characters.js';
+import { cloudBox } from '../logic/cloud.js';
 import { createBanners } from '../render/effects.js';
 import { artMeta, artSource } from './art.js';
 import { ART } from './art-assets.js';
@@ -126,7 +127,6 @@ const MAX_STEP_MS = 100; // a hidden tab does not make the effects jump on retur
 const TWO_PI = Math.PI * 2;
 const BLOOM_ROW_PX = 12; // art pixel row of a plant frame where the bloom opens
 const ZONE_CELLS = 4 * TORNADO_ARM + 1; // most cells a Tornado Zone cross has: the centre and each arm
-const CLOUD_HALF = (CLOUD_SIZE - 1) / 2; // cloud cells reach this far from its centre
 const BOARD_MIDDLE = (BOARD_SIZE - 1) / 2; // the middle cell of the field, where Hiss rings start
 const VENOM_SINK_DEPTH = 0.25; // world units the sick sprout sinks at the end
 const RING_Y = 0.05; // world height of the ring dots, just over the plots
@@ -622,15 +622,24 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     }
   }
 
-  // Cloud Eagle's cloud over the area centred on (wx, wz): puffs rolling in
-  // on the wind from the upper left (forming), or drifting off to the lower
-  // right and swelling as they thin (fading).
-  function cloudPuffs(wx, wz, forming) {
+  // Cloud Eagle's cloud over the cells it covers (the cloud whose chosen
+  // cell is (cx, cy), clipped to the field; the 4 by 4 cloud has no centre
+  // cell, so the puffs are spread over the middle of the covered cells, not
+  // the chosen one): puffs rolling in on the wind from the upper left
+  // (forming), or drifting off to the lower right and swelling as they thin
+  // (fading).
+  function cloudPuffs(cx, cy, forming) {
+    const box = cloudBox({ x: cx, y: cy }, BOARD_SIZE);
+    cellToWorldInto((box.x0 + box.x1) / 2, (box.y0 + box.y1) / 2, cellAt);
+    const wx = cellAt.x;
+    const wz = cellAt.z;
+    const halfX = (box.x1 - box.x0 + 1) / 2; // half the covered width and height, in cells
+    const halfZ = (box.y1 - box.y0 + 1) / 2;
     const count = scaledCount(CLOUD_PUFFS, frame.scale);
     for (let i = 0; i < count; i++) {
       random.fill(u);
-      const ox = (u[0] * 2 - 1) * (CLOUD_HALF + 0.5);
-      const oz = (u[1] * 2 - 1) * (CLOUD_HALF + 0.5);
+      const ox = (u[0] * 2 - 1) * halfX;
+      const oz = (u[1] * 2 - 1) * halfZ;
       if (forming) {
         // From up to 1.5 world units up the wind, gliding into the area.
         sp.x = wx + ox - 1.2 - u[2] * 0.6;
@@ -1019,8 +1028,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       }
       case 'cloudForm':
       case 'cloudFade': {
-        cellToWorldInto(spec.x, spec.y, cellAt);
-        cloudPuffs(cellAt.x, cellAt.z, spec.kind === 'cloudForm');
+        cloudPuffs(spec.x, spec.y, spec.kind === 'cloudForm');
         break;
       }
       case 'winBloom': {

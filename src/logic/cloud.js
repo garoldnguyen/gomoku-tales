@@ -4,7 +4,9 @@
 // - CLOUD: a cloud on any cell of the board, stone and rock cells too. It
 //   places no stone and does not end the owner's turn (Free Action: the
 //   owner still plants). It covers CLOUD_SIZE by
-//   CLOUD_SIZE cells centred on the chosen cell, clipped to the board, and
+//   CLOUD_SIZE cells around the chosen cell, clipped to the board (see
+//   cloudReach: an odd size is centred on the cell, an even size has no
+//   centre cell, so the chosen cell is the upper left of the middle), and
 //   lasts CLOUD_TURNS turns of its owner (not counting the turn it is
 //   placed in), then disappears. Stones placed inside stay; rocks are not
 //   affected.
@@ -25,22 +27,51 @@ export function cloudsOf(state) {
   return state.clouds ?? [];
 }
 
+// How far a cloud of `size` by `size` cells reaches from the chosen cell:
+// `lo` cells up and left, `hi` cells down and right. An odd size is centred
+// on the cell (lo = hi); an even size has no centre cell, so the cell is the
+// upper left one of the middle (size 4: lo 1, hi 2, so x - 1 to x + 2).
+export function cloudReach(size = CLOUD_SIZE) {
+  const lo = Math.floor((size - 1) / 2);
+  return { lo, hi: size - 1 - lo };
+}
+
 // True when the cell (x, y) lies under the cloud.
-export function inCloud(cloud, x, y) {
-  const half = Math.floor(CLOUD_SIZE / 2);
-  return Math.abs(x - cloud.x) <= half && Math.abs(y - cloud.y) <= half;
+export function inCloud(cloud, x, y, size = CLOUD_SIZE) {
+  const { lo, hi } = cloudReach(size);
+  return x >= cloud.x - lo && x <= cloud.x + hi && y >= cloud.y - lo && y <= cloud.y + hi;
 }
 
 // The cells the cloud covers, clipped to the board, row by row.
-export function cloudCells(board, cloud) {
-  const half = Math.floor(CLOUD_SIZE / 2);
+export function cloudCells(board, cloud, size = CLOUD_SIZE) {
+  const { lo, hi } = cloudReach(size);
   const cells = [];
-  for (let y = cloud.y - half; y <= cloud.y + half; y++) {
-    for (let x = cloud.x - half; x <= cloud.x + half; x++) {
+  for (let y = cloud.y - lo; y <= cloud.y + hi; y++) {
+    for (let x = cloud.x - lo; x <= cloud.x + hi; x++) {
       if (inBounds(board, x, y)) cells.push({ x, y });
     }
   }
   return cells;
+}
+
+// The first and last column and row the cloud covers on a board of
+// boardSize by boardSize cells: { x0, y0, x1, y1 }, clipped to the board.
+export function cloudBox(cloud, boardSize, size = CLOUD_SIZE) {
+  const { lo, hi } = cloudReach(size);
+  return {
+    x0: Math.max(0, cloud.x - lo),
+    y0: Math.max(0, cloud.y - lo),
+    x1: Math.min(boardSize - 1, cloud.x + hi),
+    y1: Math.min(boardSize - 1, cloud.y + hi),
+  };
+}
+
+// Where the cloud is drawn from: the middle of the cells it covers, in cell
+// coordinates (a half cell when the covered width or height is even), not
+// the chosen cell. { x, y }.
+export function cloudCentre(cloud, boardSize, size = CLOUD_SIZE) {
+  const box = cloudBox(cloud, boardSize, size);
+  return { x: (box.x0 + box.x1) / 2, y: (box.y0 + box.y1) / 2 };
 }
 
 // The CLOUD skill effect (same shape as the other skill effects): any cell

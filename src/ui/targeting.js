@@ -97,7 +97,7 @@ export function targetClick(state, player, targeting, cell) {
 //   { type: 'poison', x, y, cells } the Venom zone around the hovered opponent plant (3 by 3, cut at the edges)
 //   { type: 'dash', from, to }     whirl on the source, red frame on `to` (or null)
 //   { type: 'zone', x, y, cells }  the Tornado Zone cross centred on (x, y) and its cells (cut at the edges)
-//   { type: 'cloud', x, y, cells } the Cloud centred on (x, y) and its cells
+//   { type: 'cloud', x, y, cells } the Cloud placed on (x, y) and its cells (CLOUD_SIZE by CLOUD_SIZE around it, cut at the edges)
 export function targetPreview(state, player, targeting, hover) {
   const { board } = state;
   const cell = hover && inBounds(board, hover.x, hover.y) ? hover : null;
