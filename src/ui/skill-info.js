@@ -12,24 +12,27 @@
 // is not mud already, and Petrification takes only an opponent's plant that
 // is not sunk in mud. Venom also takes only an opponent's plant.
 
-import { CLOUD_SIZE, CLOUD_TURNS, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, SKY_WATCH_RUN, TORNADO_SIZE } from '../config.js';
+import {
+  CLOUD_SIZE, CLOUD_TURNS, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, SKY_WATCH_RUN, TORNADO_ARM, TORNADO_TURNS, WIND_DASH_RANGE,
+} from '../config.js';
 import {
   CLOUD, HISS, MUD_TRAP, PETRIFICATION, SKY_WATCH, TORNADO_ZONE, VENOM, WIND_DASH, getSkill,
 } from '../logic/skills.js';
 
 const turns = (count) => `${count} ${count === 1 ? 'turn' : 'turns'}`;
+const plots = (count) => `${count} ${count === 1 ? 'plot' : 'plots'}`;
 const info = (skillId, description, hint) => Object.freeze({ title: getSkill(skillId).name, description, hint });
 
 export const SKILL_INFO = Object.freeze({
   [WIND_DASH]: info(
     WIND_DASH,
-    'Pick one of your plants, then an empty target plot. After the opponent\'s next turn, the plant folds back into a seed, rides a gust of petals to the target and grows again there, if it is still yours and the plot is still empty.',
+    `Pick one of your plants, then an empty target plot up to ${plots(WIND_DASH_RANGE)} away, diagonals included. After the opponent's next turn, the plant folds back into a seed, rides a gust of petals to the target and grows again there, if it is still yours and the plot is still empty. It cannot land on mud.`,
     'Click to select, then choose a plot',
   ),
   [TORNADO_ZONE]: info(
     TORNADO_ZONE,
-    `Secretly pick the centre of a ${TORNADO_SIZE} by ${TORNADO_SIZE} zone; your opponent never sees where. On their next turn, a seed they plant inside is blown by a dandelion storm to a random empty plot anywhere on the field.`,
-    'Click to select, then choose the zone centre',
+    `Secretly pick the centre of a cross of ${plots(4 * TORNADO_ARM + 1)}: that plot and ${plots(TORNADO_ARM)} up, down, left and right of it, cut at the edge of the field. Your opponent never sees it. It is armed when this turn ends and waits for ${turns(TORNADO_TURNS)}. The first seed anyone plants on the cross, yours too, fires it: a dandelion storm throws that seed to a free plot next to it and the trap is used up.`,
+    'Click to select, then choose the trap centre',
   ),
   [MUD_TRAP]: info(
     MUD_TRAP,

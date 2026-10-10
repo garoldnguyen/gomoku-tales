@@ -28,7 +28,7 @@ import { dropOffsetPx, STAGE_DROP, STAGE_LAND, STAGE_REST, STAGE_SPROUT } from '
 //   { kind: 'tornado', x, y, cells }      the swirl of petals and leaves over the zone, until it ends
 //   { kind: 'tornadoHidden' }             the zone of the other seat: only a gust of dandelion fluff
 //                                         drifting across the whole field, never where the zone is
-//   { kind: 'storm', x, y, cells }        the dandelion storm bursting from the plot of a thrown stone
+//   { kind: 'storm', x, y, cells }        the trap fired: the dandelion storm bursts over the revealed cross (centre x, y)
 //   { kind: 'tornadoEnd' }
 //   { kind: 'throw', from, to, player }   a seed thrown in an arc, landing with a soil puff, then regrowing from Land
 //   { kind: 'throwBlocked', x, y }        a gust around a plant with nowhere to go
@@ -94,7 +94,7 @@ export function visualsForEvents(events) {
         specs.push(event.hidden ? { kind: 'tornadoHidden' } : { kind: 'tornado', x: event.x, y: event.y, cells: event.cells });
         break;
       case 'tornadoStorm':
-        specs.push({ kind: 'storm', x: event.x, y: event.y, cells: [{ x: event.x, y: event.y }] });
+        specs.push({ kind: 'storm', x: event.x, y: event.y, cells: event.cells ?? [{ x: event.x, y: event.y }] });
         break;
       case 'tornadoEnded':
         specs.push({ kind: 'tornadoEnd' });
@@ -154,6 +154,7 @@ export function catchUpVisuals(events) {
         tornado = spec;
         break;
       case 'tornadoEnd':
+      case 'storm': // a fired trap is used up at once
         tornado = null;
         break;
       case 'endLingering':

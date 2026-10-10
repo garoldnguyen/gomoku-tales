@@ -318,10 +318,10 @@ test('a full game between two windows with all four skills ends on the Game over
   assert.equal(rabbit.clickSkill(X, TORNADO_ZONE), true);
   assert.equal(rabbit.click({ x: 5, y: 5 }), true);
   assert.equal(rabbit.click({ x: 12, y: 12 }), true);
-  assert.equal(rabbit.getView().state.tornado.cells.length, 9, 'the rabbit sees its zone');
+  assert.equal(rabbit.getView().state.tornado.cells.length, 5, 'the rabbit sees its cross');
   assert.deepEqual(Object.keys(bear.getView().state.tornado).sort(), ['endsAfterTurn', 'hidden', 'player'], 'the bear never sees where');
 
-  // Turn 8: the bear places inside the zone and the host throws the stone.
+  // Turn 8: the bear plants on the cross: the trap fires and the host throws the seed to a neighbour plot.
   assert.equal(bear.click({ x: 5, y: 5 }), true);
   assert.equal(board()[5][5], EMPTY);
   assert.equal(rabbit.getView().state.tornado, null);
@@ -466,7 +466,7 @@ test('statusLine and gameOutcome', () => {
   const state = createInitialState();
   assert.equal(statusLine({ state, you: X, yourTurn: true }), 'Your turn');
   assert.equal(statusLine({ state, you: O, yourTurn: false }), "Opponent's turn");
-  assert.equal(statusLine({ state, you: X, yourTurn: true, targeting: { skill: TORNADO_ZONE, from: null } }), 'Tornado Zone: choose the zone centre');
+  assert.equal(statusLine({ state, you: X, yourTurn: true, targeting: { skill: TORNADO_ZONE, from: null } }), 'Tornado Zone: choose the trap centre');
   assert.equal(statusLine({ state, you: X, yourTurn: true, peerCountdown: 3 }), 'Opponent left. You win in 3');
   assert.equal(gameOutcome(state, X), null);
 

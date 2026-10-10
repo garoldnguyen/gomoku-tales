@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COOLDOWN_SHORT, COOLDOWN_LONG, MUD_LIFETIME_TURNS, MUD_SINK_TURNS } from '../src/config.js';
+import { COOLDOWN_SHORT, COOLDOWN_LONG, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, TORNADO_TURNS } from '../src/config.js';
 import { X, O, ROCK } from '../src/logic/board.js';
 import { createInitialState } from '../src/logic/game.js';
 import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION } from '../src/logic/skills.js';
@@ -76,7 +76,11 @@ test('Wind Dash targeting: pick an own stone, then an empty cell', () => {
   assert.deepEqual(targetClick(state, X, t, { x: 5, y: 5 }).targeting.from, { x: 5, y: 5 });
   assert.equal(targetClick(state, X, t, { x: 2, y: 2 }).targeting.from, null);
 
-  assert.deepEqual(targetClick(state, X, t, { x: 9, y: 9 }), { target: { from: { x: 2, y: 2 }, to: { x: 9, y: 9 } } });
+  // The range is WIND_DASH_RANGE cells, diagonals included (Chebyshev).
+  assert.deepEqual(targetClick(state, X, t, { x: 5, y: 4 }), { target: { from: { x: 2, y: 2 }, to: { x: 5, y: 4 } } });
+  assert.deepEqual(targetClick(state, X, t, { x: 2, y: 5 }), { target: { from: { x: 2, y: 2 }, to: { x: 2, y: 5 } } });
+  assert.deepEqual(targetClick(state, X, t, { x: 6, y: 2 }), { error: 'That cell is too far for Wind Dash.' });
+  assert.deepEqual(targetClick(state, X, t, { x: 9, y: 9 }), { error: 'That cell is too far for Wind Dash.' });
 });
 
 test('Wind Dash target cannot be a rock', () => {
@@ -88,7 +92,7 @@ test('Wind Dash target cannot be a rock', () => {
 test('Tornado Zone accepts any cell as the centre, including occupied and edge cells', () => {
   const state = stateWith([[4, 4, O]]);
   const t = startTargeting(TORNADO_ZONE);
-  assert.equal(targetPrompt(t), 'Tornado Zone: choose the zone centre');
+  assert.equal(targetPrompt(t), 'Tornado Zone: choose the trap centre');
   assert.deepEqual(targetClick(state, X, t, { x: 4, y: 4 }), { target: { x: 4, y: 4 } });
   assert.deepEqual(targetClick(state, X, t, { x: 0, y: 0 }), { target: { x: 0, y: 0 } });
 });
@@ -121,13 +125,16 @@ test('target previews follow the hovered cell', () => {
   assert.equal(targetPreview(state, X, startTargeting(WIND_DASH), null), null);
 
   const dash = { skill: WIND_DASH, from: { x: 2, y: 2 } };
-  assert.deepEqual(targetPreview(state, X, dash, { x: 6, y: 6 }), { type: 'dash', from: { x: 2, y: 2 }, to: { x: 6, y: 6 } });
+  assert.deepEqual(targetPreview(state, X, dash, { x: 5, y: 5 }), { type: 'dash', from: { x: 2, y: 2 }, to: { x: 5, y: 5 } });
+  assert.deepEqual(targetPreview(state, X, dash, { x: 6, y: 6 }), { type: 'dash', from: { x: 2, y: 2 }, to: null }, 'out of range: no red frame');
   assert.deepEqual(targetPreview(state, X, dash, { x: 3, y: 3 }), { type: 'dash', from: { x: 2, y: 2 }, to: null });
   assert.deepEqual(targetPreview(state, X, dash, null), { type: 'dash', from: { x: 2, y: 2 }, to: null });
 
   const zone = targetPreview(state, X, startTargeting(TORNADO_ZONE), { x: 0, y: 0 });
   assert.equal(zone.type, 'zone');
-  assert.equal(zone.cells.length, 4); // clipped at the corner
+  assert.deepEqual(zone.cells, [{ x: 0, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }], 'the cross, clipped at the corner');
+  assert.equal(targetPreview(state, X, startTargeting(TORNADO_ZONE), { x: 7, y: 7 }).cells.length, 5);
+  assert.equal(targetPreview(state, X, startTargeting(TORNADO_ZONE), { x: 7, y: 0 }).cells.length, 4);
 
   assert.deepEqual(targetPreview(state, O, startTargeting(MUD_TRAP), { x: 5, y: 5 }), { type: 'select', x: 5, y: 5 });
   assert.equal(targetPreview(state, O, startTargeting(MUD_TRAP), { x: 2, y: 2 }), null);
@@ -201,7 +208,7 @@ test('clicking a skill button starts targeting and the status shows the prompt',
   const game = createLocalGame();
   assert.equal(game.clickSkill(X, TORNADO_ZONE), true);
   assert.deepEqual(game.getTargeting(), { skill: TORNADO_ZONE, from: null });
-  assert.equal(game.getView().status, 'Tornado Zone: choose the zone centre');
+  assert.equal(game.getView().status, 'Tornado Zone: choose the trap centre');
   // Placement hover is off while targeting.
   game.setHover({ x: 3, y: 3 });
   assert.equal(game.getView().hover, null);
@@ -266,10 +273,12 @@ test('Wind Dash end to end: announce, red frame data, opponent turn, landing', (
   game.clickSkill(X, WIND_DASH);
   assert.equal(game.click({ x: 2, y: 2 }), false); // source picked, no action yet
   assert.deepEqual(game.getView().preview, { type: 'dash', from: { x: 2, y: 2 }, to: null });
-  assert.equal(game.click({ x: 6, y: 6 }), true);
+  assert.equal(game.click({ x: 6, y: 6 }), false, 'four cells away is out of range');
+  assert.equal(game.getView().message, 'That cell is too far for Wind Dash.');
+  assert.equal(game.click({ x: 5, y: 5 }), true);
 
   let state = game.getState();
-  assert.deepEqual(state.pendingDash.to, { x: 6, y: 6 });
+  assert.deepEqual(state.pendingDash.to, { x: 5, y: 5 });
   assert.equal(state.currentPlayer, X, 'the turn goes on after a skill');
   assert.equal(game.getTargeting(), null);
   assert.equal(game.getView().message, 'Wind Dash! The stone dashes after the next turn.');
@@ -280,7 +289,7 @@ test('Wind Dash end to end: announce, red frame data, opponent turn, landing', (
   state = game.getState();
   assert.equal(state.pendingDash, null);
   assert.equal(state.board[2][2], null);
-  assert.equal(state.board[6][6], X);
+  assert.equal(state.board[5][5], X);
   assert.equal(game.getView().message, 'Wind Dash landed.');
 });
 
@@ -290,9 +299,9 @@ test('Wind Dash failure is reported when the target is taken', () => {
   game.click({ x: 10, y: 10 });
   game.clickSkill(X, WIND_DASH);
   game.click({ x: 2, y: 2 });
-  game.click({ x: 6, y: 6 });
+  game.click({ x: 5, y: 5 });
   game.click({ x: 3, y: 14 }); // X plants, which ends its turn
-  game.click({ x: 6, y: 6 }); // O takes the target
+  game.click({ x: 5, y: 5 }); // O takes the target
   assert.equal(game.getState().board[2][2], X);
   assert.equal(game.getView().message, 'Wind Dash failed: the target cell is taken.');
 });
@@ -301,17 +310,17 @@ test('Tornado Zone end to end: on one screen the zone is hidden, and a seed plan
   const game = createLocalGame({ random: () => 0 });
   game.clickSkill(X, TORNADO_ZONE);
   game.click({ x: 7, y: 7 });
-  assert.equal(game.getState().tornado.cells.length, 9);
+  assert.equal(game.getState().tornado.cells.length, 5, 'the cross');
   // X is still to move (a skill does not end the turn) and is told what it cast.
-  assert.equal(game.getView().message, 'Tornado Zone! It lasts through the next turn.');
+  assert.equal(game.getView().message, `Tornado Zone! The trap waits for ${TORNADO_TURNS} turns.`);
   game.click({ x: 14, y: 0 }); // X plants, which ends its turn
   assert.equal(game.getView().message, null, 'O is to move and reads nothing of the cast');
   assert.deepEqual(Object.keys(game.getView().state.tornado).sort(), ['endsAfterTurn', 'hidden', 'player'], 'O is to move and must not see where');
 
-  game.click({ x: 7, y: 7 }); // O inside the zone; random 0 picks the first empty plot outside, (0, 0)
+  game.click({ x: 7, y: 7 }); // O on the cross; random 0 picks the first free neighbour, (6, 6)
   const state = game.getState();
   assert.equal(state.board[7][7], null);
-  assert.equal(state.board[0][0], O);
+  assert.equal(state.board[6][6], O);
   assert.equal(state.tornado, null);
   assert.equal(game.getView().message, 'The dandelion storm threw the stone away!');
 });

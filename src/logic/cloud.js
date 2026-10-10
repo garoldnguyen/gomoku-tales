@@ -118,9 +118,10 @@ export function skyWatchCells(state, owner) {
 // nothing is covered. The host keeps the true state; this is only what is
 // shown and sent.
 //
-// HIDDEN TORNADO ZONE (owner's rule): only the player who cast a Tornado
-// Zone may see where it is. For the other seat the zone becomes
-// { player, hidden: true } with no centre and no cells.
+// HIDDEN TORNADO ZONE (owner's rule, docs/free-action-design.md section 4):
+// only the player who cast a Tornado Zone may see where the cross is until
+// it fires. For the other seat the zone becomes
+// { player, hidden: true, endsAfterTurn } with no centre and no cells.
 export function maskForViewer(state, viewer) {
   if (!state || (viewer !== X && viewer !== O)) return state;
   const covered = coveredCells(state, viewer);
@@ -207,7 +208,9 @@ export function maskEventsForViewer(masked, events) {
   return changed ? kept : events;
 }
 
-const PUBLIC_EVENTS = Object.freeze(['cloudPlaced', 'cloudEnded', 'win', 'draw', 'turnEnded']);
+// tornadoStorm is the reveal of a Tornado Zone trap that just fired: the
+// cross is known to everybody from then on, so the event always stays.
+const PUBLIC_EVENTS = Object.freeze(['cloudPlaced', 'cloudEnded', 'win', 'draw', 'turnEnded', 'tornadoStorm']);
 
 function hidesEvent(masked, event) {
   if (PUBLIC_EVENTS.includes(event?.type)) return false;

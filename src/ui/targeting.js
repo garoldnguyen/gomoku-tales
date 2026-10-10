@@ -3,12 +3,14 @@
 // chosen source stone for Wind Dash and null otherwise. The rules module
 // still validates the finished action; these checks only guide the clicks.
 
+import { WIND_DASH_RANGE } from '../config.js';
 import { X, O, isEmptyCell, inBounds } from '../logic/board.js';
 import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION, HISS, VENOM, CLOUD } from '../logic/skills.js';
 import { cloudCells } from '../logic/cloud.js';
 import { SUNK_PLANT_ERROR, mudAt } from '../logic/earth-bear-skills.js';
 import { isSunk } from '../logic/scoring-board.js';
-import { tornadoCells } from '../logic/wind-rabbit-skills.js';
+import { isPoisoned } from '../logic/jade-serpent-skills.js';
+import { DASH_ON_MUD_ERROR, DASH_ON_POISON_ERROR, dashDistance, tornadoCells } from '../logic/wind-rabbit-skills.js';
 import { STRINGS } from './strings.js';
 
 // Skills used at once on the button click, with no target flow.
@@ -29,7 +31,7 @@ export function targetPrompt(targeting) {
     case WIND_DASH:
       return targeting.from ? 'Wind Dash: choose an empty target cell' : 'Wind Dash: choose one of your stones';
     case TORNADO_ZONE:
-      return 'Tornado Zone: choose the zone centre';
+      return STRINGS.tornadoTargetPrompt;
     case MUD_TRAP:
       return 'Mud Trap: choose an empty cell';
     case PETRIFICATION:
@@ -65,8 +67,10 @@ export function targetClick(state, player, targeting, cell) {
       // becomes the new source.
       if (from.x === x && from.y === y) return { targeting: { ...targeting, from: null } };
       if (content === player && !isSunk(state, x, y)) return { targeting: { ...targeting, from: { x, y } } };
+      if (dashDistance(from, cell) > WIND_DASH_RANGE) return { error: STRINGS.windDashTooFarError };
       if (!isEmptyCell(board, x, y)) return { error: 'Choose an empty target cell.' };
-      if (mudAt(state, x, y)) return { error: 'A Wind Dash cannot land on mud.' };
+      if (mudAt(state, x, y)) return { error: DASH_ON_MUD_ERROR };
+      if (isPoisoned(state, x, y)) return { error: DASH_ON_POISON_ERROR };
       return { target: { from, to: { x, y } } };
     }
     case TORNADO_ZONE:
@@ -90,7 +94,7 @@ export function targetClick(state, player, targeting, cell) {
 // (hover may be null). Returns null or one of:
 //   { type: 'select', x, y }       ring around a stone that can be picked, or the plot Mud Trap would flood
 //   { type: 'dash', from, to }     whirl on the source, red frame on `to` (or null)
-//   { type: 'zone', x, y, cells }  the Tornado Zone centred on (x, y) and its cells
+//   { type: 'zone', x, y, cells }  the Tornado Zone cross centred on (x, y) and its cells (cut at the edges)
 //   { type: 'cloud', x, y, cells } the Cloud centred on (x, y) and its cells
 export function targetPreview(state, player, targeting, hover) {
   const { board } = state;
@@ -101,7 +105,8 @@ export function targetPreview(state, player, targeting, hover) {
     case WIND_DASH: {
       const { from } = targeting;
       if (!from) return content === player && !isSunk(state, cell.x, cell.y) ? { type: 'select', x: cell.x, y: cell.y } : null;
-      const to = cell && isEmptyCell(board, cell.x, cell.y) && !mudAt(state, cell.x, cell.y) ? { x: cell.x, y: cell.y } : null;
+      const to = cell && dashDistance(from, cell) <= WIND_DASH_RANGE && isEmptyCell(board, cell.x, cell.y)
+        && !mudAt(state, cell.x, cell.y) && !isPoisoned(state, cell.x, cell.y) ? { x: cell.x, y: cell.y } : null;
       return { type: 'dash', from, to };
     }
     case TORNADO_ZONE:

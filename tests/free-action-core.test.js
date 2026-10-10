@@ -296,14 +296,17 @@ test('a cloud still lasts the owner\'s next CLOUD_TURNS turns', () => {
   assert.deepEqual(ended, { type: 'cloudEnded', player: X, x: 9, y: 9 });
 });
 
-test('a Tornado Zone cast then a planting lasts through the opponent\'s next turn', () => {
+test('a Tornado Zone cast then a planting waits through the opponent\'s next turn and the caster\'s next turn', () => {
   let state = gameFor([WIND_RABBIT, EARTH_BEAR]);
   state = use(state, X, TORNADO_ZONE, { x: 9, y: 9 }).state;
   state = place(state, X, 0, 0);
   assert.ok(state.tornado, 'armed for the opponent\'s turn');
   const outside = ok(placeStone(state, { player: O, x: 1, y: 0 }));
-  assert.ok(outside.events.some((e) => e.type === 'tornadoEnded'));
-  assert.equal(outside.state.tornado, null);
+  assert.equal(outside.events.some((e) => e.type === 'tornadoEnded'), false, 'still waiting for the caster\'s next turn');
+  assert.ok(outside.state.tornado);
+  const last = ok(placeStone(outside.state, { player: X, x: 2, y: 0 }));
+  assert.ok(last.events.some((e) => e.type === 'tornadoEnded'));
+  assert.equal(last.state.tornado, null);
 });
 
 // --- The room over the fake transport ---
@@ -468,7 +471,7 @@ test('local game: a skill, then a plant, targeting and Esc work as before', () =
 
   // Tornado Zone: choose the centre; the same player is still to move.
   assert.equal(game.clickSkill(X, TORNADO_ZONE), true);
-  assert.equal(game.getView().status, 'Tornado Zone: choose the zone centre');
+  assert.equal(game.getView().status, 'Tornado Zone: choose the trap centre');
   assert.equal(game.click({ x: 3, y: 3 }), true);
   const state = game.getState();
   assert.equal(state.currentPlayer, X);

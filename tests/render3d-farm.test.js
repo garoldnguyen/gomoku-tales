@@ -161,12 +161,14 @@ test('the zone decal is cut into nine cell pieces that tile it exactly, far row 
   assert.equal(zonePieceUv(-1, -1).u0, 0);
 });
 
-test('the Tornado Zone preview places each clipped cell inside the 3x3 zone decal', () => {
+test('the Tornado Zone preview places each cell of the clipped cross inside the 3x3 zone decal', () => {
   const game = createLocalGame();
   game.clickSkill('X', TORNADO_ZONE);
+  const pieces = () => boardMarks(game.getView()).decals.map((d) => `${d.x},${d.y}:${d.dx},${d.dy}`).sort();
   game.setHover({ x: 0, y: 0 });
-  const pieces = boardMarks(game.getView()).decals.map((d) => `${d.x},${d.y}:${d.dx},${d.dy}`).sort();
-  assert.deepEqual(pieces, ['0,0:0,0', '0,1:0,1', '1,0:1,0', '1,1:1,1']);
+  assert.deepEqual(pieces(), ['0,0:0,0', '0,1:0,1', '1,0:1,0'], 'no corner piece: the cross is cut at the board corner');
+  game.setHover({ x: 7, y: 7 });
+  assert.deepEqual(pieces(), ['6,7:-1,0', '7,6:0,-1', '7,7:0,0', '7,8:0,1', '8,7:1,0']);
 });
 
 test('winner marks pulse between 70 and 100 percent once a second', () => {

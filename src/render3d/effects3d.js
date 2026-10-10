@@ -65,7 +65,7 @@ import {
   HISS_RING_GAP_MS, HISS_RING_MS, HISS_RING_TO, HISS_RINGS, HISS_WOBBLE, HISS_WOBBLE_WAVES, MARK_FADE_MS,
   PLACE_DUST_COUNT, PLACEMENT_SLOTS, PLANT_OPEN_SPARKLES, PX_WORLD, RING_DOT_PX, RING_LIGHTEN, RING_MAX_DOTS, RING_SLOTS,
   DASH_GHOST_OPACITY, DASH_WIND_RATE, DASH_WIND_SPEED, FIELD_GUST_COUNT, SHAKE3D_LIGHT, SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, STORM_BURST_COUNT, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
-  TORNADO_PARTICLE_RATE, TORNADO_SIZE, VENOM_BUBBLE_RATE, VENOM_TINT, VINE_POINT_PX, VINE_POINTS, WIN_RING_DOTS,
+  TORNADO_ARM, TORNADO_PARTICLE_RATE, VENOM_BUBBLE_RATE, VENOM_TINT, VINE_POINT_PX, VINE_POINTS, WIN_RING_DOTS,
   WIN_RING_MS, WIN_RING_TO, WIN_SPARKLES, WIN_STAGGER_MS,
 } from '../config.js';
 import { O, X } from '../logic/board.js';
@@ -125,7 +125,7 @@ const TIMELINE_SLOTS = 16; // skill animations running at once before more recor
 const MAX_STEP_MS = 100; // a hidden tab does not make the effects jump on return
 const TWO_PI = Math.PI * 2;
 const BLOOM_ROW_PX = 12; // art pixel row of a plant frame where the bloom opens
-const ZONE_HALF = (TORNADO_SIZE - 1) / 2; // zone cells reach this far from its centre
+const ZONE_CELLS = 4 * TORNADO_ARM + 1; // most cells a Tornado Zone cross has: the centre and each arm
 const CLOUD_HALF = (CLOUD_SIZE - 1) / 2; // cloud cells reach this far from its centre
 const BOARD_MIDDLE = (BOARD_SIZE - 1) / 2; // the middle cell of the field, where Hiss rings start
 const VENOM_SINK_DEPTH = 0.25; // world units the sick sprout sinks at the end
@@ -1432,7 +1432,7 @@ function createDashMark({ world, pool, sp, random, u, frame }, actors) {
 function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
   const material = decalMaterial(artSource(ART.v3.decal.zone));
   const decals = [];
-  for (let i = 0; i < TORNADO_SIZE * TORNADO_SIZE; i++) {
+  for (let i = 0; i < ZONE_CELLS; i++) {
     const mesh = createCellDecal(material);
     mesh.renderOrder = 1;
     world.scene.add(mesh);
@@ -1440,12 +1440,14 @@ function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
   }
   // The zone's centre cell (cx, cy) and its world point (x, z); fade is
   // this frame's markFade, so the bend eases off as the zone ends.
-  const mark = { active: false, endStart: NaN, cx: 0, cy: 0, x: 0.5, z: 0.5, fade: 0.5, carry: 0.5 };
+  // `cells` is the cross of the zone (the array of the state, never copied).
+  const mark = { active: false, endStart: NaN, cx: 0, cy: 0, cells: null, x: 0.5, z: 0.5, fade: 0.5, carry: 0.5 };
   const centreAt = { x: 0, z: 0 }; // the zone centre's world point, rewritten by show()
 
   const hide = () => {
     mark.active = false;
     mark.endStart = NaN;
+    mark.cells = null;
     for (let i = 0; i < decals.length; i++) decals[i].visible = false;
   };
 
@@ -1463,6 +1465,7 @@ function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
       cellToWorldInto(x, y, centreAt);
       mark.cx = x;
       mark.cy = y;
+      mark.cells = cells;
       mark.x = centreAt.x;
       mark.z = centreAt.z;
       mark.fade = 1;
@@ -1476,8 +1479,12 @@ function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
     },
 
     bendAt(x, y) {
-      if (!mark.active || Math.abs(x - mark.cx) > ZONE_HALF || Math.abs(y - mark.cy) > ZONE_HALF) return 0;
-      return TORNADO_BEND_PX * mark.fade;
+      if (!mark.active) return 0;
+      const { cells } = mark;
+      for (let i = 0; i < cells.length; i++) {
+        if (cells[i].x === x && cells[i].y === y) return TORNADO_BEND_PX * mark.fade;
+      }
+      return 0;
     },
 
     update() {

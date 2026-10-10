@@ -115,6 +115,34 @@ test('events that arrive late (catch up) do not bring a hidden zone back', async
   assert.equal(zoneDecals(), 0, 'the bear\'s state hides the zone, whatever the late events said');
 });
 
+test('the caster sees the cross: 5 decals in the middle, 4 at an edge, 3 at a corner', async () => {
+  for (const [x, y, count] of [[7, 7, 5], [7, 0, 4], [0, 7, 4], [14, 7, 4], [7, 14, 4], [0, 0, 3], [14, 14, 3]]) {
+    const { game, frames, deliver, zoneDecals } = await build();
+    cast(game, x, y);
+    deliver();
+    frames();
+    assert.equal(game.getState().tornado.cells.length, count);
+    assert.equal(zoneDecals(), count, `centre (${x}, ${y})`);
+  }
+});
+
+test('plants lean towards the cross cells only, not towards its diagonal corners', async () => {
+  const lean = async (plantAt) => {
+    const { game, frames, deliver, bendTotal } = await build();
+    assert.equal(game.click(plantAt), true); // X plants
+    deliver();
+    assert.equal(game.click({ x: 1, y: 1 }), true); // O plants
+    deliver();
+    frames(80);
+    cast(game, 7, 7);
+    deliver();
+    frames(4);
+    return bendTotal();
+  };
+  assert.ok(await lean({ x: 6, y: 7 }) > 0, 'an arm cell of the cross leans');
+  assert.equal(await lean({ x: 6, y: 6 }), 0, 'a diagonal neighbour of the centre is outside the cross');
+});
+
 test('the very first frame of the bear\'s turn has no zone in it: no decal and no lean', async () => {
   const { game, frames, deliver, zoneDecals, bendTotal } = await build();
   assert.equal(game.click({ x: 6, y: 7 }), true); // X plants next to where the zone will be

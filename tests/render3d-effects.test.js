@@ -107,11 +107,11 @@ test('a failed Wind Dash fizzles and ends the marks', () => {
   assert.equal(regrowCell(specs[1], STAGES), null);
 });
 
-test('Tornado Zone: the swirl shows over the zone; a seed planted there bursts in a storm and flies anywhere in an arc', () => {
+test('Tornado Zone: the swirl shows over the cross; a seed planted on it bursts in a storm and flies to a neighbour plot in an arc', () => {
   const results = play([
     { skill: TORNADO_ZONE, target: { x: 7, y: 7 } },
     [14, 14], // the rabbit plants, which ends its turn
-    [7, 7], // the bear plants inside the zone; random 0 throws it to the first empty plot outside, (0, 0)
+    [7, 7], // the bear plants on the cross; random 0 throws it to the first free neighbour, (6, 6)
   ], { random: () => 0 });
   const announced = visualsForEvents(results[0].events);
   // Changed with the Free Action rework (part 1): a secret zone plays no cast
@@ -119,14 +119,15 @@ test('Tornado Zone: the swirl shows over the zone; a seed planted there bursts i
   // passes to the other seat; the swirl alone shows it and follows the state.
   assert.equal(kinds(announced).includes('castRing'), false, 'no cast ring at the secret centre');
   assert.equal(announced[0].kind, 'tornado');
-  assert.equal(announced[0].cells.length, 9);
+  assert.equal(announced[0].cells.length, 5, 'the cross');
 
   const thrown = visualsForEvents(results[2].events);
-  assert.deepEqual(kinds(thrown), ['place', 'storm', 'throw', 'tornadoEnd', 'banner']);
-  assert.deepEqual(thrown[1], { kind: 'storm', x: 7, y: 7, cells: [{ x: 7, y: 7 }] });
-  assert.deepEqual(thrown[2], { kind: 'throw', from: { x: 7, y: 7 }, to: { x: 0, y: 0 }, player: O });
-  assert.deepEqual(heldCell(thrown[2], STAGES), { x: 0, y: 0, ms: THROW_DELAY_MS + THROW_MS });
-  assert.deepEqual(regrowCell(thrown[2], STAGES), { x: 0, y: 0, player: O, startMs: THROW_DELAY_MS + THROW_MS - STAGES[STAGE_LAND] });
+  // The fired trap is used up at once: no tornadoEnded event, no tornadoEnd spec.
+  assert.deepEqual(kinds(thrown), ['place', 'storm', 'throw', 'banner']);
+  assert.deepEqual(thrown[1], { kind: 'storm', x: 7, y: 7, cells: [{ x: 7, y: 6 }, { x: 6, y: 7 }, { x: 7, y: 7 }, { x: 8, y: 7 }, { x: 7, y: 8 }] });
+  assert.deepEqual(thrown[2], { kind: 'throw', from: { x: 7, y: 7 }, to: { x: 6, y: 6 }, player: O });
+  assert.deepEqual(heldCell(thrown[2], STAGES), { x: 6, y: 6, ms: THROW_DELAY_MS + THROW_MS });
+  assert.deepEqual(regrowCell(thrown[2], STAGES), { x: 6, y: 6, player: O, startMs: THROW_DELAY_MS + THROW_MS - STAGES[STAGE_LAND] });
   assert.equal(shakeStrength(thrown[2]), 0);
 });
 

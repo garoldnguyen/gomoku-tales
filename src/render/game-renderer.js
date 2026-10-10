@@ -206,9 +206,10 @@ function drawCells(ctx, state) {
   for (const { x, y } of state.sunk ?? []) drawMudTint(ctx, x, y, COLORS.sunk);
 }
 
-// Translucent overlay over a group of cells (the Tornado Zone), drawn as
-// their bounding box because the zone is always a clipped square. The
-// animated tornado sprite is centred on the box and clipped to it.
+// Translucent overlay over a group of cells (the Tornado Zone cross): the
+// tornado sprite is centred on their bounding box and clipped to the cells
+// themselves, so the corners of the box that are no part of the cross stay
+// clear.
 function drawZone(ctx, cells, time, alpha = 1) {
   if (cells.length === 0) return;
   const xs = cells.map((c) => c.x);
@@ -221,7 +222,10 @@ function drawZone(ctx, cells, time, alpha = 1) {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.beginPath();
-  ctx.rect(px, py, w, h);
+  for (const cell of cells) {
+    const origin = cellOrigin(cell.x, cell.y);
+    ctx.rect(origin.px, origin.py, CELL_PX, CELL_PX);
+  }
   ctx.clip();
   assets.draw(ctx, SPRITES.tornado, cx - TORNADO_PX / 2, cy - TORNADO_PX / 2, TORNADO_PX, TORNADO_PX, () => {
     ctx.fillStyle = COLORS.tornadoFill;
@@ -236,11 +240,14 @@ function drawZone(ctx, cells, time, alpha = 1) {
       ctx.stroke();
     }
   }, { time });
-  // Dashed edge so the zone reads clearly with or without art.
+  // Dashed edge round each cell so the zone reads clearly with or without art.
   ctx.strokeStyle = COLORS.tornadoEdge;
   ctx.lineWidth = 2;
   ctx.setLineDash([4, 3]);
-  ctx.strokeRect(px + 1, py + 1, w - 2, h - 2);
+  for (const cell of cells) {
+    const origin = cellOrigin(cell.x, cell.y);
+    ctx.strokeRect(origin.px + 1, origin.py + 1, CELL_PX - 2, CELL_PX - 2);
+  }
   ctx.setLineDash([]);
   ctx.restore();
 }

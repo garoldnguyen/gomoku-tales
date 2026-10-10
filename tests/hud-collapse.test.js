@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MUD_LIFETIME_TURNS, MUD_SINK_TURNS, TORNADO_SIZE } from '../src/config.js';
+import { MUD_LIFETIME_TURNS, MUD_SINK_TURNS, TORNADO_ARM, TORNADO_TURNS, WIND_DASH_RANGE } from '../src/config.js';
 import { X, O } from '../src/logic/board.js';
 import { createInitialState, placeStone } from '../src/logic/game.js';
 import { SKILLS, PETRIFICATION, MUD_TRAP, TORNADO_ZONE, WIND_DASH, cooldownTurns } from '../src/logic/skills.js';
@@ -123,13 +123,15 @@ test('view model: every skill has its description and hint from SKILL_INFO', () 
     assert.ok(row.description.length > 20 && row.hint.startsWith('Click to select'));
   }
   assert.equal(SKILL_INFO[WIND_DASH].hint, 'Click to select, then choose a plot');
-  assert.equal(SKILL_INFO[TORNADO_ZONE].hint, 'Click to select, then choose the zone centre');
+  assert.equal(SKILL_INFO[TORNADO_ZONE].hint, 'Click to select, then choose the trap centre');
   assert.equal(SKILL_INFO[MUD_TRAP].hint, 'Click to select, then choose a plot');
   assert.equal(SKILL_INFO[PETRIFICATION].hint, 'Click to select, then choose a plant');
 });
 
 test('SKILL_INFO: the numbers are the config constants and the text matches the rules', () => {
-  assert.ok(SKILL_INFO[TORNADO_ZONE].description.includes(`${TORNADO_SIZE} by ${TORNADO_SIZE} zone`));
+  assert.ok(SKILL_INFO[TORNADO_ZONE].description.includes(`cross of ${4 * TORNADO_ARM + 1} plots`));
+  assert.ok(SKILL_INFO[TORNADO_ZONE].description.includes(`waits for ${TORNADO_TURNS} turns`));
+  assert.ok(SKILL_INFO[WIND_DASH].description.includes(`up to ${WIND_DASH_RANGE} plots away`));
   assert.ok(SKILL_INFO[MUD_TRAP].description.includes(`stays for ${MUD_LIFETIME_TURNS} turns`));
   assert.ok(SKILL_INFO[MUD_TRAP].description.includes(`no line for ${MUD_SINK_TURNS} turn,`), 'the sink time is the config constant, singular for 1');
   // No number is typed into the strings: the only digits are the constants.
@@ -137,11 +139,11 @@ test('SKILL_INFO: the numbers are the config constants and the text matches the 
   const strings = source.slice(source.indexOf('export const SKILL_INFO'));
   assert.doesNotMatch(strings.replace(/\$\{[^}]*\}/g, ''), /'[^'\n]*\d[^'\n]*'|`[^`\n]*\d[^`\n]*`/);
   // Accuracy (src/logic): Wind Dash needs an empty target and lands after
-  // the opponent's turn; Tornado Zone is secret and throws a seed the
-  // opponent plants inside it on their next turn anywhere on the field; Mud Trap needs an empty plot;
+  // the opponent's turn; Tornado Zone is a secret cross trap that the first
+  // seed anyone plants on it sets off; Mud Trap needs an empty plot;
   // Petrification takes only an opponent's plant that is not sunk in mud.
-  assert.match(SKILL_INFO[WIND_DASH].description, /empty target plot\. After the opponent's next turn/);
-  assert.match(SKILL_INFO[TORNADO_ZONE].description, /your opponent never sees where\. On their next turn, a seed they plant inside is blown .* anywhere on the field/);
+  assert.match(SKILL_INFO[WIND_DASH].description, /empty target plot up to .* away, diagonals included\. After the opponent's next turn/);
+  assert.match(SKILL_INFO[TORNADO_ZONE].description, /Your opponent never sees it\. It is armed when this turn ends .* The first seed anyone plants on the cross, yours too, fires it: .* throws that seed to a free plot next to it/);
   assert.match(SKILL_INFO[MUD_TRAP].description, /^Turns an empty plot into a mud puddle\./);
   assert.match(SKILL_INFO[PETRIFICATION].description, /^Pick one of the opponent's plants\. It turns to stone: a rock that stays for good and breaks every line\./);
   assert.ok(SKILL_INFO[PETRIFICATION].description.endsWith('A seed sunk in mud cannot be picked.'));

@@ -38,6 +38,14 @@ export function venom(state, player, target) {
   };
 }
 
+// True when (x, y) lies in the poison zone of a Venom (state.poison, a
+// missing field means no poison). Poison cells cannot be planted on, dashed
+// to or hit by a Tornado throw (docs/free-action-design.md section 5).
+export function isPoisoned(state, x, y) {
+  const cells = state?.poison?.cells;
+  return Array.isArray(cells) && cells.some((cell) => cell.x === x && cell.y === y);
+}
+
 // True when the player may not use a skill this turn because of a Hiss.
 export function isSkillLocked(state, player) {
   return state.skillLock?.player === player;

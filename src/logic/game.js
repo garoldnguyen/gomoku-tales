@@ -11,7 +11,7 @@ import { DEFAULT_SIDES, FIRST_PLAYER, assignSides, characterForStone } from './c
 import { cooldownTurns, getSkill, isPassiveSkill, MUD_TRAP, PETRIFICATION, WIND_DASH, TORNADO_ZONE, HISS, VENOM, CLOUD } from './skills.js';
 import { dryMud, mudTrap, petrification, sinkSeed, surfacingSeeds } from './earth-bear-skills.js';
 import { scoringBoard } from './scoring-board.js';
-import { inTornado, resolveDash, throwStone, tornadoZone, windDash } from './wind-rabbit-skills.js';
+import { resolveDash, throwStone, tornadoFires, tornadoZone, windDash } from './wind-rabbit-skills.js';
 import { hiss, isSkillLocked, venom } from './jade-serpent-skills.js';
 import { cloud, tickClouds } from './cloud.js';
 
@@ -54,7 +54,7 @@ export function createInitialState(size = BOARD_SIZE, characters = DEFAULT_SIDES
     mud: [], // [{ x, y, player, driesAfterTurn }] Mud Trap puddles on empty plots
     sunk: [], // [{ x, y, player, surfacesAfterTurn }] seeds sunk in mud: on the board, but they count for no line
     pendingDash: null, // { player, from, to, resolvesAfterTurn } while a Wind Dash is announced
-    tornado: null, // { player, x, y, cells, endsAfterTurn } while a Tornado Zone is active
+    tornado: null, // { player, x, y, cells, armedAfterTurn, endsAfterTurn } while a Tornado Zone trap waits (secret cross)
     skillLock: null, // { player, endsAfterTurn } while a Hiss keeps that player from using skills
     skillUsed: null, // id of the skill the player to move used this turn, or null (Free Action)
     cooldowns: { [X]: initialCooldowns(sides, X), [O]: initialCooldowns(sides, O) },
@@ -92,10 +92,11 @@ export function canUseSkill(state, player, skillId) {
 }
 
 // Places a stone for the acting player. Planting is the only action that
-// ends a turn (Free Action). A stone placed inside the
-// opponent's active Tornado Zone is thrown by a dandelion storm to a random
-// empty plot anywhere outside the zone; options.random (default
-// Math.random) picks it, so only the host runs it and tests can inject it.
+// ends a turn (Free Action). A seed planted on a cell of an armed Tornado
+// Zone cross (by either player, the caster too) fires the trap: it is used
+// up at once and the seed is thrown to a random free neighbour plot, or
+// stays when there is none. options.random (default Math.random) picks the
+// plot, so only the host runs it and tests can inject it.
 export function placeStone(state, action, options = {}) {
   const { random = Math.random } = options;
   const { player, x, y } = action;
@@ -108,14 +109,12 @@ export function placeStone(state, action, options = {}) {
   board[y][x] = player;
   let events = [{ type: 'stonePlaced', player, x, y }];
   let planted = { x, y }; // where the seed ends up
-  const { tornado } = state;
-  if (tornado && tornado.player !== player && inTornado(tornado, x, y)) {
-    const thrown = throwStone(board, x, y, tornado, random, state.mud ?? []);
-    state = { ...state, board: thrown.board };
+  state = { ...state, board };
+  if (tornadoFires(state, x, y)) {
+    const thrown = throwStone(state, x, y, random);
+    state = { ...state, board: thrown.board, tornado: null };
     events = [...events, ...thrown.events];
     planted = thrown.changed;
-  } else {
-    state = { ...state, board };
   }
   // A seed that ends on a mud puddle sinks: it holds the plot but counts for
   // no line until it surfaces (the win check below reads the scoring board).
@@ -173,9 +172,9 @@ function checkSkill(state, player, skillId) {
 // Runs the win check for the acting player on the cell whose stone
 // changed and, if the game goes on, ends their turn (only a planting gets
 // here): a Wind Dash waiting for this turn to end resolves (with a win check
-// for the dashing player), a Tornado Zone lasting through this turn
-// disappears, a Hiss lock lasting through this turn ends, the acting
-// player's clouds lose a turn (and disappear when none is left), the mud
+// for the dashing player), a Tornado Zone trap that nobody fired and whose
+// time ends with this turn is over (tornadoEnded, nothing revealed), a Hiss
+// lock lasting through this turn ends, the acting player's clouds lose a turn (and disappear when none is left), the mud
 // puddles whose time ends with this turn dry, the draw check runs, their
 // cooldowns count down (all but the skill used this turn, whose full
 // cooldown started when it was used), skillUsed is cleared and the other
@@ -186,16 +185,15 @@ function checkSkill(state, player, skillId) {
 // seeds: when the board is full nobody can plant any more, so they all
 // surface at once and the draw is decided after them.
 // If the acting player wins, nothing else happens: a pending dash never
-// resolves and is dropped, and so is a Tornado Zone (it only lasts through
-// this turn), so neither is still shown as coming; a Hiss lock is dropped
-// too.
+// resolves and is dropped, and so is a waiting Tornado Zone trap, so neither
+// is still shown as coming; a Hiss lock is dropped too.
 function finishTurn(state, player, events, changed) {
   const winLine = changed ? findWinLineAt(scoringBoard(state), changed.x, changed.y) : null;
   if (winLine) return win(state, player, winLine, events);
 
   const dash = state.pendingDash;
   if (dash && dash.resolvesAfterTurn <= state.turn) {
-    const resolved = resolveDash(state.board, dash, state.mud ?? []);
+    const resolved = resolveDash(state, dash);
     state = { ...state, board: resolved.board, pendingDash: null };
     events = [...events, ...resolved.events];
     const dashLine = resolved.changed ? findWinLineAt(scoringBoard(state), resolved.changed.x, resolved.changed.y) : null;

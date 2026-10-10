@@ -57,7 +57,7 @@ test('every skill use shows a banner with its name', () => {
   const state = createInitialState();
   state.board[5][5] = X;
   state.board[6][6] = O;
-  const dash = ok(useSkill(state, { player: X, skill: WIND_DASH, target: { from: { x: 5, y: 5 }, to: { x: 9, y: 9 } } }));
+  const dash = ok(useSkill(state, { player: X, skill: WIND_DASH, target: { from: { x: 5, y: 5 }, to: { x: 8, y: 8 } } }));
   const tornado = ok(useSkill(state, { player: X, skill: TORNADO_ZONE, target: { x: 7, y: 7 } }));
   const bearTurn = { ...state, currentPlayer: O };
   const mud = ok(useSkill(bearTurn, { player: O, skill: MUD_TRAP, target: { x: 1, y: 1 } }));
@@ -122,7 +122,7 @@ test('banners from one action or fast actions queue up and each shows in full', 
   // action gives two banners.
   const start = createInitialState();
   start.board[5][5] = X;
-  const dashed = skillTurn(start, X, WIND_DASH, { from: { x: 5, y: 5 }, to: { x: 9, y: 9 } }); // a skill, then a planting
+  const dashed = skillTurn(start, X, WIND_DASH, { from: { x: 5, y: 5 }, to: { x: 8, y: 8 } }); // a skill, then a planting
   const events = [];
   skillTurn(dashed, O, MUD_TRAP, { x: 1, y: 1 }, null, events);
   assert.deepEqual(effectsForEvents(events).filter((s) => s.kind === 'banner').map((s) => s.text), ['Mud Trap!', 'Wind Dash landed!']);

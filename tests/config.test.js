@@ -10,7 +10,10 @@ test('config holds the design values', () => {
   assert.equal(config.MUD_LIFETIME_TURNS, 4);
   assert.equal(config.MUD_SINK_TURNS, 1);
   assert.equal('ROCK_LIFETIME_TURNS' in config, false, 'rocks are permanent now');
-  assert.equal(config.TORNADO_SIZE, 3);
+  assert.equal('TORNADO_SIZE' in config, false, 'the Tornado Zone is a cross now');
+  assert.equal(config.TORNADO_ARM, 1);
+  assert.equal(config.TORNADO_TURNS, 2);
+  assert.equal(config.WIND_DASH_RANGE, 3);
   assert.equal(config.CELL_PX, 24);
   assert.equal(config.INTERNAL_WIDTH, 960);
   assert.equal(config.INTERNAL_HEIGHT, 540);

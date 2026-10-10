@@ -1,6 +1,7 @@
 // Offline controller for ?local=1 dev mode: one window plays both sides.
 // Pure (no DOM); input handlers call it and the renderer reads getView().
 
+import { TORNADO_TURNS } from '../config.js';
 import { X, O, isEmptyCell } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
 import { canUseSkill, characterOf, isGameOver, newGame, placeStone, skillCooldown, useSkill } from '../logic/game.js';
@@ -266,7 +267,7 @@ function describeEvent(event) {
     case 'dashFailed':
       return event.reason === 'targetTaken' ? 'Wind Dash failed: the target cell is taken.' : 'Wind Dash failed: the stone is gone.';
     case 'tornadoAnnounced':
-      return event.hidden ? 'Tornado Zone! Somewhere a storm is waiting.' : 'Tornado Zone! It lasts through the next turn.';
+      return event.hidden ? 'Tornado Zone! Somewhere a storm is waiting.' : `Tornado Zone! The trap waits for ${TORNADO_TURNS} ${TORNADO_TURNS === 1 ? 'turn' : 'turns'}.`;
     case 'tornadoStorm':
       return 'The dandelion storm threw the stone away!';
     case 'throwBlocked':

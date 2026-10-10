@@ -103,11 +103,11 @@ test('the Wind Dash flow shows the select mark and target mark while choosing', 
   assert.deepEqual(kinds(boardMarks(game.getView())), []);
 });
 
-test('the Tornado Zone flow previews the clipped zone while choosing the centre', () => {
+test('the Tornado Zone flow previews the clipped cross while choosing the centre', () => {
   const game = createLocalGame();
   game.clickSkill(X, TORNADO_ZONE);
   game.setHover({ x: 0, y: 0 });
-  assert.deepEqual(kinds(boardMarks(game.getView())), ['zonePreview@0,0', 'zonePreview@0,1', 'zonePreview@1,0', 'zonePreview@1,1']);
+  assert.deepEqual(kinds(boardMarks(game.getView())), ['zonePreview@0,0', 'zonePreview@0,1', 'zonePreview@1,0']);
   game.click({ x: 0, y: 0 });
   game.setHover(null);
   // The announced zone is shown by the skill visuals (effects3d.js) from its event.

@@ -8,6 +8,7 @@
 import { COOLDOWN_LONG, COOLDOWN_SHORT, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, ROOM_CODE_LENGTH, WIN_LENGTH } from '../config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
 import { SKILL_ALREADY_USED_ERROR } from '../logic/game.js';
+import { DASH_TOO_FAR_ERROR } from '../logic/wind-rabbit-skills.js';
 import { MUD_TRAP, PETRIFICATION, TORNADO_ZONE, WIND_DASH } from '../logic/skills.js';
 import { SKILL_INFO } from './skill-info.js';
 
@@ -165,6 +166,8 @@ export const STRINGS = Object.freeze({
   hintCancel: 'Choose it again, press Esc or right click to cancel.',
   hintGotIt: 'Got it',
   cloudTargetPrompt: 'Cloud: choose the cloud centre', // the target step of Cloud Eagle's Cloud
+  tornadoTargetPrompt: 'Tornado Zone: choose the trap centre', // the target step of Wind Rabbit's Tornado Zone
+  windDashTooFarError: DASH_TOO_FAR_ERROR, // the rules' refusal of a Wind Dash target out of range, shown on the click
 
   // Watch a match (sections 3.8 and 3.9): the spectator's room code
   // screen, the waiting room it sees, the live game card and the Room
