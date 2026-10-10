@@ -14,12 +14,16 @@ export const V3_META_URL = 'assets/v3-meta.json';
 export const PLANT_STAGES = ['drop', 'land', 'sprout', 'open', 'rest'];
 
 const PLANT_DEFAULT = { anchor: [18, 36], stageStartMs: [0, 150, 450, 850, 1200] };
+// The mossy boulder (rock-v3, 32 by 32, rows 7 to 30): anchored so its base stands on the same ground line as the plants,
+// so a petrified plant becomes a rock that sits right on its plot.
+const ROCK_DEFAULT = { anchor: [16, 27] };
 const BOARD_DEFAULT = { cell: 32, gutter: 2, plot: 30 };
 
 // Used for any key or field the file lacks or gets wrong.
 export const DEFAULT_V3_META = {
   'plant-x': PLANT_DEFAULT,
   'plant-o': PLANT_DEFAULT,
+  'rock-v3': ROCK_DEFAULT,
   'farm-board': BOARD_DEFAULT,
   'farm-board-low': BOARD_DEFAULT,
 };

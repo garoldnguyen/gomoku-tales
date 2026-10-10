@@ -146,14 +146,15 @@ test('catching up shows where the lingering marks end up and nothing else', () =
   const to = { x: 4, y: 4 };
   const place = { type: 'stonePlaced', x: 1, y: 1, player: O };
   const dashOn = { type: 'dashAnnounced', from, to, player: X };
-  const zoneOn = { type: 'tornadoAnnounced', x: 5, y: 5, cells: [{ x: 5, y: 5 }] };
+  const zoneOn = { type: 'tornadoAnnounced', x: 5, y: 5, cells: [{ x: 5, y: 5 }], player: X };
 
   assert.deepEqual(catchUpVisuals([]), []);
   assert.deepEqual(catchUpVisuals([place, { type: 'stonePetrified', x: 0, y: 0 }]), [], 'no sparkles, falls or banners');
   assert.deepEqual(catchUpVisuals([dashOn]), [{ kind: 'dashMark', from, to, player: X }]);
   assert.deepEqual(catchUpVisuals([dashOn, place, { type: 'dashResolved', from, to, player: X }]), [{ kind: 'dashClear' }]);
   assert.deepEqual(catchUpVisuals([{ type: 'dashFailed', from, to }]), [{ kind: 'dashClear' }]);
-  assert.deepEqual(catchUpVisuals([zoneOn]), [{ kind: 'tornado', x: 5, y: 5, cells: zoneOn.cells }]);
+  // The spec names the owner of the trap: only that seat (and a spectator) may watch the cross fade when it ends.
+  assert.deepEqual(catchUpVisuals([zoneOn]), [{ kind: 'tornado', x: 5, y: 5, cells: zoneOn.cells, player: X }]);
   assert.deepEqual(catchUpVisuals([zoneOn, { type: 'tornadoEnded' }]), [{ kind: 'tornadoClear' }]);
   assert.deepEqual(
     catchUpVisuals([dashOn, zoneOn, { type: 'win', player: O }]),

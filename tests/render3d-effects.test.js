@@ -2,16 +2,15 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CAMERA_DISTANCE, CAMERA_FOV, CONVERT_SPARK_MS, DASH_LIFT, DASH_STREAK_MS, PLANT_DROP_PX, REVERSE_GROWTH_SPEED,
-  ROCK_CRUMBLE_MS, ROCK_FALL_HEIGHT, ROCK_FALL_MS, ROCK_SETTLE_MS, SHAKE3D_HEAVY, SHAKE3D_LIGHT, SHAKE3D_MS,
-  THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS,
+  SHAKE3D_HEAVY, SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS,
 } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
 import { PETRIFICATION, MUD_TRAP, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
 import { bannerTexts } from '../src/render/effects.js';
 import {
-  convertMs, convertPose, convertWiltMs, crumblePose, dashCurveInto, dashFoldMs, dashPose, heldCell, regrowCell,
-  reverseGrowthInto, reverseGrowthMs, rockFallPose, shakeLeft, shakeOffset3d, shakeStrength, snapToStep,
+  convertMs, convertPose, convertWiltMs, dashCurveInto, dashFoldMs, dashPose, heldCell, petrifyMs, regrowCell,
+  reverseGrowthInto, reverseGrowthMs, shakeLeft, shakeOffset3d, shakeStrength, snapToStep,
   SPARK_REACH, sparkPathInto, throwPose, visualsForEvents, worldUnitsPerPixel,
 } from '../src/render3d/effect-plans.js';
 import { growthStage, STAGE_DROP, STAGE_LAND, STAGE_OPEN, STAGE_REST, STAGE_SPROUT } from '../src/render3d/growth.js';
@@ -64,11 +63,13 @@ test('a planted seed is a place visual on its cell and never shakes the camera',
   assert.equal(shakeStrength({ kind: 'place' }), 0);
 });
 
-test('only a rock landing shakes the camera, and only lightly', () => {
-  for (const kind of ['place', 'dashStreak', 'throw', 'convert', 'rockCrumble', 'dashMark', 'banner']) {
+test('only a plant shattering into a rock shakes the camera, and only lightly', () => {
+  // Changed with Free Action part 7: the old rockFall spec (and the rockCrumble
+  // one, which no event starts any more) is the petrify spec of the new effect.
+  for (const kind of ['place', 'dashStreak', 'throw', 'convert', 'mudForm', 'seedSink', 'seedSurface', 'mudDry', 'dashMark', 'banner']) {
     assert.equal(shakeStrength({ kind }), 0, kind);
   }
-  assert.equal(shakeStrength({ kind: 'rockFall' }), SHAKE3D_LIGHT);
+  assert.equal(shakeStrength({ kind: 'petrify' }), SHAKE3D_LIGHT);
 });
 
 test('Wind Dash: the announcement marks source and target, then the seed rides a gust across', () => {
@@ -107,7 +108,7 @@ test('a failed Wind Dash fizzles and ends the marks', () => {
   assert.equal(regrowCell(specs[1], STAGES), null);
 });
 
-test('Tornado Zone: the swirl shows over the cross; a seed planted on it bursts in a storm and flies to a neighbour plot in an arc', () => {
+test('Tornado Zone: the caster sees the cross; a seed planted on it reveals a whirlwind and is spun up and thrown to a neighbour plot in an arc', () => {
   const results = play([
     { skill: TORNADO_ZONE, target: { x: 7, y: 7 } },
     [14, 14], // the rabbit plants, which ends its turn
@@ -131,7 +132,7 @@ test('Tornado Zone: the swirl shows over the cross; a seed planted on it bursts 
   assert.equal(shakeStrength(thrown[2]), 0);
 });
 
-test('Petrification (minimum look): the rock falls with a light shake and never crumbles', () => {
+test('Petrification: earth energy wraps the plant, it shatters into a rock with a light shake, and nothing ever crumbles', () => {
   const results = play([
     [7, 7],
     { skill: PETRIFICATION, target: { x: 7, y: 7 } },
@@ -139,19 +140,22 @@ test('Petrification (minimum look): the rock falls with a light shake and never 
     [1, 0], [2, 0], [3, 0], [4, 5], [5, 0], [6, 5],
   ]);
   const fell = visualsForEvents(results[1].events);
-  assert.deepEqual(kinds(fell), ['castRing', 'rockFall', 'banner']);
+  assert.deepEqual(kinds(fell), ['castRing', 'petrify', 'banner']);
+  assert.deepEqual(fell[1], { kind: 'petrify', x: 7, y: 7, player: O, from: X }, 'the plant of the other side turns to stone');
   assert.equal(heldCell(fell[0], STAGES), null, 'a cast ring holds nothing');
-  assert.deepEqual(heldCell(fell[1], STAGES), { x: 7, y: 7, ms: ROCK_FALL_MS + ROCK_SETTLE_MS });
+  assert.deepEqual(heldCell(fell[1], STAGES), { x: 7, y: 7, ms: petrifyMs() }, 'the real rock stays hidden while the plant becomes it');
   assert.equal(regrowCell(fell[1], STAGES), null, 'a rock does not grow');
   assert.equal(shakeStrength(fell[1]), SHAKE3D_LIGHT);
 
   for (const result of results.slice(2)) {
     const later = kinds(visualsForEvents(result.events));
-    assert.ok(!later.includes('rockCrumble') && !later.includes('rockFall'), 'rocks are permanent: nothing breaks later');
+    assert.ok(!later.includes('petrify') && !later.includes('rockCrumble'), 'rocks are permanent: nothing breaks later');
   }
 });
 
-test('Mud Trap plans no timeline: the puddle and the sunk seed are drawn from the state', () => {
+test('Mud Trap: the puddle forms, a seed sinks into it and surfaces; none of it holds a plant hidden', () => {
+  // Changed with Free Action part 7: the events mudPlaced, stoneSunk and
+  // stoneSurfaced used to plan nothing (the state alone drew the puddle).
   const results = play([
     [0, 0],
     { skill: MUD_TRAP, target: { x: 7, y: 7 } },
@@ -159,12 +163,15 @@ test('Mud Trap plans no timeline: the puddle and the sunk seed are drawn from th
     [7, 7], // X plants into the puddle: the seed sinks
     [1, 1], // the end of the next turn: the seed surfaces
   ]);
-  assert.deepEqual(kinds(visualsForEvents(results[1].events)), ['castRing', 'banner'], 'the cast ring and the name');
+  assert.deepEqual(kinds(visualsForEvents(results[1].events)), ['castRing', 'mudForm', 'banner'], 'the cast ring, the puddle and the name');
+  assert.deepEqual(visualsForEvents(results[1].events)[1], { kind: 'mudForm', x: 7, y: 7, player: O });
   assert.deepEqual(results[3].events.map((e) => e.type), ['stonePlaced', 'stoneSunk', 'turnEnded']);
-  assert.deepEqual(kinds(visualsForEvents(results[3].events)), ['place']);
+  assert.deepEqual(kinds(visualsForEvents(results[3].events)), ['place', 'seedSink']);
+  assert.deepEqual(visualsForEvents(results[3].events)[1], { kind: 'seedSink', x: 7, y: 7, player: X });
   assert.deepEqual(results[4].events.map((e) => e.type), ['stonePlaced', 'stoneSurfaced', 'turnEnded']);
-  assert.deepEqual(kinds(visualsForEvents(results[4].events)), ['place']);
-  for (const spec of visualsForEvents(results[1].events)) assert.equal(heldCell(spec, STAGES), null);
+  assert.deepEqual(kinds(visualsForEvents(results[4].events)), ['place', 'seedSurface']);
+  assert.deepEqual(visualsForEvents(results[4].events)[1], { kind: 'seedSurface', x: 7, y: 7, player: X });
+  for (const result of results) for (const spec of visualsForEvents(result.events)) assert.equal(heldCell(spec, STAGES), null, spec.kind);
 });
 
 test('a win ends the lingering marks, since it drops a pending dash and the zone without events', () => {
@@ -212,7 +219,7 @@ test('planning visuals never changes the events', () => {
 });
 
 test('only pieces that arrive by flying are held hidden', () => {
-  for (const kind of ['place', 'dashMark', 'dashFizzle', 'tornado', 'tornadoEnd', 'throwBlocked', 'rockCrumble', 'endLingering', 'banner']) {
+  for (const kind of ['place', 'dashMark', 'dashFizzle', 'tornado', 'tornadoEnd', 'throwBlocked', 'mudForm', 'seedSink', 'seedSurface', 'mudDry', 'endLingering', 'banner']) {
     const spec = { kind, x: 1, y: 1, from: { x: 0, y: 0 }, to: { x: 1, y: 1 } };
     assert.equal(heldCell(spec, STAGES), null, kind);
     assert.equal(regrowCell(spec, STAGES), null, kind);
@@ -355,43 +362,6 @@ test('on plain-slide levels a thrown seed slides along the ground', () => {
     assert.equal(out.height, 0);
   }
   assert.deepEqual([out.progress, out.done], [1, true]);
-});
-
-test('a falling rock speeds up, its shadow grows, and it squashes on impact', () => {
-  const out = {};
-  rockFallPose(at(out, 0));
-  assert.equal(out.height, ROCK_FALL_HEIGHT);
-  assert.equal(out.landed, false);
-  let lastHeight = Infinity;
-  let lastShadow = 0;
-  let lastDrop = 0;
-  for (let t = 0; t < ROCK_FALL_MS; t += 20) {
-    rockFallPose(at(out, t));
-    const drop = lastHeight === Infinity ? 0 : lastHeight - out.height;
-    assert.ok(out.height < lastHeight, 'falls');
-    assert.ok(drop >= lastDrop - 1e-9, 'speeds up');
-    assert.ok(out.shadow >= lastShadow && out.shadow <= 1, 'the shadow grows');
-    assert.deepEqual([out.scaleX, out.scaleY], [1, 1], 'no squash in the air');
-    lastDrop = drop;
-    lastHeight = out.height;
-    lastShadow = out.shadow;
-  }
-  rockFallPose(at(out, ROCK_FALL_MS));
-  assert.equal(out.height, 0);
-  assert.equal(out.shadow, 1);
-  assert.equal(out.landed, true);
-  assert.ok(out.scaleX > 1 && out.scaleY < 1, 'squashed on impact');
-  rockFallPose(at(out, ROCK_FALL_MS + ROCK_SETTLE_MS));
-  assert.deepEqual([out.scaleX, out.scaleY, out.done], [1, 1, true]);
-});
-
-test('a breaking rock sinks into rubble', () => {
-  const out = {};
-  assert.deepEqual(crumblePose(at(out, 0)), { ageMs: 0, scaleX: 1, scaleY: 1, done: false });
-  crumblePose(at(out, ROCK_CRUMBLE_MS));
-  assert.ok(out.scaleY > 0 && out.scaleY < 0.1);
-  assert.ok(out.scaleX > 1);
-  assert.equal(out.done, true);
 });
 
 test('a converted plant wilts back to Sprout, then a spark runs through the soil to it', () => {

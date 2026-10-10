@@ -11,22 +11,25 @@ import { artSource } from './art.js';
 import { ART } from './art-assets.js';
 import { HOVER_SOURCE, MARK_SOURCE, SELECT_SOURCES, sideColour, tintPairs, tintPixels } from './character-look.js';
 import { pixelTexture, releaseSheetTexture } from './sprites.js';
+import { stonePixels } from './stone-grey.js';
 
 const LAST_MOVE_ART = { [X]: ART.v3.decal.lastX, [O]: ART.v3.decal.lastO };
 
-// { colour, plant, last, hover, select }, each by player (X and O):
+// { colour, plant, stone, last, hover, select }, each by player (X and O):
 // colour the side's mark colour, plant a tinted copy of the plant sheet (a
-// canvas, for createPieceSprite), and last, hover and select textures for
-// the decals. A source whose pixels cannot be read stays untinted, with a
-// warning.
+// canvas, for createPieceSprite), stone the same plant with its colour drained
+// to stone grey (the Petrification, stone-grey.js), and last, hover and select
+// textures for the decals. A source whose pixels cannot be read stays
+// untinted, with a warning.
 export function buildMarkTints(sides, warn = () => {}) {
-  const tints = { colour: {}, plant: {}, last: {}, hover: {}, select: {} };
+  const tints = { colour: {}, plant: {}, stone: {}, last: {}, hover: {}, select: {} };
   for (const player of [X, O]) {
     const colour = sideColour(sides, player);
     const source = MARK_SOURCE[player];
     const sidePairs = tintPairs(source.main, source.shades, colour);
     tints.colour[player] = colour;
     tints.plant[player] = tintedCanvas(artSource(ART.v3.plant[player]), sidePairs, warn);
+    tints.stone[player] = stoneCanvas(tints.plant[player], warn);
     tints.last[player] = markTexture(artSource(LAST_MOVE_ART[player]), sidePairs, warn);
     tints.hover[player] = markTexture(artSource(ART.v3.decal.hover), tintPairs(HOVER_SOURCE, [], colour), warn);
     const selectPairs = SELECT_SOURCES.flatMap((hex) => tintPairs(hex, [], colour));
@@ -39,6 +42,7 @@ export function buildMarkTints(sides, warn = () => {}) {
 export function disposeMarkTints(tints) {
   for (const player of [X, O]) {
     releaseSheetTexture(tints.plant[player]);
+    releaseSheetTexture(tints.stone[player]);
     tints.last[player].dispose();
     tints.hover[player].dispose();
     tints.select[player].dispose();
@@ -49,6 +53,26 @@ function markTexture(source, pairs, warn) {
   const texture = pixelTexture(tintedCanvas(source, pairs, warn));
   texture.userData.markTint = true;
   return texture;
+}
+
+// A canvas copy of the plant sheet `source` drained to stone grey
+// (stonePixels), marked markTint like the tinted ones. A sheet whose pixels
+// cannot be read stays in its own colours, with a warning.
+function stoneCanvas(source, warn) {
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  canvas.markTint = true;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(source, 0, 0);
+  try {
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    image.data.set(stonePixels(image.data));
+    ctx.putImageData(image, 0, 0);
+  } catch (error) {
+    warn(`Mark tint: cannot read the pixels of the plant art, keeping its colours for the stone copy (${error})`);
+  }
+  return canvas;
 }
 
 // A canvas copy of `source` with the swaps of `pairs` (tintPixels), marked

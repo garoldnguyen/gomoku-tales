@@ -12,18 +12,25 @@
 //                     seed rides a short gust of petals along a curve to the
 //                     target, the marks fade as it lands and the plant
 //                     regrows there from Land
-//   Tornado Zone      a translucent swirl of petals and leaves over the
-//                     zone (decal-zone-v3) that the plants inside bend
-//                     towards (High); a thrown plant flies off as a seed in
-//                     an arc, lands with a soil puff and regrows from Land
-//   Petrification     (minimum look, the real effect comes later) the rock
-//                     falls from above with a growing shadow, lands with a
-//                     soil puff and a light camera shake (High only, the
-//                     only shake); rocks are permanent now, so the crumble
-//                     timeline is no longer started by any event
-//   Mud Trap          no timeline: the puddle is a flat decal drawn from
-//                     state.mud and a sunk seed is drawn dim and pushed down
-//                     from state.sunk (world-renderer.js)
+//   Tornado Zone      the caster sees the cross (decal-zone-cross) with faint
+//                     blue petals drifting over its cells, drawn from the
+//                     viewer's state; the plants inside bend towards it
+//                     (High); the other seat sees nothing on the board. When
+//                     the trap fires the cross is revealed as a whirlwind that
+//                     spins the seed up and throws it to its neighbour plot
+//                     in an arc; it lands with a small dust puff and regrows
+//                     from Land
+//   Petrification     earth energy winds round the enemy plant, its colour
+//                     drains to grey (it flickers first), it shatters and a
+//                     mossy rock pops in where it stood with dust rising and
+//                     a light camera shake (High only, the only shake); the
+//                     rock then stays
+//   Mud Trap          the puddle is a flat decal drawn from state.mud (and
+//                     under a sunk seed, from state.sunk) that spreads out
+//                     when it forms and bubbles; a seed planted in it sinks
+//                     and goes dim, and when it surfaces or the puddle dries
+//                     the cracked crust shows and fades while the sprout
+//                     pops up (mud-effects.js, world-renderer.js)
 //   placement         the placement effect of the character whose side
 //                     planted the seed (placement(), character-look.js):
 //                     Wind Rabbit's dandelion wind, Earth Bear's soil
@@ -32,6 +39,9 @@
 //   convert           the plant wilts back to Sprout, a small spark runs
 //                     through the soil and a plant of the other team regrows
 //                     from Land (no event starts it any more)
+//   plans             the burst particles of the Free Action effects are the
+//                     frozen plans of skill-plans.js, built once per event
+//                     and played step by step (placement-runs.js)
 //   skill banners     HUD text on the 2D canvas over the world
 // The always-on wind petals belong to the scenery (sky-scene.js). A plant
 // that regrows from Land is grown by the piece layer: the effects hold its
@@ -61,22 +71,24 @@
 import * as THREE from 'three';
 import {
   BANNER_3D_Y, BOARD_SIZE, CAMERA_FOV, CAST_RING_DOTS, CAST_RING_FROM, CAST_RING_MS, CAST_RING_TO, CAST_SPARKLES,
-  CLOUD_PUFFS, CONVERT_SPARK_RATE, DASH_SWIRL_RATE, DASH_TRAIL_RATE, HISS_MIST, HISS_RING_DOTS,
+  CELL_SIZE, CLOUD_PUFFS, CONVERT_SPARK_RATE, COVER_CLEAR_MARGIN, DASH_SWIRL_RATE, DASH_TRAIL_RATE, HISS_MIST, HISS_RING_DOTS,
   HISS_RING_GAP_MS, HISS_RING_MS, HISS_RING_TO, HISS_RINGS, HISS_WOBBLE, HISS_WOBBLE_WAVES, MARK_FADE_MS,
   PLACE_DUST_COUNT, PLACEMENT_SLOTS, PLANT_OPEN_SPARKLES, PX_WORLD, RING_DOT_PX, RING_LIGHTEN, RING_MAX_DOTS, RING_SLOTS,
-  DASH_GHOST_OPACITY, DASH_WIND_RATE, DASH_WIND_SPEED, FIELD_GUST_COUNT, SHAKE3D_LIGHT, SOIL_PUFF_MAX, SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, STORM_BURST_COUNT, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
-  TORNADO_ARM, TORNADO_PARTICLE_RATE, VENOM_BUBBLE_RATE, VENOM_TINT, VINE_POINT_PX, VINE_POINTS, WIN_RING_DOTS,
+  DASH_GHOST_OPACITY, DASH_WIND_RATE, DASH_WIND_SPEED, PETRIFY_GLOW, PETRIFY_WRAP_MS, SHAKE3D_LIGHT, SKILL_RUN_SLOTS, SOIL_PUFF_MAX,
+  SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, STORM_MS, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
+  TORNADO_ARM, VENOM_BUBBLE_RATE, VENOM_TINT, VINE_POINT_PX, VINE_POINTS, WIN_RING_DOTS,
   WIN_RING_MS, WIN_RING_TO, WIN_SPARKLES, WIN_STAGGER_MS,
 } from '../config.js';
 import { O, X } from '../logic/board.js';
 import { DEFAULT_SIDES } from '../logic/characters.js';
 import { cloudBox } from '../logic/cloud.js';
 import { createBanners } from '../render/effects.js';
+import { createMudEffects } from './mud-effects.js';
 import { artMeta, artSource } from './art.js';
 import { ART } from './art-assets.js';
 import { CHARACTER_LOOK, PLAN_SEED, placementPlan } from './character-look.js';
 import {
-  catchUpVisuals, convertPose, crumblePose, dashCurveInto, dashPose, heldCell, regrowCell, rockFallPose,
+  catchUpVisuals, convertPose, dashCurveInto, dashPose, heldCell, PETRIFY_STAGE_ROCK, petrifyPose, regrowCell,
   shakeLeft, shakeOffset3d, shakeStrength, sparkPathInto, throwPose, venomPose, visualsForEvents, zoneVisible,
 } from './effect-plans.js';
 import { STAGE_DROP, STAGE_REST } from './growth.js';
@@ -84,11 +96,15 @@ import {
   createParticlePool, createSpawnParams, emit, scaledCount, SHAPE_PLUS, SHAPE_SQUARE,
 } from './particle-pool.js';
 import { cellToWorld, cellToWorldInto } from './picking.js';
-import { clearPlacementRuns, createPlacementRuns, startPlacementRun, stepPlacementRuns, vinePointsInto } from './placement-runs.js';
+import { clearPlacementRuns, createPlacementRuns, startPlacementRun, stepPlacementRuns, stopRunsAt, vinePointsInto } from './placement-runs.js';
 import { GLOW } from './post-processing.js';
 import { MAX_PARTICLE_CAP, particleScale, plainSlides } from './quality.js';
 import { effectRandom } from './seeded-random.js';
-import { clearRings, createRings, ringDotsInto, startRing, stepRings } from './skill-rings.js';
+import { clearRings, createRings, ringDotsInto, startRing, stepRings, stopRingsAt } from './skill-rings.js';
+import {
+  CROSS_PETAL_COLOURS, mudDryPlan, mudFormPlan, petrifyPlan, seedSinkPlan, seedSurfacePlan, SKILL_PLAN_SEED, STEP_LOOKS, stormPlan,
+  tornadoCrossPlan,
+} from './skill-plans.js';
 import { stageStartMs } from './v3-meta.js';
 import { createCellDecal, createPieceSprite, decalMaterial, placeOnCell, zonePieceGeometry } from './world.js';
 
@@ -114,6 +130,7 @@ const COLORS = {
   venomDark: 0x2f9e44,
   venomSmoke: 0x3d6b3a, // the sick smoke left when the plant has sunk
   venomGlow: 0x7dff4a, // the green the wilting plant takes on (emissive)
+  petrifyGlow: 0xffd070, // the gold earth energy a wrapped plant glows with (emissive)
   white: 0xffffff,
 };
 // The petals of wind-bits: pink, white, yellow, lilac.
@@ -127,6 +144,7 @@ const MAX_STEP_MS = 100; // a hidden tab does not make the effects jump on retur
 const TWO_PI = Math.PI * 2;
 const BLOOM_ROW_PX = 12; // art pixel row of a plant frame where the bloom opens
 const ZONE_CELLS = 4 * TORNADO_ARM + 1; // most cells a Tornado Zone cross has: the centre and each arm
+const STORM_FADE_IN_MS = 120; // the revealed cross shows this fast
 const BOARD_MIDDLE = (BOARD_SIZE - 1) / 2; // the middle cell of the field, where Hiss rings start
 const VENOM_SINK_DEPTH = 0.25; // world units the sick sprout sinks at the end
 const RING_Y = 0.05; // world height of the ring dots, just over the plots
@@ -179,6 +197,9 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
   // the particle cap (the vine plays on every level), rebuilt every frame
   // from the runs.
   const placements = createPlacementRuns(PLACEMENT_SLOTS);
+  // The plans of the Free Action effects playing (skill-plans.js), in runs of
+  // their own so they never take a seed placement's slot.
+  const skillRuns = createPlacementRuns(SKILL_RUN_SLOTS);
   const vinePool = createParticlePool(VINE_POINTS * PLACEMENT_SLOTS);
   const vinePoints = createParticlePoints(vinePool.capacity);
   world.scene.add(vinePoints.mesh);
@@ -197,16 +218,21 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
   const sideRing = { [X]: RING_COLOUR[DEFAULT_SIDES[X]], [O]: RING_COLOUR[DEFAULT_SIDES[O]] };
   const ringAt = { x: 0, z: 0, y: RING_Y, from: 0, to: 0, ms: 0, dots: 0, color: 0, delay: 0, wobble: 0, waves: 0 };
   const held = new Float64Array(BOARD_SIZE * BOARD_SIZE); // cell index -> time its plant shows again
+  let covered = new Uint8Array(BOARD_SIZE * BOARD_SIZE); // cell index -> 1 while the viewer's state covers the plot (setCovered)
+  let coveredNow = new Uint8Array(BOARD_SIZE * BOARD_SIZE);
   const timelines = [];
   for (let i = 0; i < TIMELINE_SLOTS; i++) timelines.push(newTimeline());
   const dashMark = createDashMark(fx, actors);
   const swirl = createTornadoSwirl(fx);
+  const stormCross = createStormCross(fx);
+  const mud = createMudEffects(fx);
   // The camera shake: when it started and how strong it is; shakeOffset3d
   // reads ageMs and strength and writes the offset x and y.
   const shake = { start: -Infinity, ageMs: 0.5, strength: 0.5, x: 0.5, y: 0.5 };
   // The pose functions read ageMs (and progress, spark) and write the pose here.
   const pose = {
     ageMs: 0.5, frame: 0, done: false, flying: false, progress: 0.5, spark: 0.5, x: 0.5, z: 0.5, lift: 0.5, tint: 0.5, sink: 0.5,
+    spinScale: 0.5, dropPx: 0.5, height: 0.5, up: 0.5, stage: 0, grey: 0, scaleX: 0.5, scaleY: 0.5,
   };
   const at = { x: 0.5, y: 0.5, z: 0.5 }; // where a trail is left this frame
   const cellAt = { x: 0.5, z: 0.5 }; // a cell centre, for the growth cues
@@ -295,32 +321,6 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     }
   }
 
-  // Soil crumbs with the odd pebble (every third) bursting from a rock.
-  function crumbs(wx, wz, base) {
-    const count = scaledCount(base, frame.scale);
-    for (let i = 0; i < count; i++) {
-      random.fill(u);
-      const angle = u[0] * TWO_PI;
-      const speed = 0.6 + u[1];
-      const pebble = i % 3 === 0;
-      sp.x = wx;
-      sp.y = 0.1 + u[2] * 0.3;
-      sp.z = wz;
-      sp.vx = Math.cos(angle) * speed;
-      sp.vy = 1.5 + u[3] * 1.5;
-      sp.vz = Math.sin(angle) * speed;
-      sp.gravity = 12;
-      sp.drag = 0.5;
-      sp.life = 0.5 + u[4] * 0.3;
-      sp.size = (pebble ? 3 + u[5] : 2 + u[5]) * PX;
-      sp.grow = 0;
-      sp.color = pebble ? (u[6] < 0.5 ? COLORS.pebble : COLORS.pebbleDark) : SOILS[i % 3];
-      sp.alpha = 1;
-      sp.shape = SHAPE_SQUARE;
-      pool.spawnFall(sp);
-    }
-  }
-
   // Petals and the odd leaf whirling round a cell (a thrown plant with
   // nowhere to go, a dash that failed, a seed taking off).
   function petalGust(wx, wz, base) {
@@ -386,63 +386,6 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       sp.color = u[8] < 0.2 ? PETALS[2] : COLORS.dandelion;
       sp.alpha = 0.9;
       sp.shape = u[9] < 0.7 ? SHAPE_PLUS : SHAPE_SQUARE;
-      pool.spawnFall(sp);
-    }
-  }
-
-  // The storm itself (a stone planted in a Tornado Zone): a burst of
-  // dandelion fluff and petals spinning up and outward from its plot.
-  function dandelionStorm(spec) {
-    cellToWorldInto(spec.x, spec.y, at);
-    const count = scaledCount(STORM_BURST_COUNT, frame.scale);
-    for (let i = 0; i < count; i++) {
-      random.fill(u);
-      sp.x = at.x;
-      sp.y = 0.02 + u[0] * 0.3;
-      sp.z = at.z;
-      sp.radius = 0.15 + u[1] * 0.9;
-      sp.angle = u[2] * TWO_PI;
-      sp.spin = 6 + u[3] * 4;
-      sp.rise = 1.4 + u[4] * 1.2;
-      sp.widen = 1.1 + u[5] * 1.1;
-      sp.life = 1.1 + u[6] * 0.7;
-      sp.size = (2 + u[7] * 1.8) * PX;
-      sp.grow = 0.3;
-      const fluff = u[8] < 0.7;
-      sp.color = fluff ? COLORS.dandelion : u[9] < 0.5 ? PETALS[2] : COLORS.leaf;
-      sp.alpha = 0.95;
-      sp.shape = fluff ? SHAPE_PLUS : SHAPE_SQUARE;
-      pool.spawnSpiral(sp);
-    }
-    const cells = spec.cells;
-    for (let i = 0; i < cells.length; i++) {
-      cellToWorldInto(cells[i].x, cells[i].y, at);
-      petalGust(at.x, at.z, 6);
-    }
-  }
-
-  // A Tornado Zone the viewer may not see: a gust of dandelion fluff
-  // drifting with the wind over the whole field, so the cast shows but not
-  // where it is.
-  function fieldGust() {
-    const count = scaledCount(FIELD_GUST_COUNT, frame.scale);
-    for (let i = 0; i < count; i++) {
-      random.fill(u);
-      cellToWorldInto(Math.floor(u[0] * BOARD_SIZE), Math.floor(u[1] * BOARD_SIZE), at);
-      sp.x = at.x - 0.5 + u[2];
-      sp.y = 0.1 + u[3] * 0.5;
-      sp.z = at.z - 0.5 + u[4];
-      sp.vx = 0.5 + u[5] * 0.6; // the wind: towards the lower right
-      sp.vy = 0.05 + u[6] * 0.2;
-      sp.vz = 0.3 + u[7] * 0.4;
-      sp.gravity = 0;
-      sp.drag = 0.4;
-      sp.life = 1.2 + u[8] * 1;
-      sp.size = (2 + u[9] * 1.5) * PX;
-      sp.grow = 0.3;
-      sp.color = u[10] < 0.2 ? PETALS[2] : COLORS.dandelion;
-      sp.alpha = 0.9;
-      sp.shape = u[11] < 0.7 ? SHAPE_PLUS : SHAPE_SQUARE;
       pool.spawnFall(sp);
     }
   }
@@ -706,6 +649,11 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
   // stepPlacementRuns; the vine steps are drawn by drawVines instead.
   function spawnPlanStep(step, run) {
     if (!step.particle) return;
+    const look = STEP_LOOKS[step.kind];
+    if (look) {
+      spawnLookStep(step, run, look);
+      return;
+    }
     const durS = step.durationMs / 1000;
     const { from, to } = step;
     const arc = step.height ?? step.curve ?? 0;
@@ -762,6 +710,42 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     pool.spawnFall(sp);
   }
 
+  // One particle of a Free Action plan (skill-plans.js): its size, colour and
+  // shape come from the step's look; it flies from `from` to `to` over its
+  // duration (an arc `height` high when it has one) or, for a spiral step,
+  // circles the ground point under `from` while it rises.
+  function spawnLookStep(step, run, look) {
+    const durS = step.durationMs / 1000;
+    const { from, to } = step;
+    sp.life = durS;
+    sp.size = look.sizePx * PX;
+    sp.grow = look.growPx * PX;
+    sp.color = look.colours[step.tone];
+    sp.alpha = look.alpha;
+    sp.shape = look.plus ? SHAPE_PLUS : SHAPE_SQUARE;
+    if (step.spiral) {
+      sp.x = run.x + from[0];
+      sp.y = from[1];
+      sp.z = run.z + from[2];
+      sp.radius = step.radius;
+      sp.angle = step.angle;
+      sp.spin = step.spin;
+      sp.rise = step.rise;
+      sp.widen = step.widen;
+      pool.spawnSpiral(sp);
+      return;
+    }
+    sp.x = run.x + from[0];
+    sp.y = from[1];
+    sp.z = run.z + from[2];
+    sp.vx = (to[0] - from[0]) / durS;
+    sp.vz = (to[2] - from[2]) / durS;
+    sp.vy = (to[1] - from[1]) / durS + (4 * step.height) / durS;
+    sp.gravity = (8 * step.height) / (durS * durS);
+    sp.drag = 0;
+    pool.spawnFall(sp);
+  }
+
   // The vines of the playing vine coils, as still jade dots (vinePointsInto).
   function drawVines() {
     vinePool.clear();
@@ -804,20 +788,25 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     const b = cellToWorld(to.x, to.y);
     Object.assign(record, {
       active: true, kind, start: frame.time, fx: a.x, fz: a.z, tx: b.x, tz: b.z, stages, landed: false, carry: 0,
+      fromCell: from.y * BOARD_SIZE + from.x, toCell: to.y * BOARD_SIZE + to.x,
     });
     return record;
   }
 
   function endTimeline(record) {
     if (record.a) actors.release(record.a);
+    if (record.b) actors.release(record.b);
+    if (record.c) actors.release(record.c);
     record.a = null;
+    record.b = null;
+    record.c = null;
     record.active = false;
   }
 
   // One frame of a running skill animation.
   function stepTimeline(record) {
     pose.ageMs = frame.time - record.start;
-    const { a } = record;
+    const { a, b, c } = record;
     switch (record.kind) {
       case 'dashStreak':
         dashPose(pose, record.stages);
@@ -844,13 +833,17 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
         }
         break;
       case 'throw':
+        // The whirlwind spins the seed up off its plot (pose.lift, turning
+        // round), then throws it: it comes down from that height as it flies.
         throwPose(pose, frame.plain);
         a.sprite.setFrame(STAGE_DROP);
         moveAlong(record, a, pose.progress);
-        a.sprite.plane.position.y = pose.dropPx * PX * SPRITE_STRETCH_Y + pose.height;
-        a.setShadow(1 - (0.5 * pose.height) / THROW_ARC_HEIGHT);
-        if (pose.progress > 0) {
-          at.y = 0.15 + pose.height;
+        pose.up = pose.lift * (1 - pose.progress) + pose.height; // world units above its plot now
+        a.sprite.plane.position.y = pose.dropPx * PX * SPRITE_STRETCH_Y + pose.up;
+        a.sprite.plane.scale.x = pose.spinScale;
+        a.setShadow(Math.max(0.4, 1 - (0.5 * pose.up) / THROW_ARC_HEIGHT));
+        if (pose.lift > 0 || pose.progress > 0) {
+          at.y = 0.15 + pose.up;
           fluffTrail(emit(record, DASH_TRAIL_RATE * 0.6 * frame.scale, frame.dtS));
         }
         if (pose.done) {
@@ -858,22 +851,27 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
           endTimeline(record);
         }
         break;
-      case 'rockFall':
-        rockFallPose(pose);
-        a.sprite.plane.position.y = pose.height;
-        a.sprite.plane.scale.set(pose.scaleX, pose.scaleY, 1);
-        a.setShadow(pose.shadow);
-        if (pose.landed && !record.landed) {
-          record.landed = true;
-          soilPuff(record.tx, record.tz, PLACE_DUST_COUNT * 2, 2.2);
-          crumbs(record.tx, record.tz, 6);
-          startShake(shakeStrength(record));
+      case 'petrify':
+        // The victim's plant (a) glows with the earth energy and flickers to
+        // its grey copy (b), which shatters; the rock (c) pops in where it was.
+        petrifyPose(pose);
+        if (pose.stage === PETRIFY_STAGE_ROCK) {
+          if (!record.landed) {
+            record.landed = true;
+            a.sprite.object.visible = false;
+            b.sprite.object.visible = false;
+            c.sprite.object.visible = true;
+            startShake(shakeStrength(record));
+            soilPuff(record.tx, record.tz, PLACE_DUST_COUNT, 1.4);
+          }
+          c.sprite.plane.scale.set(pose.scaleX, pose.scaleY, 1);
+        } else {
+          a.sprite.object.visible = pose.grey !== 1;
+          b.sprite.object.visible = pose.grey === 1;
+          a.material.emissiveIntensity = PETRIFY_GLOW * Math.min(1, pose.ageMs / PETRIFY_WRAP_MS);
+          a.sprite.plane.scale.set(pose.scaleX, pose.scaleY, 1);
+          b.sprite.plane.scale.set(pose.scaleX, pose.scaleY, 1);
         }
-        if (pose.done) endTimeline(record);
-        break;
-      case 'rockCrumble':
-        crumblePose(pose);
-        a.sprite.plane.scale.set(pose.scaleX, pose.scaleY, 1);
         if (pose.done) endTimeline(record);
         break;
       case 'venom':
@@ -920,6 +918,60 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     }
   }
 
+  // The options of the plan of an event on the plot of `spec`: this level's
+  // particle cap and a seed that varies by plot.
+  function planOptions(spec) {
+    return { features: world.features, seed: SKILL_PLAN_SEED + spec.y * BOARD_SIZE + spec.x };
+  }
+
+  // Plays `plan` (skill-plans.js) on the plot (x, y), each step once.
+  function runPlan(plan, x, y) {
+    cellToWorldInto(x, y, cellAt);
+    startPlacementRun(skillRuns, plan, cellAt.x, cellAt.z, frame.time);
+  }
+
+  // The plot (x, y) has just become covered for the viewer (a cloud of the
+  // other seat): everything of the effects still playing on it stops at once,
+  // so the screen never shows what the cloud hides: the seed placement and
+  // skill plans, the rings, the particles over the plot, and every flying or
+  // wilting copy that starts or ends on it (Petrification, thrown, converted,
+  // poisoned and dashing seeds), with the hold on both of its plots. (Events
+  // that name a covered plot are already left out upstream.)
+  function clearPlot(x, y) {
+    cellToWorldInto(x, y, cellAt);
+    const reach = CELL_SIZE / 2 + COVER_CLEAR_MARGIN;
+    const i = y * BOARD_SIZE + x;
+    stopRunsAt(placements, cellAt.x, cellAt.z);
+    stopRunsAt(skillRuns, cellAt.x, cellAt.z);
+    stopRingsAt(rings, cellAt.x, cellAt.z);
+    pool.removeInBox(cellAt.x - reach, cellAt.z - reach, cellAt.x + reach, cellAt.z + reach);
+    for (let k = 0; k < timelines.length; k++) {
+      const record = timelines[k];
+      if (!record.active || (record.fromCell !== i && record.toCell !== i)) continue;
+      held[record.fromCell] = 0;
+      held[record.toCell] = 0;
+      endTimeline(record);
+    }
+    held[i] = 0;
+    stormCross.hidePlot(i);
+    mud.cover(x, y);
+  }
+
+  // While a storm shows, the whirlwind may spin over an arm of the cross that
+  // is covered for the viewer: its particles over a covered plot go at once,
+  // every frame, so the cloud hides it. No allocation.
+  function suppressCoveredStorm() {
+    const cells = stormCross.cellIndex;
+    for (let k = 0; k < cells.length; k++) {
+      const i = cells[k];
+      if (i < 0 || covered[i] === 0) continue;
+      const x = i % BOARD_SIZE;
+      cellToWorldInto(x, (i - x) / BOARD_SIZE, cellAt);
+      const reach = CELL_SIZE / 2;
+      pool.removeInBox(cellAt.x - reach, cellAt.z - reach, cellAt.x + reach, cellAt.z + reach);
+    }
+  }
+
   function hold(spec, stages) {
     const cell = heldCell(spec, stages);
     if (!cell) return;
@@ -954,11 +1006,10 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       case 'tornado':
         swirl.show(spec);
         break;
-      case 'tornadoHidden':
-        fieldGust();
-        break;
       case 'storm':
-        dandelionStorm(spec);
+        // The fired trap reveals the cross to everybody as a whirlwind.
+        stormCross.show(spec, covered);
+        runPlan(stormPlan(spec, planOptions(spec)), spec.x, spec.y);
         startShake(SHAKE3D_LIGHT);
         break;
       case 'tornadoEnd':
@@ -984,18 +1035,37 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
         petalGust(x, z, 14);
         break;
       }
-      case 'rockFall': {
-        const record = startTimeline('rockFall', spec, spec, stages);
-        record.a = actors.acquire('rock', spec);
+      case 'petrify': {
+        // The plant of the victim (the side the event names), its grey copy
+        // and the rock; the board already holds the rock, which the piece
+        // layer keeps hidden for petrifyMs (hold).
+        const victim = spec.from === X || spec.from === O ? spec.from : spec.player === X ? O : X;
+        const record = startTimeline('petrify', spec, spec, stages);
+        record.a = actors.acquire(victim, spec);
+        record.b = actors.acquire(victim === X ? 'stoneX' : 'stoneO', spec);
+        record.c = actors.acquire('rock', spec);
+        record.a.material.emissive.setHex(COLORS.petrifyGlow);
+        record.b.sprite.object.visible = false;
+        record.c.sprite.object.visible = false;
+        runPlan(petrifyPlan(planOptions(spec)), spec.x, spec.y);
         break;
       }
-      case 'rockCrumble': {
-        const record = startTimeline('rockCrumble', spec, spec, stages);
-        record.a = actors.acquire('rock', spec);
-        crumbs(record.tx, record.tz, 14);
-        soilPuff(record.tx, record.tz, PLACE_DUST_COUNT, 1.4);
+      case 'mudForm':
+        mud.form(spec.x, spec.y);
+        runPlan(mudFormPlan(planOptions(spec)), spec.x, spec.y);
         break;
-      }
+      case 'seedSink':
+        mud.sink(spec.x, spec.y);
+        runPlan(seedSinkPlan(planOptions(spec)), spec.x, spec.y);
+        break;
+      case 'seedSurface':
+        mud.surface(spec.x, spec.y);
+        runPlan(seedSurfacePlan(planOptions(spec)), spec.x, spec.y);
+        break;
+      case 'mudDry':
+        mud.dry(spec.x, spec.y);
+        runPlan(mudDryPlan(planOptions(spec)), spec.x, spec.y);
+        break;
       case 'convert': {
         const record = startTimeline('convert', spec, spec, stages);
         record.a = actors.acquire(spec.from, spec);
@@ -1077,12 +1147,14 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     // drawn frame with the drawn state's zone (null, hidden, or visible
     // with cells). Allocation free; it acts only when something changed. A
     // swirl that is already fading out because its zone ended is left to
-    // finish its fade.
-    syncTornado(zone) {
+    // finish its fade, but only for the seat whose trap it was and for a
+    // spectator: the seat that is not its owner (viewer X or O) loses it at
+    // once, so the fade of an expired secret cross never shows it.
+    syncTornado(zone, viewer) {
       const mark = swirl.centre;
       if (zoneVisible(zone)) {
         if (!mark.active) swirl.show(zone);
-      } else if (mark.active && Number.isNaN(mark.endStart)) {
+      } else if (mark.active && (Number.isNaN(mark.endStart) || ((viewer === X || viewer === O) && viewer !== mark.owner))) {
         swirl.clear();
       }
     },
@@ -1109,9 +1181,45 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
 
     // The plants of the flying copies (Wind Dash, a thrown or converted
     // plant) from now on: the tinted sheets of the match by player
-    // (mark-tints.js).
-    setPlantSheets(sheets) {
-      actors.setPlantSheets(sheets);
+    // (mark-tints.js), and their stone grey copies (the Petrification).
+    setPlantSheets(sheets, stoneSheets) {
+      actors.setPlantSheets(sheets, stoneSheets);
+    },
+
+    // The puddles and sunk seeds of the drawn state, for the bubbles on the
+    // puddles that stay (null: none). Called every drawn frame.
+    setMudState(puddles, seeds) {
+      mud.setState(puddles, seeds);
+    },
+
+    // The plots the drawn state covers for the viewer ([{ x, y }] of
+    // maskForViewer, or null): called every drawn frame, allocation free. A
+    // plot that was not covered on the frame before is cleared of the effects
+    // still playing on it (clearPlot).
+    setCovered(cells) {
+      coveredNow.fill(0);
+      for (let k = 0; cells && k < cells.length; k++) {
+        const i = cells[k].y * BOARD_SIZE + cells[k].x;
+        if (!(i >= 0 && i < coveredNow.length)) continue;
+        coveredNow[i] = 1;
+        if (covered[i] === 0) clearPlot(cells[k].x, cells[k].y);
+      }
+      const swap = covered;
+      covered = coveredNow;
+      coveredNow = swap;
+    },
+
+    // How big the puddle on (x, y) is at `time`, as a share of its full size
+    // (it spreads out when it forms).
+    mudSpread(x, y, time) {
+      return mud.spread(x, y, time);
+    },
+
+    // How far below its plot the plant on plot index i stands at `time`, as a
+    // share of the sunk depth (mud-effects.js depth): the piece layer sinks
+    // it in and pops it out by this.
+    sunkDepth(i, isSunk, time) {
+      return mud.depth(i, isSunk, time);
     },
 
     // The Land soil puff of a seed on cell (x, y), on levels with the
@@ -1151,14 +1259,18 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
 
       dashMark.update();
       swirl.update();
+      stormCross.update();
+      mud.update();
       for (let i = 0; i < timelines.length; i++) {
         if (timelines[i].active) stepTimeline(timelines[i]);
       }
       stepPlacementRuns(placements, time, spawnPlanStep);
+      stepPlacementRuns(skillRuns, time, spawnPlanStep);
       drawVines();
       drawRings();
 
       pool.step(frame);
+      if (stormCross.active) suppressCoveredStorm();
       points.sync(pool, frame);
 
       shake.ageMs = time - shake.start;
@@ -1176,6 +1288,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       pool.clear();
       points.sync(pool, frame);
       clearPlacementRuns(placements);
+      clearPlacementRuns(skillRuns);
       vinePool.clear();
       vinePoints.sync(vinePool, frame);
       clearRings(rings);
@@ -1183,6 +1296,8 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       ringPoints.sync(ringPool, frame);
       dashMark.reset();
       swirl.reset();
+      stormCross.reset();
+      mud.reset();
       held.fill(0);
       banners.clear();
       shake.start = -Infinity;
@@ -1195,24 +1310,35 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
 
 // A skill animation record, reused. carry is its particle emission
 // remainder (particle-pool.js emit); stages are the stage start times of
-// its plant; landed marks a one-off moment (a rock's impact, a dashing
-// seed's take-off).
+// its plant; a, b and c are the sprites it animates (a Petrification uses
+// all three: the plant, its grey copy and the rock); landed marks a one-off
+// moment (the rock popping in, a dashing seed's take-off); fromCell and toCell
+// are the plot indices it starts and ends on (clearPlot ends it when either
+// becomes covered).
 function newTimeline() {
   return {
-    active: false, kind: null, start: 0.5, fx: 0.5, fz: 0.5, tx: 0.5, tz: 0.5, stages: null, a: null, landed: false, carry: 0.5, color: 0,
+    active: false, kind: null, start: 0.5, fx: 0.5, fz: 0.5, tx: 0.5, tz: 0.5, fromCell: 0, toCell: 0, stages: null, a: null, b: null, c: null, landed: false, carry: 0.5, color: 0,
   };
 }
 
-// Pooled plant and rock sprites ('X', 'O' or 'rock') that the skill
-// animations fold, fly, drop, squash and light up. Each has its own material with an
-// emissive map set up once, so the glow never rebuilds a shader.
+// Pooled plant and rock sprites ('X', 'O', 'stoneX', 'stoneO' or 'rock') that
+// the skill animations fold, fly, drop, squash and light up. 'stoneX' and
+// 'stoneO' are the plants in their stone grey (a Petrification). Each has its
+// own material with an emissive map set up once, so the glow never rebuilds a
+// shader.
 function createActorPool(world) {
-  const free = { X: [], O: [], rock: [] };
+  const free = { X: [], O: [], stoneX: [], stoneO: [], rock: [] };
   let plantSheets = { X: null, O: null }; // the tinted plant sheets (setPlantSheets), null: the art's own
+  let stoneSheets = { X: null, O: null }; // their stone grey copies, null: the plant's own colours
+
+  // The sheet an actor of `kind` is made from, and the kind of piece sprite
+  // it is (createPieceSprite takes X or O for a plant, grey or not).
+  const sheetOf = (kind) => (kind === 'rock' ? null : kind === 'stoneX' ? stoneSheets.X : kind === 'stoneO' ? stoneSheets.O : plantSheets[kind]);
+  const spriteKindOf = (kind) => (kind === 'stoneX' ? X : kind === 'stoneO' ? O : kind);
 
   function make(kind) {
-    const sheet = kind === 'rock' ? null : plantSheets[kind];
-    const sprite = world.addSprite(createPieceSprite(kind, sheet));
+    const sheet = sheetOf(kind);
+    const sprite = world.addSprite(createPieceSprite(spriteKindOf(kind), sheet));
     const material = sprite.plane.material;
     material.emissive.set(COLORS.glow);
     material.emissiveMap = sprite.texture;
@@ -1244,17 +1370,18 @@ function createActorPool(world) {
       sprite.plane.scale.set(1, 1, 1);
       actor.setShadow(1);
       actor.material.emissiveIntensity = 0;
-      actor.material.emissive.setHex(COLORS.glow); // a Venom actor glowed green
+      actor.material.emissive.setHex(COLORS.glow); // a Venom or Petrification actor glowed
       if (actor.kind !== 'rock') sprite.setFrame(STAGE_REST);
-      if (actor.kind !== 'rock' && actor.sheet !== plantSheets[actor.kind]) dropStaleActor(world, actor);
+      if (actor.kind !== 'rock' && actor.sheet !== sheetOf(actor.kind)) dropStaleActor(world, actor);
       else free[actor.kind].push(actor);
     },
 
     // New plant sheets: the waiting plant actors are freed; one still
     // flying is freed when it lands (release).
-    setPlantSheets(sheets) {
+    setPlantSheets(sheets, stones = null) {
       plantSheets = sheets;
-      for (const kind of ['X', 'O']) {
+      stoneSheets = stones ?? stoneSheets;
+      for (const kind of ['X', 'O', 'stoneX', 'stoneO']) {
         for (const actor of free[kind]) dropStaleActor(world, actor);
         free[kind].length = 0;
       }
@@ -1433,47 +1560,57 @@ function createDashMark({ world, pool, sp, random, u, frame }, actors) {
   };
 }
 
-// The announced Tornado Zone: decal-zone-v3 centred on the zone, one piece
-// per zone cell so it is clipped at the board edges, and a translucent
-// swirl of petals and leaves rising over the zone, from 'tornadoAnnounced'
-// until it ends. bendAt says how far the plants inside lean towards it.
+// The caster's reminder of the secret Tornado Zone: the cross decal
+// (decal-zone-cross, one piece per cross cell, so it is clipped at the board
+// edges) with faint blue petals drifting over its cells, drawn from the
+// viewer's state while the zone is theirs to see (syncTornado) and from the
+// announcement event. The other seat never gets one: tornadoCrossPlan is null
+// for a hidden zone. bendAt says how far the plants inside lean towards it.
 function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
-  const material = decalMaterial(artSource(ART.v3.decal.zone));
+  const material = decalMaterial(artSource(ART.v3.decal.zoneCross));
   const decals = [];
   for (let i = 0; i < ZONE_CELLS; i++) {
     const mesh = createCellDecal(material);
     mesh.renderOrder = 1;
+    mesh.name = 'tornado-cross';
     world.scene.add(mesh);
     decals.push(mesh);
   }
   // The zone's centre cell (cx, cy) and its world point (x, z); fade is
   // this frame's markFade, so the bend eases off as the zone ends.
-  // `cells` is the cross of the zone (the array of the state, never copied).
-  const mark = { active: false, endStart: NaN, cx: 0, cy: 0, cells: null, x: 0.5, z: 0.5, fade: 0.5, carry: 0.5 };
+  // `cells` are the pieces of the cross plan (never copied) and `plan` is it.
+  const mark = { active: false, endStart: NaN, owner: null, cx: 0, cy: 0, cells: null, plan: null, x: 0.5, z: 0.5, fade: 0.5, carry: 0.5 };
   const centreAt = { x: 0, z: 0 }; // the zone centre's world point, rewritten by show()
+  const petalAt = { x: 0, z: 0 }; // the plot a petal drifts over
 
   const hide = () => {
     mark.active = false;
     mark.endStart = NaN;
     mark.cells = null;
+    mark.plan = null;
     for (let i = 0; i < decals.length; i++) decals[i].visible = false;
   };
 
   return {
     centre: mark,
 
-    show({ x, y, cells }) {
+    show(zone) {
+      const plan = tornadoCrossPlan(zone);
+      if (plan === null) return;
+      const { pieces } = plan;
       for (let i = 0; i < decals.length; i++) {
-        const cell = cells[i];
+        const cell = pieces[i];
         decals[i].visible = Boolean(cell);
         if (!cell) continue;
-        decals[i].geometry = zonePieceGeometry(cell.x - x, cell.y - y);
+        decals[i].geometry = zonePieceGeometry(cell.dx, cell.dy);
         placeOnCell(decals[i], cell.x, cell.y);
       }
-      cellToWorldInto(x, y, centreAt);
-      mark.cx = x;
-      mark.cy = y;
-      mark.cells = cells;
+      cellToWorldInto(plan.x, plan.y, centreAt);
+      mark.owner = zone.player ?? null; // whose trap it is: only they (and spectators) may watch it fade
+      mark.cx = plan.x;
+      mark.cy = plan.y;
+      mark.cells = pieces;
+      mark.plan = plan;
       mark.x = centreAt.x;
       mark.z = centreAt.z;
       mark.fade = 1;
@@ -1503,39 +1640,113 @@ function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
         return;
       }
       mark.fade = fade;
-      material.opacity = fade * (0.8 + 0.2 * Math.sin(frame.time / 260));
+      const { plan } = mark;
+      material.opacity = fade * plan.opacity * (0.8 + 0.2 * Math.sin(frame.time / 260));
       if (fade < 1) return; // ending: no new petals
-      const count = emit(mark, TORNADO_PARTICLE_RATE * frame.scale, frame.dtS);
+      const count = emit(mark, plan.petalRate * frame.scale, frame.dtS);
       for (let i = 0; i < count; i++) {
         random.fill(u);
-        // A gathering dandelion storm: white seed fluff with yellow
-        // dandelion petals and a few leaves caught up among it.
-        const leaf = u[0] < 0.12;
-        const fluff = !leaf && u[10] < 0.65;
-        sp.x = mark.x;
-        sp.y = 0.02 + u[1] * 0.23;
-        sp.z = mark.z;
-        sp.radius = 0.25 + u[2] * 0.85;
+        // A faint blue petal drifting slowly round a cell of the cross.
+        const cell = mark.cells[Math.floor(u[0] * mark.cells.length)];
+        cellToWorldInto(cell.x, cell.y, petalAt);
+        sp.x = petalAt.x;
+        sp.y = 0.05 + u[1] * 0.2;
+        sp.z = petalAt.z;
+        sp.radius = 0.2 + u[2] * 0.25;
         sp.angle = u[3] * TWO_PI;
-        sp.spin = 4.5 + u[4] * 2.5;
-        sp.rise = 1 + u[5] * 0.8;
-        sp.widen = 0.3 + u[6] * 0.25;
-        sp.life = 1.3 + u[7] * 0.7;
-        sp.size = (2 + u[8]) * PX;
+        sp.spin = 0.8 + u[4] * 0.8;
+        sp.rise = 0.12 + u[5] * 0.12;
+        sp.widen = 0.05;
+        sp.life = 1.6 + u[6] * 0.8;
+        sp.size = (2 + u[7]) * PX;
         sp.grow = 0;
-        sp.color = leaf ? (u[9] < 0.5 ? COLORS.leaf : COLORS.leafDark) : fluff ? COLORS.dandelion : u[9] < 0.6 ? PETALS[2] : PETALS[1];
-        sp.alpha = 0.7; // translucent: the plants show through the swirl
-        sp.shape = fluff ? SHAPE_PLUS : SHAPE_SQUARE;
+        sp.color = CROSS_PETAL_COLOURS[Math.floor(u[8] * CROSS_PETAL_COLOURS.length)];
+        sp.alpha = plan.petalOpacity;
+        sp.shape = SHAPE_SQUARE;
         pool.spawnSpiral(sp);
       }
     },
 
     // The zone is gone for this viewer (its turn passed, or the state says
     // the zone is hidden): the decals, the lean and the petals still
-    // circling it vanish at once.
+    // circling its cells vanish at once.
     clear() {
-      pool.removeSpiralAt(mark.x, mark.z);
+      const { cells } = mark;
+      if (cells !== null) {
+        for (let i = 0; i < cells.length; i++) {
+          cellToWorldInto(cells[i].x, cells[i].y, petalAt);
+          pool.removeSpiralAt(petalAt.x, petalAt.z);
+        }
+      }
       hide();
+    },
+
+    reset: hide,
+  };
+}
+
+// The revealed Tornado Zone (event tornadoStorm): the cross decal shows to
+// everybody for STORM_MS and fades over MARK_FADE_MS while the whirlwind of
+// the storm plan (skill-plans.js stormPlan) spins over it. It is public once
+// the trap has fired, so unlike the caster's reminder it comes from the event.
+function createStormCross({ world, frame }) {
+  const material = decalMaterial(artSource(ART.v3.decal.zoneCross));
+  const decals = [];
+  for (let i = 0; i < ZONE_CELLS; i++) {
+    const mesh = createCellDecal(material);
+    mesh.renderOrder = 1;
+    mesh.name = 'storm-cross';
+    world.scene.add(mesh);
+    decals.push(mesh);
+  }
+  const mark = { active: false, start: 0.5 };
+  const cellIndex = new Int16Array(decals.length).fill(-1); // the plot index each decal piece lies on, -1 for none
+
+  const hide = () => {
+    mark.active = false;
+    cellIndex.fill(-1);
+    for (let i = 0; i < decals.length; i++) decals[i].visible = false;
+  };
+
+  return {
+    cellIndex,
+
+    get active() {
+      return mark.active;
+    },
+
+    // `covered` marks the plots the viewer's state covers (cell index to 1):
+    // the pieces on those plots are never shown.
+    show({ x, y, cells }, covered) {
+      for (let i = 0; i < decals.length; i++) {
+        const cell = cells[i];
+        const plot = cell ? cell.y * BOARD_SIZE + cell.x : -1;
+        cellIndex[i] = plot;
+        decals[i].visible = Boolean(cell) && covered[plot] === 0;
+        if (!cell) continue;
+        decals[i].geometry = zonePieceGeometry(cell.x - x, cell.y - y);
+        placeOnCell(decals[i], cell.x, cell.y);
+      }
+      mark.start = frame.time;
+      mark.active = true;
+    },
+
+    // The plot with this index has just become covered for the viewer.
+    hidePlot(plot) {
+      for (let i = 0; i < decals.length; i++) {
+        if (cellIndex[i] === plot) decals[i].visible = false;
+      }
+    },
+
+    update() {
+      if (!mark.active) return;
+      const age = frame.time - mark.start;
+      if (age >= STORM_MS + MARK_FADE_MS) {
+        hide();
+        return;
+      }
+      const fadeOut = age > STORM_MS ? 1 - (age - STORM_MS) / MARK_FADE_MS : 1;
+      material.opacity = Math.min(1, Math.max(0, age) / STORM_FADE_IN_MS) * fadeOut;
     },
 
     reset: hide,

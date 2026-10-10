@@ -13,6 +13,7 @@
 
 const TWO_PI = Math.PI * 2;
 const WOBBLE_SPEED = 0.008; // radians per ms the wobble runs round a ring
+const AT_EPSILON = 0.001; // world units: two centres this close are the same plot
 
 function newRing() {
   return {
@@ -117,6 +118,16 @@ export function stepRings(rings, time) {
   for (let i = 0; i < rings.length; i++) {
     const ring = rings[i];
     if (ring.active && ringProgress(ring, time) >= 1) ring.active = false;
+  }
+}
+
+// The rings centred on the plot centre (x, z) stop at once (the plot became
+// covered for the viewer). Hiss sound waves (wobble) are not about a plot and
+// play on.
+export function stopRingsAt(rings, x, z) {
+  for (let i = 0; i < rings.length; i++) {
+    const ring = rings[i];
+    if (ring.active && ring.wobble === 0 && Math.abs(ring.x - x) < AT_EPSILON && Math.abs(ring.z - z) < AT_EPSILON) ring.active = false;
   }
 }
 

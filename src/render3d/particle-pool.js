@@ -208,6 +208,17 @@ export function createParticlePool(capacity) {
     }
   };
 
+  // Removes the particles over the ground rectangle x0..x1, z0..z1 at once,
+  // and no others: the leftovers of a plot that has just become covered for
+  // the viewer must not linger.
+  pool.removeInBox = (x0, z0, x1, z1) => {
+    for (let i = pool.count - 1; i >= 0; i--) {
+      if (x[i] < x0 || x[i] > x1 || z[i] < z0 || z[i] > z1) continue;
+      pool.count--;
+      if (i !== pool.count) copy(pool.count, i);
+    }
+  };
+
   // How see-through particle i is now: it fades in quickly, holds and fades
   // out over the last third of its life.
   pool.alphaAt = (i) => {

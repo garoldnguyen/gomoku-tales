@@ -349,13 +349,14 @@ export function createWorld(canvas, {
 // is the plant (plant-x, a four-petal cross bloom, or plant-o, a round
 // bloom) with its anchor pixel on the plot centre, showing the Rest stage
 // until its owner steps the growth with setFrame; 'rock' is the mossy
-// rock-v3 boulder on its bottom centre (the manifest key "rock" is the 2D
-// sprite). Sprites of a kind share one texture. `sheet` replaces a
+// rock-v3 boulder, anchored (v3-meta.js) so its base stands on the same ground
+// line as the plants and a petrified plant's rock sits right on its plot (the
+// manifest key "rock" is the 2D sprite). Sprites of a kind share one texture. `sheet` replaces a
 // plant's art with a sheet of the same size: the plant tinted to the
 // colour of its side's character (mark-tints.js).
 export function createPieceSprite(kind, sheet = null) {
   if (kind === 'rock') {
-    return new PixelSprite({ sheet: artSource(ART.v3.rock), shadowRadius: ROCK_SHADOW_RADIUS });
+    return new PixelSprite({ sheet: artSource(ART.v3.rock), shadowRadius: ROCK_SHADOW_RADIUS, anchor: metaAnchor(artMeta(), ART.v3.rock) });
   }
   const name = ART.v3.plant[kind];
   const sprite = new PixelSprite({
@@ -404,7 +405,7 @@ export function createCellDecal(material, geometry = null) {
   return decal;
 }
 
-// One-cell geometry showing the part of a 3x3-cell zone decal (decal-zone-v3)
+// One-cell geometry showing the part of a 3x3-cell zone decal (decal-zone-cross)
 // that lies on the cell (dx, dy) from the zone centre, so a zone clipped at
 // the board edge shows only its part on the field.
 // Keyed by a number, not a string, so a lookup in the render loop (the zone

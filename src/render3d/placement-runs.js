@@ -10,6 +10,7 @@ import { planDurationMs } from './character-look.js';
 
 const NO_PLAN = Object.freeze([]);
 const TWO_PI = Math.PI * 2;
+const AT_EPSILON = 0.001; // world units: two centres this close are the same plot
 
 // `slots` run records: { active, plan, x, z, start, lastMs, durationMs, vine }.
 export function createPlacementRuns(slots) {
@@ -58,6 +59,15 @@ export function stepPlacementRuns(runs, time, onStep) {
     }
     run.lastMs = age;
     if (age >= run.durationMs) run.active = false;
+  }
+}
+
+// The runs playing on the plot centre (x, z) stop at once (the plot became
+// covered for the viewer).
+export function stopRunsAt(runs, x, z) {
+  for (let r = 0; r < runs.length; r++) {
+    const run = runs[r];
+    if (run.active && Math.abs(run.x - x) < AT_EPSILON && Math.abs(run.z - z) < AT_EPSILON) run.active = false;
   }
 }
 

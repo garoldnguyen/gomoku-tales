@@ -199,6 +199,13 @@
    1200
   ]
  },
+ "rock-v3": {
+  "anchor": [
+   16,
+   27
+  ],
+  "note": "anchor is the pixel that sits on the plot centre: the boulder (rows 7 to 30, one empty row under it) stands 3 rows below it, on the same ground line as the plants (anchor row 36 of 40, feet on row 39)"
+ },
  "trees": {
   "anchor": [
    17,

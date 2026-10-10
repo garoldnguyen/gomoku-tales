@@ -8,6 +8,7 @@
 import { CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
 import { CHARACTER_LOOK } from './character-look.js';
 import { CHARACTER_ANIMS } from './character-poses.js';
+import { mudTileGrid } from './mud-art.js';
 import { bearFrames, rabbitFrames } from './placeholder-art.js';
 import { blockSheetPainter, farmBoardPainter, ringPainter, stripPainter } from './v3-placeholder-art.js';
 
@@ -63,6 +64,8 @@ export const ART = {
     plant: { X: 'plant-x', O: 'plant-o' },
     rock: 'rock-v3',
     pebble: 'rock-small',
+    // The Mud Trap puddle decal; its placeholder is the generated tile of mud-art.js.
+    mudPuddle: 'mud-puddle',
     trees: 'trees',
     // The forest behind the far edge (docs/art-direction-v3-1.md section
     // 6.1); its anchors are in assets/forest-meta.json (forest-meta.js).
@@ -95,7 +98,8 @@ export const ART = {
       lastO: 'decal-last-o',
       win: 'decal-win-v3',
       dashTarget: 'decal-dash-target-v3',
-      zone: 'decal-zone-v3',
+      // The Tornado cross on the 3 by 3 cells of 32 px: each cross cell shows its own cell of the file.
+      zoneCross: 'decal-zone-cross',
     },
     portrait: { X: 'portrait-wind-rabbit-v3', O: 'portrait-earth-bear-v3' },
   },
@@ -146,7 +150,8 @@ const V3_SHAPES = {
   'decal-last-o': [32, 32, 1],
   'decal-win-v3': [32, 32, 1],
   'decal-dash-target-v3': [32, 32, 1],
-  'decal-zone-v3': [96, 96, 1],
+  'decal-zone-cross': [96, 96, 1],
+  'mud-puddle': [32, 32, 1],
   'portrait-wind-rabbit-v3': [32, 32, 1],
   'portrait-earth-bear-v3': [32, 32, 1],
 };
@@ -218,7 +223,7 @@ const V3_RINGS = {
   'decal-last-o': '#ff4b5c',
   'decal-win-v3': '#ffe14d',
   'decal-dash-target-v3': '#ff4b5c',
-  'decal-zone-v3': '#3b8cff',
+  'decal-zone-cross': '#3b8cff',
 };
 
 function v3Placeholder(name) {
@@ -256,6 +261,7 @@ export const PLACEHOLDERS_3D = {
     [ART.character.O[pose], pixelArt(() => bearFrames(pose))],
   ])),
   ...Object.fromEntries(artNames(ART.v3).map((name) => [name, v3Placeholder(name)])),
+  [ART.v3.mudPuddle]: pixelArt(() => [mudTileGrid()]),
   ...Object.fromEntries(artNames(ART.avatar).map((name) => [name, {
     width: AVATAR_PX,
     height: AVATAR_PX,

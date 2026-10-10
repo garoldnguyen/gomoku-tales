@@ -2,8 +2,9 @@
 // sections 4 and 9): which visuals the logic events show, which board cells
 // keep their plant hidden while a flying seed is on its way there and when
 // that plant regrows from Land, the shape of every skill animation over
-// time (reverse growth, the Wind Dash gust curve, the thrown seed's arc, the
-// falling rock, the conversion spark), and the camera shake. Effects only
+// time (reverse growth, the Wind Dash gust curve, the thrown seed's spin and
+// arc, the puddle spreading, a seed sinking and surfacing, the drying crust,
+// a Petrification, the conversion spark), and the camera shake. Effects only
 // follow the events returned by src/logic; nothing here feeds back into the
 // rules. No DOM or Three.js, so it runs under node --test. The pose and
 // shake functions read their time from, and write their results into, one
@@ -11,9 +12,11 @@
 // animation never allocates or passes loose numbers around.
 
 import {
-  CLOUD_FADE_MS, CLOUD_FORM_MS, CONVERT_SPARK_MS, DASH_CURVE, DASH_LIFT, DASH_STREAK_MS, REVERSE_GROWTH_SPEED,
-  ROCK_CRUMBLE_MS, ROCK_FALL_HEIGHT, ROCK_FALL_MS, ROCK_SETTLE_MS, SHAKE3D_LIGHT, SHAKE3D_MS, SKY_WATCH_PULSE_LOW,
-  SKY_WATCH_PULSE_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS, VENOM_DROP_MS, VENOM_SINK_MS,
+  CLOUD_FADE_MS, CLOUD_FORM_MS, CONVERT_SPARK_MS, DASH_CURVE, DASH_LIFT, DASH_STREAK_MS, DRY_MS, MUD_FORM_FROM, MUD_FORM_MS,
+  PETRIFY_FLICKER_FROM, PETRIFY_FLICKER_STEPS, PETRIFY_GREY_FROM, PETRIFY_SETTLE_MS, PETRIFY_SHATTER_MS, PETRIFY_SQUASH,
+  PETRIFY_WRAP_MS, REVERSE_GROWTH_SPEED, SHAKE3D_LIGHT, SHAKE3D_MS, SINK_DELAY_MS, SINK_MS, SKY_WATCH_PULSE_LOW,
+  SKY_WATCH_PULSE_MS, SURFACE_MS, SURFACE_OVERSHOOT, SURFACE_POP_AT, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_DROP_MS,
+  THROW_MS, THROW_SPIN_LIFT, THROW_SPIN_MS, THROW_SPIN_TURNS, VENOM_DROP_MS, VENOM_SINK_MS,
 } from '../config.js';
 import { TORNADO_ZONE } from '../logic/skills.js';
 import { bannerTexts } from '../render/effects.js';
@@ -25,21 +28,24 @@ import { dropOffsetPx, STAGE_DROP, STAGE_LAND, STAGE_REST, STAGE_SPROUT } from '
 //   { kind: 'dashStreak', from, to, player } the source bloom folds into a seed that rides a gust of
 //                                         petals along a curve to the target and regrows there from Land
 //   { kind: 'dashFizzle', from, to }      a failed dash: the mark ends with a puff
-//   { kind: 'tornado', x, y, cells }      the swirl of petals and leaves over the zone, until it ends
-//   { kind: 'tornadoHidden' }             the zone of the other seat: only a gust of dandelion fluff
-//                                         drifting across the whole field, never where the zone is
-//   { kind: 'storm', x, y, cells }        the trap fired: the dandelion storm bursts over the revealed cross (centre x, y)
+//   { kind: 'tornado', x, y, cells, player }  the caster's reminder of the secret cross: faint blue petals over its cells,
+//                                         until it ends (the other seat gets nothing at all: no spec)
+//   { kind: 'storm', x, y, cells }        the trap fired: the cross is revealed as a whirlwind (centre x, y)
 //   { kind: 'tornadoEnd' }
-//   { kind: 'throw', from, to, player }   a seed thrown in an arc, landing with a soil puff, then regrowing from Land
+//   { kind: 'throw', from, to, player }   a seed spun up by the whirlwind and thrown in an arc, landing with a dust puff,
+//                                         then regrowing from Land
 //   { kind: 'throwBlocked', x, y }        a gust around a plant with nowhere to go
-//   { kind: 'rockFall', x, y }            a rock falls with a growing shadow, a soil puff and a light shake
-//                                         (the minimum look of Petrification until its own effect)
+//   { kind: 'mudForm', x, y, player }     the plot sinks into a bubbling brown puddle
+//   { kind: 'seedSink', x, y, player }    the new seed sinks below the ground, drawn dim
+//   { kind: 'seedSurface', x, y, player } the mud dries and cracks and the sprout pops up
+//   { kind: 'mudDry', x, y, player }      an unused puddle dries, cracks and fades
+//   { kind: 'petrify', x, y, player, from } earth energy wraps the plant of `from`, its colour drains to grey, it
+//                                         shatters into a mossy rock with dust rising (the rock then stays)
 //   { kind: 'castRing', x, y, player }    a ring in the character's colour spreads from a skill's
 //                                         target plot (every skill with a plot target; Wind Dash
 //                                         from its source plant)
 //   { kind: 'hiss', player, locked }      wavy jade sound rings cross the field from its middle
-//   { kind: 'venom', x, y, from }         venom drops on the plant of `from`, which wilts sickly green
-//                                         back to Sprout and sinks into the soil (no event makes it
+//   { kind: 'venom', x, y, from }         venom drops on the plant of `from` (no event makes it
 //                                         since Venom keeps the plant; the new Venom effect is a later task)
 //   { kind: 'cloudForm', x, y, player }   the cloud thickens from nothing as puffs roll in on the wind
 //   { kind: 'cloudFade', x, y, player }   the ended cloud thins away as puffs drift off on the wind
@@ -90,8 +96,9 @@ export function visualsForEvents(events) {
         specs.push({ kind: 'dashFizzle', from: event.from, to: event.to });
         break;
       case 'tornadoAnnounced':
-        // The opponent of the rabbit only sees that a zone was cast.
-        specs.push(event.hidden ? { kind: 'tornadoHidden' } : { kind: 'tornado', x: event.x, y: event.y, cells: event.cells });
+        // The other seat sees NOTHING on the board (docs/free-action-design.md
+        // section 8): the announcement it gets is hidden and plays no visual.
+        if (!event.hidden) specs.push({ kind: 'tornado', x: event.x, y: event.y, cells: event.cells, player: event.player });
         break;
       case 'tornadoStorm':
         specs.push({ kind: 'storm', x: event.x, y: event.y, cells: event.cells ?? [{ x: event.x, y: event.y }] });
@@ -106,7 +113,19 @@ export function visualsForEvents(events) {
         specs.push({ kind: 'throwBlocked', x: event.x, y: event.y });
         break;
       case 'stonePetrified':
-        specs.push({ kind: 'rockFall', x: event.x, y: event.y });
+        specs.push({ kind: 'petrify', x: event.x, y: event.y, player: event.player, from: event.from });
+        break;
+      case 'mudPlaced':
+        specs.push({ kind: 'mudForm', x: event.x, y: event.y, player: event.player });
+        break;
+      case 'stoneSunk':
+        specs.push({ kind: 'seedSink', x: event.x, y: event.y, player: event.player });
+        break;
+      case 'stoneSurfaced':
+        specs.push({ kind: 'seedSurface', x: event.x, y: event.y, player: event.player });
+        break;
+      case 'mudDried':
+        specs.push({ kind: 'mudDry', x: event.x, y: event.y, player: event.player });
         break;
       case 'win':
       case 'draw':
@@ -210,8 +229,9 @@ export function convertMs(stageStartMs) {
   return convertWiltMs(stageStartMs) + CONVERT_SPARK_MS;
 }
 
-// The cell whose plant stays hidden while a flying seed (or a falling
-// rock, or the wilting old plant) shows it arriving, and for how long:
+// The cell whose plant stays hidden while a flying seed (or the petrified
+// plant becoming a rock, or the wilting old plant) shows it arriving, and for
+// how long:
 // { x, y, ms }, or null. The board already holds the piece; the effect
 // shows it arriving. stageStartMs times the reverse growth.
 export function heldCell(spec, stageStartMs) {
@@ -220,8 +240,8 @@ export function heldCell(spec, stageStartMs) {
       return { x: spec.to.x, y: spec.to.y, ms: THROW_DELAY_MS + THROW_MS };
     case 'dashStreak':
       return { x: spec.to.x, y: spec.to.y, ms: dashFoldMs(stageStartMs) + DASH_STREAK_MS };
-    case 'rockFall':
-      return { x: spec.x, y: spec.y, ms: ROCK_FALL_MS + ROCK_SETTLE_MS };
+    case 'petrify':
+      return { x: spec.x, y: spec.y, ms: petrifyMs() };
     case 'convert':
       return { x: spec.x, y: spec.y, ms: convertMs(stageStartMs) };
     default:
@@ -250,12 +270,14 @@ export function regrowCell(spec, stageStartMs) {
   return { x, y, player, startMs: ms - stageStartMs[STAGE_LAND] };
 }
 
-// Shake strength in world units for a spec, 0 for none: only a rock
-// landing shakes, lightly (docs/art-direction-v3.md section 5, High only).
+// Shake strength in world units for a spec, 0 for none: only a plant
+// shattering into a rock shakes, lightly (docs/art-direction-v3.md section 5,
+// High only). The Tornado storm shakes by its own call (effects3d.js).
 export function shakeStrength(spec) {
-  return spec.kind === 'rockFall' ? SHAKE3D_LIGHT : 0;
+  return spec.kind === 'petrify' ? SHAKE3D_LIGHT : 0;
 }
 
+const THROW_SPIN_MIN_WIDTH = 0.12; // a spinning seed is never thinner than this share of its width (edge on)
 const clamp01 = (t) => Math.min(1, Math.max(0, t));
 export const smoothstep = (t) => {
   const u = clamp01(t);
@@ -306,13 +328,19 @@ export function dashPose(out, stageStartMs) {
 }
 
 // A thrown seed pose.ageMs after it was planted: it drops onto its plot
-// for THROW_DELAY_MS (pose.dropPx art pixels above it, as a growing seed
-// drops), then flies in an arc for THROW_MS (with `plain`, quality.js
-// plainSlides, it slides along the ground instead). pose.progress along the
-// way, pose.height, pose.done.
+// for THROW_DROP_MS (pose.dropPx art pixels above it, as a growing seed
+// drops), the whirlwind spins it up off its plot for THROW_SPIN_MS (pose.lift
+// world units up, pose.spinScale the width it shows turning round and round),
+// then it flies in an arc for THROW_MS (with `plain`, quality.js plainSlides,
+// it slides along the ground instead and is not lifted). pose.progress along
+// the way, pose.height (the arc), pose.done. The seed is on its way down from
+// pose.lift to the ground as it flies: y = lift * (1 - progress) + height.
 export function throwPose(out, plain = false) {
   const { ageMs } = out;
   out.dropPx = dropOffsetPx(ageMs);
+  const spin = clamp01((ageMs - THROW_DROP_MS) / THROW_SPIN_MS);
+  out.lift = plain ? 0 : THROW_SPIN_LIFT * smoothstep(spin);
+  out.spinScale = spin > 0 && spin < 1 ? Math.max(THROW_SPIN_MIN_WIDTH, Math.abs(Math.cos(spin * THROW_SPIN_TURNS * Math.PI * 2))) : 1;
   const t = clamp01((ageMs - THROW_DELAY_MS) / THROW_MS);
   out.progress = t;
   out.height = plain ? 0 : arcHeight(t, THROW_ARC_HEIGHT);
@@ -320,32 +348,107 @@ export function throwPose(out, plain = false) {
   return out;
 }
 
-// A falling rock pose.ageMs after a Petrification: it drops from
-// ROCK_FALL_HEIGHT, speeding up, while its shadow grows from small to full;
-// then it squashes and settles. pose.height, pose.shadow (shadow scale),
-// pose.scaleX, pose.scaleY, pose.landed (from the impact on), pose.done.
-export function rockFallPose(out) {
-  const { ageMs } = out;
-  const fall = clamp01(ageMs / ROCK_FALL_MS);
-  out.height = ROCK_FALL_HEIGHT * (1 - fall * fall);
-  out.shadow = 0.2 + 0.8 * fall * fall;
-  out.landed = ageMs >= ROCK_FALL_MS;
-  const settle = clamp01((ageMs - ROCK_FALL_MS) / ROCK_SETTLE_MS);
-  const squash = out.landed ? 0.22 * (1 - settle) : 0;
-  out.scaleX = 1 + squash;
-  out.scaleY = 1 - squash;
-  out.done = ageMs >= ROCK_FALL_MS + ROCK_SETTLE_MS;
-  return out;
+// Mud Trap: how big a puddle is `ageMs` after it formed, as a share of its
+// full size: it spreads out from MUD_FORM_FROM with a small overshoot over
+// MUD_FORM_MS and is 1 from then on (and for any age that is not a number, so
+// a puddle nobody saw form is at its full size).
+export function mudSpread(ageMs) {
+  if (!(ageMs < MUD_FORM_MS)) return 1;
+  if (ageMs <= 0) return MUD_FORM_FROM;
+  const u = ageMs / MUD_FORM_MS - 1;
+  const eased = 1 + (MUD_FORM_BACK + 1) * u * u * u + MUD_FORM_BACK * u * u;
+  return MUD_FORM_FROM + (1 - MUD_FORM_FROM) * eased;
+}
+const MUD_FORM_BACK = 1.2; // how far the spreading puddle swells past its size before it settles
+
+// Mud Trap: how far a seed planted in mud has sunk `ageMs` after it was
+// planted, 0 (at its plot) to 1 (all the way, dim): it lands for
+// SINK_DELAY_MS, then sinks for SINK_MS. 1 for any age past that or not a
+// number, so a seed that was sunk when the page loaded is fully sunk.
+export function sinkAmount(ageMs) {
+  if (!(ageMs < SINK_DELAY_MS + SINK_MS)) return 1;
+  return smoothstep((ageMs - SINK_DELAY_MS) / SINK_MS);
 }
 
-// A breaking rock pose.ageMs after it broke sinks and spreads into soil
-// crumbs and pebbles: pose.scaleX, pose.scaleY, pose.done.
-export function crumblePose(out) {
-  const { ageMs } = out;
-  const t = clamp01(ageMs / ROCK_CRUMBLE_MS);
-  out.scaleX = 1 + 0.3 * t;
-  out.scaleY = Math.max(0.05, 1 - t * t);
-  out.done = ageMs >= ROCK_CRUMBLE_MS;
+// Mud Trap: how far below its plot a seed that has just surfaced still is
+// `ageMs` after it surfaced, as a share of its sunk depth: 1 when it starts, it
+// pops up to SURFACE_OVERSHOOT above its plot (a negative depth) at
+// SURFACE_POP_AT of SURFACE_MS, and settles on its plot (0) at the end. 0 for
+// any later age or one that is not a number.
+export function surfaceDepth(ageMs) {
+  if (!(ageMs < SURFACE_MS)) return 0;
+  if (ageMs <= 0) return 1;
+  const p = ageMs / SURFACE_MS;
+  let rise;
+  if (p < SURFACE_POP_AT) {
+    const u = 1 - p / SURFACE_POP_AT;
+    rise = (1 + SURFACE_OVERSHOOT) * (1 - u * u * u);
+  } else {
+    rise = 1 + SURFACE_OVERSHOOT * (1 - smoothstep((p - SURFACE_POP_AT) / (1 - SURFACE_POP_AT)));
+  }
+  return 1 - rise;
+}
+
+// Mud Trap: how solid the dried, cracked crust of a puddle still is `ageMs`
+// after it dried (1 to 0 over DRY_MS), the opacity of its decal.
+export function dryAmount(ageMs) {
+  if (!(ageMs < DRY_MS)) return 0;
+  if (ageMs <= 0) return 1;
+  return 1 - smoothstep(ageMs / DRY_MS);
+}
+
+// Petrification: the wrap (earth energy winds round the plant and its colour
+// drains to grey, flickering between its colours and grey first), the
+// shatter (the grey plant bursts apart) and the rock popping in squashed and
+// settling. petrifyMs is the whole length: the time the plot's real rock stays
+// hidden behind the effect.
+export const PETRIFY_STAGE_WRAP = 0;
+export const PETRIFY_STAGE_SHATTER = 1;
+export const PETRIFY_STAGE_ROCK = 2;
+
+export function petrifyMs() {
+  return PETRIFY_WRAP_MS + PETRIFY_SHATTER_MS + PETRIFY_SETTLE_MS;
+}
+
+// True while the wrapped plant shows as stone grey, `ageMs` into the wrap:
+// colours until PETRIFY_FLICKER_FROM of the wrap, then PETRIFY_FLICKER_STEPS
+// swaps to grey and back, grey for good from PETRIFY_GREY_FROM.
+export function petrifyGrey(ageMs) {
+  const p = ageMs / PETRIFY_WRAP_MS;
+  if (!(p >= PETRIFY_FLICKER_FROM)) return false;
+  if (p >= PETRIFY_GREY_FROM) return true;
+  const phase = Math.floor(((p - PETRIFY_FLICKER_FROM) / (PETRIFY_GREY_FROM - PETRIFY_FLICKER_FROM)) * PETRIFY_FLICKER_STEPS * 2);
+  return phase % 2 === 1;
+}
+
+// A Petrification pose.ageMs in: pose.stage (PETRIFY_STAGE_*), pose.grey (1
+// while the grey plant is the one drawn, in the wrap and the shatter), and
+// pose.scaleX and pose.scaleY of whatever is drawn (the plant trembles as the
+// energy wraps it, bursts wide and flat as it shatters, the rock pops in
+// squashed by PETRIFY_SQUASH and settles to 1), pose.done at the end.
+export function petrifyPose(out) {
+  const age = out.ageMs;
+  const rockAt = PETRIFY_WRAP_MS + PETRIFY_SHATTER_MS;
+  out.done = age >= rockAt + PETRIFY_SETTLE_MS;
+  if (age < PETRIFY_WRAP_MS) {
+    out.stage = PETRIFY_STAGE_WRAP;
+    out.grey = petrifyGrey(age) ? 1 : 0;
+    out.scaleX = 1 + 0.04 * Math.sin(age * 0.06) * clamp01(age / PETRIFY_WRAP_MS);
+    out.scaleY = 1;
+  } else if (age < rockAt) {
+    const t = (age - PETRIFY_WRAP_MS) / PETRIFY_SHATTER_MS;
+    out.stage = PETRIFY_STAGE_SHATTER;
+    out.grey = 1;
+    out.scaleX = 1 + 0.35 * t;
+    out.scaleY = 1 - 0.9 * t * t;
+  } else {
+    const settle = clamp01((age - rockAt) / PETRIFY_SETTLE_MS);
+    const squash = PETRIFY_SQUASH * (1 - settle) * (1 - settle);
+    out.stage = PETRIFY_STAGE_ROCK;
+    out.grey = 0;
+    out.scaleX = 1 + squash;
+    out.scaleY = 1 - squash;
+  }
   return out;
 }
 

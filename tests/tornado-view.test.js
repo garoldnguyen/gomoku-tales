@@ -33,7 +33,7 @@ async function build() {
   const renderer = createWorldRenderer(fakeCanvas(), { storage: null, quality: 'high', createRenderer: () => gl });
   const game = createLocalGame();
   const ctx = fakeCanvas().getContext('2d');
-  const zoneSource = artSource(ART.v3.decal.zone);
+  const zoneSource = artSource(ART.v3.decal.zoneCross);
   let time = 1000;
   const frames = (count = 4) => {
     for (let i = 0; i < count; i++) {

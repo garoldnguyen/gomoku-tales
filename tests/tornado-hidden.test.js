@@ -45,10 +45,10 @@ test('the cast events lose the target and the zone for the other seat', () => {
   assert.deepEqual(seen.find((e) => e.type === 'tornadoAnnounced'), { type: 'tornadoAnnounced', player: X, hidden: true });
   assert.equal(JSON.stringify(seen).includes('"x":4'), false, 'no coordinate of the zone at all');
   assert.equal(maskEventsForViewer(maskForViewer(state, X), events), events, 'the rabbit keeps them');
-  // The other seat's effects: a gust over the field, no cast ring on the plot.
+  // The other seat sees NOTHING on the board (Free Action, part 7: the field wide
+  // gust is gone): no gust, no cast ring on the plot, no swirl. Only the banner.
   const kinds = visualsForEvents(seen).map((spec) => spec.kind);
-  assert.ok(kinds.includes('tornadoHidden'));
-  assert.ok(!kinds.includes('castRing') && !kinds.includes('tornado'));
+  assert.deepEqual(kinds.filter((kind) => kind !== 'banner'), [], 'no visual on the board for the other seat');
 });
 
 test('online the guest gets the hidden copy and the spectators the full one; one screen hides it from the player to move', () => {

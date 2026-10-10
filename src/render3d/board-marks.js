@@ -10,7 +10,9 @@
 //
 // Decal kinds:
 //   'zonePreview' a Tornado Zone cell while choosing the zone centre; dx
-//                 and dy (-1, 0 or 1) place it inside the 3x3 zone decal
+//                 and dy (-1, 0 or 1) place it inside the 3x3 cross decal
+//                 (decal-zone-cross: each of the 5 cross cells shows its own
+//                 32 px cell of the 96 px file)
 //   'dashTarget'  the Wind Dash target cell being chosen
 //   'select'      a chosen or pickable plant (Wind Dash, Petrification, Venom) or the plot Mud Trap would flood
 //   'mud'         a mud puddle (Mud Trap), also under a seed sunk in it
