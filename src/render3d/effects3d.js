@@ -16,18 +16,22 @@
 //                     zone (decal-zone-v3) that the plants inside bend
 //                     towards (High); a thrown plant flies off as a seed in
 //                     an arc, lands with a soil puff and regrows from Land
-//   Terrain Creation  the rock falls from above with a growing shadow, lands
-//                     with a soil puff and a light camera shake (High only,
-//                     the only shake); when it breaks it crumbles into soil
-//                     crumbs and pebbles, leaving bare soil
+//   Petrification     (minimum look, the real effect comes later) the rock
+//                     falls from above with a growing shadow, lands with a
+//                     soil puff and a light camera shake (High only, the
+//                     only shake); rocks are permanent now, so the crumble
+//                     timeline is no longer started by any event
+//   Mud Trap          no timeline: the puddle is a flat decal drawn from
+//                     state.mud and a sunk seed is drawn dim and pushed down
+//                     from state.sunk (world-renderer.js)
 //   placement         the placement effect of the character whose side
 //                     planted the seed (placement(), character-look.js):
 //                     Wind Rabbit's dandelion wind, Earth Bear's soil
 //                     burst, Jade Serpent's vine coil, Cloud Eagle's cloud
 //                     swirl with rising white feathers
-//   Stone Conversion  the plant wilts back to Sprout, a small spark runs
-//                     through the soil and the other team's plant regrows
-//                     from Land (X becomes O or O becomes X)
+//   convert           the plant wilts back to Sprout, a small spark runs
+//                     through the soil and a plant of the other team regrows
+//                     from Land (no event starts it any more)
 //   skill banners     HUD text on the 2D canvas over the world
 // The always-on wind petals belong to the scenery (sky-scene.js). A plant
 // that regrows from Land is grown by the piece layer: the effects hold its

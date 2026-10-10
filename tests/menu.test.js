@@ -101,16 +101,17 @@ test('rulesLines: six lines whose numbers come from the injected config', () => 
   const lines = rulesLines();
   assert.equal(lines.length, 6);
   assert.deepEqual(lines, [1, 2, 3, 4, 5, 6].map((n) => STRINGS[`howToRule${n}`]));
-  const changed = rulesLines({ ...config, COOLDOWN_SHORT: 11, COOLDOWN_LONG: 17, ROCK_LIFETIME_TURNS: 9, WIN_LENGTH: 7 });
+  const changed = rulesLines({ ...config, COOLDOWN_SHORT: 11, COOLDOWN_LONG: 17, MUD_LIFETIME_TURNS: 9, MUD_SINK_TURNS: 2, WIN_LENGTH: 7 });
   assert.notDeepEqual(changed, lines);
   assert.ok(changed[2].startsWith('7 or more'));
   assert.ok(changed[3].includes('next 11 turns'));
   assert.ok(changed[3].includes('next 17 turns'));
   assert.ok(changed[4].includes('after 9 turns'));
+  assert.ok(changed[4].includes('no row for 2 turns.'), 'the plural follows the number');
   assert.ok(changed[5].includes('7 in a row'));
   assert.ok(lines[2].startsWith(`${config.WIN_LENGTH} or more`));
   assert.ok(lines[3].includes(`next ${config.COOLDOWN_SHORT} turns`) && lines[3].includes(`next ${config.COOLDOWN_LONG} turns`));
-  assert.ok(lines[4].includes(`after ${config.ROCK_LIFETIME_TURNS} turns`));
+  assert.ok(lines[4].includes(`after ${config.MUD_LIFETIME_TURNS} turns`));
 });
 
 test('How to Play: every skill of every character, with the SKILL_INFO text and the config cooldown', () => {

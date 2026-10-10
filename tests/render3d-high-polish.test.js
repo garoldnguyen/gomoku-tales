@@ -477,7 +477,7 @@ const FRAME_PATH = {
   'render3d/sky-scene.js': ['place', 'placeDrifting', 'update', 'write'],
   'render3d/sky.js': ['skyDrift', 'sunRayAlpha', 'wrapAround'],
   'render3d/sprite-frames.js': ['anchorForward', 'faceYaw', 'frameAt'],
-  'render3d/sprites.js': ['setBend', 'setBlend', 'setFrame', 'setShadowScale', 'update'],
+  'render3d/sprites.js': ['setBend', 'setBlend', 'setDim', 'setFrame', 'setShadowScale', 'update'],
   'render3d/view-size.js': ['sameViewSize', 'wholePixels', 'windowViewInto'],
   'render3d/framing.js': ['fitView', 'tanHalfNeeded'],
   'render3d/wind.js': ['bendTowardPx', 'clear', 'fleckSpeed', 'gap', 'gustEnvelope', 'nextReleaseMs',

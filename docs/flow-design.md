@@ -48,8 +48,8 @@ Every screen is a DOM layer over the existing 3D world in the Ivory look (see 3.
   1. Two players take turns. Wind Rabbit plants X and always goes first. Earth Bear plants O.
   2. On your turn do one thing: plant on an empty plot, or use a skill. A skill takes your whole turn.
   3. Five or more of your plants in an unbroken row, across, down or diagonally, win the game. (number: WIN_LENGTH)
-  4. After you use a skill it rests for your next 3 turns (Wind Dash, Terrain Creation) or your next 6 turns (Tornado Zone, Stone Conversion). (numbers: COOLDOWN_SHORT, COOLDOWN_LONG)
-  5. A rock blocks a plot for both players and crumbles after 4 turns. (number: ROCK_LIFETIME_TURNS)
+  4. After you use a skill it rests for your next 3 turns (Wind Dash, Mud Trap) or your next 6 turns (Tornado Zone, Petrification). (numbers: COOLDOWN_SHORT, COOLDOWN_LONG)
+  5. A mud puddle dries after 4 turns and a seed planted in it counts for no row for 1 turn; a rock blocks a plot for both players for good. (numbers: MUD_LIFETIME_TURNS, MUD_SINK_TURNS)
   6. If the board fills up and nobody has five in a row, the game is a draw.
 - Then the four skills grouped by character: portrait, name, stone letter, and for each skill the icon, the name, the cooldown number and the description from SKILL_INFO. Skill text is never copied; it is read from SKILL_INFO.
 

@@ -53,8 +53,8 @@ export const ART = {
   },
   earthBear: {
     hud: 'portrait-earth-bear-v5',
-    terrainCreationIcon: 'icon-terrain-creation-v5',
-    stoneConversionIcon: 'icon-stone-conversion-v5',
+    mudTrapIcon: 'icon-mud-trap',
+    petrificationIcon: 'icon-petrification',
   },
   // Farmland v3 pack in assets/3d/v3/ (docs/art-direction-v3.md section 2).
   // Tuning data for these names is in assets/v3-meta.json (v3-meta.js).

@@ -7,7 +7,7 @@ import { BOARD_SIZE, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS } from '../src/config.js
 import { X, O, EMPTY, ROCK } from '../src/logic/board.js';
 import { EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
 import { createInitialState, newGame } from '../src/logic/game.js';
-import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
+import { PETRIFICATION, MUD_TRAP, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { COUNTDOWN, CONNECTED } from '../src/net/presence.js';
@@ -67,11 +67,13 @@ test('newGame equals the documented fresh state', () => {
     currentPlayer: X,
     turn: 1,
     rocks: [],
+    mud: [],
+    sunk: [],
     pendingDash: null,
     tornado: null,
     skillLock: null,
     skillUsed: null,
-    cooldowns: { [X]: { [WIND_DASH]: 0, [TORNADO_ZONE]: 0 }, [O]: { [TERRAIN_CREATION]: 0, [STONE_CONVERSION]: 0 } },
+    cooldowns: { [X]: { [WIND_DASH]: 0, [TORNADO_ZONE]: 0 }, [O]: { [MUD_TRAP]: 0, [PETRIFICATION]: 0 } },
     winner: null,
     winLine: null,
     draw: false,
@@ -349,7 +351,7 @@ test('skills of game 1 leave nothing in game 2', () => {
   const { host, guest } = ctx;
   const ok = (result) => assert.equal(result.ok, true, result.error);
   ok(host.place(12, 12)); // T1
-  ok(guest.useSkill(STONE_CONVERSION, { x: 12, y: 12 })); // T2: a skill does not end the turn
+  ok(guest.useSkill(PETRIFICATION, { x: 12, y: 12 })); // T2: a skill does not end the turn
   ok(guest.place(14, 10)); // the planting that ends T2
   ok(host.place(9, 9));
   ok(guest.place(0, 5));
@@ -364,7 +366,7 @@ test('skills of game 1 leave nothing in game 2', () => {
   ok(host.place(3, 0));
   ok(guest.place(14, 12));
   ok(host.place(13, 13));
-  ok(guest.useSkill(TERRAIN_CREATION, { x: 10, y: 10 })); // T14
+  ok(guest.useSkill(MUD_TRAP, { x: 10, y: 10 })); // T14
   ok(guest.place(14, 8));
   ok(host.useSkill(WIND_DASH, { from: { x: 9, y: 9 }, to: { x: 4, y: 0 } })); // T15
   assert.ok(host.state.pendingDash);
@@ -373,19 +375,22 @@ test('skills of game 1 leave nothing in game 2', () => {
   const ended = host.state;
   assert.equal(ended.winner, X);
   assert.equal(host.phase, OVER);
-  assert.equal(ended.board[10][10], ROCK);
-  assert.equal(ended.rocks.length, 1);
+  assert.equal(ended.board[12][12], ROCK);
+  assert.deepEqual(ended.rocks, [{ x: 12, y: 12 }]);
+  assert.equal(ended.mud.length, 1, 'the puddle is still wet when the game ends');
   assert.ok(ended.cooldowns[X][WIND_DASH] > 0);
-  assert.ok(ended.cooldowns[O][TERRAIN_CREATION] > 0);
+  assert.ok(ended.cooldowns[O][MUD_TRAP] > 0);
 
   rematch(ctx);
   for (const side of [host, guest]) {
     const { state } = side;
     assert.deepEqual(state, newGame());
     assert.deepEqual(state.rocks, []);
+    assert.deepEqual(state.mud, []);
+    assert.deepEqual(state.sunk, []);
     assert.equal(state.pendingDash, null);
     assert.equal(state.tornado, null);
-    assert.equal(state.board[10][10], EMPTY);
+    assert.equal(state.board[12][12], EMPTY);
     for (const player of [X, O]) {
       assert.ok(Object.values(state.cooldowns[player]).every((left) => left === 0));
     }

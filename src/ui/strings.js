@@ -5,10 +5,10 @@
 // src/config.js, and skill and character names from SKILL_INFO and the
 // character table, never typed twice. Pure (no DOM).
 
-import { COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS, ROOM_CODE_LENGTH, WIN_LENGTH } from '../config.js';
+import { COOLDOWN_LONG, COOLDOWN_SHORT, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, ROOM_CODE_LENGTH, WIN_LENGTH } from '../config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
 import { SKILL_ALREADY_USED_ERROR } from '../logic/game.js';
-import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../logic/skills.js';
+import { MUD_TRAP, PETRIFICATION, TORNADO_ZONE, WIND_DASH } from '../logic/skills.js';
 import { SKILL_INFO } from './skill-info.js';
 
 const rabbit = CHARACTERS[WIND_RABBIT].name;
@@ -17,16 +17,17 @@ const skill = (id) => SKILL_INFO[id].title;
 
 // The six rules lines of How to Play (section 3.2) with the numbers of
 // `config` (src/config.js or a test's own values). Each sentence was
-// checked against src/logic: a rock lasts ROCK_LIFETIME_TURNS turns of the
-// game, both players' turns counted (earth-bear-skills.js), so line 5 says
-// so, and line 6 takes WIN_LENGTH like line 3.
-export function howToRules({ COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS, WIN_LENGTH }) {
+// checked against src/logic: a mud puddle dries after MUD_LIFETIME_TURNS
+// turns of the game, both players' turns counted, and a seed planted in it
+// stays sunk for MUD_SINK_TURNS (earth-bear-skills.js), a petrified plant is
+// a rock for good, so line 5 says so, and line 6 takes WIN_LENGTH like line 3.
+export function howToRules({ COOLDOWN_LONG, COOLDOWN_SHORT, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, WIN_LENGTH }) {
   return [
     `Two players take turns. ${rabbit} plants X and always goes first. ${bear} plants O.`,
     'On your turn you may use one skill that is ready. Then you must plant a seed on an empty plot to end your turn.',
     `${WIN_LENGTH} or more of your plants in an unbroken row, across, down or diagonally, win the game.`,
-    `After you use a skill it rests for your next ${COOLDOWN_SHORT} turns (${skill(WIND_DASH)}, ${skill(TERRAIN_CREATION)}) or your next ${COOLDOWN_LONG} turns (${skill(TORNADO_ZONE)}, ${skill(STONE_CONVERSION)}).`,
-    `A rock blocks a plot for both players and crumbles after ${ROCK_LIFETIME_TURNS} turns, counting both players' turns.`,
+    `After you use a skill it rests for your next ${COOLDOWN_SHORT} turns (${skill(WIND_DASH)}, ${skill(MUD_TRAP)}) or your next ${COOLDOWN_LONG} turns (${skill(TORNADO_ZONE)}, ${skill(PETRIFICATION)}).`,
+    `A mud puddle dries after ${MUD_LIFETIME_TURNS} turns, counting both players' turns. A seed planted in it counts for no row for ${MUD_SINK_TURNS} ${MUD_SINK_TURNS === 1 ? 'turn' : 'turns'}. A rock blocks a plot for both players for good.`,
     `If the board fills up and nobody has ${WIN_LENGTH} in a row, the game is a draw.`,
   ];
 }
@@ -63,7 +64,7 @@ export const STRINGS = Object.freeze({
 
   // How to Play (section 3.2).
   howToTitle: 'How to Play',
-  ...rulesEntries(howToRules({ COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS, WIN_LENGTH })),
+  ...rulesEntries(howToRules({ COOLDOWN_LONG, COOLDOWN_SHORT, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, WIN_LENGTH })),
   howToSkillsTitle: 'Skills',
   howToCooldown: 'Rests',
   howToTurns: 'turns',

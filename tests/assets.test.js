@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { ANIMATION_FRAME_MS } from '../src/config.js';
 import { X, O, ROCK } from '../src/logic/board.js';
 import { createInitialState } from '../src/logic/game.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../src/logic/skills.js';
+import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION } from '../src/logic/skills.js';
 import { createAssetStore, loadAssets, parseManifest, sizeProblem, USES_3D } from '../src/render/assets.js';
 import { SPRITES, drawGameScreen, drawMenuScreen, setAssets } from '../src/render/game-renderer.js';
 
@@ -194,7 +194,7 @@ function busyView() {
   return {
     state,
     hover: { x: 1, y: 1 },
-    panels: [panel(X, 'Wind Rabbit', [WIND_DASH, TORNADO_ZONE]), panel(O, 'Earth Bear', [TERRAIN_CREATION, STONE_CONVERSION])],
+    panels: [panel(X, 'Wind Rabbit', [WIND_DASH, TORNADO_ZONE]), panel(O, 'Earth Bear', [MUD_TRAP, PETRIFICATION])],
     status: 'Your turn',
     time: 0,
   };

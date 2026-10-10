@@ -7,7 +7,7 @@ import {
 } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
-import { TERRAIN_CREATION } from '../src/logic/skills.js';
+import { MUD_TRAP } from '../src/logic/skills.js';
 import {
   CHARACTER_ANIMS, CHARACTER_FRAME_COUNT, characterFrame, createCharacterDirector, glowPulse, popCellsForEvents,
   popInScale, stepGlow, worldCharacterSpots,
@@ -56,7 +56,7 @@ test('characters idle until their player uses a skill, then cast for CHARACTER_C
   director.trigger([{ type: 'stonePlaced', player: X, x: 1, y: 1 }, { type: 'turnEnded', player: X, turn: 1 }], 600);
   assert.equal(director.poseAt(X, 700).pose, 'idle', 'placing a stone is not a cast');
 
-  director.trigger([{ type: 'skillUsed', player: O, skill: TERRAIN_CREATION, target: { x: 2, y: 2 } }], 1000);
+  director.trigger([{ type: 'skillUsed', player: O, skill: MUD_TRAP, target: { x: 2, y: 2 } }], 1000);
   assert.deepEqual(director.poseAt(O, 1000), { pose: 'cast', ageMs: 0 });
   assert.deepEqual(director.poseAt(O, 1250), { pose: 'cast', ageMs: 250 });
   assert.equal(director.poseAt(X, 1250).pose, 'idle', 'only the caster casts');
@@ -77,8 +77,8 @@ test('a win puts the winner in the win pose and the other character in the lose 
 test('a skill that wins the game finishes the cast before the win pose', () => {
   const director = createCharacterDirector();
   director.trigger([
-    { type: 'skillUsed', player: O, skill: 'stoneConversion', target: { x: 3, y: 3 } },
-    { type: 'stoneConverted', player: O, x: 3, y: 3, from: X },
+    { type: 'skillUsed', player: O, skill: 'petrification', target: { x: 3, y: 3 } },
+    { type: 'stonePetrified', player: O, x: 3, y: 3, from: X },
     { type: 'win', player: O, line: [] },
   ], 5000);
   assert.equal(director.poseAt(O, 5100).pose, 'cast');
@@ -90,7 +90,7 @@ test('the director follows real events from src/logic', () => {
   const director = createCharacterDirector();
   const placed = placeStone(createInitialState(), { player: X, x: 0, y: 0 });
   assert.equal(placed.ok, true);
-  const skill = useSkill(placed.state, { player: O, skill: TERRAIN_CREATION, target: { x: 7, y: 7 } });
+  const skill = useSkill(placed.state, { player: O, skill: MUD_TRAP, target: { x: 7, y: 7 } });
   assert.equal(skill.ok, true, skill.error);
   director.trigger(placed.events, 100);
   director.trigger(skill.events, 200);
@@ -98,14 +98,16 @@ test('the director follows real events from src/logic', () => {
   assert.equal(director.poseAt(X, 300).pose, 'idle');
   // Feeding events to the director never changes them or the game.
   assert.deepEqual(popCellsForEvents(placed.events), [{ x: 0, y: 0 }]);
-  assert.deepEqual(popCellsForEvents(skill.events), [], 'the rock falls in (effects3d.js) instead of popping');
+  assert.deepEqual(popCellsForEvents(skill.events), [], 'the puddle appears (effects3d.js) instead of a seed popping');
 });
 
 test('placed stones pop in; pieces that arrive by a skill are left to the skill visuals', () => {
   const cells = popCellsForEvents([
     { type: 'stonePlaced', player: X, x: 1, y: 2 },
-    { type: 'rockPlaced', player: O, x: 3, y: 4, breaksAfterTurn: 6 },
-    { type: 'stoneConverted', player: O, x: 5, y: 6, from: X },
+    { type: 'mudPlaced', player: O, x: 3, y: 4, driesAfterTurn: 6 },
+    { type: 'stonePetrified', player: O, x: 5, y: 6, from: X },
+    { type: 'stoneSunk', player: O, x: 5, y: 7, surfacesAfterTurn: 5 },
+    { type: 'stoneSurfaced', player: O, x: 5, y: 7 },
     { type: 'dashResolved', player: X, from: { x: 0, y: 0 }, to: { x: 7, y: 8 } },
     { type: 'stoneThrown', player: O, from: { x: 9, y: 9 }, to: { x: 10, y: 11 } },
     { type: 'skillUsed', player: X, skill: 'windDash', target: {} },
@@ -113,7 +115,7 @@ test('placed stones pop in; pieces that arrive by a skill are left to the skill 
     { type: 'dashFailed', player: X, from: { x: 0, y: 0 }, to: { x: 7, y: 8 }, reason: 'targetTaken' },
     { type: 'tornadoAnnounced', player: X, x: 5, y: 5, cells: [] },
     { type: 'throwBlocked', player: X, x: 5, y: 5 },
-    { type: 'rockBroken', x: 3, y: 4 },
+    { type: 'mudDried', player: O, x: 3, y: 4 },
     { type: 'turnEnded', player: X, turn: 3 },
     { type: 'win', player: X, line: [] },
   ]);
@@ -205,6 +207,6 @@ test('no rule, turn or skill code depends on the world characters being drawn', 
     assert.ok(!/SHOW_WORLD_CHARACTERS|worldCharacterSpots/.test(source), file);
   }
   const director = createCharacterDirector();
-  director.trigger([{ type: 'skillUsed', player: X, skill: TERRAIN_CREATION }], 0);
+  director.trigger([{ type: 'skillUsed', player: X, skill: MUD_TRAP }], 0);
   assert.equal(director.poseAt(X, 0).pose, 'cast', 'the poses still follow the events');
 });

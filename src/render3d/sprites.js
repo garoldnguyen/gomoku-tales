@@ -421,6 +421,13 @@ export class PixelSprite {
     if (this.sway) this.sway.uSwayOn.value = frame === this.swayFrame ? 1 : 0;
   }
 
+  // Draws the sprite at `factor` of its brightness (1: as the art is; a seed
+  // sunk in mud is dimmed). Each sprite has its own material, so this
+  // touches no other sprite and allocates nothing.
+  setDim(factor) {
+    this.plane.material.color.setScalar(factor);
+  }
+
   // Shows frame `from` cross-faded into frame `to` by `mix` (0: all
   // `from`), on swaying sprites (the plants); others show `from`.
   setBlend(from, to, mix) {

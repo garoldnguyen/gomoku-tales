@@ -8,7 +8,7 @@ import {
   CHARACTERS, EARTH_BEAR, FIRST_PLAYER, JADE_SERPENT, WIND_RABBIT, assignSides, characterForStone, stoneForCharacter,
 } from '../src/logic/characters.js';
 import { canUseSkill, characterOf, newGame, placeStone, skillCooldown, useSkill } from '../src/logic/game.js';
-import { HISS, LONG, SHORT, TERRAIN_CREATION, VENOM, WIND_DASH, cooldownTurns, getSkill } from '../src/logic/skills.js';
+import { HISS, LONG, SHORT, MUD_TRAP, PETRIFICATION, VENOM, WIND_DASH, cooldownTurns, getSkill } from '../src/logic/skills.js';
 import { skillTurn } from './skill-turn.js';
 
 function ok(result) {
@@ -39,7 +39,7 @@ test('assignSides: the first pick plays X, the second plays O, and X moves first
   assert.deepEqual(Object.keys(state.cooldowns[X]), CHARACTERS[EARTH_BEAR].skills);
   assert.deepEqual(Object.keys(state.cooldowns[O]), CHARACTERS[WIND_RABBIT].skills);
   // Earth Bear now plays X: its skills are X's, Wind Rabbit's are not.
-  assert.equal(canUseSkill(state, X, TERRAIN_CREATION), true);
+  assert.equal(canUseSkill(state, X, MUD_TRAP), true);
   assert.equal(useSkill(state, { player: X, skill: WIND_DASH, target: null }).error, 'That is not your skill.');
 });
 
@@ -110,7 +110,7 @@ test('Hiss: the opponent cannot use a skill on their next turn, and the lock end
     assert.equal(canUseSkill(state, O, skill), false);
     assert.equal(skillCooldown(state, O, skill), 0, 'not a cooldown');
   }
-  const rejected = useSkill(state, { player: O, skill: TERRAIN_CREATION, target: { x: 4, y: 4 } });
+  const rejected = useSkill(state, { player: O, skill: MUD_TRAP, target: { x: 4, y: 4 } });
   assert.equal(rejected.ok, false);
   assert.match(rejected.error, /Hiss/);
 
@@ -120,8 +120,8 @@ test('Hiss: the opponent cannot use a skill on their next turn, and the lock end
   assert.ok(after.events.some((e) => e.type === 'hissEnded' && e.player === O));
   assert.equal(state.skillLock, null);
   state = place(state, X, 0, 0);
-  assert.equal(canUseSkill(state, O, TERRAIN_CREATION), true);
-  ok(useSkill(state, { player: O, skill: TERRAIN_CREATION, target: { x: 5, y: 5 } }));
+  assert.equal(canUseSkill(state, O, MUD_TRAP), true);
+  ok(useSkill(state, { player: O, skill: MUD_TRAP, target: { x: 5, y: 5 } }));
 });
 
 test('Hiss still allows placing a stone', () => {
@@ -147,13 +147,13 @@ test('Venom removes exactly one opponent plant, leaves the plot empty and keeps 
   state = place(state, X, 7, 9);
   state = place(state, O, 9, 9);
   state = place(state, X, 0, 9);
-  state = skillTurn(state, O, TERRAIN_CREATION, { x: 2, y: 2 }, { x: 14, y: 14 });
+  state = skillTurn(state, O, PETRIFICATION, { x: 7, y: 9 }, { x: 14, y: 14 });
   const before = state;
   const result = useSkill(state, { player: X, skill: VENOM, target: { x: 8, y: 8 } });
   state = ok(result);
   assert.equal(state.board[8][8], EMPTY);
   assert.equal(state.board[9][9], O);
-  assert.equal(state.board[2][2], ROCK, 'the rock stays');
+  assert.equal(state.board[9][7], ROCK, 'the rock stays');
   assert.deepEqual(state.rocks, before.rocks);
   let changed = 0;
   for (let y = 0; y < before.board.length; y++) {
@@ -167,7 +167,9 @@ test('Venom removes exactly one opponent plant, leaves the plot empty and keeps 
 test('Venom is rejected on an empty plot, on your own plant, on a rock and off the board', () => {
   let state = serpentGame();
   state = place(state, X, 7, 7);
-  state = skillTurn(state, O, TERRAIN_CREATION, { x: 2, y: 2 }, { x: 14, y: 14 });
+  state = place(state, O, 14, 14);
+  state = place(state, X, 2, 2);
+  state = skillTurn(state, O, PETRIFICATION, { x: 2, y: 2 }, { x: 14, y: 12 });
   for (const target of [{ x: 0, y: 0 }, { x: 7, y: 7 }, { x: 2, y: 2 }, { x: -1, y: 0 }, null]) {
     const result = useSkill(state, { player: X, skill: VENOM, target });
     assert.equal(result.ok, false, JSON.stringify(target));
@@ -175,4 +177,53 @@ test('Venom is rejected on an empty plot, on your own plant, on a rock and off t
   }
   assert.equal(skillCooldown(state, X, VENOM), 0, 'a rejected skill costs nothing');
   assert.equal(state.currentPlayer, X);
+});
+
+// --- Venom and a seed sunk in mud (Free Action part 2) ---
+
+// Earth Bear (X) against Jade Serpent (O) after eight alternating seeds: O
+// has (0,0) to (3,0), X has four scattered seeds; X is to move on turn 9.
+function serpentFourInARow() {
+  let state = newGame({ characters: assignSides([EARTH_BEAR, JADE_SERPENT]) });
+  const xs = [[0, 5], [2, 5], [4, 5], [6, 5]];
+  for (let i = 0; i < 4; i++) {
+    state = place(state, X, xs[i][0], xs[i][1]);
+    state = place(state, O, i, 0);
+  }
+  assert.equal(state.turn, 9);
+  return state;
+}
+
+test('Venom on a sunk seed takes its sunk entry with it, so a seed planted there counts at once', () => {
+  let state = serpentFourInARow();
+  state = skillTurn(state, X, MUD_TRAP, { x: 4, y: 0 }, { x: 4, y: 0 }); // X plants into its own puddle: sunk
+  assert.equal(state.sunk.length, 1);
+  const used = ok(useSkill(state, { player: O, skill: VENOM, target: { x: 4, y: 0 } }));
+  assert.deepEqual(used.sunk, [], 'the entry goes with the withered plant');
+  const planted = placeStone(used, { player: O, x: 4, y: 0 });
+  assert.equal(planted.ok, true, planted.error);
+  assert.equal(planted.state.winner, O, 'five O seeds in a row: O wins, not the owner of the old sunk seed');
+  assert.equal(planted.state.winLine.length, 5);
+});
+
+test('Venom on a sunk seed that is not replanted: nothing surfaces later and nobody wins from it', () => {
+  let state = serpentFourInARow();
+  state = skillTurn(state, X, MUD_TRAP, { x: 4, y: 0 }, { x: 4, y: 0 });
+  const events = [];
+  state = skillTurn(state, O, VENOM, { x: 4, y: 0 }, { x: 9, y: 9 }, events); // the turn the seed was due to surface
+  assert.equal(state.board[0][4], EMPTY, 'the withered plot stays empty');
+  assert.deepEqual(state.sunk, []);
+  assert.equal(events.some((event) => event.type === 'stoneSurfaced'), false, 'no seed rises from an empty plot');
+  assert.equal(state.winner, null);
+});
+
+test('a stale sunk entry (its plot no longer holds the plant) surfaces nothing and never credits a win', () => {
+  const state = serpentFourInARow();
+  // Forged on purpose: an entry for X on a plot that is empty, due this turn.
+  const stale = { ...state, sunk: [{ x: 4, y: 0, player: X, surfacesAfterTurn: state.turn }] };
+  const planted = placeStone(stale, { player: X, x: 9, y: 9 });
+  assert.equal(planted.ok, true, planted.error);
+  assert.equal(planted.events.some((event) => event.type === 'stoneSurfaced'), false);
+  assert.deepEqual(planted.state.sunk, []);
+  assert.equal(planted.state.winner, null);
 });

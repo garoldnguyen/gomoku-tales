@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COOLDOWN_SHORT, COOLDOWN_LONG, ROCK_LIFETIME_TURNS } from '../src/config.js';
+import { COOLDOWN_SHORT, COOLDOWN_LONG, MUD_LIFETIME_TURNS, MUD_SINK_TURNS } from '../src/config.js';
 import { X, O, ROCK } from '../src/logic/board.js';
 import { createInitialState } from '../src/logic/game.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../src/logic/skills.js';
+import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION } from '../src/logic/skills.js';
 import { BOARD_X, BOARD_Y, BOARD_PX, panelRect, skillButtonAt, skillButtonRect } from '../src/render/layout.js';
 import { hitTest, isCancelKey } from '../src/ui/input.js';
 import { createLocalGame, describeEvents, panelView, skillLockReason } from '../src/ui/local-game.js';
@@ -42,7 +42,7 @@ test('skillButtonAt and hitTest find buttons, board cells and empty space', () =
 
   const l = skillButtonRect(X, 0);
   assert.deepEqual(hitTest(l.x + 5, l.y + 5), { skill: { player: X, skillId: WIND_DASH } });
-  assert.deepEqual(hitTest(r.x + 5, r.y + 5), { skill: { player: O, skillId: STONE_CONVERSION } });
+  assert.deepEqual(hitTest(r.x + 5, r.y + 5), { skill: { player: O, skillId: PETRIFICATION } });
   assert.deepEqual(hitTest(BOARD_X + 1, BOARD_Y + 1), { cell: { x: 0, y: 0 } });
   assert.equal(hitTest(5, 5), null);
 });
@@ -93,21 +93,25 @@ test('Tornado Zone accepts any cell as the centre, including occupied and edge c
   assert.deepEqual(targetClick(state, X, t, { x: 0, y: 0 }), { target: { x: 0, y: 0 } });
 });
 
-test('Terrain Creation needs an empty cell; Stone Conversion needs an opponent stone', () => {
-  const state = stateWith([[1, 1, X], [2, 2, O], [3, 3, ROCK]], O);
-  const terrain = startTargeting(TERRAIN_CREATION);
-  assert.equal(targetPrompt(terrain), 'Terrain Creation: choose an empty cell');
+test('Mud Trap needs an empty plot that is not mud; Petrification needs an opponent plant that is not sunk', () => {
+  const state = stateWith([[1, 1, X], [2, 2, O], [3, 3, ROCK], [4, 4, X]], O);
+  state.mud = [{ x: 8, y: 8, player: O, driesAfterTurn: 9 }];
+  state.sunk = [{ x: 4, y: 4, player: X, surfacesAfterTurn: 9 }];
+  const mud = startTargeting(MUD_TRAP);
+  assert.equal(targetPrompt(mud), 'Mud Trap: choose an empty cell');
   for (const cell of [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 }]) {
-    assert.deepEqual(targetClick(state, O, terrain, cell), { error: 'Choose an empty cell.' });
+    assert.deepEqual(targetClick(state, O, mud, cell), { error: 'Choose an empty cell.' });
   }
-  assert.deepEqual(targetClick(state, O, terrain, { x: 6, y: 6 }), { target: { x: 6, y: 6 } });
+  assert.deepEqual(targetClick(state, O, mud, { x: 8, y: 8 }), { error: 'That cell is already mud.' });
+  assert.deepEqual(targetClick(state, O, mud, { x: 6, y: 6 }), { target: { x: 6, y: 6 } });
 
-  const convert = startTargeting(STONE_CONVERSION);
-  assert.equal(targetPrompt(convert), "Stone Conversion: choose an opponent's stone");
+  const petrify = startTargeting(PETRIFICATION);
+  assert.equal(targetPrompt(petrify), "Petrification: choose an opponent's stone");
   for (const cell of [{ x: 2, y: 2 }, { x: 3, y: 3 }, { x: 6, y: 6 }]) {
-    assert.deepEqual(targetClick(state, O, convert, cell), { error: "Choose one of your opponent's stones." });
+    assert.deepEqual(targetClick(state, O, petrify, cell), { error: "Choose one of your opponent's stones." });
   }
-  assert.deepEqual(targetClick(state, O, convert, { x: 1, y: 1 }), { target: { x: 1, y: 1 } });
+  assert.deepEqual(targetClick(state, O, petrify, { x: 4, y: 4 }), { error: 'That plant is sunk in mud.' });
+  assert.deepEqual(targetClick(state, O, petrify, { x: 1, y: 1 }), { target: { x: 1, y: 1 } });
 });
 
 test('target previews follow the hovered cell', () => {
@@ -125,10 +129,10 @@ test('target previews follow the hovered cell', () => {
   assert.equal(zone.type, 'zone');
   assert.equal(zone.cells.length, 4); // clipped at the corner
 
-  assert.deepEqual(targetPreview(state, O, startTargeting(TERRAIN_CREATION), { x: 5, y: 5 }), { type: 'rock', x: 5, y: 5 });
-  assert.equal(targetPreview(state, O, startTargeting(TERRAIN_CREATION), { x: 2, y: 2 }), null);
-  assert.deepEqual(targetPreview(state, O, startTargeting(STONE_CONVERSION), { x: 2, y: 2 }), { type: 'select', x: 2, y: 2 });
-  assert.equal(targetPreview(state, O, startTargeting(STONE_CONVERSION), { x: 3, y: 3 }), null);
+  assert.deepEqual(targetPreview(state, O, startTargeting(MUD_TRAP), { x: 5, y: 5 }), { type: 'select', x: 5, y: 5 });
+  assert.equal(targetPreview(state, O, startTargeting(MUD_TRAP), { x: 2, y: 2 }), null);
+  assert.deepEqual(targetPreview(state, O, startTargeting(PETRIFICATION), { x: 2, y: 2 }), { type: 'select', x: 2, y: 2 });
+  assert.equal(targetPreview(state, O, startTargeting(PETRIFICATION), { x: 3, y: 3 }), null);
 });
 
 // --- Panels ---
@@ -144,12 +148,12 @@ test('panel view shows name, stone, turn highlight, cooldowns and locked state',
   assert.equal(right.active, false);
   assert.equal(left.you, true);
   assert.deepEqual(left.skills.map((s) => s.id), [WIND_DASH, TORNADO_ZONE]);
-  assert.deepEqual(right.skills.map((s) => s.id), [TERRAIN_CREATION, STONE_CONVERSION]);
+  assert.deepEqual(right.skills.map((s) => s.id), [MUD_TRAP, PETRIFICATION]);
   assert.ok(left.skills.every((s) => s.usable && !s.locked && s.cooldown === 0));
   assert.ok(right.skills.every((s) => !s.usable && !s.locked));
 
   game.click({ x: 7, y: 7 }); // X
-  game.clickSkill(O, TERRAIN_CREATION);
+  game.clickSkill(O, MUD_TRAP);
   game.click({ x: 0, y: 0 });
   [left, right] = game.getView().panels;
   assert.equal(right.active, true, 'a skill does not end the turn');
@@ -230,7 +234,7 @@ test('another skill button switches the flow to that skill', () => {
 
 test("the other player's buttons and locked skills refuse with a message", () => {
   const game = createLocalGame();
-  assert.equal(game.clickSkill(O, TERRAIN_CREATION), false);
+  assert.equal(game.clickSkill(O, MUD_TRAP), false);
   assert.equal(game.getView().message, "It is Wind Rabbit's turn.");
   assert.equal(game.getTargeting(), null);
 
@@ -243,7 +247,7 @@ test("the other player's buttons and locked skills refuse with a message", () =>
   assert.equal(game.clickSkill(X, TORNADO_ZONE), false);
   assert.equal(game.getView().message, `Tornado Zone is locked for ${COOLDOWN_LONG} more turns.`);
   assert.equal(skillLockReason(game.getState(), X, WIND_DASH), null);
-  assert.equal(skillLockReason(game.getState(), O, TERRAIN_CREATION), "It is Wind Rabbit's turn.");
+  assert.equal(skillLockReason(game.getState(), O, MUD_TRAP), "It is Wind Rabbit's turn.");
 });
 
 test('an invalid target keeps the flow running with a message', () => {
@@ -312,36 +316,52 @@ test('Tornado Zone end to end: on one screen the zone is hidden, and a seed plan
   assert.equal(game.getView().message, 'The dandelion storm threw the stone away!');
 });
 
-test('Terrain Creation end to end: a rock appears and later crumbles', () => {
+test('Mud Trap end to end: a puddle appears, sinks a seed and dries', () => {
   const game = createLocalGame();
   game.click({ x: 7, y: 7 }); // X
-  game.clickSkill(O, TERRAIN_CREATION);
+  game.clickSkill(O, MUD_TRAP);
   game.setHover({ x: 3, y: 3 });
-  assert.deepEqual(game.getView().preview, { type: 'rock', x: 3, y: 3 });
+  assert.deepEqual(game.getView().preview, { type: 'select', x: 3, y: 3 });
   assert.equal(game.click({ x: 3, y: 3 }), true);
-  assert.equal(game.getState().board[3][3], ROCK);
-  assert.equal(game.getView().message, 'Terrain Creation! A rock fell.');
+  assert.equal(game.getState().board[3][3], null, 'a puddle is not a board stone');
+  assert.deepEqual(game.getState().mud.map(({ x, y }) => ({ x, y })), [{ x: 3, y: 3 }]);
+  assert.equal(game.getView().message, 'Mud Trap! A mud puddle.');
 
-  // Placing on the rock is refused (O is still to move: a skill does not end the turn).
-  assert.equal(game.click({ x: 3, y: 3 }), false);
-  assert.equal(game.getView().message, 'That cell is not empty.');
+  // A puddle nobody plants in dries MUD_LIFETIME_TURNS turns after the cast turn.
+  const dry = createLocalGame();
+  dry.click({ x: 7, y: 7 }); // X
+  dry.clickSkill(O, MUD_TRAP);
+  dry.click({ x: 3, y: 3 });
+  for (let i = 0; i <= MUD_LIFETIME_TURNS; i++) dry.click({ x: i, y: 12 });
+  assert.deepEqual(dry.getState().mud, []);
+  assert.match(dry.getView().message, /The mud dried\./);
 
-  // O plants to end the turn the rock fell in; it breaks at the end of the 4th turn after that one.
-  for (let i = 0; i <= ROCK_LIFETIME_TURNS; i++) game.click({ x: i, y: 12 });
-  assert.equal(game.getState().board[3][3], null);
-  assert.equal(game.getView().message, 'A rock crumbled.');
+  // A seed planted in the puddle sinks and surfaces MUD_SINK_TURNS turns later.
+  const sink = createLocalGame();
+  sink.click({ x: 7, y: 7 }); // X
+  sink.clickSkill(O, MUD_TRAP);
+  sink.click({ x: 3, y: 3 });
+  assert.equal(sink.click({ x: 3, y: 3 }), true); // O plants in the puddle
+  assert.equal(sink.getState().sunk.length, 1);
+  assert.equal(sink.getView().message, 'The seed sank in the mud.');
+  for (let i = 0; i < MUD_SINK_TURNS; i++) sink.click({ x: i, y: 12 });
+  assert.equal(sink.getState().sunk.length, 0);
+  assert.match(sink.getView().message, /The seed surfaced\./);
 });
 
-test('Stone Conversion end to end: an X stone becomes O', () => {
+test('Petrification end to end: an X plant turns into a rock for good', () => {
   const game = createLocalGame();
   game.click({ x: 7, y: 7 }); // X
-  game.clickSkill(O, STONE_CONVERSION);
+  game.clickSkill(O, PETRIFICATION);
   assert.equal(game.click({ x: 0, y: 0 }), false);
   assert.equal(game.getView().message, "Choose one of your opponent's stones.");
   assert.equal(game.click({ x: 7, y: 7 }), true);
-  assert.equal(game.getState().board[7][7], O);
+  assert.equal(game.getState().board[7][7], ROCK);
+  assert.deepEqual(game.getState().rocks, [{ x: 7, y: 7 }]);
   assert.equal(game.getState().currentPlayer, O, 'O still has to plant');
-  assert.equal(game.getView().message, 'Stone Conversion! The stone changed sides.');
+  assert.equal(game.getView().message, 'Petrification! The plant turned to stone.');
+  for (let i = 0; i < 12; i++) game.click({ x: i % 15, y: 12 + (i > 14 ? 1 : 0) });
+  assert.equal(game.getState().board[7][7], ROCK, 'a petrified plant never crumbles');
 });
 
 test('skills are refused after the game is won', () => {
@@ -352,7 +372,7 @@ test('skills are refused after the game is won', () => {
   }
   game.click({ x: 4, y: 0 });
   assert.equal(game.getState().winner, X);
-  assert.equal(game.clickSkill(O, TERRAIN_CREATION), false);
+  assert.equal(game.clickSkill(O, MUD_TRAP), false);
   assert.equal(game.getView().message, 'The game is over.');
   const [left, right] = game.getView().panels;
   assert.equal(left.winner, true);
@@ -362,7 +382,7 @@ test('skills are refused after the game is won', () => {
 test('describeEvents skips plain placements and joins skill messages', () => {
   assert.equal(describeEvents([{ type: 'stonePlaced' }, { type: 'turnEnded' }]), null);
   assert.equal(
-    describeEvents([{ type: 'stonePlaced' }, { type: 'dashFailed', reason: 'sourceLost' }, { type: 'rockBroken' }]),
-    'Wind Dash failed: the stone is gone. A rock crumbled.',
+    describeEvents([{ type: 'stonePlaced' }, { type: 'dashFailed', reason: 'sourceLost' }, { type: 'mudDried' }]),
+    'Wind Dash failed: the stone is gone. The mud dried.',
   );
 });

@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { register } from 'node:module';
 import { X, O } from '../src/logic/board.js';
-import { TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
+import { MUD_TRAP, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
 import { fakeCanvas, fakeRenderer, installFakeDocument } from './fake-browser.js';
 
 const hook = `
@@ -61,7 +61,7 @@ for (const quality of ['low', 'high']) {
     // by the planting of the same player.
     const moves = [
       () => game.click({ x: 7, y: 7 }), // X
-      () => game.clickSkill(O, TERRAIN_CREATION) && game.click({ x: 14, y: 14 }),
+      () => game.clickSkill(O, MUD_TRAP) && game.click({ x: 14, y: 14 }),
       () => game.click({ x: 0, y: 6 }),
       () => game.clickSkill(X, TORNADO_ZONE) && game.click({ x: 10, y: 10 }),
       () => game.click({ x: 1, y: 0 }),

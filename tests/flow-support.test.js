@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as config from '../src/config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../src/logic/characters.js';
-import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
+import { PETRIFICATION, MUD_TRAP, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { ROOM_PHASES } from '../src/net/phase.js';
@@ -132,10 +132,11 @@ test('strings.js: numbers and names in the rules come from the config, the chara
   assert.ok(STRINGS.howToRule3.startsWith(`${config.WIN_LENGTH} or more`));
   assert.ok(STRINGS.howToRule4.includes(`next ${config.COOLDOWN_SHORT} turns`));
   assert.ok(STRINGS.howToRule4.includes(`next ${config.COOLDOWN_LONG} turns`));
-  for (const id of [WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION]) {
+  for (const id of [WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION]) {
     assert.ok(STRINGS.howToRule4.includes(SKILL_INFO[id].title), id);
   }
-  assert.ok(STRINGS.howToRule5.includes(`after ${config.ROCK_LIFETIME_TURNS} turns`));
+  assert.ok(STRINGS.howToRule5.includes(`after ${config.MUD_LIFETIME_TURNS} turns`));
+  assert.ok(STRINGS.howToRule5.includes(`no row for ${config.MUD_SINK_TURNS} turn.`));
 });
 
 // --- config and room phases ---

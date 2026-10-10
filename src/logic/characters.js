@@ -3,7 +3,7 @@
 // pick order (assignSides), the first pick plays X and moves first.
 
 import { X, O } from './board.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION, HISS, VENOM, SKY_WATCH, CLOUD } from './skills.js';
+import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION, HISS, VENOM, SKY_WATCH, CLOUD } from './skills.js';
 
 export const WIND_RABBIT = 'windRabbit';
 export const EARTH_BEAR = 'earthBear';
@@ -12,7 +12,7 @@ export const CLOUD_EAGLE = 'cloudEagle';
 
 export const CHARACTERS = {
   [WIND_RABBIT]: { id: WIND_RABBIT, name: 'Wind Rabbit', skills: [WIND_DASH, TORNADO_ZONE] },
-  [EARTH_BEAR]: { id: EARTH_BEAR, name: 'Earth Bear', skills: [TERRAIN_CREATION, STONE_CONVERSION] },
+  [EARTH_BEAR]: { id: EARTH_BEAR, name: 'Earth Bear', skills: [MUD_TRAP, PETRIFICATION] },
   [JADE_SERPENT]: { id: JADE_SERPENT, name: 'Jade Serpent', skills: [HISS, VENOM] },
   [CLOUD_EAGLE]: { id: CLOUD_EAGLE, name: 'Cloud Eagle', skills: [SKY_WATCH, CLOUD] },
 };

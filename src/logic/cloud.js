@@ -13,6 +13,7 @@
 
 import { CLOUD_SIZE, CLOUD_TURNS, SKY_WATCH_RUN } from '../config.js';
 import { EMPTY, HIDDEN, X, O, cloneBoard, findWinLineAt, inBounds } from './board.js';
+import { scoringBoard } from './scoring-board.js';
 import { CLOUD, TORNADO_ZONE } from './skills.js';
 
 export function createCloud(x, y, owner, placedTurn) {
@@ -76,14 +77,14 @@ export function tickClouds(clouds, player, turn) {
 
 // SKY WATCH (owner's rule, October 2026): the empty cells where the
 // opponent of owner would make SKY_WATCH_RUN (four) or more in a row with
-// one move, across, down or diagonally, on the full board (clouds do not
-// hide anything here), so the eagle sees a three about to become a four,
-// and a four about to become five too. Rocks break a line. Row by row, as
-// [{ x, y }].
+// one move, across, down or diagonally, on the full scoring board (clouds do
+// not hide anything here; a seed sunk in mud counts for nobody), so the eagle
+// sees a three about to become a four, and a four about to become five too.
+// Rocks and sunk seeds break a line. Row by row, as [{ x, y }].
 const RUN_DIRECTIONS = Object.freeze([[1, 0], [0, 1], [1, 1], [1, -1]]);
 export function skyWatchCells(state, owner) {
   const opponent = owner === X ? O : X;
-  const { board } = state;
+  const board = scoringBoard(state);
   const same = (x, y) => inBounds(board, x, y) && board[y][x] === opponent;
   const cells = [];
   for (let y = 0; y < board.length; y++) {
@@ -107,8 +108,11 @@ export function skyWatchCells(state, owner) {
 // cloud of the other seat is covered and listed in covered ([{ x, y }], row
 // by row). A covered cell that holds a plant or a rock becomes HIDDEN (the
 // viewer knows the plot is taken, not by what or whose); an empty one stays
-// empty, so the viewer may plant there (owner's rule, October 2026). The winning line leaves out its
-// covered cells too, so a win does not tell where a hidden stone is. The
+// empty, so the viewer may plant there (owner's rule, October 2026). The
+// mud puddles and sunk seeds (state.mud, state.sunk) of covered cells are
+// left out of the lists (docs/free-action-design.md section 7). The winning
+// line leaves out its covered cells too, so a win does not tell where a
+// hidden stone is. The
 // owner of a cloud sees everything under it; any other viewer (a
 // spectator, null) sees the full state. Returns state itself when
 // nothing is covered. The host keeps the true state; this is only what is
@@ -128,6 +132,10 @@ export function maskForViewer(state, viewer) {
   const masked = { ...state, board, covered };
   if (hideZone) masked.tornado = hiddenZone(zone);
   if (Array.isArray(state.rocks)) masked.rocks = state.rocks.filter((rock) => !isCovered(masked, rock.x, rock.y));
+  // Mud puddles and sunk seeds of covered cells are not sent either: the
+  // viewer only knows the plot is taken (HIDDEN) or empty.
+  if (Array.isArray(state.mud)) masked.mud = state.mud.filter((puddle) => !isCovered(masked, puddle.x, puddle.y));
+  if (Array.isArray(state.sunk)) masked.sunk = state.sunk.filter((seed) => !isCovered(masked, seed.x, seed.y));
   if (Array.isArray(state.winLine)) masked.winLine = uncoveredOf(masked, state.winLine);
   const dash = state.pendingDash;
   if (dash && dash.player !== viewer && (isCovered(masked, dash.from?.x, dash.from?.y) || isCovered(masked, dash.to?.x, dash.to?.y))) {

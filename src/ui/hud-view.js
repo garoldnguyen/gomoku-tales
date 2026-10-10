@@ -32,8 +32,8 @@ export const PORTRAIT_ART = Object.freeze({
 export const SKILL_ICON_ART = Object.freeze({
   windDash: ART.windRabbit.windDashIcon,
   tornadoZone: ART.windRabbit.tornadoZoneIcon,
-  terrainCreation: ART.earthBear.terrainCreationIcon,
-  stoneConversion: ART.earthBear.stoneConversionIcon,
+  mudTrap: ART.earthBear.mudTrapIcon,
+  petrification: ART.earthBear.petrificationIcon,
   hiss: ART.jadeSerpent.hissIcon,
   venom: ART.jadeSerpent.venomIcon,
   skyWatch: ART.cloudEagle.skyWatchIcon,

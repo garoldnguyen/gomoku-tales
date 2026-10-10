@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { X, O } from '../src/logic/board.js';
 import { createInitialState, placeStone } from '../src/logic/game.js';
 import {
-  STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH, cooldownTurns,
+  PETRIFICATION, MUD_TRAP, TORNADO_ZONE, WIND_DASH, cooldownTurns,
 } from '../src/logic/skills.js';
 import {
   COOLING, OFF, PLANT_HINT, PORTRAIT_ART, READY, SELECTED, SKILL_ICON_ART, hudViewModel,
@@ -104,7 +104,7 @@ test('a skill cooling down with 3 turns left: plural turns and the served share'
   assert.equal(fresh.stateText, 'Ready in 3 turns');
   assert.equal(fresh.cooldownProgress, 0);
   // The reference picture: 2 of 3 turns left fills a third of the ring.
-  const ref = skill(hudViewModel(withCooldown(midGame(), O, TERRAIN_CREATION, 2), {}, X), O, TERRAIN_CREATION);
+  const ref = skill(hudViewModel(withCooldown(midGame(), O, MUD_TRAP, 2), {}, X), O, MUD_TRAP);
   assert.equal(Math.round(ref.cooldownProgress * 100), 33);
 });
 
@@ -124,7 +124,7 @@ test("opponent's turn: Waiting and dimmed rows that say Wait for your turn", () 
   assert.equal(vm.turn.hint, "Opponent's turn");
   // Their card speaks to their character, but its rows are not mine to press.
   assert.equal(card(vm, O).chip, 'Your turn');
-  assert.equal(skill(vm, O, TERRAIN_CREATION).disabled, true);
+  assert.equal(skill(vm, O, MUD_TRAP).disabled, true);
   // A cooldown still shows while waiting (the reference card).
   const cooling = hudViewModel(withCooldown(state, X, WIND_DASH, 2), {}, X);
   assert.equal(skill(cooling, X, WIND_DASH).stateText, 'Ready in 2 turns');
@@ -190,13 +190,13 @@ test('local mode: the player to move is always you, and messages become the toas
   const vm = hudViewModel(view.state, { targeting: game.getTargeting(), status: view.status, message: view.message }, null);
   assert.equal(vm.toast, "It is Earth Bear's turn.");
   assert.equal(card(vm, O).chip, 'Your turn');
-  assert.equal(skill(vm, O, STONE_CONVERSION).stateText, 'Ready');
-  assert.equal(skill(vm, O, STONE_CONVERSION).disabled, false);
+  assert.equal(skill(vm, O, PETRIFICATION).stateText, 'Ready');
+  assert.equal(skill(vm, O, PETRIFICATION).disabled, false);
   assert.equal(vm.turn.hint, 'Plant a seed');
-  game.clickSkill(O, TERRAIN_CREATION);
+  game.clickSkill(O, MUD_TRAP);
   const picked = hudViewModel(game.getView().state, { targeting: game.getTargeting() }, null);
-  assert.equal(skill(picked, O, TERRAIN_CREATION).stateText, 'Selected');
-  assert.equal(picked.turn.hint, 'Terrain Creation: choose an empty cell');
+  assert.equal(skill(picked, O, MUD_TRAP).stateText, 'Selected');
+  assert.equal(picked.turn.hint, 'Mud Trap: choose an empty cell');
 });
 
 test('the HUD art names are manifest entries', () => {

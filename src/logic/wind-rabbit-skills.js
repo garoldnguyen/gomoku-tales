@@ -5,6 +5,8 @@
 
 import { TORNADO_SIZE } from '../config.js';
 import { EMPTY, cloneBoard, inBounds, isEmptyCell } from './board.js';
+import { SUNK_PLANT_ERROR, mudAt } from './earth-bear-skills.js';
+import { isSunk } from './scoring-board.js';
 
 // WIND DASH: announce a move of one of the player's stones to an empty
 // cell. Nothing moves now; the dash resolves at the end of the opponent's
@@ -14,8 +16,10 @@ export function windDash(state, player, target) {
   const to = target?.to ?? {};
   if (!inBounds(state.board, from.x, from.y)) return { error: 'Choose one of your stones on the board.' };
   if (state.board[from.y][from.x] !== player) return { error: 'Choose one of your own stones.' };
+  if (isSunk(state, from.x, from.y)) return { error: SUNK_PLANT_ERROR };
   if (!inBounds(state.board, to.x, to.y)) return { error: 'Choose a target cell on the board.' };
   if (!isEmptyCell(state.board, to.x, to.y)) return { error: 'The target cell is not empty.' };
+  if (mudAt(state, to.x, to.y)) return { error: 'A Wind Dash cannot land on mud.' };
 
   const dash = { player, from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y }, resolvesAfterTurn: state.turn + 1 };
   return {
@@ -27,14 +31,14 @@ export function windDash(state, player, target) {
 
 // Resolves a pending dash on the given board. The stone moves only if the
 // source still holds the dashing player's stone and the target is still
-// empty. Returns { board, events, changed } with `changed` the landing
-// cell, or null when the dash failed.
-export function resolveDash(board, dash) {
+// empty and not mud (the puddles, default none). Returns { board, events,
+// changed } with `changed` the landing cell, or null when the dash failed.
+export function resolveDash(board, dash, mud = []) {
   const { player, from, to } = dash;
   if (board[from.y][from.x] !== player) {
     return { board, events: [{ type: 'dashFailed', player, from, to, reason: 'sourceLost' }], changed: null };
   }
-  if (!isEmptyCell(board, to.x, to.y)) {
+  if (!isEmptyCell(board, to.x, to.y) || mud.some((puddle) => puddle.x === to.x && puddle.y === to.y)) {
     return { board, events: [{ type: 'dashFailed', player, from, to, reason: 'targetTaken' }], changed: null };
   }
   const next = cloneBoard(board);
@@ -77,17 +81,17 @@ export function inTornado(tornado, x, y) {
 
 // The Tornado Zone throw (docs/design.md section 5.1): the stone the
 // opponent planted at (x, y) inside the zone is blown by a dandelion storm
-// to a random empty plot anywhere on the board outside the zone. random()
-// returns a number in [0, 1) like Math.random (the host's). With no such
-// plot the stone stays. Returns { board, events, changed } with `changed`
-// the cell where the stone ends up.
-export function throwStone(board, x, y, tornado, random) {
+// to a random empty plot anywhere on the board outside the zone, never a
+// mud puddle (mud, default none). random() returns a number in [0, 1) like
+// Math.random (the host's). With no such plot the stone stays. Returns
+// { board, events, changed } with `changed` the cell where the stone ends up.
+export function throwStone(board, x, y, tornado, random, mud = []) {
   const player = board[y][x];
   const storm = { type: 'tornadoStorm', player: tornado.player, x, y };
   const options = [];
   for (let cy = 0; cy < board.length; cy++) {
     for (let cx = 0; cx < board[cy].length; cx++) {
-      if (board[cy][cx] === EMPTY && !inTornado(tornado, cx, cy)) options.push({ x: cx, y: cy });
+      if (board[cy][cx] === EMPTY && !inTornado(tornado, cx, cy) && !mud.some((p) => p.x === cx && p.y === cy)) options.push({ x: cx, y: cy });
     }
   }
   if (options.length === 0) {

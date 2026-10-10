@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 import * as config from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { EARTH_BEAR, WIND_RABBIT } from '../src/logic/characters.js';
-import { TERRAIN_CREATION, WIND_DASH } from '../src/logic/skills.js';
+import { MUD_TRAP, WIND_DASH } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { SPECTATOR_ERROR, createSpectatorRoom } from '../src/net/spectator-room.js';
@@ -331,7 +331,7 @@ test('spectator input is ignored: no Ready, no pick, no cell clicks, no skills, 
   game.setHover({ x: 3, y: 3 });
   assert.equal(game.click({ x: 3, y: 3 }), false);
   assert.equal(game.clickSkill(X, WIND_DASH), false);
-  assert.equal(game.clickSkill(O, TERRAIN_CREATION), false);
+  assert.equal(game.clickSkill(O, MUD_TRAP), false);
   assert.equal(game.cancel(), false);
   assert.equal(game.getTargeting(), null);
   assert.equal(spectator.rematch(), false);

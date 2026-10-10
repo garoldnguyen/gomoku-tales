@@ -21,7 +21,7 @@ import { createWebSocketTransport } from '../src/net/ws-transport.js';
 import { createBroadcastTransport } from '../src/net/transport.js';
 import { createLocalGame } from '../src/ui/local-game.js';
 import { startTargeting, targetClick, targetPreview } from '../src/ui/targeting.js';
-import { STONE_CONVERSION, TERRAIN_CREATION } from '../src/logic/skills.js';
+import { PETRIFICATION, MUD_TRAP } from '../src/logic/skills.js';
 import { SNAPSHOT_TYPES, forwardFrame, keepsSnapshot, routeFor, snapshotFor } from '../worker/pairing.js';
 
 function ok(result) {
@@ -84,11 +84,11 @@ test('maskForViewer: a rock under the cloud is covered too', () => {
   const { state } = hiddenStoneGame();
   const board = state.board.map((row) => row.slice());
   board[6][8] = ROCK;
-  const withRock = { ...state, board, rocks: [{ x: 8, y: 6, breaksAfterTurn: 9 }, { x: 0, y: 14, breaksAfterTurn: 9 }] };
+  const withRock = { ...state, board, rocks: [{ x: 8, y: 6 }, { x: 0, y: 14 }] };
   withRock.board[14][0] = ROCK;
   const masked = maskForViewer(withRock, O);
   assert.equal(masked.board[6][8], TAKEN, 'a rock reads taken too');
-  assert.deepEqual(masked.rocks, [{ x: 0, y: 14, breaksAfterTurn: 9 }]);
+  assert.deepEqual(masked.rocks, [{ x: 0, y: 14 }]);
   assert.equal(masked.board[14][0], ROCK);
 });
 
@@ -351,14 +351,14 @@ test('local mode: a move under the cloud plays no effect for the other seat', ()
 test('local mode: the target preview and click read the drawn board, not the hidden stone', () => {
   const { state } = hiddenStoneGame();
   const shown = localViewState(state);
-  const convert = startTargeting(STONE_CONVERSION);
-  assert.deepEqual(targetPreview(state, O, convert, { x: 7, y: 7 }), { type: 'select', x: 7, y: 7 }, 'the true state would tell');
-  assert.equal(targetPreview(shown, O, convert, { x: 7, y: 7 }), null);
-  assert.ok(targetClick(shown, O, convert, { x: 7, y: 7 }).error);
-  const rock = startTargeting(TERRAIN_CREATION);
-  assert.equal(targetPreview(shown, O, rock, { x: 7, y: 7 }), null, 'a taken covered plot takes no rock');
-  assert.ok(targetClick(shown, O, rock, { x: 7, y: 7 }).error);
-  assert.deepEqual(targetPreview(shown, O, rock, { x: 6, y: 6 }), { type: 'rock', x: 6, y: 6 }, 'an empty covered plot reads empty');
+  const petrify = startTargeting(PETRIFICATION);
+  assert.deepEqual(targetPreview(state, O, petrify, { x: 7, y: 7 }), { type: 'select', x: 7, y: 7 }, 'the true state would tell');
+  assert.equal(targetPreview(shown, O, petrify, { x: 7, y: 7 }), null);
+  assert.ok(targetClick(shown, O, petrify, { x: 7, y: 7 }).error);
+  const mud = startTargeting(MUD_TRAP);
+  assert.equal(targetPreview(shown, O, mud, { x: 7, y: 7 }), null, 'a taken covered plot takes no mud');
+  assert.ok(targetClick(shown, O, mud, { x: 7, y: 7 }).error);
+  assert.deepEqual(targetPreview(shown, O, mud, { x: 6, y: 6 }), { type: 'select', x: 6, y: 6 }, 'an empty covered plot reads empty');
 });
 
 // EVERY HOST MESSAGE TO THE GUEST is masked: a real host room (Cloud Eagle,
@@ -526,7 +526,7 @@ test('online game: the host picks skill targets on the shown board, not the hidd
     },
   };
   const game = createOnlineGame(room);
-  assert.equal(game.clickSkill(X, STONE_CONVERSION), true);
+  assert.equal(game.clickSkill(X, PETRIFICATION), true);
   assert.equal(game.click({ x: 7, y: 7 }), false, 'the hidden O stone cannot be picked');
   const hidden = game.getView().message;
   assert.equal(game.click({ x: 6, y: 6 }), false);
@@ -640,8 +640,8 @@ test('coveredActionError: a plant may go into the other seat\'s cloud; a skill o
   const { state } = hiddenStoneGame(); // X stone on (7, 7) under X's cloud, (8, 8) empty under it
   assert.equal(coveredActionError(state, O, { kind: 'place', x: 7, y: 7 }), null, 'the rules answer: taken');
   assert.equal(coveredActionError(state, O, { kind: 'place', x: 8, y: 8 }), null);
-  assert.equal(coveredActionError(state, O, { kind: 'skill', skill: STONE_CONVERSION, target: { x: 6, y: 6 } }), COVERED_ERROR);
-  assert.equal(coveredActionError(state, O, { kind: 'skill', skill: STONE_CONVERSION, target: { x: 7, y: 7 } }), COVERED_ERROR);
+  assert.equal(coveredActionError(state, O, { kind: 'skill', skill: PETRIFICATION, target: { x: 6, y: 6 } }), COVERED_ERROR);
+  assert.equal(coveredActionError(state, O, { kind: 'skill', skill: PETRIFICATION, target: { x: 7, y: 7 } }), COVERED_ERROR);
   assert.equal(coveredActionError(state, O, { kind: 'skill', skill: CLOUD, target: { x: 7, y: 7 } }), null);
   assert.equal(coveredActionError(state, X, { kind: 'place', x: 8, y: 8 }), null, 'the owner plays under its own cloud');
 });
@@ -672,4 +672,138 @@ test('local mode: the player not owning the cloud plants into its empty plots; a
   assert.equal(game.getView().message, 'That cell is not empty.');
   assert.equal(game.click({ x: 8, y: 8 }), true); // an empty covered plot
   assert.equal(game.getState().board[8][8], O);
+});
+
+// --- Mud Trap (Free Action part 2): a puddle or a sunk seed under the other seat's cloud ---
+
+// Turn 1 X plants far away, turn 2 O floods (7, 8) and plants, turn 3 X puts a
+// cloud on (7, 7) (which covers (7, 8)) and plants. A puddle lies under the cloud.
+function puddleUnderCloudGame() {
+  let state = ok(placeStone(eagleGame(), { player: X, x: 14, y: 14 })).state;
+  state = ok(useSkill(state, { player: O, skill: MUD_TRAP, target: { x: 7, y: 8 } })).state;
+  state = ok(placeStone(state, { player: O, x: 0, y: 0 })).state;
+  return cloudThenPlant(state, X, { x: 13, y: 13 });
+}
+
+// The next two turns: O plants far away, X plants into the puddle under its
+// own cloud, so a seed of X is sunk at (7, 8).
+function sunkUnderCloudGame() {
+  const base = puddleUnderCloudGame();
+  let state = ok(placeStone(base.state, { player: O, x: 1, y: 0 })).state;
+  const sunk = ok(placeStone(state, { player: X, x: 7, y: 8 }));
+  return sunk;
+}
+
+// A state with a puddle and a sunk seed under the cloud, and one of each outside it.
+function mudAndSunkState() {
+  const { state } = sunkUnderCloudGame();
+  return {
+    ...state,
+    mud: [{ x: 7, y: 9, player: O, driesAfterTurn: 9 }, { x: 2, y: 2, player: O, driesAfterTurn: 9 }],
+    sunk: [...state.sunk, { x: 3, y: 3, player: O, surfacesAfterTurn: 9 }],
+  };
+}
+
+const MUD_AT_COVERED = { x: 7, y: 9 };
+const SUNK_AT_COVERED = { x: 7, y: 8 };
+
+function namesCell(value, { x, y }) {
+  return JSON.stringify(value).includes(`"x":${x},"y":${y}`);
+}
+
+test('the mud test setup: the puddle and the sunk seed lie under the cloud of X', () => {
+  const { state } = puddleUnderCloudGame();
+  assert.equal(isCovered(maskForViewer(state, O), 7, 8), true);
+  assert.deepEqual(state.mud.map(({ x, y }) => ({ x, y })), [{ x: 7, y: 8 }]);
+  const sunk = sunkUnderCloudGame().state;
+  assert.deepEqual(sunk.sunk.map(({ x, y, player }) => ({ x, y, player })), [{ x: 7, y: 8, player: X }]);
+  assert.deepEqual(sunk.mud, []);
+});
+
+test('maskForViewer: a puddle under the other seat\'s cloud is not sent; the owner and the rest stay', () => {
+  const { state } = puddleUnderCloudGame();
+  const masked = maskForViewer(state, O);
+  assert.deepEqual(masked.mud, [], 'the puddle on the covered plot is left out');
+  assert.equal(masked.board[8][7], EMPTY, 'an empty covered plot still reads empty');
+  assert.equal(maskForViewer(state, X), state, 'the owner of the cloud sees the puddle');
+  assert.equal(maskForViewer(state, X).mud.length, 1);
+  const mixed = maskForViewer(mudAndSunkState(), O);
+  assert.deepEqual(mixed.mud, [{ x: 2, y: 2, player: O, driesAfterTurn: 9 }], 'a puddle outside the cloud stays');
+});
+
+test('maskForViewer: a sunk seed under the other seat\'s cloud is not sent; it reads as a taken plot', () => {
+  const { state } = sunkUnderCloudGame();
+  const masked = maskForViewer(state, O);
+  assert.deepEqual(masked.sunk, [], 'the sunk entry on the covered plot is left out');
+  assert.equal(masked.board[8][7], TAKEN, 'taken, not by what or whose');
+  assert.equal(namesCell(masked.sunk, SUNK_AT_COVERED), false);
+  assert.equal(maskForViewer(state, X), state, 'the owner of the cloud sees the sunk seed');
+  const mixed = maskForViewer(mudAndSunkState(), O);
+  assert.deepEqual(mixed.sunk, [{ x: 3, y: 3, player: O, surfacesAfterTurn: 9 }], 'a sunk seed outside the cloud stays');
+});
+
+test('maskEventsForViewer: the events of a covered puddle, sunk seed and petrified plant stay hidden', () => {
+  const masked = maskForViewer(mudAndSunkState(), O);
+  const covered = (type) => ({ type, player: X, x: 7, y: 8 });
+  const outside = (type) => ({ type, player: O, x: 2, y: 2 });
+  const types = ['mudPlaced', 'mudDried', 'stoneSunk', 'stoneSurfaced', 'stonePetrified'];
+  for (const type of types) {
+    assert.deepEqual(maskEventsForViewer(masked, [covered(type)]), [], `${type} on a covered plot is left out`);
+    const open = [outside(type)];
+    assert.equal(maskEventsForViewer(masked, open), open, `${type} outside the cloud stays`);
+  }
+  const used = { type: 'skillUsed', player: O, skill: MUD_TRAP, target: { x: 7, y: 8 } };
+  assert.deepEqual(maskEventsForViewer(masked, [used, { type: 'turnEnded', player: O, turn: 4 }]).map((e) => e.type), ['turnEnded']);
+});
+
+// One test per host message type that carries a state: the guest's copy of
+// it names no covered puddle and no covered sunk seed, the spectators' copy
+// keeps them.
+for (const type of ['state', 'welcome', 'start', 'new-game']) {
+  test(`a '${type}' message: the covered puddle and sunk seed do not reach the guest, the spectators get them`, () => {
+    const state = mudAndSunkState();
+    const message = { type, to: 'guest', state, events: [], seq: 6, round: 1, from: 'host' };
+    const [guestCopy, spectators, ...rest] = hostStateMessages(message, O, true);
+    assert.deepEqual(rest, []);
+    assert.equal(guestCopy.masked, true);
+    assert.equal(guestCopy.type, type);
+    assert.equal(namesCell(guestCopy.state.mud, MUD_AT_COVERED), false, 'no covered puddle');
+    assert.equal(namesCell(guestCopy.state.sunk, SUNK_AT_COVERED), false, 'no covered sunk seed');
+    assert.equal(guestCopy.state.mud.length, 1, 'the open puddle goes on');
+    assert.equal(guestCopy.state.sunk.length, 1, 'the open sunk seed goes on');
+    assert.equal(spectators.spectatorsOnly, true);
+    assert.equal(spectators.state, state);
+    assert.equal(namesCell(spectators.state.mud, MUD_AT_COVERED), true);
+    assert.equal(namesCell(spectators.state.sunk, SUNK_AT_COVERED), true);
+  });
+}
+
+test('a \'state\' message: the events of a covered puddle and sunk seed do not reach the guest either', () => {
+  const state = mudAndSunkState();
+  const events = [
+    { type: 'mudPlaced', player: O, x: 7, y: 9, driesAfterTurn: 9 },
+    { type: 'stoneSunk', player: X, x: 7, y: 8, surfacesAfterTurn: 6 },
+    { type: 'stoneSurfaced', player: X, x: 7, y: 8 },
+    { type: 'mudDried', player: O, x: 7, y: 9 },
+    { type: 'stonePetrified', player: O, x: 7, y: 6, from: X },
+    { type: 'turnEnded', player: X, turn: 5 },
+  ];
+  const [guestCopy] = hostStateMessages({ type: 'state', to: 'guest', state, events, seq: 6, round: 1 }, O, true);
+  assert.deepEqual(guestCopy.events.map((e) => e.type), ['turnEnded']);
+  // The state's `covered` list names the cloud's cells (no secret); the lists of mud, sunk seeds and events must not.
+  const told = { mud: guestCopy.state.mud, sunk: guestCopy.state.sunk, events: guestCopy.events };
+  assert.equal(namesCell(told, MUD_AT_COVERED), false, 'no covered puddle in the guest copy');
+  assert.equal(namesCell(told, SUNK_AT_COVERED), false, 'no covered sunk seed in the guest copy');
+});
+
+test('a \'rejected\' message: a skill on a covered puddle or sunk seed is refused as covered, whatever it holds', () => {
+  const { state } = sunkUnderCloudGame();
+  const covered = { kind: 'skill', skill: PETRIFICATION, target: { x: 7, y: 8 } };
+  assert.equal(coveredActionError(state, O, covered), COVERED_ERROR, 'a sunk seed is not named as sunk');
+  assert.equal(maskErrorForViewer(state, O, covered, 'That plant is sunk in mud.'), COVERED_ERROR);
+  const puddle = puddleUnderCloudGame().state;
+  const flood = { kind: 'skill', skill: MUD_TRAP, target: { x: 7, y: 8 } };
+  assert.equal(coveredActionError(puddle, O, flood), COVERED_ERROR, 'a puddle is not named as mud');
+  assert.equal(maskErrorForViewer(puddle, O, flood, 'That cell is already mud.'), COVERED_ERROR);
+  assert.equal(maskErrorForViewer(puddle, X, flood, 'That cell is already mud.'), 'That cell is already mud.', 'the owner may hear it');
 });

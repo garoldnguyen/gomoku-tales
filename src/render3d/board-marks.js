@@ -12,12 +12,13 @@
 //   'zonePreview' a Tornado Zone cell while choosing the zone centre; dx
 //                 and dy (-1, 0 or 1) place it inside the 3x3 zone decal
 //   'dashTarget'  the Wind Dash target cell being chosen
-//   'select'      a chosen or pickable source plant (Wind Dash, Stone Conversion)
+//   'select'      a chosen or pickable plant (Wind Dash, Petrification, Venom) or the plot Mud Trap would flood
+//   'mud'         a mud puddle (Mud Trap), also under a seed sunk in it
 //   'win'         a cell of the winning line
 //   'cloudPreview' a cell of the Cloud being placed (Cloud Eagle)
 
 // Returns { decals: [{ kind, x, y, dx, dy }], ghost: { kind, x, y } | null }
-// where a ghost kind is 'X' or 'O' (a stone about to be placed) or 'rock',
+// where a ghost kind is 'X' or 'O' (a stone about to be placed),
 // and dx, dy place a zone preview cell in its zone (0 for other decals).
 // A fresh result each call; the render loop uses boardMarksInto.
 export function boardMarks(view) {
@@ -43,6 +44,11 @@ export function boardMarksInto(view, out) {
     for (let i = 0; i < state.winLine.length; i++) addDecal(out, 'win', state.winLine[i].x, state.winLine[i].y, 0, 0);
   }
 
+  // Mud puddles, and the puddle a sunk seed stands in (state.mud, state.sunk).
+  const { mud, sunk } = state;
+  if (mud) for (let i = 0; i < mud.length; i++) addDecal(out, 'mud', mud[i].x, mud[i].y, 0, 0);
+  if (sunk) for (let i = 0; i < sunk.length; i++) addDecal(out, 'mud', sunk[i].x, sunk[i].y, 0, 0);
+
   if (hover) setGhost(out, state.currentPlayer, hover.x, hover.y);
 
   // Hover preview for the skill target flow (see ui/targeting.js).
@@ -60,9 +66,6 @@ export function boardMarksInto(view, out) {
           const cell = preview.cells[i];
           addDecal(out, 'zonePreview', cell.x, cell.y, cell.x - preview.x, cell.y - preview.y);
         }
-        break;
-      case 'rock':
-        setGhost(out, 'rock', preview.x, preview.y);
         break;
       case 'cloud':
         for (let i = 0; i < preview.cells.length; i++) addDecal(out, 'cloudPreview', preview.cells[i].x, preview.cells[i].y, 0, 0);

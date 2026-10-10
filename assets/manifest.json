@@ -13,8 +13,6 @@
     "portrait-earth-bear": { "file": "portrait-earth-bear.png", "use": "2d", "width": 96, "height": 96, "frames": 1, "frameMs": 0 },
     "icon-wind-dash": { "file": "icon-wind-dash.png", "use": "hud", "width": 32, "height": 32, "frames": 1, "frameMs": 0 },
     "icon-tornado-zone": { "file": "icon-tornado-zone.png", "use": "hud", "width": 32, "height": 32, "frames": 1, "frameMs": 0 },
-    "icon-terrain-creation": { "file": "icon-terrain-creation.png", "use": "hud", "width": 32, "height": 32, "frames": 1, "frameMs": 0 },
-    "icon-stone-conversion": { "file": "icon-stone-conversion.png", "use": "hud", "width": 32, "height": 32, "frames": 1, "frameMs": 0 },
 
     "wind-rabbit-idle": { "file": "3d/wind-rabbit-idle.png", "use": "3d", "width": 96, "height": 96, "frames": 4, "frameMs": 220 },
     "wind-rabbit-cast": { "file": "3d/wind-rabbit-cast.png", "use": "3d", "width": 96, "height": 96, "frames": 4, "frameMs": 140 },
@@ -79,8 +77,8 @@
     "icon-wind-dash-v5": { "file": "3d/v5/icon-wind-dash-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
     "icon-tornado-zone-v5": { "file": "3d/v5/icon-tornado-zone-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
     "portrait-earth-bear-v5": { "file": "3d/v5/portrait-earth-bear-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
-    "icon-terrain-creation-v5": { "file": "3d/v5/icon-terrain-creation-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
-    "icon-stone-conversion-v5": { "file": "3d/v5/icon-stone-conversion-v5.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "icon-mud-trap": { "file": "3d/v5/icon-mud-trap.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
+    "icon-petrification": { "file": "3d/v5/icon-petrification.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
 
     "forest-wall-pine": { "file": "3d/v3/forest-wall-pine.png", "use": "3d", "width": 192, "height": 64, "frames": 1, "frameMs": 0 },
     "forest-wall-round": { "file": "3d/v3/forest-wall-round.png", "use": "3d", "width": 192, "height": 56, "frames": 1, "frameMs": 0 },

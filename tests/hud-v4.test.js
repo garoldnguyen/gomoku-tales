@@ -55,7 +55,7 @@ function midGame() {
 }
 
 test('the skill popup view model holds the description and hint of each skill in play', () => {
-  check(midGame(), ['windDash', 'tornadoZone', 'terrainCreation', 'stoneConversion']);
+  check(midGame(), ['windDash', 'tornadoZone', 'mudTrap', 'petrification']);
   check(newGame({ characters: { [X]: JADE_SERPENT, [O]: WIND_RABBIT } }), ['hiss', 'venom', 'windDash', 'tornadoZone']);
 });
 

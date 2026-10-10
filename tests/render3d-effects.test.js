@@ -7,7 +7,7 @@ import {
 } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
-import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
+import { PETRIFICATION, MUD_TRAP, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
 import { bannerTexts } from '../src/render/effects.js';
 import {
   convertMs, convertPose, convertWiltMs, crumblePose, dashCurveInto, dashFoldMs, dashPose, heldCell, regrowCell,
@@ -130,12 +130,12 @@ test('Tornado Zone: the swirl shows over the zone; a seed planted there bursts i
   assert.equal(shakeStrength(thrown[2]), 0);
 });
 
-test('Terrain Creation: the rock falls with a light shake and crumbles when it breaks', () => {
+test('Petrification (minimum look): the rock falls with a light shake and never crumbles', () => {
   const results = play([
-    [0, 0],
-    { skill: TERRAIN_CREATION, target: { x: 7, y: 7 } },
-    [14, 14], // the bear plants, which ends the turn the rock fell in
-    [1, 0], [2, 0], [3, 0], [4, 5], // the rock breaks at the end of the 4th turn after it fell
+    [7, 7],
+    { skill: PETRIFICATION, target: { x: 7, y: 7 } },
+    [14, 14], // the bear plants, which ends the turn the plant was turned to stone in
+    [1, 0], [2, 0], [3, 0], [4, 5], [5, 0], [6, 5],
   ]);
   const fell = visualsForEvents(results[1].events);
   assert.deepEqual(kinds(fell), ['castRing', 'rockFall', 'banner']);
@@ -144,29 +144,32 @@ test('Terrain Creation: the rock falls with a light shake and crumbles when it b
   assert.equal(regrowCell(fell[1], STAGES), null, 'a rock does not grow');
   assert.equal(shakeStrength(fell[1]), SHAKE3D_LIGHT);
 
-  for (const result of results.slice(2, 6)) assert.ok(!kinds(visualsForEvents(result.events)).includes('rockCrumble'));
-  const broke = visualsForEvents(results[6].events);
-  assert.deepEqual(broke.filter((s) => s.kind === 'rockCrumble'), [{ kind: 'rockCrumble', x: 7, y: 7 }]);
+  for (const result of results.slice(2)) {
+    const later = kinds(visualsForEvents(result.events));
+    assert.ok(!later.includes('rockCrumble') && !later.includes('rockFall'), 'rocks are permanent: nothing breaks later');
+  }
 });
 
-test('Stone Conversion: the old plant wilts and the other team\'s plant regrows from Land', () => {
+test('Mud Trap plans no timeline: the puddle and the sunk seed are drawn from the state', () => {
   const results = play([
-    [7, 7],
-    { skill: STONE_CONVERSION, target: { x: 7, y: 7 } },
+    [0, 0],
+    { skill: MUD_TRAP, target: { x: 7, y: 7 } },
+    [14, 14],
+    [7, 7], // X plants into the puddle: the seed sinks
+    [1, 1], // the end of the next turn: the seed surfaces
   ]);
-  const specs = visualsForEvents(results[1].events);
-  assert.deepEqual(specs[0], { kind: 'castRing', x: 7, y: 7, player: O });
-  assert.deepEqual(specs[1], { kind: 'convert', x: 7, y: 7, from: X, to: O });
-  const holdMs = convertMs(STAGES);
-  assert.deepEqual(heldCell(specs[1], STAGES), { x: 7, y: 7, ms: holdMs });
-  assert.deepEqual(regrowCell(specs[1], STAGES), { x: 7, y: 7, player: O, startMs: holdMs - STAGES[STAGE_LAND] },
-    'X becomes O, so the shape changes too');
+  assert.deepEqual(kinds(visualsForEvents(results[1].events)), ['castRing', 'banner'], 'the cast ring and the name');
+  assert.deepEqual(results[3].events.map((e) => e.type), ['stonePlaced', 'stoneSunk', 'turnEnded']);
+  assert.deepEqual(kinds(visualsForEvents(results[3].events)), ['place']);
+  assert.deepEqual(results[4].events.map((e) => e.type), ['stonePlaced', 'stoneSurfaced', 'turnEnded']);
+  assert.deepEqual(kinds(visualsForEvents(results[4].events)), ['place']);
+  for (const spec of visualsForEvents(results[1].events)) assert.equal(heldCell(spec, STAGES), null);
 });
 
 test('a win ends the lingering marks, since it drops a pending dash and the zone without events', () => {
   const results = play([
     [0, 0], [0, 5], [1, 0], [1, 5], [2, 0], [2, 5], [3, 0],
-    { skill: TERRAIN_CREATION, target: { x: 10, y: 10 } },
+    { skill: MUD_TRAP, target: { x: 10, y: 10 } },
     [14, 14],
     { skill: TORNADO_ZONE, target: { x: 12, y: 12 } },
     [14, 0],
@@ -183,21 +186,21 @@ test('a win ends the lingering marks, since it drops a pending dash and the zone
 test('skill banners in 3D use the same texts as the 2D game', () => {
   const results = play([
     [7, 7],
-    { skill: TERRAIN_CREATION, target: { x: 3, y: 3 } },
+    { skill: MUD_TRAP, target: { x: 3, y: 3 } },
     [14, 14],
     { skill: TORNADO_ZONE, target: { x: 10, y: 10 } },
     [13, 0],
-    { skill: STONE_CONVERSION, target: { x: 7, y: 7 } },
+    { skill: PETRIFICATION, target: { x: 7, y: 7 } },
   ]);
   for (const result of results) {
     const texts = visualsForEvents(result.events).filter((s) => s.kind === 'banner').map((s) => s.text);
     assert.deepEqual(texts, bannerTexts(result.events));
   }
-  assert.deepEqual(bannerTexts(results[1].events), ['Terrain Creation!']);
+  assert.deepEqual(bannerTexts(results[1].events), ['Mud Trap!']);
 });
 
 test('planning visuals never changes the events', () => {
-  const results = play([[7, 7], { skill: STONE_CONVERSION, target: { x: 7, y: 7 } }]);
+  const results = play([[7, 7], { skill: PETRIFICATION, target: { x: 7, y: 7 } }]);
   for (const result of results) {
     const copy = structuredClone(result.events);
     visualsForEvents(deepFreeze(result.events));

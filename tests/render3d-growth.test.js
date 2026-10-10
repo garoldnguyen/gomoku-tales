@@ -123,7 +123,7 @@ test('plantedCells lists placed moves only', () => {
   assert.deepEqual(plantedCells(placed.events), [{ x: 3, y: 4, player: X }]);
   const next = placeStone(placed.state, { player: O, x: 5, y: 5 });
   assert.deepEqual(plantedCells(next.events), [{ x: 5, y: 5, player: O }]);
-  assert.deepEqual(plantedCells([{ type: 'stoneConverted', x: 1, y: 1, player: O }, { type: 'stoneThrown' }, { type: 'rockPlaced', x: 2, y: 2 }]), []);
+  assert.deepEqual(plantedCells([{ type: 'stonePetrified', x: 1, y: 1, player: O }, { type: 'stoneThrown' }, { type: 'mudPlaced', x: 2, y: 2 }]), []);
   assert.deepEqual(plantedCells([]), []);
 });
 

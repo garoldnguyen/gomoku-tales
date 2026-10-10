@@ -1,5 +1,6 @@
 // Pure board helpers. The board is a 2D array indexed board[y][x].
-// Each cell is EMPTY (null), X, O or ROCK.
+// Each cell is EMPTY (null), X, O or ROCK (HIDDEN and SUNK only in the
+// masked and scoring copies below).
 
 import { BOARD_SIZE, WIN_LENGTH } from '../config.js';
 
@@ -11,6 +12,10 @@ export const ROCK = 'ROCK';
 // a board masked for a viewer (maskForViewer in cloud.js). Not empty, and
 // neither X, O nor a rock, so it never counts for a line.
 export const HIDDEN = 'HIDDEN';
+// A seed sunk in mud (Earth Bear's Mud Trap) as the scoring board shows it
+// (scoring-board.js): a plot that holds a stone but belongs to nobody for
+// lines, so it breaks every line like a rock. Never stored in state.board.
+export const SUNK = 'SUNK';
 
 // Horizontal, vertical, diagonal down-right, diagonal down-left.
 const DIRECTIONS = [

@@ -4,7 +4,7 @@ import { GAME_OVER_DELAY_MS, HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, LEAVE_COUNT
 import { X, O, ROCK, EMPTY } from '../src/logic/board.js';
 import { EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
 import { createInitialState } from '../src/logic/game.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION, HISS, VENOM } from '../src/logic/skills.js';
+import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION, HISS, VENOM } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { BAD_CODE_ERROR, GAME, GAME_OVER, JOIN, LOBBY, MENU, WAITING_SCREEN, createApp } from '../src/ui/app.js';
@@ -173,9 +173,9 @@ test('each window plays only its own side: turns, stones and skills', () => {
 
   assert.equal(guestGame.click({ x: 7, y: 7 }), false);
   assert.equal(guestGame.getView().message, "It is your opponent's turn.");
-  assert.equal(guestGame.clickSkill(O, TERRAIN_CREATION), false);
+  assert.equal(guestGame.clickSkill(O, MUD_TRAP), false);
   assert.equal(guestGame.getView().message, "It is your opponent's turn.");
-  assert.equal(hostGame.clickSkill(O, TERRAIN_CREATION), false);
+  assert.equal(hostGame.clickSkill(O, MUD_TRAP), false);
   assert.equal(hostGame.getView().message, "That is your opponent's skill.");
 
   const view = hostGame.getView();
@@ -286,26 +286,32 @@ test('a full game between two windows with all four skills ends on the Game over
   assert.equal(bear.click({ x: 0, y: 0 }), true); // turn 2
   assert.equal(rabbit.click({ x: 8, y: 7 }), true); // turn 3
 
-  // Turn 4: Terrain Creation, then a planting (a skill does not end the turn).
-  assert.equal(bear.clickSkill(O, TERRAIN_CREATION), true);
-  assert.equal(status(host), 'Terrain Creation: choose an empty cell');
+  // Turn 4: Mud Trap, then a planting (a skill does not end the turn).
+  assert.equal(bear.clickSkill(O, MUD_TRAP), true);
+  assert.equal(status(host), 'Mud Trap: choose an empty cell');
   assert.equal(bear.click({ x: 9, y: 7 }), true);
-  assert.equal(board()[7][9], ROCK);
-  assert.equal(rabbit.getView().message, 'Terrain Creation! A rock fell.');
+  assert.equal(board()[7][9], EMPTY, 'a puddle is no stone');
+  assert.deepEqual(rabbit.getView().state.mud.map(({ x, y }) => [x, y]), [[9, 7]], 'both windows see the puddle');
+  assert.equal(rabbit.getView().message, 'Mud Trap! A mud puddle.');
   assert.equal(bear.click({ x: 3, y: 0 }), true, 'the bear plants, which ends the turn');
   same();
 
-  // Turn 5: the rock blocks placement.
-  rabbit.click({ x: 9, y: 7 });
-  assert.equal(rabbit.getView().message, 'That cell is not empty.');
-  assert.equal(board()[7][9], ROCK);
-  assert.equal(rabbit.click({ x: 7, y: 8 }), true);
+  // Turn 5: the rabbit plants into the puddle: the seed is sunk, in both windows.
+  assert.equal(rabbit.click({ x: 9, y: 7 }), true);
+  assert.equal(board()[7][9], X);
+  assert.deepEqual(bear.getView().state.sunk.map(({ x, y, player }) => [x, y, player]), [[9, 7, X]]);
+  assert.equal(bear.getView().message, 'The seed sank in the mud.');
+  same();
 
-  // Turn 6: Stone Conversion.
-  assert.equal(bear.clickSkill(O, STONE_CONVERSION), true);
-  assert.equal(bear.click({ x: 7, y: 8 }), true);
-  assert.equal(board()[8][7], O);
+  // Turn 6: Petrification turns a rabbit plant to stone; the sunk seed cannot be picked.
+  assert.equal(bear.clickSkill(O, PETRIFICATION), true);
+  assert.equal(bear.click({ x: 9, y: 7 }), false);
+  assert.equal(bear.getView().message, 'That plant is sunk in mud.');
+  assert.equal(bear.click({ x: 8, y: 7 }), true);
+  assert.equal(board()[7][8], ROCK);
+  assert.deepEqual(rabbit.getView().state.rocks, [{ x: 8, y: 7 }], 'the rock is permanent');
   assert.equal(bear.click({ x: 5, y: 0 }), true);
+  assert.deepEqual(rabbit.getView().state.sunk, [], 'the seed surfaced at the end of the bear turn');
   same();
 
   // Turn 7: Tornado Zone, the guest's skill flow runs through the host.
@@ -319,7 +325,8 @@ test('a full game between two windows with all four skills ends on the Game over
   assert.equal(bear.click({ x: 5, y: 5 }), true);
   assert.equal(board()[5][5], EMPTY);
   assert.equal(rabbit.getView().state.tornado, null);
-  assert.equal(board()[7][9], EMPTY, 'the rock broke after 4 turns');
+  assert.equal(board()[7][9], X, 'the surfaced seed stays');
+  assert.equal(board()[7][8], ROCK, 'a rock never breaks');
   same();
 
   // Turn 9: Wind Dash, resolved after the bear's turn 10.

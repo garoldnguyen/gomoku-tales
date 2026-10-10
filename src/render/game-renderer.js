@@ -6,7 +6,7 @@
 
 import { CELL_PX, INTERNAL_WIDTH, INTERNAL_HEIGHT, ROCK_PX, STONE_PX, TORNADO_PX } from '../config.js';
 import { X, O, ROCK } from '../logic/board.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../logic/skills.js';
+import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION } from '../logic/skills.js';
 import {
   BOARD_FRAME_PX, BOARD_PX, BOARD_X, BOARD_Y, HUD_2D, PORTRAIT_PX, SKILL_ICON_PX,
   cellCenter, cellOrigin, panelRect, skillButtonRect,
@@ -27,8 +27,8 @@ export const SPRITES = {
   icon: {
     [WIND_DASH]: 'icon-wind-dash',
     [TORNADO_ZONE]: 'icon-tornado-zone',
-    [TERRAIN_CREATION]: 'icon-terrain-creation',
-    [STONE_CONVERSION]: 'icon-stone-conversion',
+    // Mud Trap and Petrification have no 32 px file: the 2D canvas HUD
+    // draws their lettered placeholders (the glass HUD has the 128 px art).
   },
 };
 
@@ -58,6 +58,9 @@ const COLORS = {
   rock: '#9a9aa6',
   rockDark: '#5e5e6c',
   rockLight: '#c8c8d2',
+  mud: 'rgba(107, 74, 43, 0.85)',
+  mudEdge: '#523720',
+  sunk: 'rgba(82, 55, 32, 0.6)',
   dashFrame: '#ff2a3a',
   dashFill: 'rgba(255, 42, 58, 0.28)',
   whirl: '#bfe8ff',
@@ -86,8 +89,8 @@ const FRAME_PX = BOARD_FRAME_PX;
 const SKILL_ICONS = {
   [WIND_DASH]: { letters: 'WD', color: '#7cc4ff' },
   [TORNADO_ZONE]: { letters: 'TZ', color: '#9fe0e8' },
-  [TERRAIN_CREATION]: { letters: 'TC', color: '#b8b8c4' },
-  [STONE_CONVERSION]: { letters: 'SC', color: '#ff9aa4' },
+  [MUD_TRAP]: { letters: 'MT', color: '#c49a6c' },
+  [PETRIFICATION]: { letters: 'PE', color: '#b8b8c4' },
 };
 
 // The Map 1 scene with the wind streaks drifting over it at all times.
@@ -176,7 +179,23 @@ function drawPlaceholderRock(ctx, x, y, alpha) {
   ctx.restore();
 }
 
-function drawCells(ctx, board) {
+// A plain brown tint over a cell: a mud puddle, or a seed sunk in mud (the
+// stone is drawn first, so the tint dims it).
+function drawMudTint(ctx, x, y, color) {
+  const { px, py } = cellOrigin(x, y);
+  ctx.fillStyle = color;
+  ctx.fillRect(px + 1, py + 1, CELL_PX - 1, CELL_PX - 1);
+}
+
+function drawCells(ctx, state) {
+  const { board } = state;
+  for (const { x, y } of state.mud ?? []) {
+    drawMudTint(ctx, x, y, COLORS.mud);
+    const { px, py } = cellOrigin(x, y);
+    ctx.strokeStyle = COLORS.mudEdge;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px + 2, py + 2, CELL_PX - 3, CELL_PX - 3);
+  }
   for (let y = 0; y < board.length; y++) {
     for (let x = 0; x < board[y].length; x++) {
       const cell = board[y][x];
@@ -184,6 +203,7 @@ function drawCells(ctx, board) {
       else if (cell === ROCK) drawRock(ctx, x, y);
     }
   }
+  for (const { x, y } of state.sunk ?? []) drawMudTint(ctx, x, y, COLORS.sunk);
 }
 
 // Translucent overlay over a group of cells (the Tornado Zone), drawn as
@@ -282,9 +302,6 @@ function drawPreview(ctx, preview, time) {
       break;
     case 'zone':
       drawZone(ctx, preview.cells, time, 0.6);
-      break;
-    case 'rock':
-      drawRock(ctx, preview.x, preview.y, 0.5);
       break;
   }
 }
@@ -481,7 +498,7 @@ export function drawGameScreen(ctx, view) {
   drawHeaderAndPanels(ctx, view, HUD_2D);
 
   drawBoard(ctx, state.board.length);
-  drawCells(ctx, state.board);
+  drawCells(ctx, state);
   drawAnnouncements(ctx, state, time);
   if (state.winLine) drawWinLine(ctx, state.winLine);
   if (hover) drawHover(ctx, hover, state.currentPlayer);

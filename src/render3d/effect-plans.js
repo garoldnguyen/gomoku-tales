@@ -33,9 +33,7 @@ import { dropOffsetPx, STAGE_DROP, STAGE_LAND, STAGE_REST, STAGE_SPROUT } from '
 //   { kind: 'throw', from, to, player }   a seed thrown in an arc, landing with a soil puff, then regrowing from Land
 //   { kind: 'throwBlocked', x, y }        a gust around a plant with nowhere to go
 //   { kind: 'rockFall', x, y }            a rock falls with a growing shadow, a soil puff and a light shake
-//   { kind: 'rockCrumble', x, y }         a rock breaks into soil crumbs and pebbles
-//   { kind: 'convert', x, y, from, to }   the plant wilts to Sprout, a spark runs through the soil and
-//                                         it regrows from Land as `to`
+//                                         (the minimum look of Petrification until its own effect)
 //   { kind: 'castRing', x, y, player }    a ring in the character's colour spreads from a skill's
 //                                         target plot (every skill with a plot target; Wind Dash
 //                                         from its source plant)
@@ -107,14 +105,8 @@ export function visualsForEvents(events) {
       case 'throwBlocked':
         specs.push({ kind: 'throwBlocked', x: event.x, y: event.y });
         break;
-      case 'rockPlaced':
+      case 'stonePetrified':
         specs.push({ kind: 'rockFall', x: event.x, y: event.y });
-        break;
-      case 'rockBroken':
-        specs.push({ kind: 'rockCrumble', x: event.x, y: event.y });
-        break;
-      case 'stoneConverted':
-        specs.push({ kind: 'convert', x: event.x, y: event.y, from: event.from, to: event.player });
         break;
       case 'win':
       case 'draw':
@@ -208,7 +200,7 @@ export function dashFoldMs(stageStartMs) {
   return reverseGrowthMs(stageStartMs, STAGE_REST, STAGE_DROP);
 }
 
-// Stone Conversion: the plant wilts back to Sprout, then the spark runs.
+// A plant that changes sides: it wilts back to Sprout, then the spark runs.
 export function convertWiltMs(stageStartMs) {
   return reverseGrowthMs(stageStartMs, STAGE_REST, STAGE_SPROUT);
 }
@@ -327,7 +319,7 @@ export function throwPose(out, plain = false) {
   return out;
 }
 
-// A falling rock pose.ageMs after Terrain Creation: it drops from
+// A falling rock pose.ageMs after a Petrification: it drops from
 // ROCK_FALL_HEIGHT, speeding up, while its shadow grows from small to full;
 // then it squashes and settles. pose.height, pose.shadow (shadow scale),
 // pose.scaleX, pose.scaleY, pose.landed (from the impact on), pose.done.
@@ -408,7 +400,7 @@ export function skyWatchPulse(time) {
   return SKY_WATCH_PULSE_LOW + (1 - SKY_WATCH_PULSE_LOW) * wave;
 }
 
-// Stone Conversion pose.ageMs in: the old plant wilts back to Sprout
+// A converting plant pose.ageMs in: the old plant wilts back to Sprout
 // (reverse growth, convertWiltMs), then a small spark runs through the soil
 // for CONVERT_SPARK_MS, after which the other team's plant regrows from
 // Land (the piece layer grows it, see regrowCell). pose.frame (the old

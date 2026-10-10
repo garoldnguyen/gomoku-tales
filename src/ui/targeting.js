@@ -4,8 +4,10 @@
 // still validates the finished action; these checks only guide the clicks.
 
 import { X, O, isEmptyCell, inBounds } from '../logic/board.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION, HISS, VENOM, CLOUD } from '../logic/skills.js';
+import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION, HISS, VENOM, CLOUD } from '../logic/skills.js';
 import { cloudCells } from '../logic/cloud.js';
+import { SUNK_PLANT_ERROR, mudAt } from '../logic/earth-bear-skills.js';
+import { isSunk } from '../logic/scoring-board.js';
 import { tornadoCells } from '../logic/wind-rabbit-skills.js';
 import { STRINGS } from './strings.js';
 
@@ -28,10 +30,10 @@ export function targetPrompt(targeting) {
       return targeting.from ? 'Wind Dash: choose an empty target cell' : 'Wind Dash: choose one of your stones';
     case TORNADO_ZONE:
       return 'Tornado Zone: choose the zone centre';
-    case TERRAIN_CREATION:
-      return 'Terrain Creation: choose an empty cell';
-    case STONE_CONVERSION:
-      return "Stone Conversion: choose an opponent's stone";
+    case MUD_TRAP:
+      return 'Mud Trap: choose an empty cell';
+    case PETRIFICATION:
+      return "Petrification: choose an opponent's stone";
     case VENOM:
       return "Venom: choose an opponent's stone";
     case CLOUD:
@@ -56,24 +58,28 @@ export function targetClick(state, player, targeting, cell) {
       const { from } = targeting;
       if (!from) {
         if (content !== player) return { error: 'Choose one of your own stones.' };
+        if (isSunk(state, x, y)) return { error: SUNK_PLANT_ERROR };
         return { targeting: { ...targeting, from: { x, y } } };
       }
       // Clicking the chosen stone again un-picks it; another own stone
       // becomes the new source.
       if (from.x === x && from.y === y) return { targeting: { ...targeting, from: null } };
-      if (content === player) return { targeting: { ...targeting, from: { x, y } } };
+      if (content === player && !isSunk(state, x, y)) return { targeting: { ...targeting, from: { x, y } } };
       if (!isEmptyCell(board, x, y)) return { error: 'Choose an empty target cell.' };
+      if (mudAt(state, x, y)) return { error: 'A Wind Dash cannot land on mud.' };
       return { target: { from, to: { x, y } } };
     }
     case TORNADO_ZONE:
     case CLOUD:
       return { target: { x, y } };
-    case TERRAIN_CREATION:
+    case MUD_TRAP:
       if (!isEmptyCell(board, x, y)) return { error: 'Choose an empty cell.' };
+      if (mudAt(state, x, y)) return { error: 'That cell is already mud.' };
       return { target: { x, y } };
-    case STONE_CONVERSION:
+    case PETRIFICATION:
     case VENOM:
       if (content !== opponentOf(player)) return { error: "Choose one of your opponent's stones." };
+      if (targeting.skill === PETRIFICATION && isSunk(state, x, y)) return { error: SUNK_PLANT_ERROR };
       return { target: { x, y } };
     default:
       return { error: 'Unknown skill.' };
@@ -82,10 +88,9 @@ export function targetClick(state, player, targeting, cell) {
 
 // What to draw on the board for the targeting step under the hovered cell
 // (hover may be null). Returns null or one of:
-//   { type: 'select', x, y }       ring around a stone that can be picked
+//   { type: 'select', x, y }       ring around a stone that can be picked, or the plot Mud Trap would flood
 //   { type: 'dash', from, to }     whirl on the source, red frame on `to` (or null)
 //   { type: 'zone', x, y, cells }  the Tornado Zone centred on (x, y) and its cells
-//   { type: 'rock', x, y }         a ghost rock
 //   { type: 'cloud', x, y, cells } the Cloud centred on (x, y) and its cells
 export function targetPreview(state, player, targeting, hover) {
   const { board } = state;
@@ -95,17 +100,18 @@ export function targetPreview(state, player, targeting, hover) {
   switch (targeting.skill) {
     case WIND_DASH: {
       const { from } = targeting;
-      if (!from) return content === player ? { type: 'select', x: cell.x, y: cell.y } : null;
-      const to = cell && isEmptyCell(board, cell.x, cell.y) ? { x: cell.x, y: cell.y } : null;
+      if (!from) return content === player && !isSunk(state, cell.x, cell.y) ? { type: 'select', x: cell.x, y: cell.y } : null;
+      const to = cell && isEmptyCell(board, cell.x, cell.y) && !mudAt(state, cell.x, cell.y) ? { x: cell.x, y: cell.y } : null;
       return { type: 'dash', from, to };
     }
     case TORNADO_ZONE:
       return cell ? { type: 'zone', x: cell.x, y: cell.y, cells: tornadoCells(board, cell.x, cell.y) } : null;
     case CLOUD:
       return cell ? { type: 'cloud', x: cell.x, y: cell.y, cells: cloudCells(board, cell) } : null;
-    case TERRAIN_CREATION:
-      return cell && isEmptyCell(board, cell.x, cell.y) ? { type: 'rock', x: cell.x, y: cell.y } : null;
-    case STONE_CONVERSION:
+    case MUD_TRAP:
+      return cell && isEmptyCell(board, cell.x, cell.y) && !mudAt(state, cell.x, cell.y) ? { type: 'select', x: cell.x, y: cell.y } : null;
+    case PETRIFICATION:
+      return content === opponentOf(player) && !isSunk(state, cell.x, cell.y) ? { type: 'select', x: cell.x, y: cell.y } : null;
     case VENOM:
       return content === opponentOf(player) ? { type: 'select', x: cell.x, y: cell.y } : null;
     default:

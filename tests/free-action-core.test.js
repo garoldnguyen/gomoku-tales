@@ -13,7 +13,7 @@ import {
   SKILL_ALREADY_USED_ERROR, canUseSkill, createInitialState, newGame, placeStone, skillCooldown, useSkill,
 } from '../src/logic/game.js';
 import {
-  CLOUD, HISS, SKY_WATCH, STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, VENOM, WIND_DASH, cooldownTurns,
+  CLOUD, HISS, SKY_WATCH, PETRIFICATION, MUD_TRAP, TORNADO_ZONE, VENOM, WIND_DASH, cooldownTurns,
 } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
@@ -52,8 +52,8 @@ function gameFor(sides) {
 const CASES = [
   { skill: WIND_DASH, sides: [WIND_RABBIT, EARTH_BEAR], target: { from: { x: 3, y: 3 }, to: { x: 6, y: 3 } } },
   { skill: TORNADO_ZONE, sides: [WIND_RABBIT, EARTH_BEAR], target: { x: 9, y: 9 } },
-  { skill: TERRAIN_CREATION, sides: [EARTH_BEAR, WIND_RABBIT], target: { x: 8, y: 8 } },
-  { skill: STONE_CONVERSION, sides: [EARTH_BEAR, WIND_RABBIT], target: { x: 5, y: 5 } },
+  { skill: MUD_TRAP, sides: [EARTH_BEAR, WIND_RABBIT], target: { x: 8, y: 8 } },
+  { skill: PETRIFICATION, sides: [EARTH_BEAR, WIND_RABBIT], target: { x: 5, y: 5 } },
   { skill: HISS, sides: [JADE_SERPENT, WIND_RABBIT], target: null },
   { skill: VENOM, sides: [JADE_SERPENT, WIND_RABBIT], target: { x: 5, y: 5 } },
   { skill: CLOUD, sides: [CLOUD_EAGLE, WIND_RABBIT], target: { x: 9, y: 9 } },
@@ -113,32 +113,34 @@ test('a skill alone never wins and never ends the game, but it plants nothing', 
   }
 });
 
-test('a skill that changes a plant still runs the win check at once and can end the game', () => {
-  // O O X O O: converting the X makes five for Earth Bear (O) in the same turn.
+test('a skill never wins on its own: petrifying the X between four O leaves a rock, not a fifth O', () => {
+  // O O X O O: Petrification turns the X into a rock, which breaks the line.
   const state = newGame();
   state.currentPlayer = O;
   for (const x of [2, 3, 5, 6]) state.board[5][x] = O;
   state.board[5][4] = X;
-  const result = use(state, O, STONE_CONVERSION, { x: 4, y: 5 });
-  assert.equal(result.state.winner, O);
-  assert.deepEqual(result.events.map((e) => e.type), ['skillUsed', 'stoneConverted', 'win']);
-  assert.equal(result.state.skillUsed, null, 'a finished game has no turn left');
-  assert.equal(placeStone(result.state, { player: O, x: 0, y: 0 }).ok, false);
-  assert.equal(useSkill(result.state, { player: O, skill: STONE_CONVERSION, target: { x: 0, y: 0 } }).error, 'The game is over.');
+  const result = use(state, O, PETRIFICATION, { x: 4, y: 5 });
+  assert.equal(result.state.winner, null);
+  assert.equal(result.state.board[5][4], ROCK);
+  assert.deepEqual(result.events.map((e) => e.type), ['skillUsed', 'stonePetrified']);
+  assert.equal(result.state.skillUsed, PETRIFICATION, 'the turn goes on until O plants');
 });
 
-test('a skill that fills the last empty plot is a draw, so the player to move can never be left with nowhere to plant', () => {
+test('a skill never fills the last empty plot: the player to move can always plant', () => {
   const state = newGame();
   state.currentPlayer = O;
   for (let y = 0; y < state.board.length; y++) {
     for (let x = 0; x < state.board[y].length; x++) state.board[y][x] = (x + 2 * y) % 5 < 2 ? X : ROCK;
   }
   state.board[7][7] = EMPTY;
-  const result = use(state, O, TERRAIN_CREATION, { x: 7, y: 7 });
-  assert.equal(result.state.draw, true);
-  assert.equal(result.state.skillUsed, null);
-  assert.deepEqual(result.events.map((e) => e.type), ['skillUsed', 'rockPlaced', 'draw']);
-  assert.equal(placeStone(result.state, { player: O, x: 7, y: 7 }).error, 'The game is over.');
+  const result = use(state, O, MUD_TRAP, { x: 7, y: 7 });
+  assert.equal(result.state.draw, false, 'a puddle leaves the plot empty');
+  assert.equal(result.state.skillUsed, MUD_TRAP);
+  assert.deepEqual(result.events.map((e) => e.type), ['skillUsed', 'mudPlaced']);
+  const planted = placeStone(result.state, { player: O, x: 7, y: 7 });
+  assert.equal(planted.ok, true);
+  assert.deepEqual(planted.events.map((e) => e.type), ['stonePlaced', 'stoneSunk', 'stoneSurfaced', 'draw']);
+  assert.equal(planted.state.draw, true, 'the draw waits for the sunk seed, then it is decided');
 });
 
 // --- At most one skill ---
@@ -174,10 +176,10 @@ test('the one skill rule is checked after the other checks', () => {
 
 test('a refused skill (bad target) costs nothing: it is not counted as the skill of the turn', () => {
   const state = gameFor([EARTH_BEAR, WIND_RABBIT]);
-  const bad = useSkill(state, { player: X, skill: STONE_CONVERSION, target: { x: 0, y: 0 } });
+  const bad = useSkill(state, { player: X, skill: PETRIFICATION, target: { x: 0, y: 0 } });
   assert.equal(bad.ok, false);
   assert.equal(state.skillUsed, null);
-  assert.equal(use(state, X, TERRAIN_CREATION, { x: 8, y: 8 }).state.skillUsed, TERRAIN_CREATION);
+  assert.equal(use(state, X, MUD_TRAP, { x: 8, y: 8 }).state.skillUsed, MUD_TRAP);
 });
 
 // --- Planting is the only action that ends a turn ---
@@ -186,14 +188,14 @@ test('planting is still required to end the turn, and it resets skillUsed', () =
   const used = use(gameFor([WIND_RABBIT, EARTH_BEAR]), X, TORNADO_ZONE, { x: 9, y: 9 }).state;
   // The opponent cannot act and nothing else ends the turn.
   assert.equal(placeStone(used, { player: O, x: 0, y: 0 }).error, 'It is not your turn.');
-  assert.equal(useSkill(used, { player: O, skill: TERRAIN_CREATION, target: { x: 0, y: 0 } }).error, 'It is not your turn.');
+  assert.equal(useSkill(used, { player: O, skill: MUD_TRAP, target: { x: 0, y: 0 } }).error, 'It is not your turn.');
   const planted = ok(placeStone(used, { player: X, x: 0, y: 0 }));
   assert.equal(planted.state.currentPlayer, O);
   assert.equal(planted.state.turn, used.turn + 1);
   assert.equal(planted.state.skillUsed, null);
   assert.deepEqual(planted.events.map((e) => e.type), ['stonePlaced', 'turnEnded']);
   // The next player may use a skill of their own, and so may X again two turns later.
-  assert.equal(canUseSkill(planted.state, O, TERRAIN_CREATION), true);
+  assert.equal(canUseSkill(planted.state, O, MUD_TRAP), true);
 });
 
 test('a win by planting after a skill ends the game and leaves no skillUsed', () => {
@@ -239,9 +241,9 @@ test('a skill rests for the owner\'s next COOLDOWN turns after the turn it was u
 test('the opponent\'s skills and plantings never count down my cooldowns', () => {
   let state = gameFor([WIND_RABBIT, EARTH_BEAR]);
   state = skillTurn(state, X, TORNADO_ZONE, { x: 9, y: 9 }, { x: 0, y: 13 });
-  state = skillTurn(state, O, TERRAIN_CREATION, { x: 12, y: 12 }, { x: 2, y: 13 });
+  state = skillTurn(state, O, MUD_TRAP, { x: 12, y: 12 }, { x: 2, y: 13 });
   assert.equal(skillCooldown(state, X, TORNADO_ZONE), COOLDOWN_LONG);
-  assert.equal(skillCooldown(state, O, TERRAIN_CREATION), COOLDOWN_SHORT);
+  assert.equal(skillCooldown(state, O, MUD_TRAP), COOLDOWN_SHORT);
 });
 
 // --- Hiss, Wind Dash, Cloud, Tornado still count by turns ---
@@ -253,13 +255,13 @@ test('Hiss locks the opponent\'s next turn only', () => {
   assert.equal(canUseSkill(state, X, VENOM), false, 'the serpent itself is not locked, just limited to one skill');
   state = place(state, X, 0, 0); // the cast turn ends: the lock stays for the opponent's turn
   assert.deepEqual(state.skillLock, { player: O, endsAfterTurn: 2 });
-  assert.equal(canUseSkill(state, O, TERRAIN_CREATION), false);
-  assert.match(useSkill(state, { player: O, skill: TERRAIN_CREATION, target: { x: 9, y: 9 } }).error, /Hiss/);
+  assert.equal(canUseSkill(state, O, MUD_TRAP), false);
+  assert.match(useSkill(state, { player: O, skill: MUD_TRAP, target: { x: 9, y: 9 } }).error, /Hiss/);
   const answered = ok(placeStone(state, { player: O, x: 1, y: 0 })); // the opponent plants anyway
   assert.ok(answered.events.some((e) => e.type === 'hissEnded' && e.player === O));
   assert.equal(answered.state.skillLock, null);
   state = place(answered.state, X, 2, 0);
-  assert.equal(canUseSkill(state, O, TERRAIN_CREATION), true, 'their turn after that is free again');
+  assert.equal(canUseSkill(state, O, MUD_TRAP), true, 'their turn after that is free again');
 });
 
 test('a Wind Dash cast then a planting resolves after the opponent\'s next turn', () => {
@@ -319,10 +321,10 @@ test('online: the guest uses a skill, the host answers with a state where the gu
   assert.equal(host.place(7, 7).ok, true);
   assert.equal(guest.getView().yourTurn, true);
 
-  assert.equal(guest.useSkill(TERRAIN_CREATION, { x: 9, y: 9 }).ok, true);
+  assert.equal(guest.useSkill(MUD_TRAP, { x: 9, y: 9 }).ok, true);
   assert.equal(host.state.currentPlayer, O, 'the guest is still to move');
   assert.equal(host.state.turn, 2);
-  assert.equal(host.state.skillUsed, TERRAIN_CREATION);
+  assert.equal(host.state.skillUsed, MUD_TRAP);
   assert.deepEqual(guest.state, host.state);
   const afterSkill = guestEvents.filter((e) => e.type === 'state').at(-1);
   assert.equal(afterSkill.events[0].type, 'skillUsed');
@@ -333,7 +335,7 @@ test('online: the guest uses a skill, the host answers with a state where the gu
   assert.equal(host.place(0, 0).error, 'It is not your turn.');
 
   // A second skill is refused by the host with the exact sentence.
-  assert.equal(guest.useSkill(STONE_CONVERSION, { x: 7, y: 7 }).ok, true, 'sent; the host decides');
+  assert.equal(guest.useSkill(PETRIFICATION, { x: 7, y: 7 }).ok, true, 'sent; the host decides');
   assert.equal(guestEvents.filter((e) => e.type === 'rejected').at(-1).error, EXACT_ERROR);
   assert.deepEqual(guest.state, host.state);
 

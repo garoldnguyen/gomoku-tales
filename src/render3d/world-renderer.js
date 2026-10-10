@@ -48,7 +48,7 @@
 
 import {
   BOARD_SIZE, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, CLOUD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, CLOUD_MIST_OPACITY, CLOUD_PUFF_BOB, CLOUD_PUFF_DRIFT, CLOUD_PUFF_DRIFT_MS, CLOUD_PUFF_HEIGHT, CLOUD_PUFF_SCALE, SKY_WATCH_GLOW_OPACITY, SKY_WATCH_OPACITY, SKY_WATCH_PUFF_DRIFT, SKY_WATCH_PUFF_HEIGHT, SKY_WATCH_PUFF_MS,
-  SPRITE_STRETCH_Y,
+  SPRITE_STRETCH_Y, MUD_OPACITY, SUNK_DEPTH_PX, SUNK_DIM,
 } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
 import { DEFAULT_SIDES } from '../logic/characters.js';
@@ -61,6 +61,7 @@ import { placementCues } from './character-look.js';
 import { COVER, cloudTileGrid, createCloudOverlay, hiddenPuffGrid, skyWatchGlowGrid, skyWatchOutlineGrid, skyWatchPuffGrid, viewerOf } from './cloud-overlay.js';
 import { cloudFadeAmount, cloudFormAmount, skyWatchPulse } from './effect-plans.js';
 import { createEffects3d } from './effects3d.js';
+import { mudTileGrid } from './mud-art.js';
 import { enteredStage, plantedCells, plantPoseInto, STAGE_LAND, STAGE_OPEN, STAGE_REST } from './growth.js';
 import { createWorldHitTest } from './hit-test.js';
 import { parseFpsSwitch } from './fps.js';
@@ -173,7 +174,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       // Before the plants read their lean towards the zone (pieces.sync): a
       // zone this viewer may not see must not bend anything on this frame.
       effects.syncTornado(view.state.tornado);
-      pieces.sync(view.state.board, time, effects);
+      pieces.sync(view.state.board, time, effects, view.state.sunk);
       world.characters.setActive(isGameOver(view.state) ? null : view.state.currentPlayer);
       boardMarksInto(view, marks);
       decals.show(marks.decals, marks.count, time);
@@ -300,6 +301,8 @@ function pieceKind(cell) {
 }
 
 const UNPLANTED = -1; // growth stage of a cell before its seed drops
+const NO_SUNK = Object.freeze([]);
+const SUNK_LIFT = -SUNK_DEPTH_PX * PX_WORLD * SPRITE_STRETCH_Y; // a sunk seed stands this far below its plot
 
 // Plant and rock sprites that follow the board (docs/art-direction-v3.md
 // section 4). Sprites are reused: a removed piece goes back to its kind's
@@ -322,6 +325,8 @@ function createPieceLayer(world) {
   const growStart = new Float64Array(cellCount).fill(NaN); // when the seed was planted, NaN: not growing
   const growKind = []; // the player whose seed it is
   const lastStage = new Int8Array(cellCount).fill(UNPLANTED);
+  const sunkNow = new Uint8Array(cellCount); // per cell: 1 while the seed on it is sunk in mud (this frame)
+  const sunkShown = new Uint8Array(cellCount); // per cell: 1 while its sprite is drawn dim and pushed down
   const pose = { frame: 0, progress: 0, dropPx: 0, scale: 1 }; // written by plantPoseInto
   const looks = {}; // per player: plantLook, made the first time
   const look = (player) => (looks[player] ??= plantLook(player));
@@ -369,6 +374,7 @@ function createPieceLayer(world) {
         dropSprite(world, shownSprite[i]);
         shownKind[i] = null;
         shownSprite[i] = null;
+        sunkShown[i] = 0; // the next sprite of a sunk seed is made bright and must be dimmed again
       }
       for (const kind of [X, O]) {
         for (const sprite of free[kind]) dropSprite(world, sprite);
@@ -381,8 +387,14 @@ function createPieceLayer(world) {
       for (let i = 0; i < cellCount; i++) if (!Number.isNaN(growStart[i])) settle(i);
     },
 
-    sync(board, time, effects) {
+    // sunk: state.sunk, the seeds that are dim and pushed down into their plot.
+    sync(board, time, effects, sunk = NO_SUNK) {
       const size = board.length;
+      sunkNow.fill(0);
+      for (let s = 0; s < sunk.length; s++) {
+        const at = sunk[s].y * size + sunk[s].x;
+        if (at >= 0 && at < cellCount) sunkNow[at] = 1;
+      }
       for (let y = 0; y < size; y++) {
         for (let x = 0; x < size; x++) {
           const i = y * size + x;
@@ -393,6 +405,8 @@ function createPieceLayer(world) {
             const old = shownSprite[i];
             rest(old, current);
             old.setBend(0, 0, 0);
+            old.setDim(1);
+            sunkShown[i] = 0;
             old.object.visible = false;
             free[current].push(old);
           }
@@ -419,7 +433,16 @@ function createPieceLayer(world) {
         const x = i % BOARD_SIZE;
         const y = (i - x) / BOARD_SIZE;
         sprite.setBend(effects.bendAt(x, y), effects.bendCentre.x, effects.bendCentre.z);
-        if (Number.isNaN(growStart[i])) continue;
+        const isSunk = sunkNow[i] === 1;
+        if (isSunk !== (sunkShown[i] === 1)) {
+          sunkShown[i] = isSunk ? 1 : 0;
+          sprite.setDim(isSunk ? SUNK_DIM : 1);
+          if (!isSunk) sprite.plane.position.y = 0;
+        }
+        if (Number.isNaN(growStart[i])) {
+          if (isSunk) sprite.plane.position.y = SUNK_LIFT;
+          continue;
+        }
         const player = shownKind[i];
         const plant = look(player);
         const { stages, anchorY } = plant;
@@ -429,12 +452,15 @@ function createPieceLayer(world) {
         const frames = plantFramesOf(plant, inBetween);
         const shown = frames[plantFrameIndex(pose.frame, pose.progress, plant.topRows.length, inBetween)];
         sprite.setBlend(shown.from, shown.to, shown.mix);
-        sprite.plane.position.y = (pose.dropPx + shown.liftPx) * PX_WORLD * SPRITE_STRETCH_Y;
+        sprite.plane.position.y = (pose.dropPx + shown.liftPx) * PX_WORLD * SPRITE_STRETCH_Y + (isSunk ? SUNK_LIFT : 0);
         sprite.object.scale.set(pose.scale, pose.scale, pose.scale);
         if (enteredStage(lastStage[i], pose.frame, STAGE_LAND)) effects.soilPuff(x, y);
         if (enteredStage(lastStage[i], pose.frame, STAGE_OPEN)) effects.openSparkles(x, y, player, anchorY);
         lastStage[i] = pose.frame;
-        if (pose.frame === STAGE_REST && pose.scale === 1) settle(i);
+        if (pose.frame === STAGE_REST && pose.scale === 1) {
+          settle(i);
+          if (isSunk) sprite.plane.position.y = SUNK_LIFT;
+        }
       }
     },
   };
@@ -445,6 +471,7 @@ function createPieceLayer(world) {
 // opacity; the winner marks pulse. renderOrder keeps overlapping decals in
 // a fixed order (the last-move mark is 3, see createLastMoveMark).
 const DECALS = {
+  mud: { order: 0, grid: mudTileGrid, opacity: MUD_OPACITY },
   zonePreview: { order: 1, art: ART.v3.decal.zone },
   win: { order: 2, art: ART.v3.decal.win },
   dashTarget: { order: 4, art: ART.v3.decal.dashTarget },
@@ -710,7 +737,7 @@ function createLastMoveMark(world) {
 }
 
 // See-through pieces: the stone the current player would place on the
-// hovered cell, or the rock Terrain Creation would drop.
+// hovered cell.
 function createGhosts(world) {
   const ghosts = {};
   const makeGhost = (kind, sheet) => {

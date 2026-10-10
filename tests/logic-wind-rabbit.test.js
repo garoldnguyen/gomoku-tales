@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BOARD_SIZE, COOLDOWN_LONG, COOLDOWN_SHORT } from '../src/config.js';
 import { EMPTY, X, O, ROCK } from '../src/logic/board.js';
-import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
+import { PETRIFICATION, MUD_TRAP, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
 import { createInitialState, isGameOver, placeStone, skillCooldown, useSkill } from '../src/logic/game.js';
 import { tornadoCells } from '../src/logic/wind-rabbit-skills.js';
 import { skillTurn } from './skill-turn.js';
@@ -111,12 +111,13 @@ test('a Wind Dash cast and then a planting resolves when the opponent\'s next tu
 });
 
 test('Wind Dash also resolves when the opponent uses a skill and plants on their turn', () => {
-  const used = skillResult(announcedDash(), O, TERRAIN_CREATION, { x: 10, y: 10 });
+  const used = skillResult(announcedDash(), O, MUD_TRAP, { x: 10, y: 10 });
   assert.equal(used.state.board[3][6], EMPTY, 'a skill alone does not end the turn, so the dash waits');
-  assert.deepEqual(types(used.events), ['skillUsed', 'rockPlaced']);
+  assert.deepEqual(types(used.events), ['skillUsed', 'mudPlaced']);
   const result = placeResult(used.state, O, 12, 12);
   assert.equal(result.state.board[3][6], X);
-  assert.equal(result.state.board[10][10], ROCK);
+  assert.equal(result.state.board[10][10], EMPTY, 'a puddle is no stone');
+  assert.equal(result.state.mud.length, 1);
   assert.deepEqual(types(result.events), ['stonePlaced', 'dashResolved', 'turnEnded']);
 });
 
@@ -129,19 +130,19 @@ test('Wind Dash fails if the opponent takes the target cell, and the cooldown st
   assert.equal(skillCooldown(result.state, X, WIND_DASH), COOLDOWN_SHORT);
 });
 
-test('Wind Dash fails if the opponent drops a rock on the target cell', () => {
-  const used = skillResult(announcedDash(), O, TERRAIN_CREATION, { x: 6, y: 3 });
+test('Wind Dash fails if the opponent floods the target cell with mud (a dash cannot land on mud)', () => {
+  const used = skillResult(announcedDash(), O, MUD_TRAP, { x: 6, y: 3 });
   const result = placeResult(used.state, O, 12, 12);
   assert.equal(result.state.board[3][3], X);
-  assert.equal(result.state.board[3][6], ROCK);
+  assert.equal(result.state.board[3][6], EMPTY);
   assert.equal(result.events.find((e) => e.type === 'dashFailed').reason, 'targetTaken');
 });
 
-test('Wind Dash fails if the source stone is converted', () => {
-  const used = skillResult(announcedDash(), O, STONE_CONVERSION, DASH.from);
-  assert.deepEqual(types(used.events), ['skillUsed', 'stoneConverted']);
+test('Wind Dash fails if the source stone is petrified', () => {
+  const used = skillResult(announcedDash(), O, PETRIFICATION, DASH.from);
+  assert.deepEqual(types(used.events), ['skillUsed', 'stonePetrified']);
   const result = placeResult(used.state, O, 12, 12);
-  assert.equal(result.state.board[3][3], O, 'the converted stone stays');
+  assert.equal(result.state.board[3][3], ROCK, 'the rock stays');
   assert.equal(result.state.board[3][6], EMPTY);
   assert.equal(result.state.pendingDash, null);
   assert.deepEqual(types(result.events), ['stonePlaced', 'dashFailed', 'turnEnded']);
@@ -273,8 +274,8 @@ test('a stone planted outside the zone, or a skill used, is not thrown; the zone
   const outside = placeStone(activeTornado(), { player: O, x: 9, y: 7 }, { random: noRandom });
   assert.equal(outside.state.board[7][9], O);
   assert.deepEqual(types(outside.events), ['stonePlaced', 'tornadoEnded', 'turnEnded']);
-  const used = skillResult(activeTornado(), O, TERRAIN_CREATION, { x: 7, y: 7 });
-  assert.equal(used.state.board[7][7], ROCK);
+  const used = skillResult(activeTornado(), O, MUD_TRAP, { x: 7, y: 7 });
+  assert.equal(used.state.mud.length, 1);
   assert.notEqual(used.state.tornado, null, 'a skill does not end the turn, so the zone is still there');
   const oTurn = placeResult(used.state, O, 9, 7).state;
   assert.equal(oTurn.tornado, null, 'the zone ends with the planting that ends the turn');

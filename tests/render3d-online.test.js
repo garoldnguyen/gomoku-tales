@@ -99,9 +99,9 @@ test('two online windows play stones and skills through 3D picking and get the s
   assert.equal(bear.getView().state.board[7][7], X);
   assert.equal(guestPointer.skill(X, 0), false, "the guest cannot use the host's skill");
   assert.equal(bear.getView().message, "That is your opponent's skill.");
-  assert.equal(guestPointer.skill(O, 0), true); // Terrain Creation
+  assert.equal(guestPointer.skill(O, 0), true); // Mud Trap
   assert.equal(guestPointer.cell(9, 9), true);
-  assert.equal(rabbit.getView().state.board[9][9], 'ROCK');
+  assert.deepEqual(rabbit.getView().state.mud.map(({ x, y }) => [x, y]), [[9, 9]]);
   assert.equal(guestPointer.cell(0, 0), true, 'the bear plants, which ends its turn (a skill does not)');
 
   // Wind Dash: choose the stone, then the target.
@@ -114,7 +114,7 @@ test('two online windows play stones and skills through 3D picking and get the s
   const guestEvents = bear.takeEvents();
   assert.deepEqual(hostEvents, guestEvents, 'both windows start the same 3D visuals');
   const kinds = visualsForEvents(guestEvents).map((spec) => spec.kind);
-  for (const kind of ['place', 'rockFall', 'dashMark']) assert.ok(kinds.includes(kind), kind);
+  for (const kind of ['place', 'castRing', 'dashMark']) assert.ok(kinds.includes(kind), kind);
 });
 
 test('the ghost stone shows only in the window whose turn it is', () => {
@@ -149,7 +149,7 @@ test('catching up shows where the lingering marks end up and nothing else', () =
   const zoneOn = { type: 'tornadoAnnounced', x: 5, y: 5, cells: [{ x: 5, y: 5 }] };
 
   assert.deepEqual(catchUpVisuals([]), []);
-  assert.deepEqual(catchUpVisuals([place, { type: 'rockPlaced', x: 0, y: 0 }]), [], 'no sparkles, falls or banners');
+  assert.deepEqual(catchUpVisuals([place, { type: 'stonePetrified', x: 0, y: 0 }]), [], 'no sparkles, falls or banners');
   assert.deepEqual(catchUpVisuals([dashOn]), [{ kind: 'dashMark', from, to, player: X }]);
   assert.deepEqual(catchUpVisuals([dashOn, place, { type: 'dashResolved', from, to, player: X }]), [{ kind: 'dashClear' }]);
   assert.deepEqual(catchUpVisuals([{ type: 'dashFailed', from, to }]), [{ kind: 'dashClear' }]);

@@ -8,16 +8,16 @@
 // docs/design.md section 5) and changed where it said something the game
 // does not do: Wind Dash lands only after the opponent's next turn and only
 // on a plot that is still empty, Tornado Zone throws only the seed the
-// opponent plants inside it on that turn, Terrain Creation needs an empty
-// plot, and Stone Conversion takes only an opponent's plant (only Earth
-// Bear, who plays O in the two character lobby, has it, so it only ever
-// turns X into O there). Venom also takes only an opponent's plant.
+// opponent plants inside it on that turn, Mud Trap needs an empty plot that
+// is not mud already, and Petrification takes only an opponent's plant that
+// is not sunk in mud. Venom also takes only an opponent's plant.
 
-import { CLOUD_SIZE, CLOUD_TURNS, ROCK_LIFETIME_TURNS, SKY_WATCH_RUN, TORNADO_SIZE } from '../config.js';
+import { CLOUD_SIZE, CLOUD_TURNS, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, SKY_WATCH_RUN, TORNADO_SIZE } from '../config.js';
 import {
-  CLOUD, HISS, SKY_WATCH, STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, VENOM, WIND_DASH, getSkill,
+  CLOUD, HISS, MUD_TRAP, PETRIFICATION, SKY_WATCH, TORNADO_ZONE, VENOM, WIND_DASH, getSkill,
 } from '../logic/skills.js';
 
+const turns = (count) => `${count} ${count === 1 ? 'turn' : 'turns'}`;
 const info = (skillId, description, hint) => Object.freeze({ title: getSkill(skillId).name, description, hint });
 
 export const SKILL_INFO = Object.freeze({
@@ -31,14 +31,14 @@ export const SKILL_INFO = Object.freeze({
     `Secretly pick the centre of a ${TORNADO_SIZE} by ${TORNADO_SIZE} zone; your opponent never sees where. On their next turn, a seed they plant inside is blown by a dandelion storm to a random empty plot anywhere on the field.`,
     'Click to select, then choose the zone centre',
   ),
-  [TERRAIN_CREATION]: info(
-    TERRAIN_CREATION,
-    `Drops a rock on an empty plot. The rock stays for ${ROCK_LIFETIME_TURNS} turns, then crumbles back into plain soil.`,
+  [MUD_TRAP]: info(
+    MUD_TRAP,
+    `Turns an empty plot into a mud puddle. The puddle stays for ${turns(MUD_LIFETIME_TURNS)}, then dries. A seed planted in it sinks: it counts for no line for ${turns(MUD_SINK_TURNS)}, then it surfaces and counts again.`,
     'Click to select, then choose a plot',
   ),
-  [STONE_CONVERSION]: info(
-    STONE_CONVERSION,
-    'Pick one of the opponent\'s plants. It wilts and regrows as your plant: X becomes O.',
+  [PETRIFICATION]: info(
+    PETRIFICATION,
+    'Pick one of the opponent\'s plants. It turns to stone: a rock that stays for good and breaks every line. A seed sunk in mud cannot be picked.',
     'Click to select, then choose a plant',
   ),
   [HISS]: info(

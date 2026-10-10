@@ -4,7 +4,7 @@ import { BANNER_MS, DUST_COUNT, DUST_MS, INTERNAL_WIDTH, SHAKE_MS, SHAKE_PX, SPA
 import { X, O, ROCK } from '../src/logic/board.js';
 import { WIND_RABBIT } from '../src/logic/characters.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../src/logic/skills.js';
+import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { createEffects, effectsForEvents, shakeOffset, windStreaks } from '../src/render/effects.js';
@@ -60,21 +60,21 @@ test('every skill use shows a banner with its name', () => {
   const dash = ok(useSkill(state, { player: X, skill: WIND_DASH, target: { from: { x: 5, y: 5 }, to: { x: 9, y: 9 } } }));
   const tornado = ok(useSkill(state, { player: X, skill: TORNADO_ZONE, target: { x: 7, y: 7 } }));
   const bearTurn = { ...state, currentPlayer: O };
-  const rock = ok(useSkill(bearTurn, { player: O, skill: TERRAIN_CREATION, target: { x: 1, y: 1 } }));
-  const convert = ok(useSkill(bearTurn, { player: O, skill: STONE_CONVERSION, target: { x: 5, y: 5 } }));
+  const mud = ok(useSkill(bearTurn, { player: O, skill: MUD_TRAP, target: { x: 1, y: 1 } }));
+  const petrify = ok(useSkill(bearTurn, { player: O, skill: PETRIFICATION, target: { x: 5, y: 5 } }));
 
   const banners = (events) => effectsForEvents(events).filter((s) => s.kind === 'banner').map((s) => s.text);
   assert.deepEqual(banners(dash.events), ['Wind Dash!']);
   assert.deepEqual(banners(tornado.events), ['Tornado Zone!']);
-  assert.deepEqual(banners(rock.events), ['Terrain Creation!']);
-  assert.deepEqual(banners(convert.events), ['Stone Conversion!']);
+  assert.deepEqual(banners(mud.events), ['Mud Trap!']);
+  assert.deepEqual(banners(petrify.events), ['Petrification!']);
 
   // Announcing a dash or a zone hits no stone yet: no shake.
   assert.ok(!kinds(effectsForEvents(dash.events)).includes('shake'));
   assert.ok(!kinds(effectsForEvents(tornado.events)).includes('shake'));
-  // A falling rock gives dust and a shake; a conversion hits the stone.
-  assert.deepEqual(kinds(effectsForEvents(rock.events)), ['banner', 'dust', 'shake']);
-  assert.deepEqual(effectsForEvents(convert.events).filter((s) => s.kind === 'sparkle'), [{ kind: 'sparkle', x: 5, y: 5, player: O }]);
+  // A mud puddle gives dust; a petrified plant gives dust and a shake, no sparkles.
+  assert.deepEqual(kinds(effectsForEvents(mud.events)), ['banner', 'dust']);
+  assert.deepEqual(kinds(effectsForEvents(petrify.events)), ['banner', 'dust', 'shake']);
 });
 
 test('skill hits on stones: a dash landing and a tornado throw', () => {
@@ -90,7 +90,8 @@ test('skill hits on stones: a dash landing and a tornado throw', () => {
   assert.ok(!kinds(failed).includes('shake'));
   assert.ok(kinds(failed).includes('banner'));
 
-  assert.deepEqual(effectsForEvents([{ type: 'rockBroken', x: 2, y: 3 }]), [{ kind: 'dust', x: 2, y: 3 }]);
+  assert.deepEqual(effectsForEvents([{ type: 'mudDried', player: O, x: 2, y: 3 }]), [{ kind: 'dust', x: 2, y: 3 }]);
+  assert.deepEqual(effectsForEvents([{ type: 'stoneSurfaced', player: X, x: 2, y: 3 }]).find((s) => s.kind === 'sparkle'), { kind: 'sparkle', x: 2, y: 3, player: X });
   assert.deepEqual(effectsForEvents([{ type: 'turnEnded', player: X, turn: 0 }, { type: 'win', player: X, line: [] }]), []);
 });
 
@@ -99,10 +100,10 @@ test('skill hits on stones: a dash landing and a tornado throw', () => {
 test('particles, the shake and banners fade out on time', () => {
   const effects = createEffects({ random: () => 0.5 });
   effects.trigger([
-    { type: 'skillUsed', player: O, skill: TERRAIN_CREATION, target: { x: 2, y: 2 } },
-    { type: 'rockPlaced', player: O, x: 2, y: 2, breaksAfterTurn: 5 },
+    { type: 'skillUsed', player: O, skill: PETRIFICATION, target: { x: 2, y: 2 } },
+    { type: 'stonePetrified', player: O, x: 2, y: 2, from: X },
   ], 1000);
-  assert.deepEqual(effects.active(1000), { particles: DUST_COUNT, banners: ['Terrain Creation!'], shaking: true });
+  assert.deepEqual(effects.active(1000), { particles: DUST_COUNT, banners: ['Petrification!'], shaking: true });
   assert.equal(effects.active(1000 + SHAKE_MS).shaking, false);
   assert.equal(effects.active(1000 + DUST_MS).particles, 0);
   assert.deepEqual(effects.active(1000 + BANNER_MS).banners, []);
@@ -123,8 +124,8 @@ test('banners from one action or fast actions queue up and each shows in full', 
   start.board[5][5] = X;
   const dashed = skillTurn(start, X, WIND_DASH, { from: { x: 5, y: 5 }, to: { x: 9, y: 9 } }); // a skill, then a planting
   const events = [];
-  skillTurn(dashed, O, TERRAIN_CREATION, { x: 1, y: 1 }, null, events);
-  assert.deepEqual(effectsForEvents(events).filter((s) => s.kind === 'banner').map((s) => s.text), ['Terrain Creation!', 'Wind Dash landed!']);
+  skillTurn(dashed, O, MUD_TRAP, { x: 1, y: 1 }, null, events);
+  assert.deepEqual(effectsForEvents(events).filter((s) => s.kind === 'banner').map((s) => s.text), ['Mud Trap!', 'Wind Dash landed!']);
 
   const effects = createEffects({ random: () => 0 });
   effects.trigger(events, 0);
@@ -134,9 +135,9 @@ test('banners from one action or fast actions queue up and each shows in full', 
     effects.drawBanner(ctx, time);
     return ctx.texts;
   };
-  assert.deepEqual(effects.active(0).banners, ['Terrain Creation!', 'Wind Dash landed!', 'Tornado Zone!']);
-  assert.deepEqual(shown(0), ['Terrain Creation!']);
-  assert.deepEqual(shown(BANNER_MS - 1), ['Terrain Creation!']);
+  assert.deepEqual(effects.active(0).banners, ['Mud Trap!', 'Wind Dash landed!', 'Tornado Zone!']);
+  assert.deepEqual(shown(0), ['Mud Trap!']);
+  assert.deepEqual(shown(BANNER_MS - 1), ['Mud Trap!']);
   assert.deepEqual(shown(BANNER_MS), ['Wind Dash landed!']);
   assert.deepEqual(shown(2 * BANNER_MS - 1), ['Wind Dash landed!']);
   assert.deepEqual(shown(2 * BANNER_MS), ['Tornado Zone!']);
@@ -144,8 +145,8 @@ test('banners from one action or fast actions queue up and each shows in full', 
   assert.deepEqual(effects.active(3 * BANNER_MS).banners, []);
 
   // With nothing queued, a new banner shows at once.
-  effects.trigger([{ type: 'skillUsed', player: O, skill: STONE_CONVERSION, target: { x: 5, y: 5 } }], 10000);
-  assert.deepEqual(shown(10000), ['Stone Conversion!']);
+  effects.trigger([{ type: 'skillUsed', player: O, skill: PETRIFICATION, target: { x: 5, y: 5 } }], 10000);
+  assert.deepEqual(shown(10000), ['Petrification!']);
 });
 
 test('the shake is light and stops after SHAKE_MS', () => {
@@ -173,13 +174,13 @@ test('wind streaks always drift to the right and stay on or near the screen', ()
 test('drawGameScreen shakes the scene and draws the banner', () => {
   const effects = createEffects({ random: () => 0 });
   effects.trigger([
-    { type: 'skillUsed', player: O, skill: TERRAIN_CREATION, target: { x: 2, y: 2 } },
-    { type: 'rockPlaced', player: O, x: 2, y: 2, breaksAfterTurn: 5 },
+    { type: 'skillUsed', player: O, skill: PETRIFICATION, target: { x: 2, y: 2 } },
+    { type: 'stonePetrified', player: O, x: 2, y: 2, from: X },
   ], 0);
   const ctx = fakeContext();
   const game = createLocalGame();
   drawGameScreen(ctx, { ...game.getView(), time: 30, effects });
-  assert.ok(ctx.texts.includes('Terrain Creation!'));
+  assert.ok(ctx.texts.includes('Petrification!'));
   assert.deepEqual(ctx.translations, [[shakeOffset(0, 30).dx, shakeOffset(0, 30).dy]]);
 });
 

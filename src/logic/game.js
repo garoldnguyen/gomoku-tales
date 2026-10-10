@@ -8,8 +8,9 @@
 import { BOARD_SIZE } from '../config.js';
 import { X, O, cloneBoard, createBoard, inBounds, isBoardFull, isEmptyCell, findWinLineAt } from './board.js';
 import { DEFAULT_SIDES, FIRST_PLAYER, assignSides, characterForStone } from './characters.js';
-import { cooldownTurns, getSkill, isPassiveSkill, TERRAIN_CREATION, STONE_CONVERSION, WIND_DASH, TORNADO_ZONE, HISS, VENOM, CLOUD } from './skills.js';
-import { breakRocks, stoneConversion, terrainCreation } from './earth-bear-skills.js';
+import { cooldownTurns, getSkill, isPassiveSkill, MUD_TRAP, PETRIFICATION, WIND_DASH, TORNADO_ZONE, HISS, VENOM, CLOUD } from './skills.js';
+import { dryMud, mudTrap, petrification, sinkSeed, surfacingSeeds } from './earth-bear-skills.js';
+import { scoringBoard } from './scoring-board.js';
 import { inTornado, resolveDash, throwStone, tornadoZone, windDash } from './wind-rabbit-skills.js';
 import { hiss, isSkillLocked, venom } from './jade-serpent-skills.js';
 import { cloud, tickClouds } from './cloud.js';
@@ -22,16 +23,16 @@ export const SKILL_ALREADY_USED_ERROR = 'You already used a skill this turn.';
 const SKILL_EFFECTS = {
   [WIND_DASH]: windDash,
   [TORNADO_ZONE]: tornadoZone,
-  [TERRAIN_CREATION]: terrainCreation,
-  [STONE_CONVERSION]: stoneConversion,
+  [MUD_TRAP]: mudTrap,
+  [PETRIFICATION]: petrification,
   [HISS]: hiss,
   [VENOM]: venom,
   [CLOUD]: cloud,
 };
 
 // A fresh game (docs/flow-design.md section 5), shared by the online host,
-// local mode and every rematch: empty board, no rocks, no pending Wind
-// Dash, no Tornado Zone, no Hiss lock, no skill used yet, every cooldown 0,
+// local mode and every rematch: empty board, no rocks, no mud, no sunk
+// seed, no pending Wind Dash, no Tornado Zone, no Hiss lock, no skill used yet, every cooldown 0,
 // X (the first pick) to move, no winner. options.size is the board size;
 // options.characters the sides from assignSides (default DEFAULT_SIDES:
 // Wind Rabbit X, Earth Bear O), kept across a rematch by passing them
@@ -49,7 +50,9 @@ export function createInitialState(size = BOARD_SIZE, characters = DEFAULT_SIDES
     characters: sides, // { X: characterId, O: characterId } by pick order
     currentPlayer: FIRST_PLAYER, // the first pick (X) always moves first
     turn: 1, // number of the turn being played, counting both players
-    rocks: [], // [{ x, y, breaksAfterTurn }], also marked ROCK on the board
+    rocks: [], // [{ x, y }] permanent rocks (petrified plants), also marked ROCK on the board
+    mud: [], // [{ x, y, player, driesAfterTurn }] Mud Trap puddles on empty plots
+    sunk: [], // [{ x, y, player, surfacesAfterTurn }] seeds sunk in mud: on the board, but they count for no line
     pendingDash: null, // { player, from, to, resolvesAfterTurn } while a Wind Dash is announced
     tornado: null, // { player, x, y, cells, endsAfterTurn } while a Tornado Zone is active
     skillLock: null, // { player, endsAfterTurn } while a Hiss keeps that player from using skills
@@ -103,13 +106,25 @@ export function placeStone(state, action, options = {}) {
 
   const board = cloneBoard(state.board);
   board[y][x] = player;
-  const events = [{ type: 'stonePlaced', player, x, y }];
+  let events = [{ type: 'stonePlaced', player, x, y }];
+  let planted = { x, y }; // where the seed ends up
   const { tornado } = state;
   if (tornado && tornado.player !== player && inTornado(tornado, x, y)) {
-    const thrown = throwStone(board, x, y, tornado, random);
-    return finishTurn({ ...state, board: thrown.board }, player, [...events, ...thrown.events], thrown.changed);
+    const thrown = throwStone(board, x, y, tornado, random, state.mud ?? []);
+    state = { ...state, board: thrown.board };
+    events = [...events, ...thrown.events];
+    planted = thrown.changed;
+  } else {
+    state = { ...state, board };
   }
-  return finishTurn({ ...state, board }, player, events, { x, y });
+  // A seed that ends on a mud puddle sinks: it holds the plot but counts for
+  // no line until it surfaces (the win check below reads the scoring board).
+  const sunk = sinkSeed(state, player, planted.x, planted.y);
+  if (sunk) {
+    state = { ...state, mud: sunk.mud, sunk: sunk.sunk };
+    events = [...events, ...sunk.events];
+  }
+  return finishTurn(state, player, events, planted);
 }
 
 // Uses one of the acting player's skills (Free Action): at most one per
@@ -137,11 +152,8 @@ export function useSkill(state, action) {
     skillUsed: skillId,
     cooldowns: { ...state.cooldowns, [player]: { ...state.cooldowns[player], [skillId]: cooldownTurns(skillId) } },
   };
-  const winLine = changed ? findWinLineAt(used.board, changed.x, changed.y) : null;
+  const winLine = changed ? findWinLineAt(scoringBoard(used), changed.x, changed.y) : null;
   if (winLine) return win(used, player, winLine, events);
-  // A rock on the last empty plot leaves nowhere to plant: the draw check
-  // that a turn end used to make (the turn has to end with a planting now).
-  if (isBoardFull(used.board)) return done({ ...used, draw: true, skillUsed: null }, [...events, { type: 'draw' }]);
   return done(used, events);
 }
 
@@ -163,28 +175,38 @@ function checkSkill(state, player, skillId) {
 // here): a Wind Dash waiting for this turn to end resolves (with a win check
 // for the dashing player), a Tornado Zone lasting through this turn
 // disappears, a Hiss lock lasting through this turn ends, the acting
-// player's clouds lose a turn (and disappear when none is left), rocks whose
-// lifetime ends with this turn break, the draw check runs, their cooldowns
-// count down (all but the skill used this turn, whose full cooldown started
-// when it was used), skillUsed is cleared and the other player is to move.
+// player's clouds lose a turn (and disappear when none is left), the mud
+// puddles whose time ends with this turn dry, the draw check runs, their
+// cooldowns count down (all but the skill used this turn, whose full
+// cooldown started when it was used), skillUsed is cleared and the other
+// player is to move. Every win check reads the scoring board, where a seed
+// sunk in mud counts for nobody. A sunk seed whose time ends with this turn
+// surfaces after the dash, with a win check for its owner (the acting
+// player's own planting was checked first). The draw check waits for sunk
+// seeds: when the board is full nobody can plant any more, so they all
+// surface at once and the draw is decided after them.
 // If the acting player wins, nothing else happens: a pending dash never
 // resolves and is dropped, and so is a Tornado Zone (it only lasts through
 // this turn), so neither is still shown as coming; a Hiss lock is dropped
 // too.
 function finishTurn(state, player, events, changed) {
-  const winLine = changed ? findWinLineAt(state.board, changed.x, changed.y) : null;
+  const winLine = changed ? findWinLineAt(scoringBoard(state), changed.x, changed.y) : null;
   if (winLine) return win(state, player, winLine, events);
 
   const dash = state.pendingDash;
   if (dash && dash.resolvesAfterTurn <= state.turn) {
-    const resolved = resolveDash(state.board, dash);
+    const resolved = resolveDash(state.board, dash, state.mud ?? []);
     state = { ...state, board: resolved.board, pendingDash: null };
     events = [...events, ...resolved.events];
-    const dashLine = resolved.changed ? findWinLineAt(state.board, resolved.changed.x, resolved.changed.y) : null;
+    const dashLine = resolved.changed ? findWinLineAt(scoringBoard(state), resolved.changed.x, resolved.changed.y) : null;
     if (dashLine) {
       return done({ ...state, winner: dash.player, winLine: dashLine, skillLock: null, skillUsed: null }, [...events, { type: 'win', player: dash.player, line: dashLine }]);
     }
   }
+
+  let surfaced = surfaceSeeds(state, player, events, false);
+  if (surfaced.won) return surfaced.won;
+  ({ state, events } = surfaced);
 
   const { tornado } = state;
   if (tornado && tornado.endsAfterTurn <= state.turn) {
@@ -204,10 +226,16 @@ function finishTurn(state, player, events, changed) {
     events = [...events, ...clouds.events];
   }
 
-  const rocks = breakRocks(state.board, state.rocks, state.turn);
-  state = { ...state, board: rocks.board, rocks: rocks.rocks };
-  events = [...events, ...rocks.events];
+  if (state.mud?.length) {
+    const dried = dryMud(state.mud, state.turn);
+    state = { ...state, mud: dried.mud };
+    events = [...events, ...dried.events];
+  }
+
   if (isBoardFull(state.board)) {
+    surfaced = surfaceSeeds(state, player, events, true);
+    if (surfaced.won) return surfaced.won;
+    ({ state, events } = surfaced);
     return done({ ...state, draw: true, skillUsed: null }, [...events, { type: 'draw' }]);
   }
 
@@ -226,7 +254,27 @@ function finishTurn(state, player, events, changed) {
   return done(next, [...events, { type: 'turnEnded', player, turn: state.turn }]);
 }
 
-// The acting player made five: the game is over (see finishTurn).
+// Surfaces the sunk seeds whose time ends with the state's turn (all of them
+// with `all`): each leaves state.sunk, tells stoneSurfaced and counts for its
+// owner from now on, with a win check at its plot. Returns { state, events }
+// or, when a seed made five, { won } with the finished game.
+function surfaceSeeds(state, actor, events, all) {
+  const { surfacing: due, sunk } = surfacingSeeds(state.sunk ?? [], state.turn, actor, all);
+  if (due.length === 0) return { state, events };
+  state = { ...state, sunk };
+  // A seed whose plot no longer holds its plant has nothing to surface and
+  // can win for nobody (a stale entry must never credit the wrong side).
+  const surfacing = due.filter((seed) => state.board[seed.y][seed.x] === seed.player);
+  if (surfacing.length === 0) return { state, events };
+  events = [...events, ...surfacing.map(({ player, x, y }) => ({ type: 'stoneSurfaced', player, x, y }))];
+  for (const seed of surfacing) {
+    const line = findWinLineAt(scoringBoard(state), seed.x, seed.y);
+    if (line) return { won: win(state, seed.player, line, events) };
+  }
+  return { state, events };
+}
+
+// A player made five: the game is over (see finishTurn).
 function win(state, player, winLine, events) {
   const ended = { ...state, winner: player, winLine, pendingDash: null, tornado: null, skillLock: null, skillUsed: null };
   return done(ended, [...events, { type: 'win', player, line: winLine }]);

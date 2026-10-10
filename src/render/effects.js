@@ -57,12 +57,14 @@ function effectsForEvent(event) {
     case 'stoneThrown':
       // The thrown stone belongs to the player who placed it.
       return [{ kind: 'dust', x: event.from.x, y: event.from.y }, ...hit(event.to, event.player), { kind: 'banner', text: 'Whoosh!' }];
-    case 'stoneConverted':
-      return hit(event, event.player);
-    case 'rockPlaced':
+    case 'stonePetrified':
       return hit(event, null, { sparkle: false });
-    case 'rockBroken':
+    case 'mudPlaced':
+    case 'mudDried':
+    case 'stoneSunk':
       return [{ kind: 'dust', x: event.x, y: event.y }];
+    case 'stoneSurfaced':
+      return hit(event, event.player);
     default:
       return [];
   }

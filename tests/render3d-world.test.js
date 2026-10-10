@@ -5,7 +5,7 @@ import {
   BOARD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH,
 } from '../src/config.js';
 import { X, O } from '../src/logic/board.js';
-import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../src/logic/skills.js';
+import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION } from '../src/logic/skills.js';
 import { HUD_2D, panelRect, skillButtonRect } from '../src/render/layout.js';
 import { boardMarks } from '../src/render3d/board-marks.js';
 import { gameCamera, projectToNdc } from '../src/render3d/camera.js';
@@ -114,16 +114,30 @@ test('the Tornado Zone flow previews the clipped zone while choosing the centre'
   assert.deepEqual(kinds(boardMarks(game.getView())), []);
 });
 
-test('Terrain Creation previews a ghost rock and Stone Conversion a select ring', () => {
+test('Mud Trap previews a select ring on an empty plot and Petrification one on an opponent plant', () => {
   const game = createLocalGame();
   game.click({ x: 7, y: 7 });
-  game.clickSkill(O, TERRAIN_CREATION);
+  game.clickSkill(O, MUD_TRAP);
   game.setHover({ x: 3, y: 3 });
-  assert.deepEqual(boardMarks(game.getView()), { decals: [], ghost: { kind: 'rock', x: 3, y: 3 } });
+  assert.deepEqual(boardMarks(game.getView()), { decals: [{ kind: 'select', x: 3, y: 3, dx: 0, dy: 0 }], ghost: null });
   game.setHover({ x: 7, y: 7 });
-  assert.deepEqual(boardMarks(game.getView()), { decals: [], ghost: null }, 'no rock on a stone');
-  game.clickSkill(O, STONE_CONVERSION);
+  assert.deepEqual(boardMarks(game.getView()), { decals: [], ghost: null }, 'no mud on a stone');
+  game.clickSkill(O, PETRIFICATION);
   assert.deepEqual(kinds(boardMarks(game.getView())), ['select@7,7']);
+  game.setHover({ x: 3, y: 3 });
+  assert.deepEqual(kinds(boardMarks(game.getView())), [], 'no ring on an empty plot');
+});
+
+test('a mud puddle, and the puddle under a sunk seed, show as mud decals', () => {
+  const game = createLocalGame();
+  game.click({ x: 7, y: 7 });
+  game.clickSkill(O, MUD_TRAP);
+  game.click({ x: 3, y: 3 });
+  game.click({ x: 0, y: 14 }); // O plants, which ends the turn
+  assert.deepEqual(kinds(boardMarks(game.getView())), ['mud@3,3']);
+  game.click({ x: 3, y: 3 }); // X plants into the puddle: a sunk seed
+  assert.equal(game.getState().sunk.length, 1);
+  assert.deepEqual(kinds(boardMarks(game.getView())), ['mud@3,3'], 'the sunk seed stands in a puddle');
 });
 
 test('the winning line is marked and no ghost shows after the game ends', () => {

@@ -8,8 +8,8 @@ import {
   SHORT,
   HISS,
   SKILLS,
-  STONE_CONVERSION,
-  TERRAIN_CREATION,
+  PETRIFICATION,
+  MUD_TRAP,
   TORNADO_ZONE,
   VENOM,
   WIND_DASH,
@@ -77,7 +77,7 @@ test('without a pick order (DEFAULT_SIDES) Wind Rabbit plays X and Earth Bear pl
 
 test('each character owns its two skills', () => {
   assert.deepEqual(CHARACTERS[WIND_RABBIT].skills, [WIND_DASH, TORNADO_ZONE]);
-  assert.deepEqual(CHARACTERS[EARTH_BEAR].skills, [TERRAIN_CREATION, STONE_CONVERSION]);
+  assert.deepEqual(CHARACTERS[EARTH_BEAR].skills, [MUD_TRAP, PETRIFICATION]);
   assert.deepEqual(CHARACTERS[JADE_SERPENT].skills, [HISS, VENOM]);
   for (const character of Object.values(CHARACTERS)) {
     for (const skillId of character.skills) assert.equal(SKILLS[skillId].character, character.id);
@@ -88,12 +88,12 @@ test('the eight skills have the design cooldown classes', () => {
   assert.equal(Object.keys(SKILLS).length, 8);
   assert.equal(getSkill(WIND_DASH).cooldownClass, SHORT);
   assert.equal(getSkill(TORNADO_ZONE).cooldownClass, LONG);
-  assert.equal(getSkill(TERRAIN_CREATION).cooldownClass, SHORT);
-  assert.equal(getSkill(STONE_CONVERSION).cooldownClass, LONG);
+  assert.equal(getSkill(MUD_TRAP).cooldownClass, SHORT);
+  assert.equal(getSkill(PETRIFICATION).cooldownClass, LONG);
   assert.equal(cooldownTurns(WIND_DASH), COOLDOWN_SHORT);
-  assert.equal(cooldownTurns(TERRAIN_CREATION), COOLDOWN_SHORT);
+  assert.equal(cooldownTurns(MUD_TRAP), COOLDOWN_SHORT);
   assert.equal(cooldownTurns(TORNADO_ZONE), COOLDOWN_LONG);
-  assert.equal(cooldownTurns(STONE_CONVERSION), COOLDOWN_LONG);
+  assert.equal(cooldownTurns(PETRIFICATION), COOLDOWN_LONG);
   assert.equal(getSkill('toString'), null);
   assert.equal(getSkill('nope'), null);
 });
@@ -105,7 +105,7 @@ test('initial state starts at turn 1 with every skill ready', () => {
   assert.equal(state.turn, 1);
   assert.deepEqual(state.cooldowns, {
     X: { [WIND_DASH]: 0, [TORNADO_ZONE]: 0 },
-    O: { [TERRAIN_CREATION]: 0, [STONE_CONVERSION]: 0 },
+    O: { [MUD_TRAP]: 0, [PETRIFICATION]: 0 },
   });
   assert.equal(canUseSkill(state, X, WIND_DASH), true);
   assert.equal(canUseSkill(state, X, TORNADO_ZONE), true);
@@ -118,7 +118,7 @@ test('the turn counter goes up by one for every planting of either player, never
   let state = startWithDashSource();
   state = place(state, X, 0, 0);
   assert.equal(state.turn, 2);
-  state = skill(state, O, TERRAIN_CREATION, { x: 5, y: 5 });
+  state = skill(state, O, MUD_TRAP, { x: 5, y: 5 });
   assert.equal(state.turn, 2, 'a skill does not end the turn (Free Action)');
   state = place(state, O, 1, 0);
   assert.equal(state.turn, 3);
@@ -182,13 +182,13 @@ test('useSkill does not mutate the given state', () => {
 // --- useSkill validation ---
 
 test('useSkill rejects the wrong player', () => {
-  assertSkillRejected(createInitialState(), { player: O, skill: TERRAIN_CREATION }, /not your turn/);
+  assertSkillRejected(createInitialState(), { player: O, skill: MUD_TRAP }, /not your turn/);
 });
 
 test('useSkill rejects a skill of the other character', () => {
   const state = createInitialState();
-  assertSkillRejected(state, { player: X, skill: TERRAIN_CREATION }, /not your skill/);
-  assertSkillRejected(state, { player: X, skill: STONE_CONVERSION }, /not your skill/);
+  assertSkillRejected(state, { player: X, skill: MUD_TRAP }, /not your skill/);
+  assertSkillRejected(state, { player: X, skill: PETRIFICATION }, /not your skill/);
   const oTurn = place(state, X, 0, 0);
   assertSkillRejected(oTurn, { player: O, skill: WIND_DASH }, /not your skill/);
 });
@@ -230,7 +230,7 @@ function cooldownTimeline(player, skillId, ownTurns) {
   }
   // Stone Conversion needs an X stone, Wind Dash an X stone and a free
   // cell; the other skills get a free cell.
-  const targets = { [STONE_CONVERSION]: xStone, [WIND_DASH]: DASH };
+  const targets = { [PETRIFICATION]: xStone, [WIND_DASH]: DASH };
   state = skillTurn(state, player, skillId, targets[skillId] ?? { x: 7, y: 0 });
   const timeline = [];
   for (let i = 0; i < ownTurns; i++) {
@@ -245,7 +245,7 @@ function cooldownTimeline(player, skillId, ownTurns) {
 }
 
 test('short cooldown: cannot use it during your next 3 turns, usable on the 4th', () => {
-  for (const [player, skillId] of [[X, WIND_DASH], [O, TERRAIN_CREATION]]) {
+  for (const [player, skillId] of [[X, WIND_DASH], [O, MUD_TRAP]]) {
     const timeline = cooldownTimeline(player, skillId, 5);
     assert.deepEqual(timeline, [
       { left: 3, usable: false },
@@ -258,7 +258,7 @@ test('short cooldown: cannot use it during your next 3 turns, usable on the 4th'
 });
 
 test('long cooldown: cannot use it during your next 6 turns, usable on the 7th', () => {
-  for (const [player, skillId] of [[X, TORNADO_ZONE], [O, STONE_CONVERSION]]) {
+  for (const [player, skillId] of [[X, TORNADO_ZONE], [O, PETRIFICATION]]) {
     const timeline = cooldownTimeline(player, skillId, 8);
     assert.deepEqual(
       timeline.map((t) => t.usable),
@@ -279,12 +279,12 @@ test('cooldowns count only the owner\'s turns', () => {
   assert.equal(skillCooldown(state, X, WIND_DASH), 3);
   state = place(state, X, 2, 0);
   assert.equal(skillCooldown(state, X, WIND_DASH), 2);
-  state = skillTurn(state, O, TERRAIN_CREATION, { x: 6, y: 6 });
+  state = skillTurn(state, O, MUD_TRAP, { x: 6, y: 6 });
   assert.equal(skillCooldown(state, X, WIND_DASH), 2);
-  assert.equal(skillCooldown(state, O, TERRAIN_CREATION), 3);
+  assert.equal(skillCooldown(state, O, MUD_TRAP), 3);
   state = place(state, X, 4, 0);
   assert.equal(skillCooldown(state, X, WIND_DASH), 1);
-  assert.equal(skillCooldown(state, O, TERRAIN_CREATION), 3);
+  assert.equal(skillCooldown(state, O, MUD_TRAP), 3);
 });
 
 test('cooldowns of the two skills of one player are tracked separately', () => {
@@ -318,6 +318,6 @@ test('a skill can be used again as soon as its cooldown is over', () => {
 
 test('canUseSkill is false when it is not the player\'s turn', () => {
   const state = createInitialState();
-  assert.equal(canUseSkill(state, O, TERRAIN_CREATION), false);
-  assert.equal(canUseSkill(state, X, TERRAIN_CREATION), false);
+  assert.equal(canUseSkill(state, O, MUD_TRAP), false);
+  assert.equal(canUseSkill(state, X, MUD_TRAP), false);
 });

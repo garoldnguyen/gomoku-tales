@@ -27,8 +27,12 @@ export function venom(state, player, target) {
 
   const board = cloneBoard(state.board);
   board[y][x] = EMPTY;
+  // A sunk seed that is withered has nothing left to surface, and a plant
+  // set there later must count at once: its entry goes with the plant.
+  const sunk = (state.sunk ?? []).filter((seed) => seed.x !== x || seed.y !== y);
   return {
     board,
+    sunk,
     events: [{ type: 'plantRemoved', player, x, y, from: opponent }],
     changed: null,
   };

@@ -7,7 +7,9 @@ test('config holds the design values', () => {
   assert.equal(config.WIN_LENGTH, 5);
   assert.equal(config.COOLDOWN_SHORT, 3);
   assert.equal(config.COOLDOWN_LONG, 6);
-  assert.equal(config.ROCK_LIFETIME_TURNS, 4);
+  assert.equal(config.MUD_LIFETIME_TURNS, 4);
+  assert.equal(config.MUD_SINK_TURNS, 1);
+  assert.equal('ROCK_LIFETIME_TURNS' in config, false, 'rocks are permanent now');
   assert.equal(config.TORNADO_SIZE, 3);
   assert.equal(config.CELL_PX, 24);
   assert.equal(config.INTERNAL_WIDTH, 960);

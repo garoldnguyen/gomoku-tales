@@ -271,12 +271,16 @@ function describeEvent(event) {
       return 'The dandelion storm threw the stone away!';
     case 'throwBlocked':
       return 'The storm had nowhere to throw the stone.';
-    case 'rockPlaced':
-      return 'Terrain Creation! A rock fell.';
-    case 'rockBroken':
-      return 'A rock crumbled.';
-    case 'stoneConverted':
-      return 'Stone Conversion! The stone changed sides.';
+    case 'mudPlaced':
+      return 'Mud Trap! A mud puddle.';
+    case 'mudDried':
+      return 'The mud dried.';
+    case 'stoneSunk':
+      return 'The seed sank in the mud.';
+    case 'stoneSurfaced':
+      return 'The seed surfaced.';
+    case 'stonePetrified':
+      return 'Petrification! The plant turned to stone.';
     case 'hissCast':
       return 'Hiss! No skills on the next turn.';
     case 'plantRemoved':

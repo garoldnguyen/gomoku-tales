@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { BOARD_SIZE, SHOT_READY_FRAMES, SHOT_TIME_MS } from '../src/config.js';
 import { EMPTY, O, ROCK, X, findWinLine } from '../src/logic/board.js';
 import { createInitialState, isGameOver, placeStone, useSkill } from '../src/logic/game.js';
-import { STONE_CONVERSION, TERRAIN_CREATION } from '../src/logic/skills.js';
+import { PETRIFICATION, MUD_TRAP } from '../src/logic/skills.js';
 import { createLocalGame } from '../src/ui/local-game.js';
 import { parseShotParams, SHOT_SCENES, setUpShotScene } from '../src/ui/shot-mode.js';
 import { SHOT_FIELD } from '../src/ui/shot-position.js';
@@ -23,7 +23,7 @@ test('the field position is legal: every action passes the rules and nobody has 
       ? useSkill(state, { player, skill, target: { x, y } })
       : placeStone(state, { player, x, y }, { random: () => 0 });
     assert.ok(result.ok, `${x},${y}: ${result.error}`);
-    assert.ok(!result.events.some((e) => e.type === 'stoneThrown' || e.type === 'rockBroken'), 'no random throws, no broken rock');
+    assert.ok(!result.events.some((e) => e.type === 'stoneThrown' || e.type === 'mudDried'), 'no random throws, no puddle drying');
     state = result.state;
   }
   assert.equal(isGameOver(state), false);
@@ -48,8 +48,8 @@ test('the field scene shows growing plants on its own seeds, the last move and a
   assert.deepEqual(staged.last, { x: last.x, y: last.y, player: board[last.y][last.x], ageMs: SHOT_FIELD.lastMoveAgeMs });
   assert.equal(game.getTargeting().skill, SHOT_FIELD.selectedSkill);
   assert.equal(currentPlayer, O);
-  assert.equal(SHOT_FIELD.selectedSkill, STONE_CONVERSION);
-  assert.ok(SHOT_FIELD.actions.some((a) => a.skill === TERRAIN_CREATION), 'a rock is on the field');
+  assert.equal(SHOT_FIELD.selectedSkill, PETRIFICATION);
+  assert.ok(SHOT_FIELD.actions.some((a) => a.skill === MUD_TRAP), 'a rock is on the field');
   assert.equal(game.getView().message, null, 'no toast in the picture');
   assert.equal(game.takeEvents().length, 0, 'the scene events are not replayed');
   // Cell numbering is the game's own: the board is BOARD_SIZE square.

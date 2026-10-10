@@ -4,10 +4,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { ROCK_LIFETIME_TURNS, TORNADO_SIZE } from '../src/config.js';
+import { MUD_LIFETIME_TURNS, MUD_SINK_TURNS, TORNADO_SIZE } from '../src/config.js';
 import { X, O } from '../src/logic/board.js';
 import { createInitialState, placeStone } from '../src/logic/game.js';
-import { SKILLS, STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH, cooldownTurns } from '../src/logic/skills.js';
+import { SKILLS, PETRIFICATION, MUD_TRAP, TORNADO_ZONE, WIND_DASH, cooldownTurns } from '../src/logic/skills.js';
 import {
   ALL_COLLAPSED, ALL_EXPANDED, COLLAPSE_KEY, COLLAPSE_STORAGE_KEYS, isCollapseKey, parseHudParam, readCollapsed,
   startCollapsed, toggleAll, withCollapsed, writeCollapsed,
@@ -114,7 +114,7 @@ test('view model: every skill has its description and hint from SKILL_INFO', () 
   const vm = hudViewModel(midGame(), {}, null);
   const rows = vm.cards.flatMap((c) => c.skills);
   // The skills of the two characters in play (Wind Rabbit and Earth Bear).
-  assert.deepEqual(rows.map((r) => r.id).sort(), [WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION].sort());
+  assert.deepEqual(rows.map((r) => r.id).sort(), [WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION].sort());
   assert.deepEqual(Object.keys(SKILL_INFO).sort(), Object.keys(SKILLS).sort(), 'every skill has its SKILL_INFO');
   for (const row of rows) {
     assert.equal(row.description, SKILL_INFO[row.id].description);
@@ -124,28 +124,27 @@ test('view model: every skill has its description and hint from SKILL_INFO', () 
   }
   assert.equal(SKILL_INFO[WIND_DASH].hint, 'Click to select, then choose a plot');
   assert.equal(SKILL_INFO[TORNADO_ZONE].hint, 'Click to select, then choose the zone centre');
-  assert.equal(SKILL_INFO[TERRAIN_CREATION].hint, 'Click to select, then choose a plot');
-  assert.equal(SKILL_INFO[STONE_CONVERSION].hint, 'Click to select, then choose a plant');
+  assert.equal(SKILL_INFO[MUD_TRAP].hint, 'Click to select, then choose a plot');
+  assert.equal(SKILL_INFO[PETRIFICATION].hint, 'Click to select, then choose a plant');
 });
 
 test('SKILL_INFO: the numbers are the config constants and the text matches the rules', () => {
   assert.ok(SKILL_INFO[TORNADO_ZONE].description.includes(`${TORNADO_SIZE} by ${TORNADO_SIZE} zone`));
-  assert.ok(SKILL_INFO[TERRAIN_CREATION].description.includes(`stays for ${ROCK_LIFETIME_TURNS} turns`));
+  assert.ok(SKILL_INFO[MUD_TRAP].description.includes(`stays for ${MUD_LIFETIME_TURNS} turns`));
+  assert.ok(SKILL_INFO[MUD_TRAP].description.includes(`no line for ${MUD_SINK_TURNS} turn,`), 'the sink time is the config constant, singular for 1');
   // No number is typed into the strings: the only digits are the constants.
   const source = readFileSync(new URL('../src/ui/skill-info.js', import.meta.url), 'utf8');
   const strings = source.slice(source.indexOf('export const SKILL_INFO'));
   assert.doesNotMatch(strings.replace(/\$\{[^}]*\}/g, ''), /'[^'\n]*\d[^'\n]*'|`[^`\n]*\d[^`\n]*`/);
   // Accuracy (src/logic): Wind Dash needs an empty target and lands after
   // the opponent's turn; Tornado Zone is secret and throws a seed the
-  // opponent plants inside it on their next turn anywhere on the field; Terrain Creation needs an empty plot;
-  // Stone Conversion takes only an opponent's plant.
+  // opponent plants inside it on their next turn anywhere on the field; Mud Trap needs an empty plot;
+  // Petrification takes only an opponent's plant that is not sunk in mud.
   assert.match(SKILL_INFO[WIND_DASH].description, /empty target plot\. After the opponent's next turn/);
   assert.match(SKILL_INFO[TORNADO_ZONE].description, /your opponent never sees where\. On their next turn, a seed they plant inside is blown .* anywhere on the field/);
-  assert.match(SKILL_INFO[TERRAIN_CREATION].description, /on an empty plot/);
-  assert.match(SKILL_INFO[STONE_CONVERSION].description, /^Pick one of the opponent's plants\./);
-  // Only Earth Bear (O) has Stone Conversion, so it never turns O into X.
-  assert.ok(SKILL_INFO[STONE_CONVERSION].description.endsWith('X becomes O.'));
-  assert.ok(!SKILL_INFO[STONE_CONVERSION].description.includes('O becomes X'));
+  assert.match(SKILL_INFO[MUD_TRAP].description, /^Turns an empty plot into a mud puddle\./);
+  assert.match(SKILL_INFO[PETRIFICATION].description, /^Pick one of the opponent's plants\. It turns to stone: a rock that stays for good and breaks every line\./);
+  assert.ok(SKILL_INFO[PETRIFICATION].description.endsWith('A seed sunk in mud cannot be picked.'));
 });
 
 // ---------------------------------------------------------------- tooltip

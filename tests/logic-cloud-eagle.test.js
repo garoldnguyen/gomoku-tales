@@ -85,7 +85,7 @@ test('a cloud on a cell that holds a stone, and on a rock cell; the rock is not 
   assert.equal(stoneCloud.board[3][3], X);
   assert.deepEqual(cloudsOf(stoneCloud)[0], { x: 4, y: 4, owner: X, turnsLeft: CLOUD_TURNS, placedTurn: 3 });
 
-  const rocks = [{ x: 10, y: 10, breaksAfterTurn: 99 }];
+  const rocks = [{ x: 10, y: 10 }];
   const board = state.board.map((row) => row.slice());
   board[10][10] = ROCK;
   const rocky = { ...state, board, rocks };
