@@ -415,7 +415,7 @@ export const DRY_DUST_COUNT = 10; // dust puffs rising off it (full; scaled per 
 export const DRY_SLOTS = 6; // drying puddles shown at once
 export const SKILL_RUN_SLOTS = 12; // skill effect plans (Mud Trap, Petrification, the Tornado storm) playing at once
 export const COVER_CLEAR_MARGIN = 0.25; // when a plot becomes covered for the viewer, its leftover particles are cleared this far (world units) past the plot edge
-export const POISON_OPACITY = 0.62; // a withered purple poisoned plot (Venom zone) over the soil
+export const POISON_OPACITY = 0.9; // a withered purple poisoned empty plot (Venom zone, poison-plot.png) over the soil
 export const POISON_PREVIEW_OPACITY = 0.35; // the Venom zone being chosen, under the pointer
 export const SHAKE3D_MS = 240; // camera shake length
 export const SHAKE3D_LIGHT = 0.04; // world units at the start of a light shake (a rock popping in after a Petrification, the Tornado Zone storm)
@@ -466,9 +466,18 @@ export const FEATHER_STAGGER_MS = 120; // the feathers lift off this far apart
 
 // Cloud Eagle on the board (src/render3d/cloud-overlay.js): the cloud over
 // its CLOUD_SIZE by CLOUD_SIZE area and the Sky Watch outlines.
-export const CLOUD_SEE_THROUGH_OPACITY = 0.42; // the owner's (and spectators') translucent cloud
-export const CLOUD_PREVIEW_OPACITY = 0.3; // the cloud being placed, under the pointer
-export const CLOUD_MIST_OPACITY = 0.42; // the other seat's view of a cloud: a light mist over its CLOUD_SIZE by CLOUD_SIZE plots, empty ones showing through
+export const CLOUD_SEE_THROUGH_OPACITY = 0.5; // the owner's (and spectators') translucent cloud: 50 percent, everything under it shows
+export const CLOUD_OPPONENT_OPACITY = 0.97; // the other seat's view of a cloud: a dense cloud (near 1) that hides the ground under its CLOUD_SIZE by CLOUD_SIZE plots
+export const CLOUD_PREVIEW_OPACITY = 0.3; // the cloud being placed, under the pointer (the owner's cloud tile, so it matches the placed one)
+export const CLOUD_FADE_OPACITY = 0.6; // an ended cloud starts to thin away at this opacity (the same light look for every viewer)
+// The lightning of the dense cloud is only a look: a constant seeds it, it is
+// never part of the game state or of a network message (effect-plans.js lightningSchedule).
+export const CLOUD_LIGHTNING_SEED = 20261011;
+export const CLOUD_LIGHTNING_MS = 4200; // the dense cloud has one chance of a lightning flash in each window of this length
+export const CLOUD_LIGHTNING_CHANCE = 0.75; // the share of those windows that flash
+export const CLOUD_LIGHTNING_PULSE_MS = 90; // one pulse of a flash
+export const CLOUD_LIGHTNING_GAP_MS = 70; // the dark gap between the two pulses of a flash
+export const CLOUD_LIGHTNING_GLOW = 0.55; // the opacity of the white yellow flash over the dense cloud at its brightest
 export const CLOUD_PUFF_HEIGHT = 0.42; // world units above the ground of the puff over a taken covered plot
 export const CLOUD_PUFF_SCALE = 1.15; // that puff's size, in plots
 export const CLOUD_PUFF_DRIFT = 0.08; // how far (world units) it drifts either side of its plot
@@ -501,10 +510,22 @@ export const HISS_RING_DOTS = RING_MAX_DOTS;
 export const HISS_WOBBLE = 0.12; // world units: the ring's sound wave wobble
 export const HISS_WOBBLE_WAVES = 14; // wobbles round a ring
 export const HISS_MIST = 18; // jade mist puffs rising off the field (particles)
-export const VENOM_DROP_MS = 300; // Venom: the venom drops fall onto the plant this long
-export const VENOM_SINK_MS = 520; // after the wilt, the sick sprout sinks into the soil this long
-export const VENOM_TINT = 0.85; // emissive strength of the venom green on the wilting plant at most
-export const VENOM_BUBBLE_RATE = 40; // venom bubbles per second rising while it sinks (particles)
+// Venom (docs/free-action-design.md section 8; effect-plans.js, skill-plans.js, poison-effects.js)
+export const VENOM_DROP_MS = 300; // the venom sap drops fall onto the target plant this long
+export const VENOM_WILT_IN_MS = 240; // then the plant droops this long (it stays on the board)
+export const VENOM_WILT_HOLD_MS = 520; // stays drooped this long
+export const VENOM_WILT_OUT_MS = 700; // and perks up again this long
+export const VENOM_WILT_SQUASH = 0.14; // it droops this share of its height at the most
+export const VENOM_WILT_DIM = 0.3; // and goes this much darker (a share of its brightness) at the most
+export const POISON_FORM_MS = 520; // the plots of a new zone turn withered purple this long once the sap has landed
+export const POISON_FADE_MS = 900; // a zone that ended thins away this long
+export const POISON_SAP_DROPS = 6; // sap drops falling on the target plant (full; scaled per level)
+export const POISON_SPLASH_COUNT = 8; // sap flecks splashing off the plant when the drops land (full; scaled per level)
+export const POISON_FORM_FOG = 2; // fog wisps rising on each plot as the zone forms (full; scaled per level)
+export const POISON_FORM_BUBBLES = 2; // toxic bubbles popping on each plot as the zone forms (full; scaled per level)
+export const POISON_FOG_RATE = 1.3; // fog wisps per second hugging the ground of each poisoned plot (full; scaled per level)
+export const POISON_BUBBLE_RATE = 1.5; // toxic bubbles per second popping on each poisoned plot (full; scaled per level)
+export const POISON_END_FOG = 3; // fog wisps per plot that drift off as the zone thins away (full; scaled per level)
 export const CLOUD_FORM_MS = 650; // a new cloud thickens from nothing this long
 export const CLOUD_FADE_MS = 700; // an ended cloud thins away this long
 export const CLOUD_PUFFS = 22; // cloud puffs rolling in or drifting away (particles)

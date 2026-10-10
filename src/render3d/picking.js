@@ -37,6 +37,16 @@ export function worldToCell(wx, wz, { boardSize, cellSize } = BOARD) {
   return { x, y };
 }
 
+// The index (y * boardSize + x) of the game board cell under a world point on
+// the board plane, or -1 off the board. No allocation, for the render loop.
+export function cellIndexAt(wx, wz) {
+  const half = BOARD.boardSize / 2;
+  const x = Math.floor(wx / BOARD.cellSize + half);
+  const y = Math.floor(wz / BOARD.cellSize + half);
+  if (x < 0 || y < 0 || x >= BOARD.boardSize || y >= BOARD.boardSize) return -1;
+  return y * BOARD.boardSize + x;
+}
+
 // World x and z of a cell's centre.
 export function cellToWorld(x, y, { boardSize, cellSize } = BOARD) {
   const offset = (boardSize - 1) / 2;

@@ -30,7 +30,7 @@ import { loadName } from './ui/player-names.js';
 import { JOIN_PARAM, joinCodeFromSearch } from './ui/room-screens.js';
 import { attachScreens } from './ui/screens.js';
 import {
-  parseShotParams, setUpShotScene, SHOT_GAME_OVER, SHOT_NAME, shotFlow, shotGameOverView, shotRoomView, shotWatchView, stillRoomApp,
+  parseShotParams, setUpShotScene, SHOT_GAME_OVER, SHOT_NAME, shotCharacters, shotFlow, shotGameOverView, shotRoomView, shotWatchView, stillRoomApp,
 } from './ui/shot-mode.js';
 
 const canvas = document.getElementById('game');
@@ -476,7 +476,7 @@ function startAppMode({ local = false } = {}) {
 // window.__SHOT__.ready turns true once the art and the HUD images are
 // loaded and SHOT_READY_FRAMES frames were drawn at the current window size.
 async function startShotMode({ scene }) {
-  const game = createLocalGame({ random: seededRandom(SHOT_SEED) });
+  const game = createLocalGame({ random: seededRandom(SHOT_SEED), characters: shotCharacters(scene) });
   const staged = setUpShotScene(game, scene);
   // The menu, howto and settings scenes show the menu layer over the empty
   // farm, with no HUD, like the menu screen of the game; the lobby, waiting

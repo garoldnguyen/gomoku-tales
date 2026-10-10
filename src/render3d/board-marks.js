@@ -16,10 +16,15 @@
 //   'dashTarget'  the Wind Dash target cell being chosen
 //   'select'      a chosen or pickable plant (Wind Dash, Petrification, Venom) or the plot Mud Trap would flood
 //   'mud'         a mud puddle (Mud Trap), also under a seed sunk in it
-//   'poison'      a poisoned plot of the Venom zone (state.poison)
+//   'poison'      a poisoned EMPTY plot of the Venom zone (state.poison, poison-plot.png); a plot with a plant,
+//                 and any plot under a cloud for the viewer, has none
+//   'forbidden'   the red crossed-out border on the poisoned empty plot the pointer is on (decal-forbidden.png):
+//                 a mark, not a tooltip; the plot shows no ghost plant and no hover ring then (out.forbidden)
 //   'poisonPreview' a plot of the Venom zone being chosen (Jade Serpent)
 //   'win'         a cell of the winning line
 //   'cloudPreview' a cell of the Cloud being placed (Cloud Eagle)
+
+import { createPoisonPlots, isForbiddenPlot, poisonPlotsInto } from './poison-view.js';
 
 // Returns { decals: [{ kind, x, y, dx, dy }], ghost: { kind, x, y } | null }
 // where a ghost kind is 'X' or 'O' (a stone about to be placed),
@@ -34,7 +39,7 @@ export function boardMarks(view) {
 // this frame's decals (the list only grows, so it never reallocates) and
 // ghost is ghostSpot or null.
 export function createBoardMarks() {
-  return { decals: [], count: 0, ghost: null, ghostSpot: { kind: null, x: 0, y: 0 } };
+  return { decals: [], count: 0, ghost: null, ghostSpot: { kind: null, x: 0, y: 0 }, forbidden: false, poison: createPoisonPlots() };
 }
 
 // boardMarks written into `out` from createBoardMarks, reusing its
@@ -43,6 +48,7 @@ export function boardMarksInto(view, out) {
   const { state, hover, preview } = view;
   out.count = 0;
   out.ghost = null;
+  out.forbidden = false;
 
   if (state.winLine) {
     for (let i = 0; i < state.winLine.length; i++) addDecal(out, 'win', state.winLine[i].x, state.winLine[i].y, 0, 0);
@@ -53,11 +59,20 @@ export function boardMarksInto(view, out) {
   if (mud) for (let i = 0; i < mud.length; i++) addDecal(out, 'mud', mud[i].x, mud[i].y, 0, 0);
   if (sunk) for (let i = 0; i < sunk.length; i++) addDecal(out, 'mud', sunk[i].x, sunk[i].y, 0, 0);
 
-  // The Venom zone: every plot of state.poison.cells, a public fact.
-  const poisonCells = state.poison?.cells;
-  if (poisonCells) for (let i = 0; i < poisonCells.length; i++) addDecal(out, 'poison', poisonCells[i].x, poisonCells[i].y, 0, 0);
+  // The Venom zone, a public fact: the withered soil lies on each of its empty
+  // plots the viewer may see (poisonPlotsInto leaves out the covered ones).
+  const plots = poisonPlotsInto(state, out.poison);
+  for (let i = 0; i < plots.count; i++) {
+    if (plots.empty[i] === 1) addDecal(out, 'poison', plots.x[i], plots.y[i], 0, 0);
+  }
 
-  if (hover) setGhost(out, state.currentPlayer, hover.x, hover.y);
+  // A pointer on a poisoned empty plot shows the red crossed-out border
+  // instead of the ghost plant: nobody may plant there.
+  if (hover) {
+    out.forbidden = isForbiddenPlot(plots, hover.x, hover.y);
+    if (out.forbidden) addDecal(out, 'forbidden', hover.x, hover.y, 0, 0);
+    else setGhost(out, state.currentPlayer, hover.x, hover.y);
+  }
 
   // Hover preview for the skill target flow (see ui/targeting.js).
   if (preview) {

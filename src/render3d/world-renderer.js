@@ -40,15 +40,16 @@
 // planted seed also plays the placement effect of its side's character.
 //
 // Cloud Eagle (cloud-overlay.js): each cloud shows over its cells,
-// translucent with the plants inside visible for its owner and
-// spectators, opaque for the other seat (whose state has nothing under it,
-// maskForViewer). The Sky Watch cells show as soft yellow outlines to the
+// translucent (50 percent) with the plants and ground inside visible for its
+// owner and spectators, a dense storm cloud for the other seat (whose state
+// has nothing under it, maskForViewer) with now and then a flash of lightning
+// (a look only, seeded by a constant). The Sky Watch cells show as soft yellow outlines to the
 // Cloud Eagle side and to spectators. Both are worked out again only when
 // the drawn state or its viewer changes.
 
 import {
-  BOARD_SIZE, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, CLOUD_MIST_OPACITY, CLOUD_PUFF_BOB, CLOUD_PUFF_DRIFT, CLOUD_PUFF_DRIFT_MS, CLOUD_PUFF_HEIGHT, CLOUD_PUFF_SCALE, SKY_WATCH_GLOW_OPACITY, SKY_WATCH_OPACITY, SKY_WATCH_PUFF_DRIFT, SKY_WATCH_PUFF_HEIGHT, SKY_WATCH_PUFF_MS,
-  SPRITE_STRETCH_Y, MUD_OPACITY, POISON_OPACITY, POISON_PREVIEW_OPACITY, SUNK_DEPTH_PX, SUNK_DIM,
+  BOARD_SIZE, CLOUD_FADE_OPACITY, CLOUD_LIGHTNING_GLOW, CLOUD_OPPONENT_OPACITY, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, CLOUD_PUFF_BOB, CLOUD_PUFF_DRIFT, CLOUD_PUFF_DRIFT_MS, CLOUD_PUFF_HEIGHT, CLOUD_PUFF_SCALE, SKY_WATCH_GLOW_OPACITY, SKY_WATCH_OPACITY, SKY_WATCH_PUFF_DRIFT, SKY_WATCH_PUFF_HEIGHT, SKY_WATCH_PUFF_MS,
+  SPRITE_STRETCH_Y, MUD_OPACITY, POISON_OPACITY, POISON_PREVIEW_OPACITY, SUNK_DEPTH_PX, SUNK_DIM, VENOM_WILT_DIM, VENOM_WILT_SQUASH,
 } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
 import { DEFAULT_SIDES } from '../logic/characters.js';
@@ -59,10 +60,12 @@ import { artMeta, artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
 import { boardMarksInto, createBoardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
 import { placementCues } from './character-look.js';
-import { COVER, cloudTileGrid, createCloudOverlay, hiddenPuffGrid, skyWatchGlowGrid, skyWatchOutlineGrid, skyWatchPuffGrid, viewerOf } from './cloud-overlay.js';
-import { cloudFadeAmount, cloudFormAmount, skyWatchPulse } from './effect-plans.js';
+import {
+  COVER, cloudTileGrid, createCloudOverlay, hiddenPuffGrid, lightningBoltGrid, skyWatchGlowGrid, skyWatchOutlineGrid, skyWatchPuffGrid,
+  stormFlashGrid, stormTileGrid, viewerOf,
+} from './cloud-overlay.js';
+import { cloudFadeAmount, cloudFormAmount, lightningAmount, lightningPickAt, skyWatchPulse } from './effect-plans.js';
 import { createEffects3d } from './effects3d.js';
-import { poisonTileGrid } from './poison-art.js';
 import { enteredStage, plantedCells, plantPoseInto, STAGE_LAND, STAGE_OPEN, STAGE_REST } from './growth.js';
 import { createWorldHitTest } from './hit-test.js';
 import { parseFpsSwitch } from './fps.js';
@@ -172,6 +175,10 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       const toMove = view.state.currentPlayer === O ? O : X;
       world.setHoverMap(tints.hover[toMove]);
       decals.useSelectMap(tints.select[toMove]);
+      // First of all: a plot that has just become covered is cleared of its
+      // effects before the plants and decals below read them, so not even the
+      // frame of the change shows anything on it.
+      effects.setCovered(view.state.covered);
       // Before the plants read their lean towards the zone (pieces.sync): a
       // zone this viewer may not see must not bend anything on this frame.
       effects.syncTornado(view.state.tornado, viewerOf(view));
@@ -183,9 +190,10 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       clouds.show(view);
       clouds.update(time);
       ghosts.show(marks.ghost);
-      world.setHoveredCell(view.hover ?? null);
+      // No hover ring on a poisoned plot: its red crossed-out border is the mark.
+      world.setHoveredCell(marks.forbidden ? null : view.hover ?? null);
       effects.setMudState(view.state.mud, view.state.sunk);
-      effects.setCovered(view.state.covered);
+      effects.setPoisonState(view.state);
       effects.update(time);
       world.render(time);
 
@@ -203,6 +211,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       ghosts.show(null);
       world.setHoveredCell(null);
       effects.setMudState(null, null);
+      effects.setPoisonState(null);
       effects.setCovered(null);
       effects.update(time);
       world.render(time);
@@ -332,6 +341,7 @@ function createPieceLayer(world) {
   const lastStage = new Int8Array(cellCount).fill(UNPLANTED);
   const sunkNow = new Uint8Array(cellCount); // per cell: 1 while the seed on it is sunk in mud (this frame)
   const depthShown = new Float64Array(cellCount); // per cell: how far below its plot its sprite is drawn (a share of SUNK_DEPTH_PX)
+  const wiltShown = new Float64Array(cellCount); // per cell: how drooped its plant is drawn (a poisoned target, 0 to 1)
   const pose = { frame: 0, progress: 0, dropPx: 0, scale: 1 }; // written by plantPoseInto
   const looks = {}; // per player: plantLook, made the first time
   const look = (player) => (looks[player] ??= plantLook(player));
@@ -380,6 +390,7 @@ function createPieceLayer(world) {
         shownKind[i] = null;
         shownSprite[i] = null;
         depthShown[i] = 0; // the next sprite of a sunk seed is made bright and must be dimmed again
+        wiltShown[i] = 0;
       }
       for (const kind of [X, O]) {
         for (const sprite of free[kind]) dropSprite(world, sprite);
@@ -412,6 +423,7 @@ function createPieceLayer(world) {
             old.setBend(0, 0, 0);
             old.setDim(1);
             depthShown[i] = 0;
+            wiltShown[i] = 0;
             old.object.visible = false;
             free[current].push(old);
           }
@@ -444,10 +456,15 @@ function createPieceLayer(world) {
         // dimmed by the same share.
         const depth = effects.sunkDepth(i, sunkNow[i] === 1, time);
         const lift = SUNK_LIFT * depth;
-        if (depth !== depthShown[i]) {
+        // The target of a Venom cast droops a little and goes darker, and
+        // perks up again (it stays on the board the whole time).
+        const wilt = effects.wilt(i, time);
+        if (depth !== depthShown[i] || wilt !== wiltShown[i]) {
           depthShown[i] = depth;
-          sprite.setDim(1 - (1 - SUNK_DIM) * Math.min(1, Math.max(0, depth)));
+          wiltShown[i] = wilt;
+          sprite.setDim((1 - (1 - SUNK_DIM) * Math.min(1, Math.max(0, depth))) * (1 - VENOM_WILT_DIM * wilt));
           sprite.plane.position.y = lift;
+          sprite.object.scale.y = 1 - VENOM_WILT_SQUASH * wilt;
         }
         if (Number.isNaN(growStart[i])) continue;
         const player = shownKind[i];
@@ -460,13 +477,14 @@ function createPieceLayer(world) {
         const shown = frames[plantFrameIndex(pose.frame, pose.progress, plant.topRows.length, inBetween)];
         sprite.setBlend(shown.from, shown.to, shown.mix);
         sprite.plane.position.y = (pose.dropPx + shown.liftPx) * PX_WORLD * SPRITE_STRETCH_Y + lift;
-        sprite.object.scale.set(pose.scale, pose.scale, pose.scale);
+        sprite.object.scale.set(pose.scale, pose.scale * (1 - VENOM_WILT_SQUASH * wilt), pose.scale);
         if (enteredStage(lastStage[i], pose.frame, STAGE_LAND)) effects.soilPuff(x, y);
         if (enteredStage(lastStage[i], pose.frame, STAGE_OPEN)) effects.openSparkles(x, y, player, anchorY);
         lastStage[i] = pose.frame;
         if (pose.frame === STAGE_REST && pose.scale === 1) {
           settle(i);
           sprite.plane.position.y = lift;
+          sprite.object.scale.y = 1 - VENOM_WILT_SQUASH * wilt; // settle stood it upright; a Venom droop in progress stays
         }
       }
     },
@@ -480,8 +498,10 @@ function createPieceLayer(world) {
 // a fixed order (the last-move mark is 3, see createLastMoveMark).
 const DECALS = {
   mud: { order: 0, art: ART.v3.mudPuddle, opacity: MUD_OPACITY },
-  poison: { order: 0, grid: poisonTileGrid, opacity: POISON_OPACITY },
-  poisonPreview: { order: 1, grid: poisonTileGrid, opacity: POISON_PREVIEW_OPACITY },
+  poison: { order: 0, art: ART.v3.poisonPlot, opacity: POISON_OPACITY },
+  poisonFade: { order: 0, art: ART.v3.poisonPlot, opacity: POISON_OPACITY }, // the plots of a zone that ended, thinning away
+  poisonPreview: { order: 1, art: ART.v3.poisonPlot, opacity: POISON_PREVIEW_OPACITY },
+  forbidden: { order: 6, art: ART.v3.decal.forbidden },
   zonePreview: { order: 1, art: ART.v3.decal.zoneCross },
   win: { order: 2, art: ART.v3.decal.win },
   dashTarget: { order: 4, art: ART.v3.decal.dashTarget },
@@ -492,7 +512,10 @@ const DECALS = {
 // Pools of flat cell decals; show(decals, count, time, effects) places the
 // first `count` decals and hides the rest. A zone decal shows its own part of
 // the 3x3 cross art; a mud puddle is as big as effects.mudSpread says (a new
-// one spreads out from its middle).
+// one spreads out from its middle). The withered soil of a new Venom zone turns
+// in (effects.poisonForm) and that of an ended zone thins away over the plots it
+// showed (effects.poisonFade); the red crossed-out border shows on the poisoned
+// plot the pointer is on (board-marks.js).
 function createDecalLayer(world) {
   const pools = {};
   for (const [kind, look] of Object.entries(DECALS)) {
@@ -515,19 +538,13 @@ function createDecalLayer(world) {
 
     show(decals, count, time, effects) {
       pools.win.material.opacity = winPulseOpacity(time);
+      pools.poison.material.opacity = POISON_OPACITY * effects.poisonForm(time);
       for (let p = 0; p < poolList.length; p++) poolList[p].used = 0;
       for (let d = 0; d < count; d++) {
         const decal = decals[d];
         const pool = pools[decal.kind];
         if (!pool) continue;
-        let mesh = pool.meshes[pool.used];
-        if (!mesh) {
-          mesh = createCellDecal(pool.material);
-          mesh.renderOrder = pool.order;
-          world.scene.add(mesh);
-          pool.meshes.push(mesh);
-        }
-        pool.used++;
+        const mesh = nextMesh(pool);
         if (decal.kind === 'zonePreview') mesh.geometry = zonePieceGeometry(decal.dx, decal.dy);
         if (decal.kind === 'mud') {
           const spread = effects.mudSpread(decal.x, decal.y, time);
@@ -536,12 +553,37 @@ function createDecalLayer(world) {
         mesh.visible = true;
         placeOnCell(mesh, decal.x, decal.y);
       }
+      // The zone that ended: its empty plots thin away.
+      const fade = effects.poisonFade;
+      const fadeLeft = fade.fadeCount > 0 ? effects.poisonFadeAmount(time) : 0;
+      if (fadeLeft > 0) {
+        pools.poisonFade.material.opacity = POISON_OPACITY * fadeLeft;
+        for (let k = 0; k < fade.fadeCount; k++) {
+          if (fade.fadeEmpty[k] === 0) continue;
+          const mesh = nextMesh(pools.poisonFade);
+          mesh.visible = true;
+          placeOnCell(mesh, fade.fadeX[k], fade.fadeY[k]);
+        }
+      }
       for (let p = 0; p < poolList.length; p++) {
         const pool = poolList[p];
         for (let i = pool.used; i < pool.meshes.length; i++) pool.meshes[i].visible = false;
       }
     },
   };
+
+  // The next unused mesh of `pool`, made the first time that many show.
+  function nextMesh(pool) {
+    let mesh = pool.meshes[pool.used];
+    if (!mesh) {
+      mesh = createCellDecal(pool.material);
+      mesh.renderOrder = pool.order;
+      world.scene.add(mesh);
+      pool.meshes.push(mesh);
+    }
+    pool.used++;
+    return mesh;
+  }
 }
 
 // Cloud Eagle's clouds and Sky Watch outlines (cloud-overlay.js) as flat
@@ -550,21 +592,27 @@ function createDecalLayer(world) {
 // the overlay changes. A new cloud thickens from nothing (cloudFormAmount),
 // an ended one thins away over its old cells (cloudFadeAmount, the same
 // light see-through look for every viewer: what was under it shows again
-// at once, as the rules say), and the Sky Watch outlines breathe
+// at once, as the rules say). The other seat's dense cloud has a flash over
+// its cells and a bolt on one of them now and then (lightningAmount: a look
+// only, seeded by a constant, never part of the state or of a message), and
+// the Sky Watch outlines breathe
 // (skyWatchPulse) over a plot lit in pale yellow, with a small cloud puff
 // drifting to and fro above each one so the eagle's player spots them.
-const CLOUD_ORDER = { seeThrough: 1, cover: 6, outline: 7, fading: 6, glow: 2, puff: 8, hidden: 9 };
+// (flash and bolt lie between the dense cloud and the Sky Watch outlines)
+const CLOUD_ORDER = { seeThrough: 1, cover: 6, flash: 6.5, bolt: 6.75, outline: 7, fading: 6, glow: 2, puff: 8, hidden: 9 };
+const LIGHTNING_SLOTS = 2; // dense clouds seen at once: one per owner
 function createCloudLayer(world) {
   const overlayFor = createCloudOverlay();
   const cloudTile = sheetCanvas([cloudTileGrid()]);
   const looks = {
     seeThrough: decalMaterial(cloudTile),
-    cover: decalMaterial(cloudTile),
+    cover: decalMaterial(sheetCanvas([stormTileGrid()])),
     outline: decalMaterial(sheetCanvas([skyWatchOutlineGrid()])),
     glow: decalMaterial(sheetCanvas([skyWatchGlowGrid()])),
     puff: decalMaterial(sheetCanvas([skyWatchPuffGrid()])),
     hidden: decalMaterial(sheetCanvas([hiddenPuffGrid()])),
   };
+  for (const [kind, material] of Object.entries(looks)) material.name = `cloud-${kind}`;
   looks.seeThrough.opacity = CLOUD_SEE_THROUGH_OPACITY;
   looks.outline.opacity = SKY_WATCH_OPACITY;
   // The ended cloud thinning away: its own decals and material.
@@ -572,6 +620,18 @@ function createCloudLayer(world) {
   const fadeMeshes = [];
   // When the newest cloud was placed and when the last one ended (ms).
   const timing = { formStart: -Infinity, fadeStart: -Infinity, fadeShown: false };
+  // The lightning of each dense cloud on show: its flash over every cell and
+  // its bolt on one, with a material each (their opacity follows the flash).
+  const lightning = [];
+  for (let n = 0; n < LIGHTNING_SLOTS; n++) {
+    const flash = decalMaterial(sheetCanvas([stormFlashGrid()]));
+    const bolt = decalMaterial(sheetCanvas([lightningBoltGrid()]));
+    flash.name = 'cloud-flash';
+    bolt.name = 'cloud-bolt';
+    flash.opacity = 0;
+    bolt.opacity = 0;
+    lightning.push({ flash, bolt, flashMeshes: [], boltMesh: null, view: null, pickShown: -1 });
+  }
   const pools = { seeThrough: [], cover: [], outline: [], glow: [], puff: [], hidden: [] };
   const used = { seeThrough: 0, cover: 0, outline: 0, glow: 0, puff: 0, hidden: 0 };
   const kinds = Object.keys(pools);
@@ -592,17 +652,50 @@ function createCloudLayer(world) {
     used[kind]++;
     mesh.visible = true;
     placeOnCell(mesh, x, y);
+    // The cells of a dense cloud lie turned by quarter turns (by plot), so the
+    // one tile does not repeat as a grid.
+    if (kind === 'cover') mesh.rotation.y = ((x * 7 + y * 13) % 4) * (Math.PI / 2);
     mesh.userData.baseX = mesh.position.x; // where a puff drifts around
   };
   const hideFrom = (kind, first) => {
     const meshes = pools[kind];
     for (let i = first; i < meshes.length; i++) meshes[i].visible = false;
   };
+  // One flash decal over each cell of every dense cloud (up to
+  // LIGHTNING_SLOTS), the cloud's view kept for update().
+  const placeLightning = (views) => {
+    let n = 0;
+    for (const view of views) {
+      if (view.look !== COVER || n >= lightning.length) continue;
+      const slot = lightning[n++];
+      slot.view = view;
+      slot.pickShown = -1;
+      for (let c = 0; c < view.cells.length; c++) {
+        let mesh = slot.flashMeshes[c];
+        if (!mesh) {
+          mesh = createCellDecal(slot.flash);
+          mesh.renderOrder = CLOUD_ORDER.flash;
+          world.scene.add(mesh);
+          slot.flashMeshes.push(mesh);
+        }
+        mesh.visible = true;
+        placeOnCell(mesh, view.cells[c].x, view.cells[c].y);
+      }
+      for (let c = view.cells.length; c < slot.flashMeshes.length; c++) slot.flashMeshes[c].visible = false;
+    }
+    for (; n < lightning.length; n++) {
+      const slot = lightning[n];
+      slot.view = null;
+      for (let c = 0; c < slot.flashMeshes.length; c++) slot.flashMeshes[c].visible = false;
+      if (slot.boltMesh) slot.boltMesh.visible = false;
+    }
+  };
   // Only when the overlay changed (a new state or viewer).
   const placeOverlay = (overlay) => {
     for (const kind of kinds) used[kind] = 0;
     for (const cell of overlay.clouds) placeDecal(cell.look === COVER ? 'cover' : 'seeThrough', cell.x, cell.y);
     for (const cell of overlay.hidden) placeDecal('hidden', cell.x, cell.y);
+    placeLightning(overlay.views);
     for (const cell of overlay.skyWatch) {
       placeDecal('glow', cell.x, cell.y);
       placeDecal('outline', cell.x, cell.y);
@@ -630,6 +723,30 @@ function createCloudLayer(world) {
     }
     for (let i = n; i < fadeMeshes.length; i++) fadeMeshes[i].visible = false;
   };
+  // The flash over the dense cloud of `slot` at `time` and its bolt on the cell
+  // of this flash (lightningAmount, lightningPickAt). No allocation.
+  const flashLightning = (slot, time, form) => {
+    const { view } = slot;
+    const amount = lightningAmount(time, view.seed);
+    slot.flash.opacity = CLOUD_LIGHTNING_GLOW * amount * form;
+    slot.bolt.opacity = amount * form;
+    if (!(amount > 0)) {
+      if (slot.boltMesh) slot.boltMesh.visible = false;
+      return;
+    }
+    if (!slot.boltMesh) {
+      slot.boltMesh = createCellDecal(slot.bolt);
+      slot.boltMesh.renderOrder = CLOUD_ORDER.bolt;
+      world.scene.add(slot.boltMesh);
+    }
+    const pick = Math.min(view.cells.length - 1, Math.floor(lightningPickAt(time, view.seed) * view.cells.length));
+    if (pick < 0) return;
+    if (pick !== slot.pickShown) {
+      slot.pickShown = pick;
+      placeOnCell(slot.boltMesh, view.cells[pick].x, view.cells[pick].y);
+    }
+    slot.boltMesh.visible = true;
+  };
   const hideFading = () => {
     for (let i = 0; i < fadeMeshes.length; i++) fadeMeshes[i].visible = false;
     timing.fadeShown = false;
@@ -650,8 +767,12 @@ function createCloudLayer(world) {
     update(time) {
       const form = cloudFormAmount(time - timing.formStart);
       looks.seeThrough.opacity = CLOUD_SEE_THROUGH_OPACITY * form;
-      looks.cover.opacity = CLOUD_MIST_OPACITY * form; // the other seat: a light mist, its empty plots show through
+      looks.cover.opacity = CLOUD_OPPONENT_OPACITY * form; // the other seat: a dense cloud that hides the ground
       looks.hidden.opacity = form;
+      for (let n = 0; n < lightning.length; n++) {
+        const slot = lightning[n];
+        if (slot.view) flashLightning(slot, time, form);
+      }
       const hiddenPuffs = pools.hidden;
       for (let i = 0; i < used.hidden; i++) {
         const phase = (time / CLOUD_PUFF_DRIFT_MS) * Math.PI * 2 + i * 2.3;
@@ -669,12 +790,18 @@ function createCloudLayer(world) {
       if (!timing.fadeShown) return;
       const left = cloudFadeAmount(time - timing.fadeStart);
       if (left <= 0) hideFading();
-      else fading.opacity = CLOUD_SEE_THROUGH_OPACITY * 1.6 * left;
+      else fading.opacity = CLOUD_FADE_OPACITY * left;
     },
     hide() {
       if (timing.fadeShown) hideFading();
       if (shownVersion === -1) return;
       for (let k = 0; k < kinds.length; k++) hideFrom(kinds[k], 0);
+      for (let n = 0; n < lightning.length; n++) {
+        const slot = lightning[n];
+        slot.view = null;
+        for (let c = 0; c < slot.flashMeshes.length; c++) slot.flashMeshes[c].visible = false;
+        if (slot.boltMesh) slot.boltMesh.visible = false;
+      }
       shownVersion = -1;
     },
     reset() {

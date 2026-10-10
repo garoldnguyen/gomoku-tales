@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { BOARD_SIZE, CAMERA_DISTANCE, CAMERA_FOV, CAMERA_PITCH_DEG, CAMERA_TARGET_Z, CELL_SIZE } from '../src/config.js';
 import { CAMERA_TARGET, cameraPosition, cameraRay, gameCamera, projectToNdc } from '../src/render3d/camera.js';
-import { cellToWorld, intersectHorizontalPlane, pickCell, pointerToNdc, worldToCell } from '../src/render3d/picking.js';
+import { cellIndexAt, cellToWorld, intersectHorizontalPlane, pickCell, pointerToNdc, worldToCell } from '../src/render3d/picking.js';
 import { createFpsMeter } from '../src/render3d/fps.js';
 
 const TARGET = CAMERA_TARGET;
@@ -99,6 +99,19 @@ test('worldToCell covers the board from edge to edge and nothing outside it', ()
   assert.equal(worldToCell(0, half), null);
   assert.equal(worldToCell(half, 0), null);
   assert.equal(worldToCell(0, -half - 0.5), null);
+});
+
+test('cellIndexAt is worldToCell as a plot index, -1 off the board', () => {
+  for (let y = 0; y < BOARD_SIZE; y++) {
+    for (let x = 0; x < BOARD_SIZE; x++) {
+      const centre = cellToWorld(x, y);
+      assert.equal(cellIndexAt(centre.x, centre.z), y * BOARD_SIZE + x);
+    }
+  }
+  const half = (BOARD_SIZE * CELL_SIZE) / 2;
+  assert.equal(cellIndexAt(-half - 1e-6, 0), -1);
+  assert.equal(cellIndexAt(0, half), -1);
+  assert.equal(cellIndexAt(half, 0), -1);
 });
 
 test('worldToCell and cellToWorld agree for every cell and other board sizes', () => {

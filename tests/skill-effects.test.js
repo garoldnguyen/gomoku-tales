@@ -1,13 +1,14 @@
 // The skill effects of every character (src/render3d/effect-plans.js and
 // skill-rings.js): which visuals the Jade Serpent and Cloud Eagle events
 // show, the cast ring of every skill, the win celebration, and the pure
-// timing of the rings, the Venom wilt, the cloud forming and fading and
-// the Sky Watch pulse.
+// timing of the rings, the Venom wilt and the poison zone turning in and
+// thinning away, the cloud forming and fading and the Sky Watch pulse.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CAST_RING_FROM, CAST_RING_MS, CAST_RING_TO, CLOUD_FADE_MS, CLOUD_FORM_MS, HISS_WOBBLE, RING_MAX_DOTS,
-  SKY_WATCH_PULSE_LOW, SKY_WATCH_PULSE_MS, VENOM_DROP_MS, VENOM_SINK_MS,
+  POISON_FADE_MS, POISON_FORM_MS, SKY_WATCH_PULSE_LOW, SKY_WATCH_PULSE_MS, VENOM_DROP_MS, VENOM_WILT_HOLD_MS, VENOM_WILT_IN_MS,
+  VENOM_WILT_OUT_MS,
 } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { CLOUD_EAGLE, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
@@ -15,15 +16,12 @@ import { maskEventsForViewer, maskForViewer } from '../src/logic/cloud.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
 import { CLOUD, HISS, VENOM } from '../src/logic/skills.js';
 import {
-  cloudFadeAmount, cloudFormAmount, skyWatchPulse, venomMs, venomPose, venomWiltMs, visualsForEvents,
+  cloudFadeAmount, cloudFormAmount, poisonFadeAmount, poisonFormAmount, skyWatchPulse, venomWilt, venomWiltMs, visualsForEvents,
 } from '../src/render3d/effect-plans.js';
-import { STAGE_REST, STAGE_SPROUT } from '../src/render3d/growth.js';
 import {
   clearRings, createRings, ringAlpha, ringDotsInto, ringProgress, ringRadius, startRing, stepRings,
 } from '../src/render3d/skill-rings.js';
 
-// The pack's default stage start times (v3-meta.json): drop, land, sprout, open, rest.
-const STAGES = [0, 250, 500, 800, 1000];
 const kinds = (specs) => specs.map((spec) => spec.kind);
 
 // Plays moves ([x, y] plants, { skill, target } uses a skill) for the
@@ -50,11 +48,14 @@ test('Hiss sends wavy jade rings across the field and names who it silences', ()
   assert.deepEqual(specs.find((spec) => spec.kind === 'hiss'), { kind: 'hiss', player: X, locked: O });
 });
 
-test('Venom: a cast ring on the target; the plant stays, so it no longer wilts away (the zone is drawn from the state)', () => {
+test('Venom: a cast ring, then sap drops on the target plant and the zone turning (the plant stays)', () => {
   const results = play({ [X]: WIND_RABBIT, [O]: JADE_SERPENT }, [[7, 7], { skill: VENOM, target: { x: 7, y: 7 } }]);
   const specs = visualsForEvents(results[1].events);
   assert.deepEqual(specs[0], { kind: 'castRing', x: 7, y: 7, player: O });
-  assert.equal(specs.some((spec) => spec.kind === 'venom'), false, 'no wilt-and-sink: Venom removes nothing');
+  const venom = specs.find((spec) => spec.kind === 'venom');
+  assert.deepEqual([venom.x, venom.y, venom.player], [7, 7, O]);
+  assert.equal(venom.cells.length, 9, 'the 3 by 3 square of the zone');
+  assert.deepEqual(visualsForEvents([{ type: 'poisonEnded', player: O }]), [{ kind: 'poisonEnd', player: O }]);
 });
 
 test('Cloud: the cloud forms where it is placed and fades where it ended', () => {
@@ -87,26 +88,35 @@ test('every winning plant celebrates in the winner\'s turn of the line', () => {
   assert.deepEqual(kinds(visualsForEvents([{ type: 'win', player: O, line: [] }])), ['endLingering'], 'a fully covered line shows nothing');
 });
 
-test('venomPose: drops fall, the plant wilts green back to Sprout, then sinks', () => {
-  const pose = { ageMs: 0 };
-  venomPose(pose, STAGES);
-  assert.deepEqual([pose.frame, pose.tint, pose.sink, pose.done], [STAGE_REST, 0, 0, false], 'still whole while the drops fall');
+test('venomWilt: upright while the sap falls, droops, holds, perks up again and never removes the plant', () => {
+  assert.equal(venomWilt(0), 0, 'upright while the drops fall');
+  assert.equal(venomWilt(VENOM_DROP_MS), 0);
+  const mid = venomWilt(VENOM_DROP_MS + VENOM_WILT_IN_MS / 2);
+  assert.ok(mid > 0.4 && mid < 0.6, 'half drooped halfway in');
+  assert.equal(venomWilt(VENOM_DROP_MS + VENOM_WILT_IN_MS + VENOM_WILT_HOLD_MS / 2), 1, 'fully drooped while it holds');
+  const out = venomWilt(VENOM_DROP_MS + VENOM_WILT_IN_MS + VENOM_WILT_HOLD_MS + VENOM_WILT_OUT_MS / 2);
+  assert.ok(out > 0.4 && out < 0.6, 'half way back up');
+  assert.equal(venomWilt(venomWiltMs()), 0, 'upright again at the end');
+  assert.equal(venomWiltMs(), VENOM_DROP_MS + VENOM_WILT_IN_MS + VENOM_WILT_HOLD_MS + VENOM_WILT_OUT_MS);
+  assert.equal(venomWilt(-Infinity), 0, 'a plant nobody saw poisoned stands upright');
+  assert.equal(venomWilt(Infinity), 0);
+  assert.equal(venomWilt(NaN), 0);
+});
 
-  pose.ageMs = VENOM_DROP_MS + venomWiltMs(STAGES) / 2;
-  venomPose(pose, STAGES);
-  assert.ok(pose.tint > 0.4 && pose.tint < 0.6, 'half green halfway through the wilt');
-  assert.equal(pose.sink, 0);
-
-  pose.ageMs = VENOM_DROP_MS + venomWiltMs(STAGES) + 1;
-  venomPose(pose, STAGES);
-  assert.equal(pose.frame, STAGE_SPROUT);
-  assert.equal(pose.tint, 1);
-
-  pose.ageMs = venomMs(STAGES);
-  venomPose(pose, STAGES);
-  assert.equal(pose.sink, 1);
-  assert.equal(pose.done, true);
-  assert.equal(venomMs(STAGES), VENOM_DROP_MS + venomWiltMs(STAGES) + VENOM_SINK_MS);
+test('the poison zone turns in after the sap lands and thins away when it ends', () => {
+  assert.equal(poisonFormAmount(0), 0, 'bare soil while the sap falls');
+  assert.equal(poisonFormAmount(VENOM_DROP_MS), 0);
+  const mid = poisonFormAmount(VENOM_DROP_MS + POISON_FORM_MS / 2);
+  assert.ok(mid > 0.4 && mid < 0.6);
+  assert.equal(poisonFormAmount(VENOM_DROP_MS + POISON_FORM_MS), 1);
+  assert.equal(poisonFormAmount(Infinity), 1, 'a zone the page loaded with is simply there');
+  assert.equal(poisonFormAmount(NaN), 1);
+  assert.equal(poisonFadeAmount(0), 1);
+  assert.equal(poisonFadeAmount(POISON_FADE_MS), 0);
+  const half = poisonFadeAmount(POISON_FADE_MS / 2);
+  assert.ok(half > 0.4 && half < 0.6);
+  assert.equal(poisonFadeAmount(-Infinity), 0, 'nothing fades before a zone ends');
+  assert.equal(poisonFadeAmount(Infinity), 0);
 });
 
 test('a cloud thickens from nothing and an ended one thins away', () => {

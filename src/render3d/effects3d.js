@@ -31,6 +31,12 @@
 //                     and goes dim, and when it surfaces or the puddle dries
 //                     the cracked crust shows and fades while the sprout
 //                     pops up (mud-effects.js, world-renderer.js)
+//   Venom             sap drops fall from the sky onto the target plant, which
+//                     droops a little and stays; the zone's empty plots show
+//                     withered purple soil (poison-plot.png) drawn from the
+//                     viewer's state, with low fog and toxic bubbles hugging
+//                     the ground, and thin away when it ends (poison-effects.js,
+//                     world-renderer.js); nothing is drawn on a covered plot
 //   placement         the placement effect of the character whose side
 //                     planted the seed (placement(), character-look.js):
 //                     Wind Rabbit's dandelion wind, Earth Bear's soil
@@ -76,7 +82,7 @@ import {
   PLACE_DUST_COUNT, PLACEMENT_SLOTS, PLANT_OPEN_SPARKLES, PX_WORLD, RING_DOT_PX, RING_LIGHTEN, RING_MAX_DOTS, RING_SLOTS,
   DASH_GHOST_OPACITY, DASH_WIND_RATE, DASH_WIND_SPEED, PETRIFY_GLOW, PETRIFY_WRAP_MS, SHAKE3D_LIGHT, SKILL_RUN_SLOTS, SOIL_PUFF_MAX,
   SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, STORM_MS, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
-  TORNADO_ARM, VENOM_BUBBLE_RATE, VENOM_TINT, VINE_POINT_PX, VINE_POINTS, WIN_RING_DOTS,
+  TORNADO_ARM, VINE_POINT_PX, VINE_POINTS, WIN_RING_DOTS,
   WIN_RING_MS, WIN_RING_TO, WIN_SPARKLES, WIN_STAGGER_MS,
 } from '../config.js';
 import { O, X } from '../logic/board.js';
@@ -84,26 +90,27 @@ import { DEFAULT_SIDES } from '../logic/characters.js';
 import { cloudBox } from '../logic/cloud.js';
 import { createBanners } from '../render/effects.js';
 import { createMudEffects } from './mud-effects.js';
+import { createPoisonEffects } from './poison-effects.js';
 import { artMeta, artSource } from './art.js';
 import { ART } from './art-assets.js';
 import { CHARACTER_LOOK, PLAN_SEED, placementPlan } from './character-look.js';
 import {
   catchUpVisuals, convertPose, dashCurveInto, dashPose, heldCell, PETRIFY_STAGE_ROCK, petrifyPose, regrowCell,
-  shakeLeft, shakeOffset3d, shakeStrength, sparkPathInto, throwPose, venomPose, visualsForEvents, zoneVisible,
+  shakeLeft, shakeOffset3d, shakeStrength, sparkPathInto, throwPose, visualsForEvents, zoneVisible,
 } from './effect-plans.js';
 import { STAGE_DROP, STAGE_REST } from './growth.js';
 import {
   createParticlePool, createSpawnParams, emit, scaledCount, SHAPE_PLUS, SHAPE_SQUARE,
 } from './particle-pool.js';
-import { cellToWorld, cellToWorldInto } from './picking.js';
+import { cellIndexAt, cellToWorld, cellToWorldInto } from './picking.js';
 import { clearPlacementRuns, createPlacementRuns, startPlacementRun, stepPlacementRuns, stopRunsAt, vinePointsInto } from './placement-runs.js';
 import { GLOW } from './post-processing.js';
 import { MAX_PARTICLE_CAP, particleScale, plainSlides } from './quality.js';
 import { effectRandom } from './seeded-random.js';
 import { clearRings, createRings, ringDotsInto, startRing, stepRings, stopRingsAt } from './skill-rings.js';
 import {
-  CROSS_PETAL_COLOURS, mudDryPlan, mudFormPlan, petrifyPlan, seedSinkPlan, seedSurfacePlan, SKILL_PLAN_SEED, STEP_LOOKS, stormPlan,
-  tornadoCrossPlan,
+  CROSS_PETAL_COLOURS, mudDryPlan, mudFormPlan, petrifyPlan, poisonEndPlan, seedSinkPlan, seedSurfacePlan, SKILL_PLAN_SEED, STEP_LOOKS,
+  stormPlan, tornadoCrossPlan, venomPlan,
 } from './skill-plans.js';
 import { stageStartMs } from './v3-meta.js';
 import { createCellDecal, createPieceSprite, decalMaterial, placeOnCell, zonePieceGeometry } from './world.js';
@@ -126,10 +133,6 @@ const COLORS = {
   vineDark: 0x1f8a57,
   cloudPuff: 0xf4f8ff, // cloudSwirl: the soft cloud puffs
   feather: 0xffffff, // and the white feathers
-  venom: 0x8cff5a, // Venom: the bright venom drops and bubbles
-  venomDark: 0x2f9e44,
-  venomSmoke: 0x3d6b3a, // the sick smoke left when the plant has sunk
-  venomGlow: 0x7dff4a, // the green the wilting plant takes on (emissive)
   petrifyGlow: 0xffd070, // the gold earth energy a wrapped plant glows with (emissive)
   white: 0xffffff,
 };
@@ -146,7 +149,6 @@ const BLOOM_ROW_PX = 12; // art pixel row of a plant frame where the bloom opens
 const ZONE_CELLS = 4 * TORNADO_ARM + 1; // most cells a Tornado Zone cross has: the centre and each arm
 const STORM_FADE_IN_MS = 120; // the revealed cross shows this fast
 const BOARD_MIDDLE = (BOARD_SIZE - 1) / 2; // the middle cell of the field, where Hiss rings start
-const VENOM_SINK_DEPTH = 0.25; // world units the sick sprout sinks at the end
 const RING_Y = 0.05; // world height of the ring dots, just over the plots
 
 // The colour of each character as a number (CHARACTER_LOOK), for the
@@ -226,12 +228,13 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
   const swirl = createTornadoSwirl(fx);
   const stormCross = createStormCross(fx);
   const mud = createMudEffects(fx);
+  const poison = createPoisonEffects(fx);
   // The camera shake: when it started and how strong it is; shakeOffset3d
   // reads ageMs and strength and writes the offset x and y.
   const shake = { start: -Infinity, ageMs: 0.5, strength: 0.5, x: 0.5, y: 0.5 };
   // The pose functions read ageMs (and progress, spark) and write the pose here.
   const pose = {
-    ageMs: 0.5, frame: 0, done: false, flying: false, progress: 0.5, spark: 0.5, x: 0.5, z: 0.5, lift: 0.5, tint: 0.5, sink: 0.5,
+    ageMs: 0.5, frame: 0, done: false, flying: false, progress: 0.5, spark: 0.5, x: 0.5, z: 0.5, lift: 0.5,
     spinScale: 0.5, dropPx: 0.5, height: 0.5, up: 0.5, stage: 0, grey: 0, scaleX: 0.5, scaleY: 0.5,
   };
   const at = { x: 0.5, y: 0.5, z: 0.5 }; // where a trail is left this frame
@@ -497,74 +500,6 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     }
   }
 
-  // Venom: three bright drops falling onto the plant at (wx, wz).
-  function venomDrops(wx, wz) {
-    const count = scaledCount(3, frame.scale);
-    for (let i = 0; i < count; i++) {
-      random.fill(u);
-      sp.x = wx - 0.06 + u[0] * 0.12;
-      sp.y = 1.3 + i * 0.25;
-      sp.z = wz - 0.04 + u[1] * 0.08;
-      sp.vx = 0;
-      sp.vy = -2.2;
-      sp.vz = 0;
-      sp.gravity = 6;
-      sp.drag = 0;
-      sp.life = 0.32 + i * 0.04;
-      sp.size = 3 * PX;
-      sp.grow = 0;
-      sp.color = i % 2 ? COLORS.venomDark : COLORS.venom;
-      sp.alpha = 1;
-      sp.shape = SHAPE_SQUARE;
-      pool.spawnFall(sp);
-    }
-  }
-
-  // Venom: `count` green bubbles rising from the sinking plant at `at`.
-  function venomBubbles(count) {
-    for (let i = 0; i < count; i++) {
-      random.fill(u);
-      sp.x = at.x - 0.15 + u[0] * 0.3;
-      sp.y = 0.05 + u[1] * 0.15;
-      sp.z = at.z - 0.1 + u[2] * 0.2;
-      sp.vx = 0;
-      sp.vy = 0.35 + u[3] * 0.35;
-      sp.vz = 0;
-      sp.gravity = 0;
-      sp.drag = 1;
-      sp.life = 0.4 + u[4] * 0.3;
-      sp.size = (1 + u[5] * 2) * PX;
-      sp.grow = PX;
-      sp.color = u[6] < 0.6 ? COLORS.venom : COLORS.venomDark;
-      sp.alpha = 0.9;
-      sp.shape = SHAPE_SQUARE;
-      pool.spawnFall(sp);
-    }
-  }
-
-  // Venom: the sick smoke left where the plant sank, drifting with the wind.
-  function venomSmoke(wx, wz) {
-    const count = scaledCount(8, frame.scale);
-    for (let i = 0; i < count; i++) {
-      random.fill(u);
-      sp.x = wx - 0.12 + u[0] * 0.24;
-      sp.y = 0.06;
-      sp.z = wz - 0.1 + u[1] * 0.2;
-      sp.vx = 0.08 + u[2] * 0.12;
-      sp.vy = 0.25 + u[3] * 0.25;
-      sp.vz = 0.03 + u[4] * 0.05;
-      sp.gravity = 0;
-      sp.drag = 1.2;
-      sp.life = 0.6 + u[5] * 0.3;
-      sp.size = (3 + u[6] * 2) * PX;
-      sp.grow = 3 * PX;
-      sp.color = i % 2 ? COLORS.venomSmoke : COLORS.venomDark;
-      sp.alpha = 0.6;
-      sp.shape = SHAPE_SQUARE;
-      pool.spawnFall(sp);
-    }
-  }
-
   // Cloud Eagle's cloud over the cells it covers (the cloud whose chosen
   // cell is (cx, cy), clipped to the field; the 4 by 4 cloud has no centre
   // cell, so the puffs are spread over the middle of the covered cells, not
@@ -708,6 +643,20 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
         return;
     }
     pool.spawnFall(sp);
+  }
+
+  // One step of a Free Action plan on a plot run (runPlan): left out when the
+  // plot it starts over is covered for the viewer NOW, whatever plot the run
+  // started on and whatever the viewer's state was when it started. A run only
+  // stops with its own plot (clearPlot), so a cloud that covers another plot of
+  // a zone cast or of the zone ending leaves the rest of the plan playing on
+  // the plots that stay visible; the steps of a plan stay over their plot.
+  function spawnSkillStep(step, run) {
+    if (step.particle) {
+      const i = cellIndexAt(run.x + step.from[0], run.z + step.from[2]);
+      if (i >= 0 && covered[i] === 1) return;
+    }
+    spawnPlanStep(step, run);
   }
 
   // One particle of a Free Action plan (skill-plans.js): its size, colour and
@@ -874,23 +823,6 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
         }
         if (pose.done) endTimeline(record);
         break;
-      case 'venom':
-        venomPose(pose, record.stages);
-        a.sprite.setFrame(pose.frame);
-        a.material.emissiveIntensity = VENOM_TINT * pose.tint;
-        if (pose.sink > 0) {
-          a.sprite.plane.scale.set(1 - 0.25 * pose.sink, 1 - 0.75 * pose.sink, 1);
-          a.sprite.plane.position.y = -VENOM_SINK_DEPTH * pose.sink;
-          a.setShadow(1 - pose.sink);
-          at.x = record.tx;
-          at.z = record.tz;
-          venomBubbles(emit(record, VENOM_BUBBLE_RATE * frame.scale, frame.dtS));
-        }
-        if (pose.done) {
-          venomSmoke(record.tx, record.tz);
-          endTimeline(record);
-        }
-        break;
       case 'winPop':
         // One winning plant's turn in the celebration: it starts `carry` ms
         // after the win (its place in the line).
@@ -930,6 +862,38 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     startPlacementRun(skillRuns, plan, cellAt.x, cellAt.z, frame.time);
   }
 
+  // Venom (event poisonPlaced): sap drops fall onto the target plant (x, y),
+  // which droops a little and stays, and the plots of the zone turn withered
+  // under fog and bubbles (poison-effects.js draws the zone itself from the
+  // viewer's state). The event is public, so what the viewer may not see is
+  // left out here: nothing names a plot that is covered for the viewer.
+  function startVenom(spec) {
+    const target = spec.y * BOARD_SIZE + spec.x;
+    const targetShown = covered[target] === 0;
+    poison.form();
+    if (targetShown) poison.wiltPlot(target);
+    const cells = [];
+    for (const cell of spec.cells) {
+      const i = cell.y * BOARD_SIZE + cell.x;
+      if (covered[i] === 1 || i === target) continue;
+      cells.push(cell);
+    }
+    runPlan(venomPlan({ x: spec.x, y: spec.y, cells, target: targetShown }, planOptions(spec)), spec.x, spec.y);
+  }
+
+  // Venom (event poisonEnded): the plots the zone showed on the last frame
+  // thin away (poison-effects.js) and fog lifts off the ones with no target.
+  function endPoison() {
+    const count = poison.end();
+    const cells = [];
+    for (let k = 0; k < count; k++) {
+      if (poison.fadeCentre[k] === 0) cells.push({ x: poison.fadeX[k], y: poison.fadeY[k] });
+    }
+    if (cells.length === 0) return;
+    const origin = cells[0];
+    runPlan(poisonEndPlan({ x: origin.x, y: origin.y, cells }, planOptions(origin)), origin.x, origin.y);
+  }
+
   // The plot (x, y) has just become covered for the viewer (a cloud of the
   // other seat): everything of the effects still playing on it stops at once,
   // so the screen never shows what the cloud hides: the seed placement and
@@ -955,6 +919,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     held[i] = 0;
     stormCross.hidePlot(i);
     mud.cover(x, y);
+    poison.cover(x, y);
   }
 
   // While a storm shows, the whirlwind may spin over an arm of the cross that
@@ -1089,13 +1054,12 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
         hissMist(color);
         break;
       }
-      case 'venom': {
-        const record = startTimeline('venom', spec, spec, plantStages(spec.from));
-        record.a = actors.acquire(spec.from, spec);
-        record.a.material.emissive.setHex(COLORS.venomGlow);
-        venomDrops(record.tx, record.tz);
+      case 'venom':
+        startVenom(spec);
         break;
-      }
+      case 'poisonEnd':
+        endPoison(spec);
+        break;
       case 'cloudForm':
       case 'cloudFade': {
         cloudPuffs(spec.x, spec.y, spec.kind === 'cloudForm');
@@ -1192,6 +1156,31 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       mud.setState(puddles, seeds);
     },
 
+    // The drawn state, for the fog and bubbles on the plots of its Venom zone
+    // (poison-effects.js): called every drawn frame, null for none.
+    setPoisonState(state) {
+      poison.setState(state);
+    },
+
+    // How withered the plots of the zone are at `time` (a share of the decal's
+    // opacity), and how much of a zone that just ended is left. The thinning
+    // zone's plots are poisonFade (fadeX, fadeY, fadeEmpty for fadeCount of them).
+    poisonForm(time) {
+      return poison.formAmount(time);
+    },
+
+    poisonFadeAmount(time) {
+      return poison.fadeAmount(time);
+    },
+
+    poisonFade: poison,
+
+    // How drooped the plant on plot index i is at `time` (0 to 1): the target
+    // of a Venom cast droops a little and perks up again.
+    wilt(i, time) {
+      return poison.wilt(i, time);
+    },
+
     // The plots the drawn state covers for the viewer ([{ x, y }] of
     // maskForViewer, or null): called every drawn frame, allocation free. A
     // plot that was not covered on the frame before is cleared of the effects
@@ -1261,11 +1250,12 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       swirl.update();
       stormCross.update();
       mud.update();
+      poison.update();
       for (let i = 0; i < timelines.length; i++) {
         if (timelines[i].active) stepTimeline(timelines[i]);
       }
       stepPlacementRuns(placements, time, spawnPlanStep);
-      stepPlacementRuns(skillRuns, time, spawnPlanStep);
+      stepPlacementRuns(skillRuns, time, spawnSkillStep);
       drawVines();
       drawRings();
 
@@ -1298,6 +1288,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       swirl.reset();
       stormCross.reset();
       mud.reset();
+      poison.reset();
       held.fill(0);
       banners.clear();
       shake.start = -Infinity;

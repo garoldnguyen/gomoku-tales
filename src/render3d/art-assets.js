@@ -9,6 +9,7 @@ import { CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/cha
 import { CHARACTER_LOOK } from './character-look.js';
 import { CHARACTER_ANIMS } from './character-poses.js';
 import { mudTileGrid } from './mud-art.js';
+import { poisonTileGrid } from './poison-art.js';
 import { bearFrames, rabbitFrames } from './placeholder-art.js';
 import { blockSheetPainter, farmBoardPainter, ringPainter, stripPainter } from './v3-placeholder-art.js';
 
@@ -66,6 +67,9 @@ export const ART = {
     pebble: 'rock-small',
     // The Mud Trap puddle decal; its placeholder is the generated tile of mud-art.js.
     mudPuddle: 'mud-puddle',
+    // The withered purple soil of one poisoned empty plot of the Venom zone;
+    // its placeholder is the generated tile of poison-art.js.
+    poisonPlot: 'poison-plot',
     trees: 'trees',
     // The forest behind the far edge (docs/art-direction-v3-1.md section
     // 6.1); its anchors are in assets/forest-meta.json (forest-meta.js).
@@ -100,6 +104,8 @@ export const ART = {
       dashTarget: 'decal-dash-target-v3',
       // The Tornado cross on the 3 by 3 cells of 32 px: each cross cell shows its own cell of the file.
       zoneCross: 'decal-zone-cross',
+      // The red crossed-out border on a hovered poisoned plot (a mark, not a tooltip).
+      forbidden: 'decal-forbidden',
     },
     portrait: { X: 'portrait-wind-rabbit-v3', O: 'portrait-earth-bear-v3' },
   },
@@ -152,6 +158,8 @@ const V3_SHAPES = {
   'decal-dash-target-v3': [32, 32, 1],
   'decal-zone-cross': [96, 96, 1],
   'mud-puddle': [32, 32, 1],
+  'poison-plot': [32, 32, 1],
+  'decal-forbidden': [32, 32, 1],
   'portrait-wind-rabbit-v3': [32, 32, 1],
   'portrait-earth-bear-v3': [32, 32, 1],
 };
@@ -224,6 +232,7 @@ const V3_RINGS = {
   'decal-win-v3': '#ffe14d',
   'decal-dash-target-v3': '#ff4b5c',
   'decal-zone-cross': '#3b8cff',
+  'decal-forbidden': '#ff4b5c',
 };
 
 function v3Placeholder(name) {
@@ -262,6 +271,7 @@ export const PLACEHOLDERS_3D = {
   ])),
   ...Object.fromEntries(artNames(ART.v3).map((name) => [name, v3Placeholder(name)])),
   [ART.v3.mudPuddle]: pixelArt(() => [mudTileGrid()]),
+  [ART.v3.poisonPlot]: pixelArt(() => [poisonTileGrid()]),
   ...Object.fromEntries(artNames(ART.avatar).map((name) => [name, {
     width: AVATAR_PX,
     height: AVATAR_PX,

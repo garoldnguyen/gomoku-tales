@@ -2,7 +2,9 @@
 // (docs/free-action-design.md section 8): the Mud Trap puddle forming, a seed
 // sinking into it and surfacing out of the dried mud, a drying puddle, a
 // Petrification, the Tornado storm that reveals the cross, and the secret
-// cross the caster sees. Each builder is called once when its event arrives
+// cross the caster sees, and the Venom effects: the sap drops falling onto
+// the target plant with the plots of the zone turning, and the zone thinning
+// away. Each builder is called once when its event arrives
 // (effects3d.js start) and returns a frozen list of particle steps in the
 // shape of the placement plans (character-look.js): world units relative to
 // the plot centre (x right, y up, z toward the viewer) and ms from the event,
@@ -20,9 +22,10 @@
 
 import {
   CELL_SIZE, DRY_CRUMBS, DRY_DUST_COUNT, DRY_MS, MUD_FORM_BUBBLES, MUD_FORM_FLECKS, MUD_FORM_MS, MUD_SPLASH_COUNT,
-  PETRIFY_CHIP_COUNT, PETRIFY_DUST_COUNT, PETRIFY_MOTE_COUNT, PETRIFY_SHATTER_MS, PETRIFY_WRAP_MS,
-  SINK_DELAY_MS, SINK_MS, STORM_BURST_COUNT, STORM_CELL_COUNT, STORM_MS, STORM_SPIN, TORNADO_CROSS_OPACITY,
-  TORNADO_PETAL_OPACITY, TORNADO_PETAL_RATE,
+  PETRIFY_CHIP_COUNT, PETRIFY_DUST_COUNT, PETRIFY_MOTE_COUNT, PETRIFY_SHATTER_MS, PETRIFY_WRAP_MS, POISON_END_FOG,
+  POISON_FORM_BUBBLES, POISON_FORM_FOG, POISON_FORM_MS, POISON_SAP_DROPS, POISON_SPLASH_COUNT, SINK_DELAY_MS, SINK_MS,
+  STORM_BURST_COUNT, STORM_CELL_COUNT, STORM_MS, STORM_SPIN, TORNADO_CROSS_OPACITY, TORNADO_PETAL_OPACITY, TORNADO_PETAL_RATE,
+  VENOM_DROP_MS,
 } from '../config.js';
 import { zoneVisible } from './effect-plans.js';
 import { scaledCount } from './particle-pool.js';
@@ -50,7 +53,24 @@ export const STEP_LOOKS = Object.freeze({
   stoneChip: Object.freeze({ sizePx: 3, growPx: 0, colours: Object.freeze([0x9a9aa6, 0x6e6e7a, 0xc4c4cc, 0x6cc04a]), alpha: 1, plus: false }),
   whirlFluff: Object.freeze({ sizePx: 2, growPx: 0.4, colours: Object.freeze([0xfff6ec, 0xffffff, 0xffe066]), alpha: 0.95, plus: true }),
   whirlLeaf: Object.freeze({ sizePx: 2, growPx: 0, colours: Object.freeze([0x6cc04a, 0xbfe0ff, 0x4fa044]), alpha: 0.9, plus: false }),
+  // Venom: deep purple sap, a sickly green toxic bubble, a low purple grey fog.
+  sapDrop: Object.freeze({ sizePx: 3, growPx: 0, colours: Object.freeze([0x7b3fb0, 0x9b59d6, 0xc9a0ff]), alpha: 1, plus: false }),
+  sapSplash: Object.freeze({ sizePx: 2, growPx: 0, colours: Object.freeze([0x9b59d6, 0x7b3fb0, 0x8cff5a]), alpha: 0.95, plus: false }),
+  toxicBubble: Object.freeze({ sizePx: 2, growPx: 1.5, colours: Object.freeze([0x8cff5a, 0xb48cff, 0x5fd04a]), alpha: 0.9, plus: false }),
+  poisonFog: Object.freeze({ sizePx: 5, growPx: 4, colours: Object.freeze([0xb9a2d6, 0x9c82c0, 0xd2c2e6]), alpha: 0.38, plus: false }),
 });
+
+// A wisp of the zone starts within FOG_SPREAD of its plot's middle and drifts
+// at most FOG_DRIFT along the wind, which together stays inside the plot (half
+// a cell is 0.5): no plan step ever reaches a neighbouring plot, which may be
+// covered for the viewer.
+const FOG_SPREAD = 0.2;
+const FOG_DRIFT = 0.3;
+
+// The height the sap drops start at (world units over the target plot) and the
+// height of the plant's head they land on.
+export const SAP_START_HEIGHT = 2.6;
+export const SAP_LAND_HEIGHT = 0.45;
 
 // The faint petals drifting over the caster's cross (not a plan step: the
 // swirl emits them while the cross shows).
@@ -280,6 +300,81 @@ export function tornadoCrossPlan(zone) {
     opacity: TORNADO_CROSS_OPACITY,
     petalRate: TORNADO_PETAL_RATE,
     petalOpacity: TORNADO_PETAL_OPACITY,
+  });
+}
+
+// The offsets (world units from the plan's origin plot) of the zone cells a
+// plan is for: [{ x, y }] cells and the origin cell (x, y).
+function cellOffset(cell, spec) {
+  return [(cell.x - spec.x) * CELL_SIZE, (cell.y - spec.y) * CELL_SIZE];
+}
+
+// Venom (event poisonPlaced): sap drops fall from the sky onto the target
+// plant (x, y) one after another during VENOM_DROP_MS and splash off it, then
+// the plots of the zone turn: toxic bubbles pop and low fog rises on each cell
+// of `spec.cells` over POISON_FORM_MS. The plan only names the cells it is
+// given (effects3d.js passes the ones the viewer may see, and none of the
+// target's drops when the viewer cannot see the target plot: spec.target is
+// false), so a covered plot is never named. Origin: the target plot.
+export function venomPlan(spec, options) {
+  return build(options, (random, budget) => {
+    const steps = [];
+    const drops = spec.target === false ? 0 : want(budget, POISON_SAP_DROPS);
+    for (let i = 0; i < drops; i++) {
+      const fall = between(random, 230, 290);
+      const landAt = Math.max(fall, ((i + 1) / drops) * VENOM_DROP_MS);
+      steps.push(fly('sapDrop', landAt - fall, fall, [between(random, -0.07, 0.07), SAP_START_HEIGHT + i * 0.1, between(random, -0.05, 0.05)],
+        [between(random, -0.05, 0.05), SAP_LAND_HEIGHT, between(random, -0.04, 0.04)], toneOf(random, 'sapDrop')));
+    }
+    const splash = spec.target === false ? 0 : want(budget, POISON_SPLASH_COUNT);
+    for (let i = 0; i < splash; i++) {
+      const angle = ((i + random() * 0.6) / splash) * TWO_PI;
+      const reach = between(random, 0.2, 0.45);
+      steps.push(fly('sapSplash', VENOM_DROP_MS + random() * 50, between(random, 320, 460),
+        [Math.cos(angle) * 0.05, SAP_LAND_HEIGHT * 0.6, Math.sin(angle) * 0.05], [Math.cos(angle) * reach, 0.03, Math.sin(angle) * reach],
+        toneOf(random, 'sapSplash'), between(random, 0.15, 0.3)));
+    }
+    const cells = spec.cells ?? [];
+    for (let c = 0; c < cells.length; c++) {
+      const [ox, oz] = cellOffset(cells[c], spec);
+      const fog = want(budget, POISON_FORM_FOG);
+      for (let i = 0; i < fog; i++) {
+        steps.push(rise('poisonFog', VENOM_DROP_MS + random() * POISON_FORM_MS * 0.6, between(random, 1100, 1600),
+          ox + between(random, -FOG_SPREAD, FOG_SPREAD), oz + between(random, -FOG_SPREAD, FOG_SPREAD), between(random, 0.1, 0.22),
+          toneOf(random, 'poisonFog'), between(random, 0.1, FOG_DRIFT)));
+      }
+      const bubbles = want(budget, POISON_FORM_BUBBLES);
+      for (let i = 0; i < bubbles; i++) {
+        steps.push(rise('toxicBubble', VENOM_DROP_MS + random() * POISON_FORM_MS, between(random, 420, 640),
+          ox + between(random, -0.3, 0.3), oz + between(random, -0.3, 0.3), between(random, 0.14, 0.28), toneOf(random, 'toxicBubble')));
+      }
+    }
+    return steps;
+  });
+}
+
+// Venom (event poisonEnded): the zone thins away. `spec.cells` are the plots it
+// showed (the empty ones the viewer saw) and (spec.x, spec.y) the origin plot:
+// fog wisps lift off each of them and drift away on the wind, and a last bubble
+// or two pops.
+export function poisonEndPlan(spec, options) {
+  return build(options, (random, budget) => {
+    const steps = [];
+    const cells = spec.cells ?? [];
+    for (let c = 0; c < cells.length; c++) {
+      const [ox, oz] = cellOffset(cells[c], spec);
+      const fog = want(budget, POISON_END_FOG);
+      for (let i = 0; i < fog; i++) {
+        steps.push(rise('poisonFog', random() * 300, between(random, 800, 1200), ox + between(random, -FOG_SPREAD, FOG_SPREAD),
+          oz + between(random, -FOG_SPREAD, FOG_SPREAD), between(random, 0.25, 0.5), toneOf(random, 'poisonFog'),
+          between(random, 0.2, FOG_DRIFT)));
+      }
+      if (want(budget, 1) === 1) {
+        steps.push(rise('toxicBubble', random() * 300, between(random, 380, 560), ox + between(random, -0.25, 0.25),
+          oz + between(random, -0.25, 0.25), between(random, 0.14, 0.25), toneOf(random, 'toxicBubble')));
+      }
+    }
+    return steps;
   });
 }
 

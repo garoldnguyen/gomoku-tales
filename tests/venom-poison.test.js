@@ -416,7 +416,8 @@ test('Venom targeting: the prompt, a click on an opponent plant, and the 3 by 3 
 test('poisoned plots become poison decals; the preview shows the square and a ring on the plant', () => {
   const state = venomTurn(serpentToVenom(), { x: 8, y: 8 });
   const marks = boardMarks({ state, hover: null, preview: null });
-  assert.deepEqual(keys(marks.decals.filter((d) => d.kind === 'poison')), square(7, 7, 9, 9));
+  // The withered soil lies on the empty plots only: the target plant (8, 8) stands in the fog.
+  assert.deepEqual(keys(marks.decals.filter((d) => d.kind === 'poison')), square(7, 7, 9, 9).filter((key) => key !== '8,8'));
 
   const bare = serpentToVenom();
   const preview = targetPreview(bare, X, startTargeting(VENOM), { x: 8, y: 8 });
@@ -439,13 +440,15 @@ test('the poison tile is a withered purple 32 by 32 pixel tile', () => {
   }
 });
 
-test('the old Venom wilt effect is not made by an event any more', () => {
+test('Venom plays a cast effect from its public events (the zone itself is drawn from state.poison)', () => {
   const state = venomTurn(serpentToVenom());
   const used = useSkill(serpentToVenom(), { player: X, skill: VENOM, target: { x: 8, y: 8 } });
   const specs = visualsForEvents(used.events);
-  assert.equal(specs.some((spec) => spec.kind === 'venom'), false);
+  const venom = specs.find((spec) => spec.kind === 'venom');
+  assert.ok(venom, 'a venom spec');
+  assert.deepEqual([venom.x, venom.y, venom.player, venom.cells.length], [8, 8, X, 9]);
   assert.ok(specs.some((spec) => spec.kind === 'castRing' && spec.x === 8 && spec.y === 8));
-  assert.deepEqual(visualsForEvents([{ type: 'poisonEnded', player: X }]), []);
+  assert.deepEqual(visualsForEvents([{ type: 'poisonEnded', player: X }]), [{ kind: 'poisonEnd', player: X }]);
   assert.ok(state.poison);
 });
 
@@ -490,15 +493,15 @@ test('the 3D board tints the zone for both seats and drops it when it ends', asy
   assert.equal(decals('poison').length, 0, 'no zone yet');
   assert.equal(game.click({ x: 8, y: 8 }), true);
   frames(game.getView());
-  assert.deepEqual(decals('poison'), Array(9).fill(POISON_OPACITY), 'the zone is drawn from state.poison');
+  assert.deepEqual(decals('poison'), Array(8).fill(POISON_OPACITY), 'the zone is drawn from state.poison, on its 8 empty plots');
   assert.equal(decals('poisonPreview').length, 0, 'the preview is gone once the zone exists');
 
   assert.equal(game.click({ x: 14, y: 0 }), true); // X plants: O's turn, the other seat sees the zone too
   frames(game.getView());
-  assert.equal(decals('poison').length, 9);
+  assert.equal(decals('poison').length, 8);
   assert.equal(game.click({ x: 1, y: 1 }), true); // O
   frames(game.getView());
-  assert.equal(decals('poison').length, 9, 'still there on the caster\'s next turn');
+  assert.equal(decals('poison').length, 8, 'still there on the caster\'s next turn');
   assert.equal(game.click({ x: 2, y: 2 }), true); // X: the zone ends with this turn
   frames(game.getView());
   assert.equal(game.getState().poison, null);

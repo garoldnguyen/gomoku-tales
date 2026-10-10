@@ -4,7 +4,9 @@
 // tests/shot-mode.test.js checks it. Cells are { x, y } with board[y][x].
 // It only feeds the screenshot self-check; normal play never reads it.
 
-import { MUD_TRAP, PETRIFICATION } from '../logic/skills.js';
+import { O, X } from '../logic/board.js';
+import { CLOUD_EAGLE, JADE_SERPENT } from '../logic/characters.js';
+import { CLOUD, MUD_TRAP, PETRIFICATION, VENOM } from '../logic/skills.js';
 
 export const SHOT_FIELD = Object.freeze({
   // Actions in order, Wind Rabbit (X) first: a cell places a seed, a cell
@@ -61,4 +63,28 @@ export const SHOT_FREE_ACTION = Object.freeze({
     { x: 7, y: 8, ageMs: 300 },
   ]),
   lastMoveAgeMs: SHOT_FIELD.lastMoveAgeMs,
+});
+
+// The `venomcloud` shot scene (docs/free-action-design.md section 8): Jade
+// Serpent (X) against Cloud Eagle (O), seen by X on turn 5. X poisoned O's
+// plant at 8, 8 on turn 3 (the zone lasts through turn 5), and O put its Cloud
+// on 6, 9 on turn 4, which hides the plots 5 to 8 by 8 to 11: the target plant,
+// a plant of O and half the zone are under the dense cloud for X, the other
+// five plots of the zone show their withered soil. The cloud is staged on the
+// cell whose seeded lightning (effect-plans.js lightningAmount) is lit at the
+// frozen shot time, so the picture shows a flash and a bolt. Played through the
+// rules, so it is legal by construction (tests/shot-mode.test.js).
+export const SHOT_VENOM_CLOUD = Object.freeze({
+  characters: Object.freeze({ [X]: JADE_SERPENT, [O]: CLOUD_EAGLE }),
+  cloudCell: Object.freeze({ x: 6, y: 9 }),
+  actions: Object.freeze([
+    { x: 10, y: 6 }, // 1 X
+    { x: 8, y: 8 }, // 2 O: the plant that is poisoned
+    { x: 8, y: 8, skill: VENOM }, // 3 X: the zone 7 to 9 by 7 to 9, then the same turn goes on
+    { x: 11, y: 8 }, // 3 X
+    { x: 6, y: 9, skill: CLOUD }, // 4 O: the Cloud over 5 to 8 by 8 to 11, then the same turn goes on
+    { x: 10, y: 10 }, // 4 O
+  ]),
+  growing: Object.freeze([]),
+  lastMoveAgeMs: 2000,
 });

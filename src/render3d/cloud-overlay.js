@@ -9,11 +9,17 @@
 // cell the viewer may not see, so the overlay never tells a hidden stone.
 //
 // THE CLOUD: each cloud's cells (clipped to the board) with a look:
-//   'seeThrough'  the owner and spectators: a translucent cloud with the
-//                 plants and rocks inside visible
-//   'cover'       the other seat: a light mist over the area; its empty
-//                 plots show through (that seat may plant there)
-// A cell under two clouds is listed once; cover wins.
+//   'seeThrough'  the owner and spectators: a translucent pixel cloud at
+//                 CLOUD_SEE_THROUGH_OPACITY (50 percent) with the plants,
+//                 rocks and ground inside visible
+//   'cover'       the other seat: a dense storm cloud at CLOUD_OPPONENT_OPACITY
+//                 (near 1) that hides the ground, with now and then a flash of
+//                 lightning (a look only: effect-plans.js lightningSchedule).
+//                 Its empty plots are still plantable (that seat may plant
+//                 there) and the taken ones carry a small puff, below
+// A cell under two clouds is listed once; cover wins. The cloud is drawn over
+// the cells it covers, so its drawn centre is the middle of those cells (clipped
+// to the board), never the chosen cell (cloudViewsOf: `centre`).
 //
 // HIDDEN PUFFS: for the other seat, every covered plot that is taken (HIDDEN
 // in its masked board) gets a little cloud puff drifting over it, so the
@@ -24,10 +30,11 @@
 // to nobody else. Covered cells are left out (the viewer cannot see them).
 // None once the round is over.
 
+import { BOARD_SIZE, CLOUD_LIGHTNING_SEED, CLOUD_OPPONENT_OPACITY, CLOUD_SEE_THROUGH_OPACITY } from '../config.js';
 import { CLOUD_EAGLE } from '../logic/characters.js';
 import { CHARACTER_LOOK } from './character-look.js';
-import { createGrid, fillEllipse, fillRect, setPixel } from './pixel-art.js';
-import { cloudCells, cloudsOf, isCovered, skyWatchCells } from '../logic/cloud.js';
+import { createGrid, fillEllipse, fillRect, line, setPixel } from './pixel-art.js';
+import { cloudBox, cloudCells, cloudCentre, cloudsOf, isCovered, skyWatchCells } from '../logic/cloud.js';
 import { isGameOver } from '../logic/game.js';
 import { HIDDEN, O, X } from '../logic/board.js';
 
@@ -47,6 +54,39 @@ export function cloudEagleSide(state) {
 // The look of a cloud of `owner` for `viewer`.
 export function cloudLook(owner, viewer) {
   return viewer === null || viewer === undefined || viewer === owner ? SEE_THROUGH : COVER;
+}
+
+// How solid a cloud of `look` is: the opacity of its cells at full thickness.
+export function cloudLookOpacity(look) {
+  return look === COVER ? CLOUD_OPPONENT_OPACITY : CLOUD_SEE_THROUGH_OPACITY;
+}
+
+// The clouds of the state as viewer sees them, one entry each, oldest first:
+//   { owner, look, opacity, x, y,          the cloud's chosen cell
+//     box: { x0, y0, x1, y1 },             the covered cells' bounds (clipped)
+//     centre: { x, y },                    the middle of the covered cells, in cell
+//                                          coordinates (a half cell for an even width)
+//     cells: [{ x, y }],                   the covered cells
+//     seed }                               the lightning's seed (a constant plus the chosen cell)
+// The look differs by viewer only: the owner and spectators see through it,
+// the other seat sees a dense one. Everything else is the same for both.
+export function cloudViewsOf(state, viewer) {
+  const views = [];
+  for (const cloud of cloudsOf(state ?? {})) {
+    const look = cloudLook(cloud.owner, viewer);
+    views.push(Object.freeze({
+      owner: cloud.owner,
+      look,
+      opacity: cloudLookOpacity(look),
+      x: cloud.x,
+      y: cloud.y,
+      box: Object.freeze(cloudBox(cloud, BOARD_SIZE)),
+      centre: Object.freeze(cloudCentre(cloud, BOARD_SIZE)),
+      cells: Object.freeze(cloudCells(state.board, cloud)),
+      seed: CLOUD_LIGHTNING_SEED + cloud.y * BOARD_SIZE + cloud.x,
+    }));
+  }
+  return Object.freeze(views);
 }
 
 // The cloud cells of the board for viewer: [{ x, y, look }], row by row,
@@ -85,10 +125,10 @@ export function skyWatchOutlineCells(state, viewer) {
 
 // Both overlays of a game view, worked out again only when the drawn
 // state or the viewer changes (the render loop calls it every frame).
-// Returns { clouds, skyWatch, hidden } (the lists above); the same object
-// while nothing changed.
+// Returns { clouds, views, skyWatch, hidden } (the lists above); the same
+// object while nothing changed.
 export function createCloudOverlay() {
-  const result = { clouds: NONE, skyWatch: NONE, hidden: NONE, version: 0, state: null, viewer: undefined };
+  const result = { clouds: NONE, views: NONE, skyWatch: NONE, hidden: NONE, version: 0, state: null, viewer: undefined };
   const overlayFor = (state, viewer) => (state === result.state && viewer === result.viewer ? result : rebuildOverlay(result, state, viewer));
   return overlayFor;
 }
@@ -98,6 +138,7 @@ function rebuildOverlay(result, state, viewer) {
   result.state = state;
   result.viewer = viewer;
   result.clouds = cloudOverlayCells(state, viewer);
+  result.views = cloudViewsOf(state, viewer);
   result.skyWatch = skyWatchOutlineCells(state, viewer);
   result.hidden = hiddenPuffCells(state, viewer);
   result.version++;
@@ -128,6 +169,57 @@ export function cloudTileGrid() {
   fillEllipse(grid, 22, 8, 6, 4, CLOUD_TILE_COLOURS.light);
   fillEllipse(grid, 17, 22, 8, 5, CLOUD_TILE_COLOURS.light);
   for (const [x, y] of [[4, 27], [5, 27], [27, 17], [28, 17], [13, 4], [26, 28], [27, 28]]) setPixel(grid, x, y, CLOUD_TILE_COLOURS.shade);
+  return grid;
+}
+
+// The dense cloud the other seat sees: one cell of storm cloud in the style of
+// the owner's cloud tile (soft bumps on a flat mass, no outlines) but dark
+// slate blue, filling the whole tile so the cells of the cloud join into one
+// heavy mass. Every bump is drawn again one tile to each side (wrapped), so it
+// runs across the cell border and the tile has no seam. The flash of the
+// lightning is drawn over it (stormFlashGrid) and the bolt on one cell
+// (lightningBoltGrid).
+export const STORM_TILE_COLOURS = Object.freeze({ base: '#5f6a8a', light: '#76819f', highlight: '#939eba', shade: '#4d5775', deep: '#414a65' });
+function wrappedEllipse(grid, cx, cy, rx, ry, colour) {
+  const n = OVERLAY_TILE_PX;
+  for (const dy of [-n, 0, n]) for (const dx of [-n, 0, n]) fillEllipse(grid, cx + dx, cy + dy, rx, ry, colour);
+}
+export function stormTileGrid() {
+  const n = OVERLAY_TILE_PX;
+  const grid = createGrid(n, n);
+  const { base, light, highlight, shade, deep } = STORM_TILE_COLOURS;
+  fillRect(grid, 0, 0, n, n, base);
+  for (const [cx, cy, rx, ry] of [[7, 9, 9, 6], [24, 6, 8, 5], [16, 24, 11, 6], [29, 21, 6, 5]]) wrappedEllipse(grid, cx, cy, rx, ry, light);
+  for (const [cx, cy, rx, ry] of [[22, 15, 7, 3], [4, 29, 6, 3], [12, 16, 5, 2]]) wrappedEllipse(grid, cx, cy, rx, ry, shade);
+  for (const [x, y] of [[5, 5], [6, 5], [7, 5], [22, 3], [23, 3], [14, 20], [15, 20], [16, 20], [29, 18]]) setPixel(grid, x, y, highlight);
+  for (const [x, y] of [[26, 16], [27, 16], [8, 30], [9, 30], [13, 17]]) setPixel(grid, x, y, deep);
+  return grid;
+}
+
+// The lightning's flash over the dense cloud: a plain white yellow tile, drawn
+// over every dense cell at an opacity that follows the flash.
+export const STORM_FLASH_COLOUR = '#fff6c8';
+export function stormFlashGrid() {
+  const n = OVERLAY_TILE_PX;
+  const grid = createGrid(n, n);
+  fillRect(grid, 0, 0, n, n, STORM_FLASH_COLOUR);
+  return grid;
+}
+
+// The bolt of the lightning on one cell of the dense cloud: a zig zag of
+// white yellow pixels with a bright two pixel core and a glow, top to bottom.
+export const BOLT_COLOURS = Object.freeze({ glow: '#ffe066', core: '#ffffff' });
+export const BOLT_PATH = Object.freeze([[18, 2], [12, 12], [19, 12], [10, 29]]);
+export function lightningBoltGrid() {
+  const n = OVERLAY_TILE_PX;
+  const grid = createGrid(n, n);
+  for (let i = 0; i + 1 < BOLT_PATH.length; i++) {
+    const [x0, y0] = BOLT_PATH[i];
+    const [x1, y1] = BOLT_PATH[i + 1];
+    for (const dx of [-2, -1, 2]) line(grid, x0 + dx, y0, x1 + dx, y1, BOLT_COLOURS.glow);
+    line(grid, x0, y0, x1, y1, BOLT_COLOURS.core);
+    line(grid, x0 + 1, y0, x1 + 1, y1, BOLT_COLOURS.core);
+  }
   return grid;
 }
 

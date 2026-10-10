@@ -12,11 +12,13 @@
 // animation never allocates or passes loose numbers around.
 
 import {
-  CLOUD_FADE_MS, CLOUD_FORM_MS, CONVERT_SPARK_MS, DASH_CURVE, DASH_LIFT, DASH_STREAK_MS, DRY_MS, MUD_FORM_FROM, MUD_FORM_MS,
+  CLOUD_FADE_MS, CLOUD_FORM_MS, CLOUD_LIGHTNING_CHANCE, CLOUD_LIGHTNING_GAP_MS, CLOUD_LIGHTNING_MS, CLOUD_LIGHTNING_PULSE_MS,
+  CONVERT_SPARK_MS, DASH_CURVE, DASH_LIFT, DASH_STREAK_MS, DRY_MS, MUD_FORM_FROM, MUD_FORM_MS,
   PETRIFY_FLICKER_FROM, PETRIFY_FLICKER_STEPS, PETRIFY_GREY_FROM, PETRIFY_SETTLE_MS, PETRIFY_SHATTER_MS, PETRIFY_SQUASH,
   PETRIFY_WRAP_MS, REVERSE_GROWTH_SPEED, SHAKE3D_LIGHT, SHAKE3D_MS, SINK_DELAY_MS, SINK_MS, SKY_WATCH_PULSE_LOW,
   SKY_WATCH_PULSE_MS, SURFACE_MS, SURFACE_OVERSHOOT, SURFACE_POP_AT, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_DROP_MS,
-  THROW_MS, THROW_SPIN_LIFT, THROW_SPIN_MS, THROW_SPIN_TURNS, VENOM_DROP_MS, VENOM_SINK_MS,
+  THROW_MS, THROW_SPIN_LIFT, THROW_SPIN_MS, THROW_SPIN_TURNS, POISON_FADE_MS, POISON_FORM_MS, VENOM_DROP_MS,
+  VENOM_WILT_HOLD_MS, VENOM_WILT_IN_MS, VENOM_WILT_OUT_MS,
 } from '../config.js';
 import { TORNADO_ZONE } from '../logic/skills.js';
 import { bannerTexts } from '../render/effects.js';
@@ -45,8 +47,10 @@ import { dropOffsetPx, STAGE_DROP, STAGE_LAND, STAGE_REST, STAGE_SPROUT } from '
 //                                         target plot (every skill with a plot target; Wind Dash
 //                                         from its source plant)
 //   { kind: 'hiss', player, locked }      wavy jade sound rings cross the field from its middle
-//   { kind: 'venom', x, y, from }         venom drops on the plant of `from` (no event makes it
-//                                         since Venom keeps the plant; the new Venom effect is a later task)
+//   { kind: 'venom', x, y, player, cells } venom sap drops fall from the sky onto the target plant (x, y), which wilts a
+//                                         little and stays; the empty plots of the zone (`cells`) turn withered purple
+//                                         under low fog and toxic bubbles (the zone itself is drawn from state.poison)
+//   { kind: 'poisonEnd', player }         the zone is over: it thins away over the plots it showed
 //   { kind: 'cloudForm', x, y, player }   the cloud thickens from nothing as puffs roll in on the wind
 //   { kind: 'cloudFade', x, y, player }   the ended cloud thins away as puffs drift off on the wind
 //   { kind: 'winBloom', line, player }    each winning plant in turn sends a ring and twinkles in the
@@ -74,8 +78,16 @@ export function visualsForEvents(events) {
       case 'hissCast':
         specs.push({ kind: 'hiss', player: event.player, locked: event.locked });
         break;
-      // poisonPlaced plays no spec yet: the zone is drawn from state.poison
-      // (board-marks.js) and the cast ring comes from the skillUsed event.
+      // The zone itself is drawn from state.poison (board-marks.js,
+      // poison-effects.js); the events start the sap drops and the turning
+      // of its plots, and its thinning away. The cast ring comes from the
+      // skillUsed event.
+      case 'poisonPlaced':
+        specs.push({ kind: 'venom', x: event.x, y: event.y, player: event.player, cells: event.cells ?? [] });
+        break;
+      case 'poisonEnded':
+        specs.push({ kind: 'poisonEnd', player: event.player });
+        break;
       case 'cloudPlaced':
         specs.push({ kind: 'cloudForm', x: event.x, y: event.y, player: event.player });
         break;
@@ -452,36 +464,41 @@ export function petrifyPose(out) {
   return out;
 }
 
-// Venom pose.ageMs in: the venom drops fall for VENOM_DROP_MS, then the
-// plant wilts back to Sprout (reverse growth) while the venom green rises
-// in it, then the sick sprout sinks into the soil for VENOM_SINK_MS.
-// pose.frame (the stage shown), pose.tint (0 to 1, the venom green),
-// pose.sink (0 to 1, how far it has sunk), pose.done.
-export function venomWiltMs(stageStartMs) {
-  return reverseGrowthMs(stageStartMs, STAGE_REST, STAGE_SPROUT);
+// Venom: how long the cast plays for the target plant: the sap drops fall for
+// VENOM_DROP_MS, then it droops, stays drooped and perks up again.
+export function venomWiltMs() {
+  return VENOM_DROP_MS + VENOM_WILT_IN_MS + VENOM_WILT_HOLD_MS + VENOM_WILT_OUT_MS;
 }
 
-export function venomMs(stageStartMs) {
-  return VENOM_DROP_MS + venomWiltMs(stageStartMs) + VENOM_SINK_MS;
+// Venom: how drooped the target plant is `ageMs` after the cast, 0 (upright)
+// to 1 (most): upright while the sap falls, it droops for VENOM_WILT_IN_MS,
+// holds, and perks up over VENOM_WILT_OUT_MS. 0 for any age that is not a
+// number or is past the end, so a plant nobody saw poisoned stands upright.
+// The plant stays on the board the whole time.
+export function venomWilt(ageMs) {
+  const t = ageMs - VENOM_DROP_MS;
+  if (!(t > 0)) return 0;
+  if (t < VENOM_WILT_IN_MS) return smoothstep(t / VENOM_WILT_IN_MS);
+  const held = t - VENOM_WILT_IN_MS;
+  if (held < VENOM_WILT_HOLD_MS) return 1;
+  const out = (held - VENOM_WILT_HOLD_MS) / VENOM_WILT_OUT_MS;
+  return out < 1 ? 1 - smoothstep(out) : 0;
 }
 
-export function venomPose(out, stageStartMs) {
-  const { ageMs } = out;
-  const wiltMs = venomWiltMs(stageStartMs);
-  const wilting = ageMs - VENOM_DROP_MS;
-  if (wilting < 0) {
-    out.frame = STAGE_REST;
-    out.tint = 0;
-  } else {
-    out.ageMs = wilting;
-    reverseGrowthInto(out, stageStartMs, STAGE_REST, STAGE_SPROUT);
-    out.ageMs = ageMs;
-    out.tint = clamp01(wilting / wiltMs);
-  }
-  const sink = clamp01((wilting - wiltMs) / VENOM_SINK_MS);
-  out.sink = sink * sink;
-  out.done = ageMs >= VENOM_DROP_MS + wiltMs + VENOM_SINK_MS;
-  return out;
+// Venom: how withered the plots of a new zone are `ageMs` after the cast (0 to
+// 1, the opacity share of the poison decals): bare soil while the sap falls,
+// then they turn over POISON_FORM_MS. 1 for any age that is not a number or
+// is past it, so a zone the page loaded with is simply there.
+export function poisonFormAmount(ageMs) {
+  if (!(ageMs < VENOM_DROP_MS + POISON_FORM_MS)) return 1;
+  if (ageMs <= VENOM_DROP_MS) return 0;
+  return smoothstep((ageMs - VENOM_DROP_MS) / POISON_FORM_MS);
+}
+
+// Venom: how withered an ended zone still is `ageMs` after it ended: it thins
+// away over POISON_FADE_MS. 0 once it is gone.
+export function poisonFadeAmount(ageMs) {
+  return ageMs >= 0 ? 1 - smoothstep(ageMs / POISON_FADE_MS) : 0;
 }
 
 // How thick a cloud is `ageMs` after it was placed (0 to 1): it thickens
@@ -502,6 +519,63 @@ export function cloudFadeAmount(ageMs) {
 export function skyWatchPulse(time) {
   const wave = 0.5 + 0.5 * Math.cos((time / SKY_WATCH_PULSE_MS) * Math.PI * 2);
   return SKY_WATCH_PULSE_LOW + (1 - SKY_WATCH_PULSE_LOW) * wave;
+}
+
+// The lightning of the dense cloud the other seat sees: a look only. Time is
+// cut into windows of CLOUD_LIGHTNING_MS; a window flashes with chance
+// CLOUD_LIGHTNING_CHANCE, once, at a moment in it, as two quick pulses with a
+// gap between. Whether, when and where in the cloud (a share, `pick`) all come
+// from a hash of the window number and a seed (config CLOUD_LIGHTNING_SEED
+// plus the cloud's cell), so the same time always gives the same flash. It is
+// never part of the game state or of any message, and nothing here allocates.
+const LIGHTNING_FLASH_MS = CLOUD_LIGHTNING_PULSE_MS * 2 + CLOUD_LIGHTNING_GAP_MS;
+
+// A number in [0, 1) from two integers (an integer hash).
+function hash01(a, b) {
+  let h = (Math.imul(a | 0, 0x9e3779b1) ^ Math.imul(b | 0, 0x85ebca6b)) >>> 0;
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0;
+  h = Math.imul(h ^ (h >>> 12), 0x297a2d39) >>> 0;
+  return ((h ^ (h >>> 15)) >>> 0) / 4294967296;
+}
+
+// When the flash of window `windowIndex` starts (ms), or NaN when it has none.
+export function lightningStartMs(windowIndex, seed) {
+  if (!(hash01(seed, windowIndex * 3) < CLOUD_LIGHTNING_CHANCE)) return NaN;
+  return windowIndex * CLOUD_LIGHTNING_MS + hash01(seed, windowIndex * 3 + 1) * (CLOUD_LIGHTNING_MS - LIGHTNING_FLASH_MS);
+}
+
+// The share (0 to 1) of the cloud's cells at which the flash of window
+// `windowIndex` strikes.
+export function lightningPick(windowIndex, seed) {
+  return hash01(seed, windowIndex * 3 + 2);
+}
+
+// How bright the flash is `timeMs` into the cloud's life of windows, 0 (none)
+// to 1: a pulse that dies away, a gap, then a second softer pulse.
+export function lightningAmount(timeMs, seed) {
+  const start = lightningStartMs(Math.floor(timeMs / CLOUD_LIGHTNING_MS), seed);
+  const local = timeMs - start; // NaN without a flash: every test below is false
+  if (local >= 0 && local < CLOUD_LIGHTNING_PULSE_MS) return 1 - local / CLOUD_LIGHTNING_PULSE_MS;
+  const second = local - CLOUD_LIGHTNING_PULSE_MS - CLOUD_LIGHTNING_GAP_MS;
+  if (second >= 0 && second < CLOUD_LIGHTNING_PULSE_MS) return 0.7 * (1 - second / CLOUD_LIGHTNING_PULSE_MS);
+  return 0;
+}
+
+// The share of the cells the flash of the window `timeMs` falls in strikes.
+export function lightningPickAt(timeMs, seed) {
+  return lightningPick(Math.floor(timeMs / CLOUD_LIGHTNING_MS), seed);
+}
+
+// Every flash from `fromMs` up to `toMs`, oldest first, as a frozen list of
+// { startMs, endMs, pick } (for tests and tools: the drawing reads
+// lightningAmount).
+export function lightningSchedule(seed, fromMs, toMs) {
+  const flashes = [];
+  for (let w = Math.floor(fromMs / CLOUD_LIGHTNING_MS); w * CLOUD_LIGHTNING_MS < toMs; w++) {
+    const startMs = lightningStartMs(w, seed);
+    if (startMs >= fromMs && startMs < toMs) flashes.push(Object.freeze({ startMs, endMs: startMs + LIGHTNING_FLASH_MS, pick: lightningPick(w, seed) }));
+  }
+  return Object.freeze(flashes);
 }
 
 // A converting plant pose.ageMs in: the old plant wilts back to Sprout

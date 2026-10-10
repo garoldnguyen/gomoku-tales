@@ -75,7 +75,7 @@ test('parseShotParams: no shot parameter means normal play', () => {
 test('parseShotParams reads the scene and the quality', () => {
   assert.deepEqual(SHOT_SCENES, [
     'field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting', 'select', 'gameover', 'gameover-pending',
-    'spectate', 'spectate-game', 'room-closed', 'freeaction',
+    'spectate', 'spectate-game', 'room-closed', 'freeaction', 'venomcloud',
   ]);
   assert.deepEqual(parseShotParams('?shot=field&quality=high'), { scene: 'field', quality: 'high', hud: null });
   assert.deepEqual(parseShotParams('?shot=empty&quality=low'), { scene: 'empty', quality: 'low', hud: null });
@@ -87,4 +87,28 @@ test('parseShotParams falls back to the field scene and medium quality', () => {
   assert.deepEqual(parseShotParams('?shot='), { scene: 'field', quality: 'medium', hud: null });
   assert.deepEqual(parseShotParams('?shot=castle&quality=ultra'), { scene: 'field', quality: 'medium', hud: null });
   assert.deepEqual(parseShotParams('?shot=field'), { scene: 'field', quality: 'medium', hud: null });
+});
+
+test('the venomcloud scene is legal: Venom on turn 3, the Cloud on turn 4, X to move, the lightning lit at the frozen time', async () => {
+  const { SHOT_VENOM_CLOUD_SCENE, shotCharacters } = await import('../src/ui/shot-mode.js');
+  const { SHOT_VENOM_CLOUD } = await import('../src/ui/shot-position.js');
+  const { CLOUD_LIGHTNING_SEED } = await import('../src/config.js');
+  const { lightningAmount } = await import('../src/render3d/effect-plans.js');
+  const { maskForViewer } = await import('../src/logic/cloud.js');
+  const { cloudViewsOf } = await import('../src/render3d/cloud-overlay.js');
+  assert.equal(SHOT_VENOM_CLOUD_SCENE, 'venomcloud');
+  assert.equal(parseShotParams('?shot=venomcloud&quality=low').scene, 'venomcloud');
+  assert.deepEqual(shotCharacters('field'), undefined);
+  const game = createLocalGame({ random: () => 0, characters: shotCharacters(SHOT_VENOM_CLOUD_SCENE) });
+  const staged = setUpShotScene(game, SHOT_VENOM_CLOUD_SCENE);
+  assert.deepEqual(staged.growing, []);
+  const state = game.getState();
+  assert.equal(state.currentPlayer, X, 'X sees the board');
+  assert.ok(state.poison, 'the zone is still there on turn 5');
+  assert.equal(state.clouds.length, 1);
+  assert.deepEqual([state.clouds[0].x, state.clouds[0].y], [SHOT_VENOM_CLOUD.cloudCell.x, SHOT_VENOM_CLOUD.cloudCell.y]);
+  assert.equal(game.getView().state.covered.length, 16, 'the cloud covers 4 by 4 plots of O for X');
+  assert.equal(cloudViewsOf(maskForViewer(state, X), X)[0].look, 'cover', 'X sees the dense cloud');
+  const seed = CLOUD_LIGHTNING_SEED + SHOT_VENOM_CLOUD.cloudCell.y * BOARD_SIZE + SHOT_VENOM_CLOUD.cloudCell.x;
+  assert.ok(lightningAmount(SHOT_TIME_MS, seed) > 0.3, 'a flash is lit in the picture');
 });
