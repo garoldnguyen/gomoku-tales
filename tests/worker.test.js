@@ -152,6 +152,8 @@ test('.assetsignore keeps the server, tests and private files off the public sit
   for (const entry of ['worker/', 'tests/', 'docs/', 'tools/', 'shots/', '.millstone/', '.git/', 'node_modules/', 'wrangler.toml', 'package.json', 'package-lock.json']) {
     assert.ok(lines.includes(entry), entry);
   }
+  // A debug screenshot dropped in the repo root must never go public.
+  assert.ok(lines.includes('/*.png'), '/*.png');
   // The game itself must stay public.
   for (const kept of ['src/', 'assets/', 'vendor/', 'index.html']) {
     assert.ok(!lines.some((line) => line.replace(/\/$/, '') === kept.replace(/\/$/, '')), kept);

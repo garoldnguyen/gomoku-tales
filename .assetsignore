@@ -18,3 +18,5 @@ CLAUDE.md
 AGENTS.md
 README.md
 hd2d-lab.html
+# Loose images in the repo root (debug screenshots). The game art lives in assets/.
+/*.png

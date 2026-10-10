@@ -46,7 +46,8 @@ not need it.
   `docs/`, `tools/`, `shots/`, `.millstone/`, `.git/`, `node_modules/`,
   `.wrangler/`, `wrangler.toml`, `package.json`, `package-lock.json`,
   `CLAUDE.md`, `AGENTS.md`, `README.md` and `hd2d-lab.html` out of the
-  public site.
+  public site, and also any loose `.png` in the repo root (`/*.png`, for
+  example a debug screenshot); the game art in `assets/` is not affected.
 
 ## Local test
 
