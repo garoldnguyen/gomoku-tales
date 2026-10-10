@@ -9,7 +9,8 @@
 //                 pill that slides by under the turn pill, for TURN_BANNER_MS;
 //                 after a skill (Free Action: the turn goes on) the same pill
 //                 says Now plant a seed to end your turn. to the player who
-//                 used it
+//                 used it, and <Character> placed a trap! to the other seat
+//                 and the spectators after a Tornado Zone (cast-view.js)
 //   hints         short tips in a small glass card, each once (stored under
 //                 HINT_STORAGE_KEY): five in a row wins (the first game),
 //                 what a skill does (the first time it is picked), tap again
@@ -21,6 +22,7 @@ import { TURN_BANNER_MS, HINT_MS } from '../config.js';
 import { EMPTY } from '../logic/board.js';
 import { characterOf, isGameOver } from '../logic/game.js';
 import { CHARACTER_LOOK } from '../render3d/character-look.js';
+import { castNotice } from './cast-view.js';
 import { skillInfo } from './skill-info.js';
 import { STRINGS } from './strings.js';
 
@@ -38,7 +40,8 @@ function emptyBoard(state) {
 // prev is what the last call saw ({ player, skill, used, started } or null
 // for a new game); next the same for this call. banner is null or { name,
 // colour } (the turn of a character), or { name, colour, kicker: null } when
-// a skill was just used and the player must plant; hints is a list of hint
+// a skill was just used (the player must plant, or the trap notice of the
+// other seat); hints is a list of hint
 // ids to show (the caller drops the ones already seen). local is true for a
 // game on one screen; watching for a spectator, who gets no hints; you is
 // the stone of this window online (null otherwise), who alone is told to
@@ -55,8 +58,11 @@ export function announcements(prev, state, targeting, { local, watching, you = n
   const colour = CHARACTER_LOOK[character.id]?.colour ?? null;
   if (local && player && player !== prev?.player) {
     out.banner = { name: character.name, colour };
-  } else if (used && used !== prev?.used && !watching && (local || (you !== null && you === player))) {
-    out.banner = { name: STRINGS.plantToEndTurn, colour, kicker: null };
+  } else if (used && used !== prev?.used) {
+    // After a skill: the caster is told to plant, the other seat and the
+    // spectators only learn of a Tornado Zone trap (cast-view.js).
+    const notice = castNotice(state, { local, watching, you });
+    if (notice) out.banner = { name: notice.text, colour, kicker: null };
   }
   if (watching) return out;
   if (!next.started && emptyBoard(state)) {

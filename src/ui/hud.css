@@ -314,3 +314,68 @@
 .hud.is-compact .name { font-size: 16px; }
 .hud.is-compact .turn .who { font-size: 15px; }
 .hud.is-compact.is-rail .name { font-size: 13px; }
+
+/* Free Action cast effects (docs/free-action-design.md section 8). hud.js
+   plays them from the view model of hud-view.js; the timings are the
+   --flash-ms, --shake-ms, --dust-ms, --wave-ms, --feather-ms and --blink-ms
+   it sets from src/config.js, and the colour of a flash is --cast-colour,
+   set per cast (the colour of the character, deep purple for Venom). Only
+   opacity and transforms animate. Under reduced motion nothing moves: the
+   flash border simply stays for the length of the flash, the lock rune
+   stops blinking, and the dust, feathers and wave stay hidden. */
+.hud .card::after { content: ""; position: absolute; inset: -2px; border-radius: inherit; border: 2px solid var(--cast-colour, var(--ink));
+  box-shadow: 0 0 22px color-mix(in srgb, var(--cast-colour, var(--ink)) 60%, transparent), inset 0 0 14px color-mix(in srgb, var(--cast-colour, var(--ink)) 35%, transparent);
+  opacity: 0; pointer-events: none; }
+@keyframes hud-cast-flash { 0% { opacity: 0; } 18% { opacity: 1; } 100% { opacity: 0; } }
+.hud .card.is-cast::after { animation: hud-cast-flash var(--flash-ms, 900ms) ease-out both; }
+/* shot mode (data-cast-hold): the flash stays at its brightest */
+.hud[data-cast-hold] .card.is-cast::after { animation: none; opacity: 1; }
+
+/* Petrification: gold and green dust rises off the card. Cloud: white feathers float out. */
+.hud .cast-fx { position: absolute; inset: 0; pointer-events: none; }
+.hud .dust, .hud .feather { display: none; position: absolute; opacity: 0; pointer-events: none; }
+.hud .dust { bottom: 6px; left: calc(8% + var(--i) * 11%); width: 6px; height: 6px; background: var(--gold); }
+.hud .dust:nth-child(even) { background: var(--ready); }
+.hud .feather { top: 38%; left: calc(14% + var(--i) * 13%); width: 5px; height: 13px; border-radius: 50%; background: var(--ink); }
+@keyframes hud-dust {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.6); }
+  20% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(calc((var(--i) - 3.5) * 5px), -48px) scale(1.2); }
+}
+@keyframes hud-feather {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0deg); }
+  20% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(calc((var(--i) - 2.5) * 16px), -78px) rotate(calc((var(--i) - 2.5) * 40deg)); }
+}
+.hud .card.is-dust .dust { display: block; animation: hud-dust var(--dust-ms, 1000ms) ease-out both; animation-delay: calc(var(--i) * 45ms); }
+.hud .card.is-feathers .feather { display: block; animation: hud-feather var(--feather-ms, 1500ms) ease-out both; animation-delay: calc(var(--i) * 90ms); }
+
+/* Hiss: a purple sonic wave crosses from the serpent's card to the opponent's.
+   hud.js sets --wave-x and --wave-y (the start) and --wave-dx and --wave-dy
+   (the way across). */
+.hud .cast-wave { position: absolute; left: var(--wave-x, 0px); top: var(--wave-y, 0px); width: 72px; height: 72px; border-radius: 50%; border: 3px solid var(--wave-colour, var(--ink));
+  box-shadow: 0 0 24px var(--wave-colour, var(--ink)); opacity: 0; pointer-events: none; transform: translate(-50%, -50%); }
+.hud .cast-wave::after { content: ""; position: absolute; inset: -14px; border-radius: 50%; border: 2px solid var(--wave-colour, var(--ink)); opacity: 0.5; }
+@keyframes hud-wave {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  15% { opacity: 0.95; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--wave-dx, 0px)), calc(-50% + var(--wave-dy, 0px))) scale(1.6); }
+}
+.hud .cast-wave.is-playing { animation: hud-wave var(--wave-ms, 700ms) ease-in both; }
+.hud[data-cast-hold] .cast-wave.is-playing { animation: none; opacity: 0; }
+
+/* The Hiss lock: a red blinking lock rune with the text, inside the status
+   chip, and the card's skill icons dimmed to LOCKED_ICON_OPACITY. */
+.hud .chip { display: flex; align-items: center; gap: 8px; max-width: 100%; }
+.hud .lock-rune { display: inline-flex; align-items: center; gap: 4px; padding: 0 8px 0 6px; line-height: 18px; border-radius: 999px; background: var(--red); color: var(--card-solid); font-size: 11px; font-weight: 600; white-space: nowrap; animation: hud-blink var(--blink-ms, 1000ms) ease-in-out infinite; }
+.hud .lock-rune svg { flex-shrink: 0; }
+@keyframes hud-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.hud .skill.is-dimmed .ico img, .hud .pskill.is-dimmed .ico img { opacity: var(--locked-icon-opacity, 0.4); }
+/* The slim bars and the pill have no room for the words: the rune is the lock alone (its aria-label has the text). */
+.hud.is-compact .lock-rune .lock-text { display: none; }
+.hud.is-compact .lock-rune { padding: 3px 5px; }
+.hud .card.is-collapsed.is-locked .tile::after { content: ""; position: absolute; left: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: var(--red); border: 3px solid var(--card-solid); animation: hud-blink var(--blink-ms, 1000ms) ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .hud .card.is-cast::after { animation: none; opacity: 1; }
+  .hud .lock-rune, .hud .card.is-collapsed.is-locked .tile::after { animation: none; }
+}

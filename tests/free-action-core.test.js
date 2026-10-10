@@ -450,8 +450,18 @@ test('the banner tells the player who used a skill to plant, once, and never a s
 
   const onlineIn = announcements(first.next, used, null, { local: false, you: X });
   assert.equal(onlineIn.banner.name, STRINGS.plantToEndTurn);
-  assert.equal(announcements(first.next, used, null, { local: false, you: O }).banner, null);
-  assert.equal(announcements(first.next, used, null, { local: false, watching: true }).banner, null);
+
+  // The other seat and the spectators only learn of a Tornado Zone trap
+  // (the intended change of Free Action part 6): the character, never a cell.
+  const otherSeat = announcements(first.next, used, null, { local: false, you: O }).banner;
+  assert.equal(otherSeat.name, 'Wind Rabbit placed a trap!');
+  assert.equal(announcements(first.next, used, null, { local: false, watching: true }).banner.name, 'Wind Rabbit placed a trap!');
+  assert.doesNotMatch(otherSeat.name, /\d/, 'no cell in the notice');
+
+  // Every other skill tells the other seat and the spectators nothing.
+  const dashed = use(start, X, WIND_DASH, CASES[0].target).state;
+  assert.equal(announcements(first.next, dashed, null, { local: false, you: O }).banner, null);
+  assert.equal(announcements(first.next, dashed, null, { local: false, watching: true }).banner, null);
 });
 
 // --- The local game flow ---

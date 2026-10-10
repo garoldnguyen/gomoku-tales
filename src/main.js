@@ -117,7 +117,7 @@ const hud = renderer === RENDERER_2D ? null : createHud(document.getElementById(
   onCancel: () => hudHandlers.onCancel(),
   onCollapse: (player) => setCollapsed(withCollapsed(hudCollapsed, player, !hudCollapsed[player])),
   onFullscreen: () => toggleFullscreen(document),
-});
+}, null, { holdCast: Boolean(shot) }); // shot mode holds a cast effect still (docs/shots.md section 4)
 assetsLoaded.then((store) => hud?.setAssets(store));
 
 // Which HUD cards are folded into pills (docs/art-direction-v3-1.md section

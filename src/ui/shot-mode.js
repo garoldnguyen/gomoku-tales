@@ -15,7 +15,7 @@ import { FLOW_EVENTS, LOCAL_SEATS, MODES, SCREENS, flowReducer, initialFlow, isS
 import { gameOverViewModel, rematchViewModel } from './game-over.js';
 import { parseHudParam } from './hud-collapse.js';
 import { localSelectViewModel, roomClosedViewModel, spectateViewModel, waitingViewModel, watchViewModel } from './room-screens.js';
-import { SHOT_FIELD } from './shot-position.js';
+import { SHOT_FIELD, SHOT_FREE_ACTION } from './shot-position.js';
 import { STRINGS } from './strings.js';
 
 // The name the empty name boxes suggest in the pictures (a random one in play).
@@ -23,8 +23,12 @@ export const SHOT_NAME = 'Sweet Ant';
 
 export const SHOT_SCENES = Object.freeze([
   'field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting', 'select', 'gameover', 'gameover-pending',
-  'spectate', 'spectate-game', 'room-closed',
+  'spectate', 'spectate-game', 'room-closed', 'freeaction',
 ]);
+
+// The Free Action scene (docs/free-action-design.md section 8): the field
+// position after a Mud Trap was used and before the planting (SHOT_FREE_ACTION).
+export const SHOT_FREE_ACTION_SCENE = 'freeaction';
 
 // The spectator's live game scene (docs/flow-design.md section 3.9): the
 // field scene watched by a spectator of SHOT_ROOM, with the watch card on
@@ -188,8 +192,13 @@ export function parseShotParams(search) {
 // last: { x, y, player, ageMs } or null }. Throws if a click is refused,
 // so a position that breaks the rules can never be shown.
 export function setUpShotScene(game, scene) {
-  if (scene !== 'field' && scene !== SHOT_WATCH_SCENE && !Object.hasOwn(GAME_OVER_SCENES, scene)) return { growing: [], last: null };
-  const { actions, growing, lastMoveAgeMs, selectedSkill } = SHOT_FIELD;
+  const freeAction = scene === SHOT_FREE_ACTION_SCENE;
+  if (scene !== 'field' && !freeAction && scene !== SHOT_WATCH_SCENE && !Object.hasOwn(GAME_OVER_SCENES, scene)) return { growing: [], last: null };
+  // The free action scene is the first part of the field scene, with no skill selected.
+  const { actions: allActions, growing, lastMoveAgeMs, selectedSkill } = freeAction
+    ? { ...SHOT_FIELD, ...SHOT_FREE_ACTION, selectedSkill: null }
+    : SHOT_FIELD;
+  const actions = freeAction ? allActions.slice(0, SHOT_FREE_ACTION.actionCount) : allActions;
   let last = null;
   for (const action of actions) {
     const player = game.getState().currentPlayer;
@@ -201,6 +210,6 @@ export function setUpShotScene(game, scene) {
   const board = game.getState().board;
   const grown = growing.map(({ x, y, ageMs }) => ({ x, y, player: board[y][x], ageMs }));
   const toMove = game.getState().currentPlayer;
-  if (!game.clickSkill(toMove, selectedSkill)) throw new Error(`Shot scene: ${selectedSkill} cannot be selected`);
+  if (selectedSkill && !game.clickSkill(toMove, selectedSkill)) throw new Error(`Shot scene: ${selectedSkill} cannot be selected`);
   return { growing: grown, last };
 }

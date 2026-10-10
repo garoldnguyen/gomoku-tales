@@ -9,6 +9,7 @@ import { characterOf, isGameOver, skillCooldown } from '../logic/game.js';
 import { isSkillLocked } from '../logic/jade-serpent-skills.js';
 import { cooldownTurns, getSkill, isPassiveSkill } from '../logic/skills.js';
 import { ART } from '../render3d/art-assets.js';
+import { castNotice, castView, lockView, reactionView, trapNotice } from './cast-view.js';
 import { ALL_EXPANDED } from './hud-collapse.js';
 import { skillInfo } from './skill-info.js';
 import { STRINGS } from './strings.js';
@@ -96,6 +97,12 @@ export function hudViewModel(gameState, uiState = {}, localPlayer = null) {
     qualityChoices: QUALITY_CHOICES.map(({ level, label }) => ({ level, label, pressed: level === quality })),
     turn: turnView(gameState, { over, winner, toMove, leaving, peerCountdown, targeting, status, localPlayer }),
     toast: message || null,
+    // The banner after a skill (cast-view.js castNotice): Now plant a seed
+    // for the caster, Wind Rabbit placed a trap! for the other seat and
+    // the spectators after a Tornado Zone. Never a cell.
+    notice: over ? null : castNotice(gameState, {
+      local: localPlayer === null, watching: localPlayer === SPECTATOR_VIEW, you: localPlayer === SPECTATOR_VIEW ? null : localPlayer,
+    }),
     hint,
     cards,
   };
@@ -122,11 +129,14 @@ function turnView(state, { over, winner, toMove, leaving, peerCountdown, targeti
     };
   }
   const mine = localPlayer === null || localPlayer === toMove;
+  // A Tornado Zone just cast: the seat that cannot act (the other player,
+  // a spectator) is told which character placed a trap and nothing else.
+  const trap = trapNotice(state)?.text ?? null;
   let hint;
-  if (localPlayer === SPECTATOR_VIEW) hint = STRINGS.watchingHint;
+  if (localPlayer === SPECTATOR_VIEW) hint = trap ?? STRINGS.watchingHint;
   else if (targeting && mine) hint = targetPrompt(targeting);
   else if (mine) hint = state.skillUsed ? STRINGS.plantToEndTurn : PLANT_HINT; // after a skill the turn is not over yet
-  else hint = status ?? "Opponent's turn";
+  else hint = trap ?? status ?? "Opponent's turn";
   return { player: toMove, team: teamOf(toMove), who: `${nameOf(state, toMove)}'s turn`, hint, countdown: null };
 }
 
@@ -139,6 +149,7 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
   if (isWinner) chip = 'Winner';
   else if (over) chip = 'Round over';
   else chip = active ? 'Your turn' : 'Waiting';
+  const lock = lockView(state, player);
   return {
     player,
     side: player === X ? 'left' : 'right',
@@ -154,7 +165,15 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
     active,
     collapsed,
     chevronLabel: `${collapsed ? 'Expand' : 'Collapse'} ${character.name} panel`,
-    skills: character.skills.map((skillId) => skillView(state, player, skillId, { over, active, yours, targeting, usedSkill: active && !over && Boolean(state.skillUsed) })),
+    // The Free Action effects (cast-view.js): the flash of the skill this
+    // player just used, the shake of a Hiss that hit this player, and the
+    // red lock rune while a Hiss keeps this player from using skills.
+    cast: castView(state, player),
+    reaction: reactionView(state, player),
+    lock,
+    skills: character.skills.map((skillId) => skillView(state, player, skillId, {
+      over, active, yours, targeting, usedSkill: active && !over && Boolean(state.skillUsed), locked: lock !== null,
+    })),
   };
 }
 
@@ -164,8 +183,8 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
 // no timer: it reads Always on while the round goes on, and is never used.
 // usedSkill (Free Action): the player to move already used a skill this
 // turn, so every other skill is off until the next turn; the skill used keeps
-// the cooldown it started at once.
-function skillView(state, player, skillId, { over, active, yours, targeting, usedSkill }) {
+// the cooldown it started at once, which is checked first and shows at once.
+function skillView(state, player, skillId, { over, active, yours, targeting, usedSkill, locked }) {
   const info = skillInfo(skillId);
   const title = info?.title ?? getSkill(skillId).name;
   const passive = isPassiveSkill(skillId);
@@ -220,6 +239,9 @@ function skillView(state, player, skillId, { over, active, yours, targeting, use
     cooldownTurns: remaining,
     cooldownProgress: progress,
     passive,
+    // A card a Hiss locks dims its skill icons (LOCKED_ICON_OPACITY); Sky Watch
+    // is passive and keeps working, so it stays bright.
+    dimmed: locked && !passive,
     selected: look === SELECTED,
     disabled: passive || look === OFF || look === COOLING || !yours,
     ariaLabel: `${title}: ${text}`,

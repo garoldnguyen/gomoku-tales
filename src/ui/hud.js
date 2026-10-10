@@ -10,6 +10,14 @@
 // onSkill, and one shared tooltip with the skill's description, placed by
 // tooltipPosition(). The slim layouts of narrow windows never fold.
 //
+// Free Action (docs/free-action-design.md section 8): the view model says
+// which card just cast a skill (cast), which card a Hiss hit (reaction) and
+// which card is locked (lock). Each cast is drawn once, when its key is new:
+// the border flash, the shake, the gold and green dust, the feathers and the
+// purple wave all animate opacity and transforms in hud.css and stand still
+// under reduced motion; the lock rune and the dimmed icons are plain state.
+// Nothing here decides what to show or reads a cell.
+//
 // Design v4: a click on a skill button still runs onSkill and also opens
 // the skill detail popup (skillPopupViewModel) next to its card: title,
 // state, the full description and the hint (not in the slim layouts of
@@ -21,6 +29,8 @@
 import { X, O } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
 import { getSkill } from '../logic/skills.js';
+import { HISS_WAVE_MS, HUD_SHAKE_MS } from '../config.js';
+import { DUST_COUNT, FEATHER_COUNT, castCssVars, castDurationMs, shakeFrames } from './cast-view.js';
 import { CARD_HEIGHT, chevronSize, hudFoldLayout, pillScale, topBarLayout } from './hud-layout.js';
 import { PORTRAIT_ART, QUALITY_CHOICES, SKILL_ICON_ART, skillPopupViewModel } from './hud-view.js';
 import { TOOLTIP_LONG_PRESS_MS, TOOLTIP_SHOW_MS, tooltipPosition } from './tooltip-position.js';
@@ -41,8 +51,12 @@ const POPUP_ID = 'hud-skill-popup';
 //   onFullscreen()            the Fullscreen button was pressed; it must
 //                             call the Fullscreen API at once (a user action)
 // assets: the asset store (render/assets.js) or null; setAssets() swaps it.
-export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFullscreen }, assets = null) {
+// holdCast: a cast effect stays in its first frame and is never cleared by a
+// timer (shot mode, whose pictures must stand still).
+export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFullscreen }, assets = null, { holdCast = false } = {}) {
   root.classList.add('hud');
+  for (const [name, value] of Object.entries(castCssVars())) root.style.setProperty(name, value);
+  if (holdCast) root.dataset.castHold = '';
   const el = (tag, className, parent) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -185,7 +199,15 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     const body = el('div', 'card-body', card);
     body.id = `hud-card-${team}-body`;
     chevron.setAttribute('aria-controls', body.id);
+    // The status chip; a Hiss lock adds the red lock rune inside it, so the
+    // card keeps its height.
     const chip = el('div', 'chip', body);
+    const chipText = el('span', 'chip-text', chip);
+    const rune = el('span', 'lock-rune', chip);
+    rune.hidden = true;
+    rune.dataset.hudBox = `lock-rune-${team}`;
+    rune.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg><span class="lock-text"></span>';
+    const runeText = rune.querySelector('.lock-text');
     el('div', 'rule', body);
     el('div', 'label', body).textContent = 'SKILLS';
     const list = el('div', 'skills', body);
@@ -229,8 +251,22 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
         slot, icon, picon, button, ico, ring, count, title, state, pill, arc, pcount, look: null, progress: null, view: null,
       };
     });
-    return { card, team, portrait, text, pillSkills, chevron, body, name, meta, chip, skills, folded: false, collapsed: false };
+    // Decorative specks for the Petrification dust and the Cloud feathers,
+    // made once; hud.css shows them only while the card is casting.
+    const fx = el('div', 'cast-fx', card);
+    fx.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < DUST_COUNT; i++) el('span', 'dust', fx).style.setProperty('--i', String(i));
+    for (let i = 0; i < FEATHER_COUNT; i++) el('span', 'feather', fx).style.setProperty('--i', String(i));
+    return {
+      card, team, portrait, text, pillSkills, chevron, body, name, meta, chip, chipText, rune, runeText, skills,
+      folded: false, collapsed: false, castKey: null, reactionKey: null, castTimer: null, locked: false,
+    };
   });
+
+  // The purple wave a Hiss sends from the serpent's card to the opponent's.
+  const wave = el('div', 'cast-wave', root);
+  wave.setAttribute('aria-hidden', 'true');
+  let waveTimer = null;
 
   const toast = el('div', 'toast glass', root);
   toast.setAttribute('role', 'status');
@@ -244,6 +280,75 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     if (pressed || skipClick) return;
     onCancel?.();
   });
+
+  // --- The Free Action effects (view model: cast, reaction, lock) ---
+  const reducedMotion = () => Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  // A shake of the whole card with the Web Animations API, on `translate`
+  // only, so the card's --card-scale transform and its fold animation stay.
+  const shake = (dom, light) => {
+    if (reducedMotion() || typeof dom.card.animate !== 'function') return;
+    dom.card.animate(shakeFrames(light), { duration: HUD_SHAKE_MS, easing: 'ease-out' });
+  };
+  // The wave crosses from the middle of card `from` to the middle of card `to`.
+  const sendWave = (from, to) => {
+    const area = root.getBoundingClientRect();
+    const a = cards[from].card.getBoundingClientRect();
+    const b = cards[to].card.getBoundingClientRect();
+    const ax = a.left + a.width / 2 - area.left;
+    const ay = a.top + a.height / 2 - area.top;
+    wave.style.setProperty('--wave-x', `${ax}px`);
+    wave.style.setProperty('--wave-y', `${ay}px`);
+    wave.style.setProperty('--wave-dx', `${b.left + b.width / 2 - area.left - ax}px`);
+    wave.style.setProperty('--wave-dy', `${b.top + b.height / 2 - area.top - ay}px`);
+    wave.classList.remove('is-playing');
+    void wave.offsetWidth; // restart the animation
+    wave.classList.add('is-playing');
+    clearTimeout(waveTimer);
+    if (!holdCast) waveTimer = setTimeout(() => wave.classList.remove('is-playing'), HISS_WAVE_MS + 50);
+  };
+  const clearCast = (dom) => {
+    clearTimeout(dom.castTimer);
+    dom.castTimer = null;
+    dom.card.classList.remove('is-cast', 'is-dust', 'is-feathers');
+  };
+  const playCast = (c, cast) => {
+    const dom = cards[c];
+    clearCast(dom);
+    void dom.card.offsetWidth; // restart the animations of a new cast
+    dom.card.style.setProperty('--cast-colour', cast.colour ?? 'var(--ink)');
+    dom.card.classList.add('is-cast');
+    if (cast.dust) dom.card.classList.add('is-dust');
+    if (cast.feathers) dom.card.classList.add('is-feathers');
+    if (cast.shake) shake(dom, false);
+    if (cast.wave) sendWave(c, 1 - c);
+    if (!holdCast) dom.castTimer = setTimeout(() => clearCast(dom), castDurationMs(cast) + 50);
+  };
+  // One card's effects for its part of the view model; a cast or a hit plays
+  // once, when its key is new.
+  const showCast = (c, card) => {
+    const dom = cards[c];
+    const castKey = card.cast?.key ?? null;
+    if (castKey !== dom.castKey) {
+      dom.castKey = castKey;
+      if (card.cast) playCast(c, card.cast);
+      else clearCast(dom);
+    }
+    const reactionKey = card.reaction?.key ?? null;
+    if (reactionKey !== dom.reactionKey) {
+      dom.reactionKey = reactionKey;
+      if (card.reaction) shake(dom, true);
+    }
+    const locked = card.lock !== null;
+    if (dom.locked !== locked) {
+      dom.locked = locked;
+      dom.card.classList.toggle('is-locked', locked);
+      dom.rune.hidden = !locked;
+    }
+    if (locked) {
+      setText(dom.runeText, card.lock.text);
+      setAttr(dom.rune, 'aria-label', card.lock.text);
+    }
+  };
 
   const setText = (node, text) => {
     if (node.textContent !== text) node.textContent = text;
@@ -506,7 +611,8 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
         }
         setText(dom.name, card.name);
         setText(dom.meta, card.meta);
-        setText(dom.chip, card.chip);
+        setText(dom.chipText, card.chip);
+        showCast(c, card);
         dom.card.classList.toggle('is-waiting', card.waiting);
         dom.card.classList.toggle('is-winner', card.winner);
         dom.card.classList.toggle('is-active', card.active);
@@ -528,6 +634,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
             }
             row.look = skill.look;
           }
+          for (const button of [row.button, row.pill]) button.classList.toggle('is-dimmed', skill.dimmed);
           setAttr(row.pill, 'data-state', skill.state);
           setText(row.title, skill.title);
           setText(row.state, skill.stateText);

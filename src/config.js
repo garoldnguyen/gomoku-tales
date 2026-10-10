@@ -477,6 +477,25 @@ export const SKY_WATCH_PULSE_MS = 1400; // the Sky Watch outlines breathe once i
 // (src/ui/announce.js).
 export const TURN_BANNER_MS = 1300; // the banner stays this long (it fades in and out within it)
 export const HINT_MS = 9000; // a hint card hides by itself after this long (Got it hides it at once)
+// The HUD cast effects of the Free Action turn (docs/free-action-design.md
+// section 8; src/ui/cast-view.js decides, src/ui/hud.js draws, src/ui/hud.css
+// animates opacity and transforms only, and nothing moves under reduced
+// motion). When a skill is used its user's card flashes the colour of its
+// character on the border.
+export const SKILL_FLASH_MS = 900; // the border flash of the card of the skill's user
+export const HUD_SHAKE_MS = 480; // a card shakes this long (Petrification: the user's card, Hiss: the locked card)
+export const HUD_SHAKE_PX = 4; // the slight shake of the Petrification card, in px each way
+export const HUD_SHAKE_LIGHT_PX = 2; // the light shake of the card a Hiss locks
+export const HUD_SHAKE_STEPS = 6; // swings in one shake
+export const HUD_DUST_MS = 1000; // the gold and green dust of Petrification rises this long
+export const HUD_DUST_COUNT = 8; // specks of dust on a card (gold and green, alternating)
+export const HISS_WAVE_MS = 700; // the sonic wave crosses from the serpent's card to the opponent's card
+export const HISS_WAVE_COLOUR = '#b07ae0'; // purple of that wave
+export const HUD_FEATHER_MS = 1500; // the white feathers of the Cloud float out of the card this long
+export const HUD_FEATHER_COUNT = 6; // feathers on a card
+export const LOCK_BLINK_MS = 1000; // the red lock rune of a card the Hiss locks blinks once in this long
+export const LOCKED_ICON_OPACITY = 0.4; // the skill icons of a locked card (40 percent)
+export const VENOM_FLASH_COLOUR = '#7b3fb0'; // the deep purple card flash of Venom (the other skills flash their character's colour)
 export const SKY_WATCH_PULSE_LOW = 0.6; // share of SKY_WATCH_OPACITY at the faintest
 export const WIN_STAGGER_MS = 110; // the winning plants celebrate one after another this far apart
 export const WIN_RING_MS = 700;

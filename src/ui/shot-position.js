@@ -46,3 +46,19 @@ export const SHOT_FIELD = Object.freeze({
   // rested after its cast on turn 2 and is ready again on turn 16.
   selectedSkill: PETRIFICATION,
 });
+
+// The `freeaction` shot scene (docs/free-action-design.md section 8): the
+// field position up to the Mud Trap of turn 14, before the same player
+// plants. It is the first actions of SHOT_FIELD (the Mud Trap is the last
+// of them), so it is legal by construction. O used the skill and must plant:
+// the hint says so, every other skill row is off, the Mud Trap row shows its
+// rest at once and the card of O shows the flash of its character. No skill
+// is selected.
+export const SHOT_FREE_ACTION = Object.freeze({
+  actionCount: SHOT_FIELD.actions.findIndex((action) => action.skill === MUD_TRAP) + 1,
+  // Plants shown still growing; the last plant (X, seed 13) is the last move.
+  growing: Object.freeze([
+    { x: 7, y: 8, ageMs: 300 },
+  ]),
+  lastMoveAgeMs: SHOT_FIELD.lastMoveAgeMs,
+});
