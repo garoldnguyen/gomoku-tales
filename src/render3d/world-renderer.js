@@ -48,7 +48,7 @@
 
 import {
   BOARD_SIZE, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, CLOUD_SIZE, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, CLOUD_MIST_OPACITY, CLOUD_PUFF_BOB, CLOUD_PUFF_DRIFT, CLOUD_PUFF_DRIFT_MS, CLOUD_PUFF_HEIGHT, CLOUD_PUFF_SCALE, SKY_WATCH_GLOW_OPACITY, SKY_WATCH_OPACITY, SKY_WATCH_PUFF_DRIFT, SKY_WATCH_PUFF_HEIGHT, SKY_WATCH_PUFF_MS,
-  SPRITE_STRETCH_Y, MUD_OPACITY, SUNK_DEPTH_PX, SUNK_DIM,
+  SPRITE_STRETCH_Y, MUD_OPACITY, POISON_OPACITY, POISON_PREVIEW_OPACITY, SUNK_DEPTH_PX, SUNK_DIM,
 } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
 import { DEFAULT_SIDES } from '../logic/characters.js';
@@ -62,6 +62,7 @@ import { COVER, cloudTileGrid, createCloudOverlay, hiddenPuffGrid, skyWatchGlowG
 import { cloudFadeAmount, cloudFormAmount, skyWatchPulse } from './effect-plans.js';
 import { createEffects3d } from './effects3d.js';
 import { mudTileGrid } from './mud-art.js';
+import { poisonTileGrid } from './poison-art.js';
 import { enteredStage, plantedCells, plantPoseInto, STAGE_LAND, STAGE_OPEN, STAGE_REST } from './growth.js';
 import { createWorldHitTest } from './hit-test.js';
 import { parseFpsSwitch } from './fps.js';
@@ -472,6 +473,8 @@ function createPieceLayer(world) {
 // a fixed order (the last-move mark is 3, see createLastMoveMark).
 const DECALS = {
   mud: { order: 0, grid: mudTileGrid, opacity: MUD_OPACITY },
+  poison: { order: 0, grid: poisonTileGrid, opacity: POISON_OPACITY },
+  poisonPreview: { order: 1, grid: poisonTileGrid, opacity: POISON_PREVIEW_OPACITY },
   zonePreview: { order: 1, art: ART.v3.decal.zone },
   win: { order: 2, art: ART.v3.decal.win },
   dashTarget: { order: 4, art: ART.v3.decal.dashTarget },
@@ -486,6 +489,7 @@ function createDecalLayer(world) {
   for (const [kind, look] of Object.entries(DECALS)) {
     const material = decalMaterial(look.grid ? sheetCanvas([look.grid()]) : artSource(look.art));
     if (look.opacity !== undefined) material.opacity = look.opacity;
+    material.name = `decal-${kind}`;
     pools[kind] = { material, order: look.order, meshes: [], used: 0 };
   }
   const poolList = Object.values(pools);

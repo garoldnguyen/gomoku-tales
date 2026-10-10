@@ -209,8 +209,10 @@ export function maskEventsForViewer(masked, events) {
 }
 
 // tornadoStorm is the reveal of a Tornado Zone trap that just fired: the
-// cross is known to everybody from then on, so the event always stays.
-const PUBLIC_EVENTS = Object.freeze(['cloudPlaced', 'cloudEnded', 'win', 'draw', 'turnEnded', 'tornadoStorm']);
+// cross is known to everybody from then on, so the event always stays. The
+// Venom poison zone is public too (state.poison is never masked), also under
+// a cloud, so its two events stay.
+const PUBLIC_EVENTS = Object.freeze(['cloudPlaced', 'cloudEnded', 'win', 'draw', 'turnEnded', 'tornadoStorm', 'poisonPlaced', 'poisonEnded']);
 
 function hidesEvent(masked, event) {
   if (PUBLIC_EVENTS.includes(event?.type)) return false;

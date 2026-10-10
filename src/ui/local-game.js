@@ -284,8 +284,10 @@ function describeEvent(event) {
       return 'Petrification! The plant turned to stone.';
     case 'hissCast':
       return 'Hiss! No skills on the next turn.';
-    case 'plantRemoved':
-      return 'Venom! The plant withered.';
+    case 'poisonPlaced':
+      return 'Venom! The plots around the plant are poisoned.';
+    case 'poisonEnded':
+      return 'The poison faded.';
     default:
       return null;
   }

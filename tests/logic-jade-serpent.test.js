@@ -2,8 +2,8 @@
 // (docs/design.md section 5).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { COOLDOWN_SHORT, COOLDOWN_LONG } from '../src/config.js';
-import { EMPTY, ROCK, X, O } from '../src/logic/board.js';
+import { COOLDOWN_SHORT, COOLDOWN_LONG, VENOM_TURNS, VENOM_ZONE_SIZE } from '../src/config.js';
+import { ROCK, X, O } from '../src/logic/board.js';
 import {
   CHARACTERS, EARTH_BEAR, FIRST_PLAYER, JADE_SERPENT, WIND_RABBIT, assignSides, characterForStone, stoneForCharacter,
 } from '../src/logic/characters.js';
@@ -140,7 +140,7 @@ test('Hiss does not lock the serpent itself', () => {
 
 // --- Venom ---
 
-test('Venom removes exactly one opponent plant, leaves the plot empty and keeps rocks', () => {
+test('Venom removes nothing: the plant and the rocks stay and only a poison zone is added', () => {
   let state = serpentGame();
   state = place(state, X, 7, 7);
   state = place(state, O, 8, 8);
@@ -151,16 +151,14 @@ test('Venom removes exactly one opponent plant, leaves the plot empty and keeps 
   const before = state;
   const result = useSkill(state, { player: X, skill: VENOM, target: { x: 8, y: 8 } });
   state = ok(result);
-  assert.equal(state.board[8][8], EMPTY);
-  assert.equal(state.board[9][9], O);
+  assert.deepEqual(state.board, before.board, 'not one plot changed');
+  assert.equal(state.board[8][8], O, 'the poisoned plant stays on the board');
   assert.equal(state.board[9][7], ROCK, 'the rock stays');
   assert.deepEqual(state.rocks, before.rocks);
-  let changed = 0;
-  for (let y = 0; y < before.board.length; y++) {
-    for (let x = 0; x < before.board.length; x++) if (before.board[y][x] !== state.board[y][x]) changed++;
-  }
-  assert.equal(changed, 1, 'exactly one plot changed');
-  assert.ok(result.events.some((e) => e.type === 'plantRemoved' && e.x === 8 && e.y === 8 && e.from === O));
+  assert.equal(result.events.some((e) => e.type === 'plantRemoved'), false, 'plantRemoved is gone');
+  const placed = result.events.find((e) => e.type === 'poisonPlaced');
+  assert.deepEqual(placed, { type: 'poisonPlaced', player: X, x: 8, y: 8, cells: state.poison.cells, endsAfterTurn: before.turn + VENOM_TURNS });
+  assert.equal(state.poison.cells.length, VENOM_ZONE_SIZE * VENOM_ZONE_SIZE);
   assert.equal(state.currentPlayer, X, 'using Venom does not end the turn');
 });
 
@@ -194,26 +192,32 @@ function serpentFourInARow() {
   return state;
 }
 
-test('Venom on a sunk seed takes its sunk entry with it, so a seed planted there counts at once', () => {
+test('Venom on a sunk seed poisons around it and leaves it sunk: it still surfaces on time', () => {
   let state = serpentFourInARow();
   state = skillTurn(state, X, MUD_TRAP, { x: 4, y: 0 }, { x: 4, y: 0 }); // X plants into its own puddle: sunk
   assert.equal(state.sunk.length, 1);
   const used = ok(useSkill(state, { player: O, skill: VENOM, target: { x: 4, y: 0 } }));
-  assert.deepEqual(used.sunk, [], 'the entry goes with the withered plant');
-  const planted = placeStone(used, { player: O, x: 4, y: 0 });
-  assert.equal(planted.ok, true, planted.error);
-  assert.equal(planted.state.winner, O, 'five O seeds in a row: O wins, not the owner of the old sunk seed');
-  assert.equal(planted.state.winLine.length, 5);
+  assert.equal(used.sunk.length, 1, 'the sunk seed keeps its entry');
+  assert.equal(used.board[0][4], X, 'the seed stays on its plot');
+  assert.deepEqual(used.poison.cells.map((c) => `${c.x},${c.y}`), ['3,0', '4,0', '5,0', '3,1', '4,1', '5,1'], 'the square is cut at the top edge');
+  // O cannot plant at (4,0) any more (taken anyway) nor beside it at (5,0).
+  assert.equal(placeStone(used, { player: O, x: 5, y: 0 }).error, 'That cell is poisoned.');
+  const result = placeStone(used, { player: O, x: 9, y: 9 });
+  const planted = ok(result);
+  assert.ok(result.events.some((e) => e.type === 'stoneSurfaced' && e.x === 4 && e.y === 0), 'the seed surfaces at the end of the turn it was due');
+  assert.deepEqual(planted.sunk, []);
+  assert.equal(planted.board[0][4], X);
+  assert.ok(planted.poison, 'the zone lasts on');
 });
 
-test('Venom on a sunk seed that is not replanted: nothing surfaces later and nobody wins from it', () => {
+test('Venom on a sunk seed that is not replanted: it still surfaces and nobody else wins', () => {
   let state = serpentFourInARow();
   state = skillTurn(state, X, MUD_TRAP, { x: 4, y: 0 }, { x: 4, y: 0 });
   const events = [];
   state = skillTurn(state, O, VENOM, { x: 4, y: 0 }, { x: 9, y: 9 }, events); // the turn the seed was due to surface
-  assert.equal(state.board[0][4], EMPTY, 'the withered plot stays empty');
+  assert.equal(state.board[0][4], X, 'the plot still holds the plant: Venom removes nothing');
   assert.deepEqual(state.sunk, []);
-  assert.equal(events.some((event) => event.type === 'stoneSurfaced'), false, 'no seed rises from an empty plot');
+  assert.equal(events.some((event) => event.type === 'stoneSurfaced'), true);
   assert.equal(state.winner, null);
 });
 

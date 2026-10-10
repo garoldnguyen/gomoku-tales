@@ -9,7 +9,7 @@ import { WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION, HISS, VENOM, CLOUD } 
 import { cloudCells } from '../logic/cloud.js';
 import { SUNK_PLANT_ERROR, mudAt } from '../logic/earth-bear-skills.js';
 import { isSunk } from '../logic/scoring-board.js';
-import { isPoisoned } from '../logic/jade-serpent-skills.js';
+import { POISONED_ERROR, isPoisoned, poisonCells } from '../logic/jade-serpent-skills.js';
 import { DASH_ON_MUD_ERROR, DASH_ON_POISON_ERROR, dashDistance, tornadoCells } from '../logic/wind-rabbit-skills.js';
 import { STRINGS } from './strings.js';
 
@@ -37,7 +37,7 @@ export function targetPrompt(targeting) {
     case PETRIFICATION:
       return "Petrification: choose an opponent's stone";
     case VENOM:
-      return "Venom: choose an opponent's stone";
+      return STRINGS.venomTargetPrompt;
     case CLOUD:
       return STRINGS.cloudTargetPrompt;
     default:
@@ -79,6 +79,7 @@ export function targetClick(state, player, targeting, cell) {
     case MUD_TRAP:
       if (!isEmptyCell(board, x, y)) return { error: 'Choose an empty cell.' };
       if (mudAt(state, x, y)) return { error: 'That cell is already mud.' };
+      if (isPoisoned(state, x, y)) return { error: POISONED_ERROR };
       return { target: { x, y } };
     case PETRIFICATION:
     case VENOM:
@@ -93,6 +94,7 @@ export function targetClick(state, player, targeting, cell) {
 // What to draw on the board for the targeting step under the hovered cell
 // (hover may be null). Returns null or one of:
 //   { type: 'select', x, y }       ring around a stone that can be picked, or the plot Mud Trap would flood
+//   { type: 'poison', x, y, cells } the Venom zone around the hovered opponent plant (3 by 3, cut at the edges)
 //   { type: 'dash', from, to }     whirl on the source, red frame on `to` (or null)
 //   { type: 'zone', x, y, cells }  the Tornado Zone cross centred on (x, y) and its cells (cut at the edges)
 //   { type: 'cloud', x, y, cells } the Cloud centred on (x, y) and its cells
@@ -114,11 +116,12 @@ export function targetPreview(state, player, targeting, hover) {
     case CLOUD:
       return cell ? { type: 'cloud', x: cell.x, y: cell.y, cells: cloudCells(board, cell) } : null;
     case MUD_TRAP:
-      return cell && isEmptyCell(board, cell.x, cell.y) && !mudAt(state, cell.x, cell.y) ? { type: 'select', x: cell.x, y: cell.y } : null;
+      return cell && isEmptyCell(board, cell.x, cell.y) && !mudAt(state, cell.x, cell.y) && !isPoisoned(state, cell.x, cell.y)
+        ? { type: 'select', x: cell.x, y: cell.y } : null;
     case PETRIFICATION:
       return content === opponentOf(player) && !isSunk(state, cell.x, cell.y) ? { type: 'select', x: cell.x, y: cell.y } : null;
     case VENOM:
-      return content === opponentOf(player) ? { type: 'select', x: cell.x, y: cell.y } : null;
+      return content === opponentOf(player) ? { type: 'poison', x: cell.x, y: cell.y, cells: poisonCells(board, cell.x, cell.y) } : null;
     default:
       return null;
   }

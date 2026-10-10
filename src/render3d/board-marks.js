@@ -14,6 +14,8 @@
 //   'dashTarget'  the Wind Dash target cell being chosen
 //   'select'      a chosen or pickable plant (Wind Dash, Petrification, Venom) or the plot Mud Trap would flood
 //   'mud'         a mud puddle (Mud Trap), also under a seed sunk in it
+//   'poison'      a poisoned plot of the Venom zone (state.poison)
+//   'poisonPreview' a plot of the Venom zone being chosen (Jade Serpent)
 //   'win'         a cell of the winning line
 //   'cloudPreview' a cell of the Cloud being placed (Cloud Eagle)
 
@@ -49,6 +51,10 @@ export function boardMarksInto(view, out) {
   if (mud) for (let i = 0; i < mud.length; i++) addDecal(out, 'mud', mud[i].x, mud[i].y, 0, 0);
   if (sunk) for (let i = 0; i < sunk.length; i++) addDecal(out, 'mud', sunk[i].x, sunk[i].y, 0, 0);
 
+  // The Venom zone: every plot of state.poison.cells, a public fact.
+  const poisonCells = state.poison?.cells;
+  if (poisonCells) for (let i = 0; i < poisonCells.length; i++) addDecal(out, 'poison', poisonCells[i].x, poisonCells[i].y, 0, 0);
+
   if (hover) setGhost(out, state.currentPlayer, hover.x, hover.y);
 
   // Hover preview for the skill target flow (see ui/targeting.js).
@@ -69,6 +75,10 @@ export function boardMarksInto(view, out) {
         break;
       case 'cloud':
         for (let i = 0; i < preview.cells.length; i++) addDecal(out, 'cloudPreview', preview.cells[i].x, preview.cells[i].y, 0, 0);
+        break;
+      case 'poison':
+        for (let i = 0; i < preview.cells.length; i++) addDecal(out, 'poisonPreview', preview.cells[i].x, preview.cells[i].y, 0, 0);
+        addDecal(out, 'select', preview.x, preview.y, 0, 0);
         break;
     }
   }

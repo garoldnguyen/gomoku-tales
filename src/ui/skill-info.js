@@ -10,10 +10,12 @@
 // on a plot that is still empty, Tornado Zone throws only the seed the
 // opponent plants inside it on that turn, Mud Trap needs an empty plot that
 // is not mud already, and Petrification takes only an opponent's plant that
-// is not sunk in mud. Venom also takes only an opponent's plant.
+// is not sunk in mud. Venom poisons the square around an opponent's plant (a
+// seed sunk in mud too) and removes nothing.
 
 import {
-  CLOUD_SIZE, CLOUD_TURNS, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, SKY_WATCH_RUN, TORNADO_ARM, TORNADO_TURNS, WIND_DASH_RANGE,
+  CLOUD_SIZE, CLOUD_TURNS, HISS_LOCK_TURNS, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, SKY_WATCH_RUN, TORNADO_ARM, TORNADO_TURNS, VENOM_TURNS,
+  VENOM_ZONE_SIZE, WIND_DASH_RANGE,
 } from '../config.js';
 import {
   CLOUD, HISS, MUD_TRAP, PETRIFICATION, SKY_WATCH, TORNADO_ZONE, VENOM, WIND_DASH, getSkill,
@@ -46,12 +48,12 @@ export const SKILL_INFO = Object.freeze({
   ),
   [HISS]: info(
     HISS,
-    'A warning hiss. On their next turn the opponent cannot use a skill, but they can still plant a seed.',
+    `A warning hiss. For ${turns(HISS_LOCK_TURNS)} the opponent cannot use a skill, but they can still plant a seed.`,
     'Click to select, no target needed',
   ),
   [VENOM]: info(
     VENOM,
-    'Pick one of the opponent\'s plants. It withers and its plot is left empty. Rocks cannot be picked.',
+    `Pick one of the opponent's plants, even one sunk in mud. The ${VENOM_ZONE_SIZE} by ${VENOM_ZONE_SIZE} square of plots around it is poisoned for ${turns(VENOM_TURNS)}: nobody, you included, can plant on an empty poisoned plot, and a Wind Dash, a Mud Trap or a Tornado throw cannot reach it. The plant itself stays and keeps counting for its row. Rocks cannot be picked.`,
     'Click to select, then choose a plant',
   ),
   [SKY_WATCH]: info(

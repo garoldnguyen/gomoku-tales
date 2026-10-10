@@ -61,6 +61,8 @@ const COLORS = {
   mud: 'rgba(107, 74, 43, 0.85)',
   mudEdge: '#523720',
   sunk: 'rgba(82, 55, 32, 0.6)',
+  poison: 'rgba(122, 70, 150, 0.5)', // a poisoned plot (Venom zone): withered purple
+  poisonPreview: 'rgba(122, 70, 150, 0.3)',
   dashFrame: '#ff2a3a',
   dashFill: 'rgba(255, 42, 58, 0.28)',
   whirl: '#bfe8ff',
@@ -189,6 +191,7 @@ function drawMudTint(ctx, x, y, color) {
 
 function drawCells(ctx, state) {
   const { board } = state;
+  for (const { x, y } of state.poison?.cells ?? []) drawMudTint(ctx, x, y, COLORS.poison);
   for (const { x, y } of state.mud ?? []) {
     drawMudTint(ctx, x, y, COLORS.mud);
     const { px, py } = cellOrigin(x, y);
@@ -309,6 +312,10 @@ function drawPreview(ctx, preview, time) {
       break;
     case 'zone':
       drawZone(ctx, preview.cells, time, 0.6);
+      break;
+    case 'poison':
+      for (const { x, y } of preview.cells) drawMudTint(ctx, x, y, COLORS.poisonPreview);
+      drawSelectRing(ctx, preview.x, preview.y);
       break;
   }
 }

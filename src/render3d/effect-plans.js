@@ -39,7 +39,8 @@ import { dropOffsetPx, STAGE_DROP, STAGE_LAND, STAGE_REST, STAGE_SPROUT } from '
 //                                         from its source plant)
 //   { kind: 'hiss', player, locked }      wavy jade sound rings cross the field from its middle
 //   { kind: 'venom', x, y, from }         venom drops on the plant of `from`, which wilts sickly green
-//                                         back to Sprout and sinks into the soil
+//                                         back to Sprout and sinks into the soil (no event makes it
+//                                         since Venom keeps the plant; the new Venom effect is a later task)
 //   { kind: 'cloudForm', x, y, player }   the cloud thickens from nothing as puffs roll in on the wind
 //   { kind: 'cloudFade', x, y, player }   the ended cloud thins away as puffs drift off on the wind
 //   { kind: 'winBloom', line, player }    each winning plant in turn sends a ring and twinkles in the
@@ -67,9 +68,8 @@ export function visualsForEvents(events) {
       case 'hissCast':
         specs.push({ kind: 'hiss', player: event.player, locked: event.locked });
         break;
-      case 'plantRemoved':
-        specs.push({ kind: 'venom', x: event.x, y: event.y, from: event.from });
-        break;
+      // poisonPlaced plays no spec yet: the zone is drawn from state.poison
+      // (board-marks.js) and the cast ring comes from the skillUsed event.
       case 'cloudPlaced':
         specs.push({ kind: 'cloudForm', x: event.x, y: event.y, player: event.player });
         break;

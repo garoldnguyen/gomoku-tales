@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { BOARD_SIZE, CELL_PX } from '../src/config.js';
-import { X, O, EMPTY } from '../src/logic/board.js';
+import { X, O } from '../src/logic/board.js';
 import { JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
 import { HISS, VENOM, WIND_DASH } from '../src/logic/skills.js';
 import { BOARD_PX, BOARD_X, BOARD_Y, cellAtPoint, cellCenter } from '../src/render/layout.js';
@@ -113,14 +113,15 @@ test('local mode: Jade Serpent can use Hiss (no target) and Venom (an opponent s
   assert.equal(game.getState().currentPlayer, O);
   assert.equal(game.clickSkill(O, WIND_DASH), false, 'the Hiss lock holds');
   game.click({ x: 0, y: 0 }); // O
-  // Venom: an own stone is refused, the opponent stone withers.
+  // Venom: an own stone is refused, the opponent plant poisons its square and stays.
   assert.equal(game.clickSkill(X, VENOM), true);
-  assert.equal(game.getView().status, "Venom: choose an opponent's stone");
+  assert.equal(game.getView().status, STRINGS.venomTargetPrompt);
   assert.equal(game.click({ x: 7, y: 7 }), false);
   assert.equal(game.getView().message, "Choose one of your opponent's stones.");
   assert.equal(game.click({ x: 8, y: 8 }), true);
-  assert.equal(game.getState().board[8][8], EMPTY);
-  assert.equal(game.getView().message, 'Venom! The plant withered.');
+  assert.equal(game.getState().board[8][8], O, 'the plant stays on the board');
+  assert.equal(game.getState().poison.cells.length, 9);
+  assert.equal(game.getView().message, 'Venom! The plots around the plant are poisoned.');
   assert.equal(game.getState().currentPlayer, X, 'Venom does not end the turn either');
 });
 

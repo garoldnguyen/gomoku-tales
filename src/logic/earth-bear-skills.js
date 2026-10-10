@@ -6,6 +6,7 @@
 
 import { MUD_LIFETIME_TURNS, MUD_SINK_TURNS } from '../config.js';
 import { ROCK, X, O, cloneBoard, inBounds, isEmptyCell } from './board.js';
+import { POISONED_ERROR, isPoisoned } from './jade-serpent-skills.js';
 import { isSunk } from './scoring-board.js';
 
 export const SUNK_PLANT_ERROR = 'That plant is sunk in mud.';
@@ -15,7 +16,7 @@ export function mudAt(state, x, y) {
   return (state.mud ?? []).find((puddle) => puddle.x === x && puddle.y === y) ?? null;
 }
 
-// MUD TRAP: an empty plot becomes a mud puddle. It dries at the end of the
+// MUD TRAP: an empty plot that is not poisoned becomes a mud puddle. It dries at the end of the
 // MUD_LIFETIME_TURNS-th turn after this one. A seed planted in it sinks
 // (sinkSeed).
 export function mudTrap(state, player, target) {
@@ -23,6 +24,7 @@ export function mudTrap(state, player, target) {
   if (!inBounds(state.board, x, y)) return { error: 'Choose a cell on the board.' };
   if (!isEmptyCell(state.board, x, y)) return { error: 'That cell is not empty.' };
   if (mudAt(state, x, y)) return { error: 'That cell is already mud.' };
+  if (isPoisoned(state, x, y)) return { error: POISONED_ERROR };
 
   const puddle = { x, y, player, driesAfterTurn: state.turn + MUD_LIFETIME_TURNS };
   return {

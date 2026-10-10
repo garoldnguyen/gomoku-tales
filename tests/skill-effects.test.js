@@ -50,11 +50,11 @@ test('Hiss sends wavy jade rings across the field and names who it silences', ()
   assert.deepEqual(specs.find((spec) => spec.kind === 'hiss'), { kind: 'hiss', player: X, locked: O });
 });
 
-test('Venom: a cast ring on the target, then the plant of the other side wilts and sinks', () => {
+test('Venom: a cast ring on the target; the plant stays, so it no longer wilts away (the zone is drawn from the state)', () => {
   const results = play({ [X]: WIND_RABBIT, [O]: JADE_SERPENT }, [[7, 7], { skill: VENOM, target: { x: 7, y: 7 } }]);
   const specs = visualsForEvents(results[1].events);
   assert.deepEqual(specs[0], { kind: 'castRing', x: 7, y: 7, player: O });
-  assert.deepEqual(specs.find((spec) => spec.kind === 'venom'), { kind: 'venom', x: 7, y: 7, from: X });
+  assert.equal(specs.some((spec) => spec.kind === 'venom'), false, 'no wilt-and-sink: Venom removes nothing');
 });
 
 test('Cloud: the cloud forms where it is placed and fades where it ended', () => {

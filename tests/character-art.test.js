@@ -53,7 +53,7 @@ test('the files of the Cloud Eagle, Jade Serpent, Wind Rabbit and Earth Bear art
   }
 });
 
-test('a player silenced by Hiss sees every skill row Silenced, never Ready', async () => {
+test('a player locked by Hiss sees every skill row Locked, never Ready', async () => {
   const { STRINGS } = await import('../src/ui/strings.js');
   const { useSkill } = await import('../src/logic/game.js');
   const { HISS } = await import('../src/logic/skills.js');
@@ -63,7 +63,8 @@ test('a player silenced by Hiss sees every skill row Silenced, never Ready', asy
   const vm = hudViewModel(after.state);
   const eagle = vm.cards.find((card) => card.player === O);
   const cloud = eagle.skills.find((skill) => skill.id === 'cloud');
-  assert.equal(cloud.stateText, STRINGS.skillSilenced);
+  assert.equal(cloud.stateText, STRINGS.skillLocked);
+  assert.equal(cloud.stateText, 'Locked: 1 turn', 'the number is HISS_LOCK_TURNS (1), singular');
   assert.equal(cloud.disabled, true);
   assert.equal(eagle.skills.find((skill) => skill.id === 'skyWatch').stateText, STRINGS.skillAlwaysOn, 'a passive skill stays on');
 });

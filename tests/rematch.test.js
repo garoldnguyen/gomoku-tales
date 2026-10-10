@@ -71,6 +71,7 @@ test('newGame equals the documented fresh state', () => {
     sunk: [],
     pendingDash: null,
     tornado: null,
+    poison: null,
     skillLock: null,
     skillUsed: null,
     cooldowns: { [X]: { [WIND_DASH]: 0, [TORNADO_ZONE]: 0 }, [O]: { [MUD_TRAP]: 0, [PETRIFICATION]: 0 } },

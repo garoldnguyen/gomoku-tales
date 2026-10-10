@@ -267,7 +267,9 @@ test('online: a guest playing Jade Serpent uses Hiss and Venom through the host'
   assert.equal(rabbit.click({ x: 0, y: 0 }), true); // O
   assert.equal(serpent.clickSkill(X, VENOM), true);
   assert.equal(serpent.click({ x: 8, y: 8 }), true);
-  assert.equal(state().board[8][8], EMPTY);
+  assert.equal(state().board[8][8], O, 'Venom keeps the plant on the board');
+  assert.equal(state().poison.cells.length, 9, 'the poison zone reaches the other window');
+  assert.equal(rabbit.getView().state.poison.cells.length, 9);
   assert.equal(state().currentPlayer, X, 'Venom does not end the turn either');
   assert.equal(serpent.click({ x: 1, y: 14 }), true);
   assert.equal(state().currentPlayer, O);

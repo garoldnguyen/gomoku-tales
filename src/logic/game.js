@@ -12,7 +12,7 @@ import { cooldownTurns, getSkill, isPassiveSkill, MUD_TRAP, PETRIFICATION, WIND_
 import { dryMud, mudTrap, petrification, sinkSeed, surfacingSeeds } from './earth-bear-skills.js';
 import { scoringBoard } from './scoring-board.js';
 import { resolveDash, throwStone, tornadoFires, tornadoZone, windDash } from './wind-rabbit-skills.js';
-import { hiss, isSkillLocked, venom } from './jade-serpent-skills.js';
+import { POISONED_ERROR, hasPlantableCell, hiss, isPoisoned, isSkillLocked, venom } from './jade-serpent-skills.js';
 import { cloud, tickClouds } from './cloud.js';
 
 // The refusal of a second skill in one turn (Free Action). The UI shows the
@@ -32,7 +32,7 @@ const SKILL_EFFECTS = {
 
 // A fresh game (docs/flow-design.md section 5), shared by the online host,
 // local mode and every rematch: empty board, no rocks, no mud, no sunk
-// seed, no pending Wind Dash, no Tornado Zone, no Hiss lock, no skill used yet, every cooldown 0,
+// seed, no pending Wind Dash, no Tornado Zone, no Venom zone, no Hiss lock, no skill used yet, every cooldown 0,
 // X (the first pick) to move, no winner. options.size is the board size;
 // options.characters the sides from assignSides (default DEFAULT_SIDES:
 // Wind Rabbit X, Earth Bear O), kept across a rematch by passing them
@@ -55,6 +55,7 @@ export function createInitialState(size = BOARD_SIZE, characters = DEFAULT_SIDES
     sunk: [], // [{ x, y, player, surfacesAfterTurn }] seeds sunk in mud: on the board, but they count for no line
     pendingDash: null, // { player, from, to, resolvesAfterTurn } while a Wind Dash is announced
     tornado: null, // { player, x, y, cells, armedAfterTurn, endsAfterTurn } while a Tornado Zone trap waits (secret cross)
+    poison: null, // { player, x, y, cells, endsAfterTurn } while a Venom zone lasts: nobody plants on its empty cells
     skillLock: null, // { player, endsAfterTurn } while a Hiss keeps that player from using skills
     skillUsed: null, // id of the skill the player to move used this turn, or null (Free Action)
     cooldowns: { [X]: initialCooldowns(sides, X), [O]: initialCooldowns(sides, O) },
@@ -104,6 +105,7 @@ export function placeStone(state, action, options = {}) {
   if (player !== state.currentPlayer) return fail('It is not your turn.');
   if (!inBounds(state.board, x, y)) return fail('That cell is off the board.');
   if (!isEmptyCell(state.board, x, y)) return fail('That cell is not empty.');
+  if (isPoisoned(state, x, y)) return fail(POISONED_ERROR);
 
   const board = cloneBoard(state.board);
   board[y][x] = player;
@@ -174,7 +176,9 @@ function checkSkill(state, player, skillId) {
 // here): a Wind Dash waiting for this turn to end resolves (with a win check
 // for the dashing player), a Tornado Zone trap that nobody fired and whose
 // time ends with this turn is over (tornadoEnded, nothing revealed), a Hiss
-// lock lasting through this turn ends, the acting player's clouds lose a turn (and disappear when none is left), the mud
+// lock lasting through this turn ends, a Venom zone whose time ends with this
+// turn ends (poisonEnded; also early when it would leave the next player no
+// plot to plant on), the acting player's clouds lose a turn (and disappear when none is left), the mud
 // puddles whose time ends with this turn dry, the draw check runs, their
 // cooldowns count down (all but the skill used this turn, whose full
 // cooldown started when it was used), skillUsed is cleared and the other
@@ -212,6 +216,12 @@ function finishTurn(state, player, events, changed) {
     events = [...events, { type: 'tornadoEnded', player: tornado.player }];
   }
 
+  const { poison } = state;
+  if (poison && poison.endsAfterTurn <= state.turn) {
+    state = { ...state, poison: null };
+    events = [...events, { type: 'poisonEnded', player: poison.player }];
+  }
+
   const { skillLock } = state;
   if (skillLock && skillLock.endsAfterTurn <= state.turn) {
     state = { ...state, skillLock: null };
@@ -235,6 +245,13 @@ function finishTurn(state, player, events, changed) {
     if (surfaced.won) return surfaced.won;
     ({ state, events } = surfaced);
     return done({ ...state, draw: true, skillUsed: null }, [...events, { type: 'draw' }]);
+  }
+
+  // The player to move can always plant: if a Venom zone (still lasting)
+  // has left no empty plot outside itself, it ends now instead of on time.
+  if (state.poison && !hasPlantableCell(state)) {
+    events = [...events, { type: 'poisonEnded', player: state.poison.player }];
+    state = { ...state, poison: null };
   }
 
   const own = {};

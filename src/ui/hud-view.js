@@ -190,7 +190,7 @@ function skillView(state, player, skillId, { over, active, yours, targeting, use
     // Jade Serpent's Hiss: no skill this turn (the player can still plant).
     look = OFF;
     skillState = STATE_WAITING;
-    text = STRINGS.skillSilenced;
+    text = STRINGS.skillLocked;
   } else if (usedSkill) {
     look = OFF;
     skillState = STATE_WAITING;

@@ -5,7 +5,9 @@
 // src/config.js, and skill and character names from SKILL_INFO and the
 // character table, never typed twice. Pure (no DOM).
 
-import { COOLDOWN_LONG, COOLDOWN_SHORT, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, ROOM_CODE_LENGTH, WIN_LENGTH } from '../config.js';
+import {
+  COOLDOWN_LONG, COOLDOWN_SHORT, HISS_LOCK_TURNS, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, ROOM_CODE_LENGTH, VENOM_ZONE_SIZE, WIN_LENGTH,
+} from '../config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
 import { SKILL_ALREADY_USED_ERROR } from '../logic/game.js';
 import { DASH_TOO_FAR_ERROR } from '../logic/wind-rabbit-skills.js';
@@ -31,6 +33,12 @@ export function howToRules({ COOLDOWN_LONG, COOLDOWN_SHORT, MUD_LIFETIME_TURNS, 
     `A mud puddle dries after ${MUD_LIFETIME_TURNS} turns, counting both players' turns. A seed planted in it counts for no row for ${MUD_SINK_TURNS} ${MUD_SINK_TURNS === 1 ? 'turn' : 'turns'}. A rock blocks a plot for both players for good.`,
     `If the board fills up and nobody has ${WIN_LENGTH} in a row, the game is a draw.`,
   ];
+}
+
+// The lock rune text of a skill row that the opponent's Hiss locks, with the
+// number of turns of the lock (HISS_LOCK_TURNS) and the right plural.
+export function lockedText(turns) {
+  return `Locked: ${turns} ${turns === 1 ? 'turn' : 'turns'}`;
 }
 
 // A text of STRINGS with its {code} filled in by a room code.
@@ -151,7 +159,7 @@ export const STRINGS = Object.freeze({
   selectTaglineJadeSerpent: 'Patient, then sudden.',
   selectTaglineCloudEagle: 'Sees far, hides much.',
   skillAlwaysOn: 'Always on', // a passive skill (Sky Watch): no rest turns, no timer
-  skillSilenced: 'Silenced by Hiss', // a skill the opponent's Hiss locks for this turn
+  skillLocked: lockedText(HISS_LOCK_TURNS), // a skill the opponent's Hiss locks
   // Free Action (docs/free-action-design.md section 1): one skill per turn, then plant.
   skillAlreadyUsedError: SKILL_ALREADY_USED_ERROR, // the rules' refusal of a second skill, shown when a locked row is clicked
   skillUsedHint: 'Already used a skill this turn.', // the hint of every skill row after a skill
@@ -167,6 +175,7 @@ export const STRINGS = Object.freeze({
   hintGotIt: 'Got it',
   cloudTargetPrompt: 'Cloud: choose the cloud centre', // the target step of Cloud Eagle's Cloud
   tornadoTargetPrompt: 'Tornado Zone: choose the trap centre', // the target step of Wind Rabbit's Tornado Zone
+  venomTargetPrompt: `Venom: choose an opponent's plant to poison the ${VENOM_ZONE_SIZE} by ${VENOM_ZONE_SIZE} square around it`, // the target step of Jade Serpent's Venom
   windDashTooFarError: DASH_TOO_FAR_ERROR, // the rules' refusal of a Wind Dash target out of range, shown on the click
 
   // Watch a match (sections 3.8 and 3.9): the spectator's room code

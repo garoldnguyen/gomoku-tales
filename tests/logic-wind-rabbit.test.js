@@ -113,13 +113,14 @@ test('Wind Dash range: 1 to WIND_DASH_RANGE cells (Chebyshev, diagonals included
   assertSkillRejected(state, dash(BOARD_SIZE - 1, BOARD_SIZE - 1), TOO_FAR);
 });
 
-test('Wind Dash cannot target mud or a poisoned cell; a missing poison field means no poison', () => {
+test('Wind Dash cannot target mud or a poisoned cell; a null or missing poison field means no poison', () => {
   const state = stateWith([[3, 3, X]]);
   const toward = (x, y) => ({ player: X, skill: WIND_DASH, target: { from: { x: 3, y: 3 }, to: { x, y } } });
-  assert.equal('poison' in state, false, 'the state has no poison field yet');
-  skillResult(state, X, WIND_DASH, toward(5, 3).target); // no field, no poison
+  assert.equal(state.poison, null, 'a fresh state has the poison field, null (Free Action part 4)');
+  skillResult(state, X, WIND_DASH, toward(5, 3).target); // null, no poison
+  delete state.poison;
+  skillResult(state, X, WIND_DASH, toward(5, 3).target); // a state without the field, no poison
   state.poison = null;
-  skillResult(state, X, WIND_DASH, toward(5, 3).target);
 
   state.mud = [{ x: 5, y: 3, player: O, driesAfterTurn: 9 }];
   assertSkillRejected(state, toward(5, 3), /^A Wind Dash cannot land on mud\.$/);
