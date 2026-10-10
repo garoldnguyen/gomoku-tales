@@ -7,6 +7,7 @@ import { HISS, VENOM, WIND_DASH } from '../src/logic/skills.js';
 import { BOARD_PX, BOARD_X, BOARD_Y, cellAtPoint, cellCenter } from '../src/render/layout.js';
 import { isRestartKey, toInternalPoint } from '../src/ui/input.js';
 import { createLocalGame, statusText } from '../src/ui/local-game.js';
+import { STRINGS } from '../src/ui/strings.js';
 
 // --- Layout ---
 
@@ -103,6 +104,13 @@ test('local mode: Jade Serpent can use Hiss (no target) and Venom (an opponent s
   assert.equal(game.getTargeting(), null);
   assert.equal(game.getState().skillLock?.player, O);
   assert.equal(game.getView().message, 'Hiss! No skills on the next turn.');
+  // A skill does not end the turn: the serpent is still to move and plants.
+  assert.equal(game.getState().currentPlayer, X);
+  assert.equal(game.getView().status, STRINGS.plantToEndTurn);
+  assert.equal(game.clickSkill(X, VENOM), false, 'one skill per turn');
+  assert.equal(game.getView().message, STRINGS.skillAlreadyUsedError);
+  game.click({ x: 0, y: 14 }); // X plants, which ends the turn
+  assert.equal(game.getState().currentPlayer, O);
   assert.equal(game.clickSkill(O, WIND_DASH), false, 'the Hiss lock holds');
   game.click({ x: 0, y: 0 }); // O
   // Venom: an own stone is refused, the opponent stone withers.
@@ -113,6 +121,7 @@ test('local mode: Jade Serpent can use Hiss (no target) and Venom (an opponent s
   assert.equal(game.click({ x: 8, y: 8 }), true);
   assert.equal(game.getState().board[8][8], EMPTY);
   assert.equal(game.getView().message, 'Venom! The plant withered.');
+  assert.equal(game.getState().currentPlayer, X, 'Venom does not end the turn either');
 });
 
 function playXWin(game) {

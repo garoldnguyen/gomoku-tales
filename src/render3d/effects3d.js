@@ -72,7 +72,7 @@ import { ART } from './art-assets.js';
 import { CHARACTER_LOOK, PLAN_SEED, placementPlan } from './character-look.js';
 import {
   catchUpVisuals, convertPose, crumblePose, dashCurveInto, dashPose, heldCell, regrowCell, rockFallPose,
-  shakeLeft, shakeOffset3d, shakeStrength, sparkPathInto, throwPose, venomPose, visualsForEvents,
+  shakeLeft, shakeOffset3d, shakeStrength, sparkPathInto, throwPose, venomPose, visualsForEvents, zoneVisible,
 } from './effect-plans.js';
 import { STAGE_DROP, STAGE_REST } from './growth.js';
 import {
@@ -955,7 +955,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
         dashMark.reset();
         break;
       case 'tornadoClear':
-        swirl.reset();
+        swirl.clear();
         break;
       case 'endLingering':
         swirl.end();
@@ -1057,6 +1057,22 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
     catchUp(events, time) {
       frame.time = time;
       for (const spec of catchUpVisuals(events)) start(spec);
+    },
+
+    // The Tornado Zone follows what the viewer's state shows, not only the
+    // events (a secret zone must be gone from the screen the moment the
+    // viewer may no longer see it, and be there when they may): called every
+    // drawn frame with the drawn state's zone (null, hidden, or visible
+    // with cells). Allocation free; it acts only when something changed. A
+    // swirl that is already fading out because its zone ended is left to
+    // finish its fade.
+    syncTornado(zone) {
+      const mark = swirl.centre;
+      if (zoneVisible(zone)) {
+        if (!mark.active) swirl.show(zone);
+      } else if (mark.active && Number.isNaN(mark.endStart)) {
+        swirl.clear();
+      }
     },
 
     // The Open sparkles of the plant of `player` on cell (x, y), on levels
@@ -1493,6 +1509,14 @@ function createTornadoSwirl({ world, pool, sp, random, u, frame }) {
         sp.shape = fluff ? SHAPE_PLUS : SHAPE_SQUARE;
         pool.spawnSpiral(sp);
       }
+    },
+
+    // The zone is gone for this viewer (its turn passed, or the state says
+    // the zone is hidden): the decals, the lean and the petals still
+    // circling it vanish at once.
+    clear() {
+      pool.removeSpiralAt(mark.x, mark.z);
+      hide();
     },
 
     reset: hide,

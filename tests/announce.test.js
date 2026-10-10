@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 import { HINT_MS, TURN_BANNER_MS } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { CLOUD_EAGLE, JADE_SERPENT } from '../src/logic/characters.js';
-import { createInitialState, placeStone } from '../src/logic/game.js';
-import { TORNADO_ZONE } from '../src/logic/skills.js';
+import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
+import { HISS, TORNADO_ZONE } from '../src/logic/skills.js';
 import { CHARACTER_LOOK } from '../src/render3d/character-look.js';
 import {
   HINT_STORAGE_KEY, HINT_TOUCH, HINT_WIN, announcements, createAnnouncer, hintText, parseSeen, skillHintId,
@@ -113,4 +113,32 @@ test('hints stored in an earlier visit stay hidden', () => {
   const { announcer, card } = setup(JSON.stringify([HINT_WIN]));
   announcer.onHud(createInitialState(undefined, sides), null, false, false);
   assert.equal(card.hidden, true);
+});
+
+test('after a skill the banner says to plant a seed, without the To play label, and the turn banner comes back after the planting', () => {
+  const { timers, announcer, banner } = setup();
+  const start = createInitialState(undefined, sides);
+  announcer.onHud(start, null, true, false);
+  assert.equal(banner.children[0].hidden, false, 'the turn banner shows its label');
+  assert.equal(banner.children[0].textContent, STRINGS.turnBannerKicker);
+
+  const used = useSkill(start, { player: X, skill: HISS });
+  assert.equal(used.ok, true, used.error);
+  banner.hidden = true;
+  announcer.onHud(used.state, null, true, false);
+  assert.equal(banner.hidden, false);
+  assert.equal(banner.children[0].hidden, true, 'no label on the plant reminder');
+  assert.equal(banner.children[1].textContent, STRINGS.plantToEndTurn);
+  assert.equal(banner.style.props['--banner-colour'], CHARACTER_LOOK[JADE_SERPENT].colour);
+  assert.ok(timers.filter((t) => t.ms === TURN_BANNER_MS).length >= 2);
+
+  banner.hidden = true;
+  announcer.onHud(used.state, null, true, false);
+  assert.equal(banner.hidden, true, 'the same state shows nothing again');
+
+  const planted = placeStone(used.state, { player: X, x: 0, y: 0 });
+  announcer.onHud(planted.state, null, true, false);
+  assert.equal(banner.hidden, false);
+  assert.equal(banner.children[0].hidden, false, 'the label is back');
+  assert.equal(banner.children[1].textContent, 'Cloud Eagle');
 });

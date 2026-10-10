@@ -34,9 +34,19 @@ function eagleGame() {
   return newGame({ characters: assignSides([CLOUD_EAGLE, EARTH_BEAR]) });
 }
 
-// X puts a cloud on (7, 7), O plays far away, X plays (7, 7) under its cloud.
+// player puts a cloud on target (default (7, 7)) and plants a seed far away
+// to end the turn: a skill does not end it any more (Free Action). Returns
+// { state, events } of both steps.
+function cloudThenPlant(state, player, plant = { x: 14, y: 14 }, target = { x: 7, y: 7 }) {
+  const used = ok(useSkill(state, { player, skill: CLOUD, target }));
+  const planted = ok(placeStone(used.state, { player, x: plant.x, y: plant.y }));
+  return { state: planted.state, events: [...used.events, ...planted.events] };
+}
+
+// X puts a cloud on (7, 7) and plants far away, O plays far away, X plays
+// (7, 7) under its cloud.
 function hiddenStoneGame() {
-  let state = ok(useSkill(eagleGame(), { player: X, skill: CLOUD, target: { x: 7, y: 7 } })).state;
+  let state = cloudThenPlant(eagleGame(), X).state;
   state = ok(placeStone(state, { player: O, x: 0, y: 0 })).state;
   return ok(placeStone(state, { player: X, x: 7, y: 7 }));
 }
@@ -114,7 +124,7 @@ test('maskEventsForViewer leaves out the move under the cloud, never the cloud i
 // X wins with a line of five whose cells (5, 7) and (6, 7) lie under X's
 // cloud on (7, 7): the win does not tell O where the hidden stones are.
 function hiddenWinGame() {
-  let state = ok(useSkill(eagleGame(), { player: X, skill: CLOUD, target: { x: 7, y: 7 } })).state;
+  let state = cloudThenPlant(eagleGame(), X).state;
   for (const [ox, x] of [[0, 2], [2, 3], [4, 5], [6, 6]]) {
     state = ok(placeStone(state, { player: O, x: ox, y: 0 })).state;
     state = ok(placeStone(state, { player: X, x, y: 7 })).state;
@@ -228,14 +238,15 @@ test('through the relay the guest never receives a hidden stone, and gets the re
     for (const message of hostStateMessages({ type: 'state', to: 'guest', state, events: result.events, seq, from: 'h' }, O, true)) relay('host', message);
     for (const c of state.clouds ?? []) shown.push(...cloudCells(state.board, c));
   };
-  send(ok(useSkill(state, { player: X, skill: CLOUD, target: { x: 7, y: 7 } }))); // turn 1, X
+  send(ok(useSkill(state, { player: X, skill: CLOUD, target: { x: 7, y: 7 } }))); // turn 1, X: the cloud
+  send(ok(placeStone(state, { player: X, x: 13, y: 13 }))); // 1, X plants, which ends the turn
   send(ok(placeStone(state, { player: O, x: 0, y: 0 }))); // 2, O
   send(ok(placeStone(state, { player: X, x: 7, y: 7 }))); // 3, X under its cloud
   send(ok(placeStone(state, { player: O, x: 1, y: 0 }))); // 4, O
   assert.equal(state.clouds.length, 1, 'the cloud is still up');
   // The guest got every state, none with a stone under the cloud.
   const guestFrames = sockets.guest[0].frames.map((f) => JSON.parse(f));
-  assert.equal(guestFrames.length, 4);
+  assert.equal(guestFrames.length, 5);
   for (const frame of guestFrames) {
     assert.notEqual(frame.spectatorsOnly, true);
     assert.notEqual(frame.state.board[7][7], X, 'never the hidden stone itself');
@@ -401,6 +412,7 @@ function playHiddenWin({ host, guest }, { win = true } = {}) {
   const moves = [[6, 8], [0, 0], [7, 8], [2, 0], [9, 8], [4, 0], [10, 8], [6, 0]];
   for (let i = 0; i < moves.length; i++) ok((i % 2 === 0 ? host : guest).place(...moves[i]));
   ok(host.useSkill(CLOUD, { x: 7, y: 7 }));
+  ok(host.place(12, 12)); // the planting that ends the turn of the cloud
   ok(guest.place(8, 0));
   if (win) ok(host.place(HIDDEN.x, HIDDEN.y));
 }
@@ -502,9 +514,7 @@ test('online game: the host picks skill targets on the shown board, not the hidd
   state = ok(placeStone(state, { player: X, x: 0, y: 0 })).state;
   state = ok(placeStone(state, { player: O, x: 7, y: 7 })).state;
   state = ok(placeStone(state, { player: X, x: 1, y: 0 })).state;
-  state = ok(useSkill(state, { player: O, skill: CLOUD, target: { x: 7, y: 7 } })).state;
-  state = ok(placeStone(state, { player: X, x: 2, y: 0 })).state;
-  state = ok(placeStone(state, { player: O, x: 14, y: 14 })).state; // an O stone in the open
+  state = cloudThenPlant(state, O, { x: 14, y: 14 }).state; // an O stone in the open, after the cloud
   const used = [];
   const room = {
     state, // the true state, as the host room keeps it

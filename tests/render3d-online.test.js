@@ -102,6 +102,7 @@ test('two online windows play stones and skills through 3D picking and get the s
   assert.equal(guestPointer.skill(O, 0), true); // Terrain Creation
   assert.equal(guestPointer.cell(9, 9), true);
   assert.equal(rabbit.getView().state.board[9][9], 'ROCK');
+  assert.equal(guestPointer.cell(0, 0), true, 'the bear plants, which ends its turn (a skill does not)');
 
   // Wind Dash: choose the stone, then the target.
   assert.equal(hostPointer.skill(X, 0), true);

@@ -125,7 +125,7 @@ function turnView(state, { over, winner, toMove, leaving, peerCountdown, targeti
   let hint;
   if (localPlayer === SPECTATOR_VIEW) hint = STRINGS.watchingHint;
   else if (targeting && mine) hint = targetPrompt(targeting);
-  else if (mine) hint = PLANT_HINT;
+  else if (mine) hint = state.skillUsed ? STRINGS.plantToEndTurn : PLANT_HINT; // after a skill the turn is not over yet
   else hint = status ?? "Opponent's turn";
   return { player: toMove, team: teamOf(toMove), who: `${nameOf(state, toMove)}'s turn`, hint, countdown: null };
 }
@@ -154,7 +154,7 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
     active,
     collapsed,
     chevronLabel: `${collapsed ? 'Expand' : 'Collapse'} ${character.name} panel`,
-    skills: character.skills.map((skillId) => skillView(state, player, skillId, { over, active, yours, targeting })),
+    skills: character.skills.map((skillId) => skillView(state, player, skillId, { over, active, yours, targeting, usedSkill: active && !over && Boolean(state.skillUsed) })),
   };
 }
 
@@ -162,7 +162,10 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
 // them focusable and clickable (aria-disabled) so a click still explains
 // why, with the game's existing messages. A passive skill (Sky Watch) has
 // no timer: it reads Always on while the round goes on, and is never used.
-function skillView(state, player, skillId, { over, active, yours, targeting }) {
+// usedSkill (Free Action): the player to move already used a skill this
+// turn, so every other skill is off until the next turn; the skill used keeps
+// the cooldown it started at once.
+function skillView(state, player, skillId, { over, active, yours, targeting, usedSkill }) {
   const info = skillInfo(skillId);
   const title = info?.title ?? getSkill(skillId).name;
   const passive = isPassiveSkill(skillId);
@@ -188,6 +191,10 @@ function skillView(state, player, skillId, { over, active, yours, targeting }) {
     look = OFF;
     skillState = STATE_WAITING;
     text = STRINGS.skillSilenced;
+  } else if (usedSkill) {
+    look = OFF;
+    skillState = STATE_WAITING;
+    text = STRINGS.skillUsedState;
   } else if (targeting?.skill === skillId) {
     look = SELECTED;
     skillState = STATE_SELECTED;
@@ -217,7 +224,7 @@ function skillView(state, player, skillId, { over, active, yours, targeting }) {
     disabled: passive || look === OFF || look === COOLING || !yours,
     ariaLabel: `${title}: ${text}`,
     description: info?.description ?? '',
-    hint: info?.hint ?? '',
+    hint: usedSkill && !passive ? STRINGS.skillUsedHint : info?.hint ?? '',
   };
 }
 

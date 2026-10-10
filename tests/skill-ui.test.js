@@ -7,6 +7,7 @@ import { WIND_DASH, TORNADO_ZONE, TERRAIN_CREATION, STONE_CONVERSION } from '../
 import { BOARD_X, BOARD_Y, BOARD_PX, panelRect, skillButtonAt, skillButtonRect } from '../src/render/layout.js';
 import { hitTest, isCancelKey } from '../src/ui/input.js';
 import { createLocalGame, describeEvents, panelView, skillLockReason } from '../src/ui/local-game.js';
+import { STRINGS } from '../src/ui/strings.js';
 import { startTargeting, targetClick, targetPreview, targetPrompt } from '../src/ui/targeting.js';
 
 // --- Layout and hit testing ---
@@ -151,10 +152,32 @@ test('panel view shows name, stone, turn highlight, cooldowns and locked state',
   game.clickSkill(O, TERRAIN_CREATION);
   game.click({ x: 0, y: 0 });
   [left, right] = game.getView().panels;
-  assert.equal(left.active, true);
-  assert.equal(right.skills[0].cooldown, COOLDOWN_SHORT);
+  assert.equal(right.active, true, 'a skill does not end the turn');
+  assert.equal(left.active, false);
+  assert.equal(right.skills[0].cooldown, COOLDOWN_SHORT, 'the full cooldown starts at once');
   assert.equal(right.skills[0].locked, true);
   assert.equal(right.skills[1].locked, false);
+  assert.equal(right.skills[1].usable, false, 'one skill per turn');
+  game.click({ x: 1, y: 14 }); // O plants, which ends the turn
+  [left, right] = game.getView().panels;
+  assert.equal(left.active, true);
+  assert.equal(right.skills[0].cooldown, COOLDOWN_SHORT, 'the planting does not count the used skill down');
+});
+
+test('panelView: after a skill the ready skills of the player to move carry the used note, for the 2D panel', () => {
+  const game = createLocalGame();
+  assert.ok(game.getView().panels.every((panel) => panel.skills.every((skill) => skill.note === null)), 'no note before a skill');
+  game.clickSkill(X, TORNADO_ZONE);
+  game.click({ x: 7, y: 7 });
+  let [left, right] = game.getView().panels;
+  assert.equal(left.skills[0].note, STRINGS.skillUsedState, 'Wind Dash is ready but not usable now');
+  assert.equal(left.skills[0].locked, false);
+  assert.equal(left.skills[1].note, null, 'the skill used is locked by its cooldown, not noted');
+  assert.equal(left.skills[1].locked, true);
+  assert.ok(right.skills.every((skill) => skill.note === null), 'the other player is waiting, nothing to note');
+  game.click({ x: 14, y: 0 }); // X plants, which ends the turn
+  [left, right] = game.getView().panels;
+  assert.ok([left, right].every((panel) => panel.skills.every((skill) => skill.note === null)), 'the note ends with the turn');
 });
 
 test('panelView marks the selected skill and the winner', () => {
@@ -213,6 +236,9 @@ test("the other player's buttons and locked skills refuse with a message", () =>
 
   game.clickSkill(X, TORNADO_ZONE);
   game.click({ x: 7, y: 7 });
+  assert.equal(game.clickSkill(X, WIND_DASH), false, 'one skill per turn');
+  assert.equal(game.getView().message, STRINGS.skillAlreadyUsedError);
+  game.click({ x: 14, y: 0 }); // X plants, which ends the turn
   game.click({ x: 0, y: 14 }); // O, outside the zone
   assert.equal(game.clickSkill(X, TORNADO_ZONE), false);
   assert.equal(game.getView().message, `Tornado Zone is locked for ${COOLDOWN_LONG} more turns.`);
@@ -240,10 +266,12 @@ test('Wind Dash end to end: announce, red frame data, opponent turn, landing', (
 
   let state = game.getState();
   assert.deepEqual(state.pendingDash.to, { x: 6, y: 6 });
-  assert.equal(state.currentPlayer, O);
+  assert.equal(state.currentPlayer, X, 'the turn goes on after a skill');
   assert.equal(game.getTargeting(), null);
   assert.equal(game.getView().message, 'Wind Dash! The stone dashes after the next turn.');
+  assert.equal(game.getView().status, STRINGS.plantToEndTurn);
 
+  game.click({ x: 3, y: 14 }); // X plants, which ends its turn
   game.click({ x: 11, y: 11 }); // O's turn ends, the dash resolves
   state = game.getState();
   assert.equal(state.pendingDash, null);
@@ -259,6 +287,7 @@ test('Wind Dash failure is reported when the target is taken', () => {
   game.clickSkill(X, WIND_DASH);
   game.click({ x: 2, y: 2 });
   game.click({ x: 6, y: 6 });
+  game.click({ x: 3, y: 14 }); // X plants, which ends its turn
   game.click({ x: 6, y: 6 }); // O takes the target
   assert.equal(game.getState().board[2][2], X);
   assert.equal(game.getView().message, 'Wind Dash failed: the target cell is taken.');
@@ -269,7 +298,11 @@ test('Tornado Zone end to end: on one screen the zone is hidden, and a seed plan
   game.clickSkill(X, TORNADO_ZONE);
   game.click({ x: 7, y: 7 });
   assert.equal(game.getState().tornado.cells.length, 9);
-  assert.equal(game.getView().message, 'Tornado Zone! Somewhere a storm is waiting.', 'O is to move and must not see it');
+  // X is still to move (a skill does not end the turn) and is told what it cast.
+  assert.equal(game.getView().message, 'Tornado Zone! It lasts through the next turn.');
+  game.click({ x: 14, y: 0 }); // X plants, which ends its turn
+  assert.equal(game.getView().message, null, 'O is to move and reads nothing of the cast');
+  assert.deepEqual(Object.keys(game.getView().state.tornado).sort(), ['endsAfterTurn', 'hidden', 'player'], 'O is to move and must not see where');
 
   game.click({ x: 7, y: 7 }); // O inside the zone; random 0 picks the first empty plot outside, (0, 0)
   const state = game.getState();
@@ -289,11 +322,12 @@ test('Terrain Creation end to end: a rock appears and later crumbles', () => {
   assert.equal(game.getState().board[3][3], ROCK);
   assert.equal(game.getView().message, 'Terrain Creation! A rock fell.');
 
-  // Placing on the rock is refused.
+  // Placing on the rock is refused (O is still to move: a skill does not end the turn).
   assert.equal(game.click({ x: 3, y: 3 }), false);
   assert.equal(game.getView().message, 'That cell is not empty.');
 
-  for (let i = 0; i < ROCK_LIFETIME_TURNS; i++) game.click({ x: i, y: 12 });
+  // O plants to end the turn the rock fell in; it breaks at the end of the 4th turn after that one.
+  for (let i = 0; i <= ROCK_LIFETIME_TURNS; i++) game.click({ x: i, y: 12 });
   assert.equal(game.getState().board[3][3], null);
   assert.equal(game.getView().message, 'A rock crumbled.');
 });
@@ -306,7 +340,7 @@ test('Stone Conversion end to end: an X stone becomes O', () => {
   assert.equal(game.getView().message, "Choose one of your opponent's stones.");
   assert.equal(game.click({ x: 7, y: 7 }), true);
   assert.equal(game.getState().board[7][7], O);
-  assert.equal(game.getState().currentPlayer, X);
+  assert.equal(game.getState().currentPlayer, O, 'O still has to plant');
   assert.equal(game.getView().message, 'Stone Conversion! The stone changed sides.');
 });
 

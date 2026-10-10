@@ -6,7 +6,10 @@
 //
 //   turn banner   on this computer, every time the turn passes (and at the
 //                 start), the name of the character to move in a small glass
-//                 pill that slides by under the turn pill, for TURN_BANNER_MS
+//                 pill that slides by under the turn pill, for TURN_BANNER_MS;
+//                 after a skill (Free Action: the turn goes on) the same pill
+//                 says Now plant a seed to end your turn. to the player who
+//                 used it
 //   hints         short tips in a small glass card, each once (stored under
 //                 HINT_STORAGE_KEY): five in a row wins (the first game),
 //                 what a skill does (the first time it is picked), tap again
@@ -32,21 +35,28 @@ function emptyBoard(state) {
 }
 
 // What to announce for a change of the HUD inputs: { banner, hints }.
-// prev is what the last call saw ({ player, skill, started } or null for a
-// new game); next the same for this call. banner is null or { name,
-// colour }; hints is a list of hint ids to show (the caller drops the ones
-// already seen). local is true for a game on one screen; watching for a
-// spectator, who gets no hints.
-export function announcements(prev, state, targeting, { local, watching }) {
+// prev is what the last call saw ({ player, skill, used, started } or null
+// for a new game); next the same for this call. banner is null or { name,
+// colour } (the turn of a character), or { name, colour, kicker: null } when
+// a skill was just used and the player must plant; hints is a list of hint
+// ids to show (the caller drops the ones already seen). local is true for a
+// game on one screen; watching for a spectator, who gets no hints; you is
+// the stone of this window online (null otherwise), who alone is told to
+// plant.
+export function announcements(prev, state, targeting, { local, watching, you = null }) {
   const over = isGameOver(state);
   const player = over ? null : state.currentPlayer;
   const skill = targeting?.skill ?? null;
-  const next = { player, skill, started: prev?.started ?? false };
+  const used = over ? null : state.skillUsed ?? null;
+  const next = { player, skill, used, started: prev?.started ?? false };
   const out = { next, banner: null, hints: [] };
   if (over) return out;
+  const character = characterOf(state, player);
+  const colour = CHARACTER_LOOK[character.id]?.colour ?? null;
   if (local && player && player !== prev?.player) {
-    const character = characterOf(state, player);
-    out.banner = { name: character.name, colour: CHARACTER_LOOK[character.id]?.colour ?? null };
+    out.banner = { name: character.name, colour };
+  } else if (used && used !== prev?.used && !watching && (local || (you !== null && you === player))) {
+    out.banner = { name: STRINGS.plantToEndTurn, colour, kicker: null };
   }
   if (watching) return out;
   if (!next.started && emptyBoard(state)) {
@@ -155,12 +165,14 @@ export function createAnnouncer(root, { storage = null, setTimer = setTimeout, c
   let last = null;
   return {
     // The HUD inputs changed (main.js showHud). local: a game on one
-    // screen; watching: a spectator.
-    onHud(state, targeting, local = false, watching = false) {
-      const result = announcements(last, state, targeting, { local, watching });
+    // screen; watching: a spectator; you: this window's stone online.
+    onHud(state, targeting, local = false, watching = false, you = null) {
+      const result = announcements(last, state, targeting, { local, watching, you });
       last = result.next;
       if (result.banner) {
-        bannerKicker.textContent = STRINGS.turnBannerKicker;
+        const kicker = result.banner.kicker === undefined ? STRINGS.turnBannerKicker : result.banner.kicker;
+        bannerKicker.textContent = kicker ?? '';
+        bannerKicker.hidden = kicker === null;
         bannerName.textContent = result.banner.name;
         banner.style.setProperty('--banner-colour', result.banner.colour ?? 'currentColor');
         banner.hidden = false;

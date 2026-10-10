@@ -17,6 +17,7 @@ import {
   getSkill,
 } from '../src/logic/skills.js';
 import { canUseSkill, createInitialState, placeStone, skillCooldown, useSkill } from '../src/logic/game.js';
+import { skillTurn } from './skill-turn.js';
 
 function place(state, player, x, y) {
   const result = placeStone(state, { player, x, y });
@@ -113,13 +114,17 @@ test('initial state starts at turn 1 with every skill ready', () => {
 
 // --- Turn counter and events ---
 
-test('the turn counter goes up by one for every turn of either player', () => {
+test('the turn counter goes up by one for every planting of either player, never for a skill', () => {
   let state = startWithDashSource();
   state = place(state, X, 0, 0);
   assert.equal(state.turn, 2);
   state = skill(state, O, TERRAIN_CREATION, { x: 5, y: 5 });
+  assert.equal(state.turn, 2, 'a skill does not end the turn (Free Action)');
+  state = place(state, O, 1, 0);
   assert.equal(state.turn, 3);
   state = skill(state, X, WIND_DASH, DASH);
+  assert.equal(state.turn, 3);
+  state = place(state, X, 2, 0);
   assert.equal(state.turn, 4);
 });
 
@@ -149,19 +154,22 @@ test('rejected actions return an empty events list', () => {
 
 // --- Using a skill uses the whole turn ---
 
-test('using a skill uses the whole turn', () => {
+test('using a skill does not end the turn: the same player still has to plant a seed', () => {
   const state = startWithDashSource();
   const result = useSkill(state, { player: X, skill: WIND_DASH, target: DASH });
   assert.equal(result.ok, true);
-  assert.equal(result.state.currentPlayer, O);
+  assert.equal(result.state.currentPlayer, X);
+  assert.equal(result.state.turn, state.turn);
   assert.deepEqual(result.state.board, state.board, 'the dash is only announced, no stone placed');
   assert.deepEqual(result.events, [
     { type: 'skillUsed', player: X, skill: WIND_DASH, target: DASH },
     { type: 'dashAnnounced', player: X, from: DASH.from, to: DASH.to },
-    { type: 'turnEnded', player: X, turn: 1 },
   ]);
-  // The same player cannot then also place a stone.
-  assert.equal(placeStone(result.state, { player: X, x: 7, y: 7 }).ok, false);
+  // The other player cannot act yet; the same player plants to end the turn.
+  assert.equal(placeStone(result.state, { player: O, x: 7, y: 7 }).ok, false);
+  const planted = placeStone(result.state, { player: X, x: 7, y: 7 });
+  assert.equal(planted.ok, true);
+  assert.equal(planted.state.currentPlayer, O);
 });
 
 test('useSkill does not mutate the given state', () => {
@@ -201,7 +209,7 @@ test('useSkill rejects any skill after the game is over', () => {
 });
 
 test('useSkill rejects a skill on cooldown', () => {
-  let state = skill(startWithDashSource(), X, WIND_DASH, DASH);
+  let state = skillTurn(startWithDashSource(), X, WIND_DASH, DASH);
   state = place(state, O, 0, 0);
   const again = { from: DASH.to, to: { x: 14, y: 4 } };
   assertSkillRejected(state, { player: X, skill: WIND_DASH, target: again }, /Wind Dash is on cooldown for 3 more turns/);
@@ -223,7 +231,7 @@ function cooldownTimeline(player, skillId, ownTurns) {
   // Stone Conversion needs an X stone, Wind Dash an X stone and a free
   // cell; the other skills get a free cell.
   const targets = { [STONE_CONVERSION]: xStone, [WIND_DASH]: DASH };
-  state = skill(state, player, skillId, targets[skillId] ?? { x: 7, y: 0 });
+  state = skillTurn(state, player, skillId, targets[skillId] ?? { x: 7, y: 0 });
   const timeline = [];
   for (let i = 0; i < ownTurns; i++) {
     const opponentMove = next();
@@ -264,14 +272,14 @@ test('long cooldown: cannot use it during your next 6 turns, usable on the 7th',
 });
 
 test('cooldowns count only the owner\'s turns', () => {
-  let state = skill(startWithDashSource(), X, WIND_DASH, DASH);
-  assert.equal(skillCooldown(state, X, WIND_DASH), 3);
+  let state = skillTurn(startWithDashSource(), X, WIND_DASH, DASH);
+  assert.equal(skillCooldown(state, X, WIND_DASH), 3, 'the planting of the skill turn does not count it down');
   // The opponent's turns (placing or using skills) do not count down X.
   state = place(state, O, 0, 0);
   assert.equal(skillCooldown(state, X, WIND_DASH), 3);
   state = place(state, X, 2, 0);
   assert.equal(skillCooldown(state, X, WIND_DASH), 2);
-  state = skill(state, O, TERRAIN_CREATION, { x: 6, y: 6 });
+  state = skillTurn(state, O, TERRAIN_CREATION, { x: 6, y: 6 });
   assert.equal(skillCooldown(state, X, WIND_DASH), 2);
   assert.equal(skillCooldown(state, O, TERRAIN_CREATION), 3);
   state = place(state, X, 4, 0);
@@ -280,18 +288,21 @@ test('cooldowns count only the owner\'s turns', () => {
 });
 
 test('cooldowns of the two skills of one player are tracked separately', () => {
-  let state = skill(startWithDashSource(), X, WIND_DASH, DASH);
+  let state = skillTurn(startWithDashSource(), X, WIND_DASH, DASH);
   state = place(state, O, 0, 0);
   // Wind Dash is locked but Tornado Zone is still ready.
   assert.equal(canUseSkill(state, X, WIND_DASH), false);
   assert.equal(canUseSkill(state, X, TORNADO_ZONE), true);
   state = skill(state, X, TORNADO_ZONE, { x: 7, y: 7 });
-  assert.equal(skillCooldown(state, X, WIND_DASH), 2);
+  assert.equal(skillCooldown(state, X, WIND_DASH), 3, 'Wind Dash was not counted down yet');
+  assert.equal(skillCooldown(state, X, TORNADO_ZONE), 6);
+  state = place(state, X, 9, 9);
+  assert.equal(skillCooldown(state, X, WIND_DASH), 2, 'the planting counts down the other skills, not the one used');
   assert.equal(skillCooldown(state, X, TORNADO_ZONE), 6);
 });
 
 test('a skill can be used again as soon as its cooldown is over', () => {
-  let state = skill(startWithDashSource(), X, WIND_DASH, DASH);
+  let state = skillTurn(startWithDashSource(), X, WIND_DASH, DASH);
   const next = filler();
   for (let i = 0; i < COOLDOWN_SHORT; i++) {
     let move = next();

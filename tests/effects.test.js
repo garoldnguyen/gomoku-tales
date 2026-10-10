@@ -12,6 +12,7 @@ import { drawGameScreen } from '../src/render/game-renderer.js';
 import { createApp } from '../src/ui/app.js';
 import { createLocalGame } from '../src/ui/local-game.js';
 import { pickAndReady } from './room-start.js';
+import { skillTurn } from './skill-turn.js';
 
 // The app starts on the main menu; Play Online opens the lobby.
 const onLobby = (app) => {
@@ -120,8 +121,9 @@ test('banners from one action or fast actions queue up and each shows in full', 
   // action gives two banners.
   const start = createInitialState();
   start.board[5][5] = X;
-  const dashed = ok(useSkill(start, { player: X, skill: WIND_DASH, target: { from: { x: 5, y: 5 }, to: { x: 9, y: 9 } } }));
-  const { events } = ok(useSkill(dashed.state, { player: O, skill: TERRAIN_CREATION, target: { x: 1, y: 1 } }));
+  const dashed = skillTurn(start, X, WIND_DASH, { from: { x: 5, y: 5 }, to: { x: 9, y: 9 } }); // a skill, then a planting
+  const events = [];
+  skillTurn(dashed, O, TERRAIN_CREATION, { x: 1, y: 1 }, null, events);
   assert.deepEqual(effectsForEvents(events).filter((s) => s.kind === 'banner').map((s) => s.text), ['Terrain Creation!', 'Wind Dash landed!']);
 
   const effects = createEffects({ random: () => 0 });

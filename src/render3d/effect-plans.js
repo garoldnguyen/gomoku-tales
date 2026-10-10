@@ -15,6 +15,7 @@ import {
   ROCK_CRUMBLE_MS, ROCK_FALL_HEIGHT, ROCK_FALL_MS, ROCK_SETTLE_MS, SHAKE3D_LIGHT, SHAKE3D_MS, SKY_WATCH_PULSE_LOW,
   SKY_WATCH_PULSE_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS, VENOM_DROP_MS, VENOM_SINK_MS,
 } from '../config.js';
+import { TORNADO_ZONE } from '../logic/skills.js';
 import { bannerTexts } from '../render/effects.js';
 import { dropOffsetPx, STAGE_DROP, STAGE_LAND, STAGE_REST, STAGE_SPROUT } from './growth.js';
 
@@ -56,7 +57,11 @@ export function visualsForEvents(events) {
     switch (event.type) {
       case 'skillUsed': {
         const target = event.target;
-        if (Number.isInteger(target?.x) && Number.isInteger(target?.y)) {
+        // A Tornado Zone is secret: its swirl follows the viewer's state
+        // (effects.syncTornado), but a cast ring and its twinkles would keep
+        // playing round the secret centre after the turn passes to the other
+        // seat, so that skill plays none.
+        if (event.skill !== TORNADO_ZONE && Number.isInteger(target?.x) && Number.isInteger(target?.y)) {
           specs.push({ kind: 'castRing', x: target.x, y: target.y, player: event.player });
         }
         break;
@@ -123,6 +128,16 @@ export function visualsForEvents(events) {
   }
   for (const text of bannerTexts(events)) specs.push({ kind: 'banner', text });
   return specs;
+}
+
+// True when the drawn state's Tornado Zone is one the viewer may see: it
+// exists and carries its cells (the other seat's copy is { hidden: true } with
+// no cells, see maskForViewer in logic/cloud.js). The renderer keeps the
+// swirl in step with this every frame, so a secret zone is gone the moment
+// the viewer may no longer see it, whatever the events said. Allocation
+// free: it runs on the frame path.
+export function zoneVisible(zone) {
+  return zone != null && zone.hidden !== true && zone.cells != null;
 }
 
 // The visuals for events that piled up while the page was hidden (see

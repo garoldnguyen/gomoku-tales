@@ -4,6 +4,7 @@ import { BOARD_SIZE, COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS } from '
 import { EMPTY, X, O, ROCK } from '../src/logic/board.js';
 import { STONE_CONVERSION, TERRAIN_CREATION } from '../src/logic/skills.js';
 import { createInitialState, isGameOver, placeStone, skillCooldown, useSkill } from '../src/logic/game.js';
+import { skillTurn } from './skill-turn.js';
 
 // Builds a playing state with cells set directly: [[x, y, value], ...].
 function stateWith(cells, currentPlayer = O) {
@@ -34,26 +35,26 @@ function assertSkillRejected(state, action, errorPattern) {
   assert.equal(JSON.stringify(state), before, 'state must not change');
 }
 
-// X places at (0, 0), then Earth Bear drops a rock on (7, 7) on turn 2.
+// X places at (0, 0), then Earth Bear drops a rock on (7, 7) on turn 2 and
+// plants a seed at (14, 14) to end that turn (a skill does not end it).
 function stateWithRock() {
   const state = place(createInitialState(), X, 0, 0);
-  return skillResult(state, O, TERRAIN_CREATION, { x: 7, y: 7 }).state;
+  return skillTurn(state, O, TERRAIN_CREATION, { x: 7, y: 7 }, { x: 14, y: 14 });
 }
 
 // --- TERRAIN CREATION ---
 
-test('Terrain Creation drops a rock on an empty cell at once and uses the turn', () => {
+test('Terrain Creation drops a rock on an empty cell at once and does not end the turn', () => {
   const state = place(createInitialState(), X, 0, 0);
   const result = skillResult(state, O, TERRAIN_CREATION, { x: 7, y: 7 });
   assert.equal(result.state.board[7][7], ROCK);
   assert.deepEqual(result.state.rocks, [{ x: 7, y: 7, breaksAfterTurn: 2 + ROCK_LIFETIME_TURNS }]);
-  assert.equal(result.state.currentPlayer, X);
-  assert.equal(result.state.turn, 3);
+  assert.equal(result.state.currentPlayer, O, 'O still has to plant');
+  assert.equal(result.state.turn, 2);
   assert.equal(skillCooldown(result.state, O, TERRAIN_CREATION), COOLDOWN_SHORT);
   assert.deepEqual(result.events, [
     { type: 'skillUsed', player: O, skill: TERRAIN_CREATION, target: { x: 7, y: 7 } },
     { type: 'rockPlaced', player: O, x: 7, y: 7, breaksAfterTurn: 6 },
-    { type: 'turnEnded', player: O, turn: 2 },
   ]);
   assert.equal(state.board[7][7], EMPTY, 'the given state is not mutated');
   assert.deepEqual(JSON.parse(JSON.stringify(result.state)), result.state);
@@ -103,7 +104,8 @@ test('a rock cannot be converted', () => {
 test('a rock breaks the opponent\'s line', () => {
   // X X X X _ with a rock dropped on the fifth cell: X cannot finish there.
   const cells = [0, 1, 2, 3].map((x) => [x, 0, X]);
-  let state = skillResult(stateWith(cells), O, TERRAIN_CREATION, { x: 4, y: 0 }).state;
+  let state = skillTurn(stateWith(cells), O, TERRAIN_CREATION, { x: 4, y: 0 }, { x: 14, y: 14 });
+  assert.equal(state.currentPlayer, X);
   assert.equal(placeStone(state, { player: X, x: 4, y: 0 }).ok, false);
   state = place(state, X, 9, 9);
   assert.equal(state.winner, null);
@@ -144,14 +146,17 @@ test('a rock lasts for the 4 turns after it is created and breaks at the end of 
   assert.equal(state.board[7][7], X);
 });
 
-test('a rock also breaks when the 4th turn is a skill', () => {
+test('a rock also breaks when the 4th turn uses a skill, with the planting that ends it', () => {
   let state = place(stateWithRock(), X, 1, 10); // turn 3
   state = place(state, O, 2, 10); // turn 4
   state = place(state, X, 3, 10); // turn 5
-  // Turn 6: O converts instead of placing.
-  const result = skillResult(state, O, STONE_CONVERSION, { x: 3, y: 10 });
+  // Turn 6: O converts, then plants; the rock breaks when the turn ends.
+  const used = skillResult(state, O, STONE_CONVERSION, { x: 3, y: 10 });
+  assert.equal(used.state.board[7][7], ROCK, 'the skill alone does not end the turn');
+  assert.deepEqual(used.events.map((e) => e.type), ['skillUsed', 'stoneConverted']);
+  const result = placeStone(used.state, { player: O, x: 4, y: 10 });
   assert.equal(result.state.board[7][7], EMPTY);
-  assert.deepEqual(result.events.map((e) => e.type), ['skillUsed', 'stoneConverted', 'rockBroken', 'turnEnded']);
+  assert.deepEqual(result.events.map((e) => e.type), ['stonePlaced', 'rockBroken', 'turnEnded']);
 });
 
 test('each rock breaks on its own schedule', () => {
@@ -159,10 +164,10 @@ test('each rock breaks on its own schedule', () => {
   // so the second rock can be dropped two turns later).
   let twoRocks = stateWith([]);
   twoRocks.turn = 2;
-  twoRocks = skillResult(twoRocks, O, TERRAIN_CREATION, { x: 1, y: 1 }).state; // turn 2
+  twoRocks = skillTurn(twoRocks, O, TERRAIN_CREATION, { x: 1, y: 1 }, { x: 0, y: 13 }); // turn 2
   twoRocks.cooldowns = { ...twoRocks.cooldowns, O: { ...twoRocks.cooldowns.O, [TERRAIN_CREATION]: 0 } };
   twoRocks = place(twoRocks, X, 0, 14); // turn 3
-  twoRocks = skillResult(twoRocks, O, TERRAIN_CREATION, { x: 2, y: 2 }).state; // turn 4
+  twoRocks = skillTurn(twoRocks, O, TERRAIN_CREATION, { x: 2, y: 2 }, { x: 2, y: 13 }); // turn 4
   twoRocks = place(twoRocks, X, 1, 14); // turn 5
   const sixth = placeStone(twoRocks, { player: O, x: 2, y: 14 }); // turn 6
   assert.deepEqual(sixth.events.filter((e) => e.type === 'rockBroken'), [{ type: 'rockBroken', x: 1, y: 1 }]);
@@ -192,17 +197,16 @@ test('a rock that breaks at the end of the turn does not make a full board a dra
 
 // --- STONE CONVERSION ---
 
-test('Stone Conversion turns one opponent stone into an O stone at once and uses the turn', () => {
+test('Stone Conversion turns one opponent stone into an O stone at once and does not end the turn', () => {
   const state = stateWith([[6, 6, X], [7, 7, X]]);
   const result = skillResult(state, O, STONE_CONVERSION, { x: 6, y: 6 });
   assert.equal(result.state.board[6][6], O);
   assert.equal(result.state.board[7][7], X, 'only the chosen stone changes');
-  assert.equal(result.state.currentPlayer, X);
+  assert.equal(result.state.currentPlayer, O, 'O still has to plant');
   assert.equal(skillCooldown(result.state, O, STONE_CONVERSION), COOLDOWN_LONG);
   assert.deepEqual(result.events, [
     { type: 'skillUsed', player: O, skill: STONE_CONVERSION, target: { x: 6, y: 6 } },
     { type: 'stoneConverted', player: O, x: 6, y: 6, from: X },
-    { type: 'turnEnded', player: O, turn: 1 },
   ]);
   assert.equal(state.board[6][6], X, 'the given state is not mutated');
 });
@@ -242,5 +246,6 @@ test('a conversion that does not make five lets the game go on', () => {
   const state = stateWith([[2, 5, O], [3, 5, O], [4, 5, X], [5, 5, O]]);
   const result = skillResult(state, O, STONE_CONVERSION, { x: 4, y: 5 });
   assert.equal(result.state.winner, null);
-  assert.equal(result.state.currentPlayer, X);
+  assert.equal(result.state.currentPlayer, O, 'the turn goes on until O plants');
+  assert.equal(place(result.state, O, 14, 14).currentPlayer, X);
 });

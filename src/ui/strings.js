@@ -7,6 +7,7 @@
 
 import { COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS, ROOM_CODE_LENGTH, WIN_LENGTH } from '../config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../logic/characters.js';
+import { SKILL_ALREADY_USED_ERROR } from '../logic/game.js';
 import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../logic/skills.js';
 import { SKILL_INFO } from './skill-info.js';
 
@@ -22,7 +23,7 @@ const skill = (id) => SKILL_INFO[id].title;
 export function howToRules({ COOLDOWN_LONG, COOLDOWN_SHORT, ROCK_LIFETIME_TURNS, WIN_LENGTH }) {
   return [
     `Two players take turns. ${rabbit} plants X and always goes first. ${bear} plants O.`,
-    'On your turn do one thing: plant on an empty plot, or use a skill. A skill takes your whole turn.',
+    'On your turn you may use one skill that is ready. Then you must plant a seed on an empty plot to end your turn.',
     `${WIN_LENGTH} or more of your plants in an unbroken row, across, down or diagonally, win the game.`,
     `After you use a skill it rests for your next ${COOLDOWN_SHORT} turns (${skill(WIND_DASH)}, ${skill(TERRAIN_CREATION)}) or your next ${COOLDOWN_LONG} turns (${skill(TORNADO_ZONE)}, ${skill(STONE_CONVERSION)}).`,
     `A rock blocks a plot for both players and crumbles after ${ROCK_LIFETIME_TURNS} turns, counting both players' turns.`,
@@ -149,6 +150,11 @@ export const STRINGS = Object.freeze({
   selectTaglineCloudEagle: 'Sees far, hides much.',
   skillAlwaysOn: 'Always on', // a passive skill (Sky Watch): no rest turns, no timer
   skillSilenced: 'Silenced by Hiss', // a skill the opponent's Hiss locks for this turn
+  // Free Action (docs/free-action-design.md section 1): one skill per turn, then plant.
+  skillAlreadyUsedError: SKILL_ALREADY_USED_ERROR, // the rules' refusal of a second skill, shown when a locked row is clicked
+  skillUsedHint: 'Already used a skill this turn.', // the hint of every skill row after a skill
+  skillUsedState: 'Next turn', // a ready skill row that cannot be used because a skill was used this turn
+  plantToEndTurn: 'Now plant a seed to end your turn.', // the turn pill hint, status line and banner after a skill
   // The turn banner of a game on one screen and the first-game hints (src/ui/announce.js).
   turnBannerKicker: 'To play',
   hintWinTitle: 'Five in a row wins',

@@ -8,6 +8,7 @@ import { ALL_CHARACTERS, CHARACTERS, CLOUD_EAGLE, EARTH_BEAR, assignSides } from
 import { canUseSkill, newGame, placeStone, skillCooldown, useSkill } from '../src/logic/game.js';
 import { CLOUD, LONG, PASSIVE, SKILLS, SKY_WATCH, cooldownTurns, getSkill, isPassiveSkill } from '../src/logic/skills.js';
 import { cloudCells, cloudsOf, createCloud, inCloud, skyWatchCells, tickClouds } from '../src/logic/cloud.js';
+import { skillTurn } from './skill-turn.js';
 
 function ok(result) {
   assert.equal(result.ok, true, result.error);
@@ -18,8 +19,10 @@ function place(state, player, x, y) {
   return ok(placeStone(state, { player, x, y }));
 }
 
-function useCloud(state, player, x, y) {
-  return ok(useSkill(state, { player, skill: CLOUD, target: { x, y } }));
+// The cloud is placed and the owner plants a seed (a spare cell, or cell) to
+// end the turn: a skill does not end it any more.
+function useCloud(state, player, x, y, cell = null) {
+  return skillTurn(state, player, CLOUD, { x, y }, cell);
 }
 
 // Cloud Eagle picked first (X) against Earth Bear (O).
@@ -59,13 +62,14 @@ test('Sky Watch is always on: it cannot be used and never has a cooldown', () =>
   assert.equal(skillCooldown(state, X, CLOUD), COOLDOWN_LONG);
 });
 
-test('a cloud on an empty cell: no stone, the turn is used, the record holds centre, owner and turns left', () => {
+test('a cloud on an empty cell: no stone, the turn goes on, the record holds centre, owner and turns left', () => {
   const before = eagleGame();
   const result = useSkill(before, { player: X, skill: CLOUD, target: { x: 7, y: 7 } });
   const state = ok(result);
   assert.deepEqual(state.board, before.board, 'no stone is placed');
-  assert.equal(state.currentPlayer, O);
-  assert.equal(state.turn, 2);
+  assert.equal(state.currentPlayer, X, 'the owner still has to plant');
+  assert.equal(state.turn, 1);
+  assert.equal(place(state, X, 0, 0).currentPlayer, O);
   assert.deepEqual(cloudsOf(state), [{ x: 7, y: 7, owner: X, turnsLeft: CLOUD_TURNS, placedTurn: 1 }]);
   const placed = result.events.find((e) => e.type === 'cloudPlaced');
   assert.equal(placed.cells.length, CLOUD_SIZE * CLOUD_SIZE);

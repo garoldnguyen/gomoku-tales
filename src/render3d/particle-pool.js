@@ -196,6 +196,18 @@ export function createParticlePool(capacity) {
     pool.count = 0;
   };
 
+  // Removes the particles circling the ground point (x, z) at once, and no
+  // others: the swirl of a Tornado Zone that the viewer may no longer see
+  // must not linger. (Float32 storage, so the point is matched within a
+  // thousandth of a world unit.)
+  pool.removeSpiralAt = (px, pz) => {
+    for (let i = pool.count - 1; i >= 0; i--) {
+      if (motion[i] !== MOTION_SPIRAL || Math.abs(cx[i] - px) > 0.001 || Math.abs(cz[i] - pz) > 0.001) continue;
+      pool.count--;
+      if (i !== pool.count) copy(pool.count, i);
+    }
+  };
+
   // How see-through particle i is now: it fades in quickly, holds and fades
   // out over the last third of its life.
   pool.alphaAt = (i) => {

@@ -7,8 +7,9 @@
 import { STONE_CONVERSION, TERRAIN_CREATION } from '../logic/skills.js';
 
 export const SHOT_FIELD = Object.freeze({
-  // Turns in order, Wind Rabbit (X) first: a cell places a seed, a cell
-  // with a skill uses that skill on it. 14 seeds and one rock, no winner.
+  // Actions in order, Wind Rabbit (X) first: a cell places a seed, a cell
+  // with a skill uses that skill on it. A skill does not end the turn (Free
+  // Action), so the same player plants next. 15 seeds and one rock, no winner.
   actions: Object.freeze([
     { x: 7, y: 7 }, // 1 X
     { x: 8, y: 8 }, // 2 O
@@ -21,7 +22,8 @@ export const SHOT_FIELD = Object.freeze({
     { x: 6, y: 7 }, // 9 X
     { x: 5, y: 7 }, // 10 O
     { x: 7, y: 8 }, // 11 X
-    { x: 6, y: 9, skill: TERRAIN_CREATION }, // 12 O: a rock falls
+    { x: 6, y: 9, skill: TERRAIN_CREATION }, // 12 O: a rock falls, then the same turn goes on
+    { x: 4, y: 7 }, // 12 O
     { x: 7, y: 6 }, // 13 X
     { x: 7, y: 9 }, // 14 O
     { x: 5, y: 9 }, // 15 X: the last move

@@ -2,7 +2,8 @@
 // - SKY WATCH (passive): the cells where the opponent would make five in a
 //   row (SKY_WATCH_RUN, four) with one move (skyWatchCells).
 // - CLOUD: a cloud on any cell of the board, stone and rock cells too. It
-//   places no stone and uses the owner's turn. It covers CLOUD_SIZE by
+//   places no stone and does not end the owner's turn (Free Action: the
+//   owner still plants). It covers CLOUD_SIZE by
 //   CLOUD_SIZE cells centred on the chosen cell, clipped to the board, and
 //   lasts CLOUD_TURNS turns of its owner (not counting the turn it is
 //   placed in), then disappears. Stones placed inside stay; rocks are not
@@ -216,7 +217,12 @@ export function localViewState(state) {
 
 // LOCAL MODE: the events of an action as the player to move next (in
 // state, the state after the action) may see them, for the effects and
-// messages: a move under the other seat's cloud plays no effect.
+// messages: a move under the other seat's cloud plays no effect. A skill
+// does not end the turn (Free Action), so right after one the caster is
+// still to move and sees all of it, a secret Tornado Zone included. What
+// outlives the turn is kept right by the renderer: it draws the zone from
+// the viewer's state (effects.syncTornado), so the swirl is gone the moment
+// the turn passes to the other seat.
 export function localViewEvents(state, events) {
   return maskEventsForViewer(localViewState(state), events);
 }

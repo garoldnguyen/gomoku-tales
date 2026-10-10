@@ -57,11 +57,13 @@ for (const quality of ['low', 'high']) {
     // Game 1: plants, a rock, a Tornado Zone, then Earth Bear wins while a
     // Wind Dash is still pending; the new game starts a few frames after
     // the winning move, with the effects still running.
+    // A skill does not end the turn (Free Action), so each skill is followed
+    // by the planting of the same player.
     const moves = [
-      () => game.click({ x: 7, y: 7 }),
+      () => game.click({ x: 7, y: 7 }), // X
       () => game.clickSkill(O, TERRAIN_CREATION) && game.click({ x: 14, y: 14 }),
-      () => game.clickSkill(X, TORNADO_ZONE) && game.click({ x: 10, y: 10 }),
       () => game.click({ x: 0, y: 6 }),
+      () => game.clickSkill(X, TORNADO_ZONE) && game.click({ x: 10, y: 10 }),
       () => game.click({ x: 1, y: 0 }),
       () => game.click({ x: 1, y: 6 }),
       () => game.click({ x: 2, y: 0 }),
@@ -69,6 +71,7 @@ for (const quality of ['low', 'high']) {
       () => game.click({ x: 3, y: 0 }),
       () => game.click({ x: 3, y: 6 }),
       () => game.clickSkill(X, WIND_DASH) && game.click({ x: 7, y: 7 }) === false && game.click({ x: 7, y: 9 }),
+      () => game.click({ x: 4, y: 0 }),
       () => game.click({ x: 4, y: 6 }),
     ];
     moves.forEach((move, i) => {

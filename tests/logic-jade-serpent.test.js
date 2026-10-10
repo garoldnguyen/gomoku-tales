@@ -9,6 +9,7 @@ import {
 } from '../src/logic/characters.js';
 import { canUseSkill, characterOf, newGame, placeStone, skillCooldown, useSkill } from '../src/logic/game.js';
 import { HISS, LONG, SHORT, TERRAIN_CREATION, VENOM, WIND_DASH, cooldownTurns, getSkill } from '../src/logic/skills.js';
+import { skillTurn } from './skill-turn.js';
 
 function ok(result) {
   assert.equal(result.ok, true, result.error);
@@ -72,6 +73,8 @@ test('Hiss rests COOLDOWN_SHORT own turns and Venom COOLDOWN_LONG', () => {
   let state = serpentGame();
   state = ok(useSkill(state, { player: X, skill: HISS }));
   assert.equal(skillCooldown(state, X, HISS), COOLDOWN_SHORT);
+  state = place(state, X, 12, 12); // the planting that ends the turn does not count it down
+  assert.equal(skillCooldown(state, X, HISS), COOLDOWN_SHORT);
   // The cooldown counts down on the serpent's own turns only.
   let row = 0;
   for (let i = 0; i < COOLDOWN_SHORT; i++) {
@@ -89,6 +92,7 @@ test('Hiss rests COOLDOWN_SHORT own turns and Venom COOLDOWN_LONG', () => {
   state = place(state, O, 8, 8);
   state = ok(useSkill(state, { player: X, skill: VENOM, target: { x: 8, y: 8 } }));
   assert.equal(skillCooldown(state, X, VENOM), COOLDOWN_LONG);
+  state = place(state, X, 0, 14);
   assert.match(useSkill(place(state, O, 3, 3), { player: X, skill: VENOM, target: { x: 3, y: 3 } }).error, /cooldown/);
 });
 
@@ -99,6 +103,8 @@ test('Hiss: the opponent cannot use a skill on their next turn, and the lock end
   const result = useSkill(state, { player: X, skill: HISS });
   state = ok(result);
   assert.ok(result.events.some((e) => e.type === 'hissCast' && e.player === X && e.locked === O));
+  assert.equal(state.currentPlayer, X, 'the turn goes on: the serpent still plants');
+  state = place(state, X, 0, 14);
   assert.equal(state.currentPlayer, O);
   for (const skill of CHARACTERS[EARTH_BEAR].skills) {
     assert.equal(canUseSkill(state, O, skill), false);
@@ -119,7 +125,7 @@ test('Hiss: the opponent cannot use a skill on their next turn, and the lock end
 });
 
 test('Hiss still allows placing a stone', () => {
-  const state = ok(useSkill(serpentGame(), { player: X, skill: HISS }));
+  const state = place(ok(useSkill(serpentGame(), { player: X, skill: HISS })), X, 0, 0);
   const next = place(state, O, 7, 7);
   assert.equal(next.board[7][7], O);
   assert.equal(next.currentPlayer, X);
@@ -127,6 +133,7 @@ test('Hiss still allows placing a stone', () => {
 
 test('Hiss does not lock the serpent itself', () => {
   let state = ok(useSkill(serpentGame(), { player: X, skill: HISS }));
+  state = place(state, X, 0, 0);
   state = place(state, O, 7, 7);
   assert.equal(canUseSkill(state, X, VENOM), true);
 });
@@ -140,7 +147,7 @@ test('Venom removes exactly one opponent plant, leaves the plot empty and keeps 
   state = place(state, X, 7, 9);
   state = place(state, O, 9, 9);
   state = place(state, X, 0, 9);
-  state = ok(useSkill(state, { player: O, skill: TERRAIN_CREATION, target: { x: 2, y: 2 } }));
+  state = skillTurn(state, O, TERRAIN_CREATION, { x: 2, y: 2 }, { x: 14, y: 14 });
   const before = state;
   const result = useSkill(state, { player: X, skill: VENOM, target: { x: 8, y: 8 } });
   state = ok(result);
@@ -154,13 +161,13 @@ test('Venom removes exactly one opponent plant, leaves the plot empty and keeps 
   }
   assert.equal(changed, 1, 'exactly one plot changed');
   assert.ok(result.events.some((e) => e.type === 'plantRemoved' && e.x === 8 && e.y === 8 && e.from === O));
-  assert.equal(state.currentPlayer, O, 'using Venom uses the turn');
+  assert.equal(state.currentPlayer, X, 'using Venom does not end the turn');
 });
 
 test('Venom is rejected on an empty plot, on your own plant, on a rock and off the board', () => {
   let state = serpentGame();
   state = place(state, X, 7, 7);
-  state = ok(useSkill(state, { player: O, skill: TERRAIN_CREATION, target: { x: 2, y: 2 } }));
+  state = skillTurn(state, O, TERRAIN_CREATION, { x: 2, y: 2 }, { x: 14, y: 14 });
   for (const target of [{ x: 0, y: 0 }, { x: 7, y: 7 }, { x: 2, y: 2 }, { x: -1, y: 0 }, null]) {
     const result = useSkill(state, { player: X, skill: VENOM, target });
     assert.equal(result.ok, false, JSON.stringify(target));

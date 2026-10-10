@@ -284,7 +284,7 @@ function showHud(game, view, localPlayer, winner, hint) {
   hudInputs.players = players;
   hud.render(hudViewModel(view.state, hudInputs, localPlayer));
   // The turn banner (one screen) and the first-game hints, on the same changes.
-  announcer?.onHud(view.state, targeting, localPlayer === null, localPlayer === SPECTATOR_VIEW);
+  announcer?.onHud(view.state, targeting, localPlayer === null, localPlayer === SPECTATOR_VIEW, localPlayer === SPECTATOR_VIEW ? null : localPlayer);
 }
 
 // The game view with this frame's time, effects and hint, for the

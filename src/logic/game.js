@@ -1,4 +1,5 @@
-// Pure core rules (docs/design.md sections 4 and 5). Actions never mutate
+// Pure core rules (docs/design.md sections 4 and 5, docs/free-action-design.md
+// section 1: Free Action). Actions never mutate
 // the state they are given; they return { ok: true, state, events } with a
 // new state and the list of things that happened (for rendering and
 // effects), or { ok: false, error, events: [] } when the action is not
@@ -13,6 +14,10 @@ import { inTornado, resolveDash, throwStone, tornadoZone, windDash } from './win
 import { hiss, isSkillLocked, venom } from './jade-serpent-skills.js';
 import { cloud, tickClouds } from './cloud.js';
 
+// The refusal of a second skill in one turn (Free Action). The UI shows the
+// same sentence through STRINGS.skillAlreadyUsedError (src/ui/strings.js).
+export const SKILL_ALREADY_USED_ERROR = 'You already used a skill this turn.';
+
 // Skill effects by skill id.
 const SKILL_EFFECTS = {
   [WIND_DASH]: windDash,
@@ -26,8 +31,8 @@ const SKILL_EFFECTS = {
 
 // A fresh game (docs/flow-design.md section 5), shared by the online host,
 // local mode and every rematch: empty board, no rocks, no pending Wind
-// Dash, no Tornado Zone, no Hiss lock, every cooldown 0, X (the first
-// pick) to move, no winner. options.size is the board size;
+// Dash, no Tornado Zone, no Hiss lock, no skill used yet, every cooldown 0,
+// X (the first pick) to move, no winner. options.size is the board size;
 // options.characters the sides from assignSides (default DEFAULT_SIDES:
 // Wind Rabbit X, Earth Bear O), kept across a rematch by passing them
 // again. Random choices are not made here, the actions keep taking the
@@ -48,6 +53,7 @@ export function createInitialState(size = BOARD_SIZE, characters = DEFAULT_SIDES
     pendingDash: null, // { player, from, to, resolvesAfterTurn } while a Wind Dash is announced
     tornado: null, // { player, x, y, cells, endsAfterTurn } while a Tornado Zone is active
     skillLock: null, // { player, endsAfterTurn } while a Hiss keeps that player from using skills
+    skillUsed: null, // id of the skill the player to move used this turn, or null (Free Action)
     cooldowns: { [X]: initialCooldowns(sides, X), [O]: initialCooldowns(sides, O) },
     winner: null,
     winLine: null,
@@ -82,7 +88,8 @@ export function canUseSkill(state, player, skillId) {
   return !isGameOver(state) && player === state.currentPlayer && checkSkill(state, player, skillId) === null;
 }
 
-// Places a stone for the acting player. A stone placed inside the
+// Places a stone for the acting player. Planting is the only action that
+// ends a turn (Free Action). A stone placed inside the
 // opponent's active Tornado Zone is thrown by a dandelion storm to a random
 // empty plot anywhere outside the zone; options.random (default
 // Math.random) picks it, so only the host runs it and tests can inject it.
@@ -105,9 +112,14 @@ export function placeStone(state, action, options = {}) {
   return finishTurn({ ...state, board }, player, events, { x, y });
 }
 
-// Uses one of the acting player's skills. Using a skill uses the whole
-// turn. action = { player, skill, target } where target is whatever the
-// skill needs: { from: { x, y }, to: { x, y } } for Wind Dash and a cell
+// Uses one of the acting player's skills (Free Action): at most one per
+// turn, and it does not end the turn. The skill is applied, its full
+// cooldown starts at once and state.skillUsed names it; the same player is
+// still to move, state.turn is unchanged and no turnEnded event is made. The
+// player must still plant a seed (placeStone) to end the turn. A skill that
+// changes a plant (a changed cell) runs the win check at once.
+// action = { player, skill, target } where target is whatever the skill
+// needs: { from: { x, y }, to: { x, y } } for Wind Dash and a cell
 // { x, y } for the other skills (Hiss needs none).
 export function useSkill(state, action) {
   const { player, skill: skillId, target = null } = action;
@@ -119,7 +131,18 @@ export function useSkill(state, action) {
   const { error: effectError, events: effectEvents, changed, ...updates } = SKILL_EFFECTS[skillId](state, player, target);
   if (effectError) return fail(effectError);
   const events = [{ type: 'skillUsed', player, skill: skillId, target }, ...effectEvents];
-  return finishTurn({ ...state, ...updates }, player, events, changed, skillId);
+  const used = {
+    ...state,
+    ...updates,
+    skillUsed: skillId,
+    cooldowns: { ...state.cooldowns, [player]: { ...state.cooldowns[player], [skillId]: cooldownTurns(skillId) } },
+  };
+  const winLine = changed ? findWinLineAt(used.board, changed.x, changed.y) : null;
+  if (winLine) return win(used, player, winLine, events);
+  // A rock on the last empty plot leaves nowhere to plant: the draw check
+  // that a turn end used to make (the turn has to end with a planting now).
+  if (isBoardFull(used.board)) return done({ ...used, draw: true, skillUsed: null }, [...events, { type: 'draw' }]);
+  return done(used, events);
 }
 
 function checkSkill(state, player, skillId) {
@@ -131,27 +154,26 @@ function checkSkill(state, player, skillId) {
   const left = skillCooldown(state, player, skillId);
   if (left > 0) return `${skill.name} is on cooldown for ${left} more ${left === 1 ? 'turn' : 'turns'}.`;
   if (isSkillLocked(state, player)) return 'Hiss: you cannot use a skill this turn.';
+  if (state.skillUsed) return SKILL_ALREADY_USED_ERROR;
   return null;
 }
 
 // Runs the win check for the acting player on the cell whose stone
-// changed and, if the game goes on, ends their turn: a Wind Dash waiting
-// for this turn to end resolves (with a win check for the dashing player),
-// a Tornado Zone lasting through this turn disappears, a Hiss lock lasting
-// through this turn ends, the acting player's clouds lose a turn (and
-// disappear when none is left), rocks whose
+// changed and, if the game goes on, ends their turn (only a planting gets
+// here): a Wind Dash waiting for this turn to end resolves (with a win check
+// for the dashing player), a Tornado Zone lasting through this turn
+// disappears, a Hiss lock lasting through this turn ends, the acting
+// player's clouds lose a turn (and disappear when none is left), rocks whose
 // lifetime ends with this turn break, the draw check runs, their cooldowns
-// count down (a skill used this turn starts its full cooldown) and the
-// other player is to move. If the acting player wins, nothing else happens:
-// a pending dash never resolves and is dropped, and so is a Tornado Zone
-// (it only lasts through this turn), so neither is still shown as coming;
-// a Hiss lock is dropped too.
-function finishTurn(state, player, events, changed, usedSkillId = null) {
+// count down (all but the skill used this turn, whose full cooldown started
+// when it was used), skillUsed is cleared and the other player is to move.
+// If the acting player wins, nothing else happens: a pending dash never
+// resolves and is dropped, and so is a Tornado Zone (it only lasts through
+// this turn), so neither is still shown as coming; a Hiss lock is dropped
+// too.
+function finishTurn(state, player, events, changed) {
   const winLine = changed ? findWinLineAt(state.board, changed.x, changed.y) : null;
-  if (winLine) {
-    const ended = { ...state, winner: player, winLine, pendingDash: null, tornado: null, skillLock: null };
-    return done(ended, [...events, { type: 'win', player, line: winLine }]);
-  }
+  if (winLine) return win(state, player, winLine, events);
 
   const dash = state.pendingDash;
   if (dash && dash.resolvesAfterTurn <= state.turn) {
@@ -160,7 +182,7 @@ function finishTurn(state, player, events, changed, usedSkillId = null) {
     events = [...events, ...resolved.events];
     const dashLine = resolved.changed ? findWinLineAt(state.board, resolved.changed.x, resolved.changed.y) : null;
     if (dashLine) {
-      return done({ ...state, winner: dash.player, winLine: dashLine, skillLock: null }, [...events, { type: 'win', player: dash.player, line: dashLine }]);
+      return done({ ...state, winner: dash.player, winLine: dashLine, skillLock: null, skillUsed: null }, [...events, { type: 'win', player: dash.player, line: dashLine }]);
     }
   }
 
@@ -186,22 +208,28 @@ function finishTurn(state, player, events, changed, usedSkillId = null) {
   state = { ...state, board: rocks.board, rocks: rocks.rocks };
   events = [...events, ...rocks.events];
   if (isBoardFull(state.board)) {
-    return done({ ...state, draw: true }, [...events, { type: 'draw' }]);
+    return done({ ...state, draw: true, skillUsed: null }, [...events, { type: 'draw' }]);
   }
 
   const own = {};
   for (const [skillId, left] of Object.entries(state.cooldowns[player])) {
-    own[skillId] = Math.max(0, left - 1);
+    own[skillId] = skillId === state.skillUsed ? left : Math.max(0, left - 1);
   }
-  if (usedSkillId) own[usedSkillId] = cooldownTurns(usedSkillId);
 
   const next = {
     ...state,
     cooldowns: { ...state.cooldowns, [player]: own },
     currentPlayer: otherPlayer(player),
     turn: state.turn + 1,
+    skillUsed: null,
   };
   return done(next, [...events, { type: 'turnEnded', player, turn: state.turn }]);
+}
+
+// The acting player made five: the game is over (see finishTurn).
+function win(state, player, winLine, events) {
+  const ended = { ...state, winner: player, winLine, pendingDash: null, tornado: null, skillLock: null, skillUsed: null };
+  return done(ended, [...events, { type: 'win', player, line: winLine }]);
 }
 
 function done(state, events) {

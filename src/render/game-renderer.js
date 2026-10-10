@@ -399,15 +399,16 @@ function drawSkillButton(ctx, rect, skill, panelActive) {
   ctx.fillText(skill.name, textX, y + 22);
   ctx.font = SKILL_STATE_FONT;
   const turns = skill.cooldown === 1 ? 'turn' : 'turns';
-  ctx.fillText(skill.locked ? `Locked: ${skill.cooldown} ${turns}` : skill.selected ? 'Choosing...' : 'Ready', textX, y + 42);
+  ctx.fillText(skill.locked ? `Locked: ${skill.cooldown} ${turns}` : skill.selected ? 'Choosing...' : skill.note ?? 'Ready', textX, y + 42);
 
   if (skill.locked) {
     // Grey overlay with the remaining cooldown over the icon.
     ctx.fillStyle = COLORS.locked;
     ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
     drawText(ctx, String(skill.cooldown), iconX + SKILL_ICON_PX / 2, iconY + SKILL_ICON_PX / 2, { size: 22 });
-  } else if (!panelActive) {
-    // Not this player's turn: dimmed but not locked.
+  } else if (!panelActive || skill.note) {
+    // Not this player's turn, or a skill was already used this turn (the
+    // note says so): dimmed but not locked.
     ctx.fillStyle = 'rgba(40, 30, 20, 0.25)';
     ctx.fillRect(x + 2, y + 2, w - 4, h - 4);
   }

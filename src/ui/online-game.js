@@ -10,6 +10,7 @@ import { seatStone } from '../logic/seats.js';
 import { COUNTDOWN } from '../net/presence.js';
 import { describeEvents, panelView, skillLockReason } from './local-game.js';
 import { createPlayersByStone } from './player-names.js';
+import { STRINGS } from './strings.js';
 import { needsTarget, startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
 
 // takeEvents' answer when nothing happened, shared so the render loop makes
@@ -202,6 +203,7 @@ export function statusLine({ state, you, result = null, targeting = null, yourTu
   if (outcome) return outcome.title;
   if (peerCountdown !== null) return `Opponent left. You win in ${peerCountdown}`;
   if (targeting) return targetPrompt(targeting);
+  if (yourTurn && state.skillUsed) return STRINGS.plantToEndTurn; // a skill does not end the turn
   return yourTurn ? 'Your turn' : "Opponent's turn";
 }
 

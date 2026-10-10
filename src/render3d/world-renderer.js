@@ -170,6 +170,9 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       const toMove = view.state.currentPlayer === O ? O : X;
       world.setHoverMap(tints.hover[toMove]);
       decals.useSelectMap(tints.select[toMove]);
+      // Before the plants read their lean towards the zone (pieces.sync): a
+      // zone this viewer may not see must not bend anything on this frame.
+      effects.syncTornado(view.state.tornado);
       pieces.sync(view.state.board, time, effects);
       world.characters.setActive(isGameOver(view.state) ? null : view.state.currentPlayer);
       boardMarksInto(view, marks);

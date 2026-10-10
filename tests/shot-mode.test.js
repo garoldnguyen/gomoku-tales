@@ -30,7 +30,7 @@ test('the field position is legal: every action passes the rules and nobody has 
   assert.equal(findWinLine(state.board, X), null);
   assert.equal(findWinLine(state.board, O), null);
   const stones = count(state.board, X) + count(state.board, O);
-  assert.ok(stones >= 12 && stones <= 16, `about 14 seeds, got ${stones}`);
+  assert.ok(stones >= 12 && stones <= 16, `about 15 seeds, got ${stones}`);
   assert.equal(count(state.board, ROCK), 1);
   assert.equal(state.rocks.length, 1);
 });

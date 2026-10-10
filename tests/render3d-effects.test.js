@@ -32,7 +32,8 @@ const kinds = (specs) => specs.map((spec) => spec.kind);
 const STAGES = stageStartMs(DEFAULT_V3_META, 'plant-x'); // [0, 150, 450, 850, 1200]
 
 // Plays moves from the start; each move is [x, y] for a stone or
-// { skill, target } for a skill. Returns the results.
+// { skill, target } for a skill. A skill does not end the turn (Free
+// Action), so the same player plants next. Returns the results.
 function play(moves, options = {}) {
   let state = createInitialState();
   const results = [];
@@ -74,6 +75,7 @@ test('Wind Dash: the announcement marks source and target, then the seed rides a
   const results = play([
     [7, 7], [0, 0],
     { skill: WIND_DASH, target: { from: { x: 7, y: 7 }, to: { x: 9, y: 9 } } },
+    [13, 13], // the rabbit plants, which ends its turn
     [14, 14], // the bear's turn ends and the dash resolves
   ]);
   const announced = visualsForEvents(results[2].events);
@@ -82,7 +84,7 @@ test('Wind Dash: the announcement marks source and target, then the seed rides a
   assert.deepEqual(announced[1], { kind: 'dashMark', from: { x: 7, y: 7 }, to: { x: 9, y: 9 }, player: X });
   assert.equal(announced[2].text, 'Wind Dash!');
 
-  const resolved = visualsForEvents(results[3].events);
+  const resolved = visualsForEvents(results[4].events);
   assert.deepEqual(kinds(resolved), ['place', 'dashStreak', 'banner']);
   assert.deepEqual(resolved[1], { kind: 'dashStreak', from: { x: 7, y: 7 }, to: { x: 9, y: 9 }, player: X });
   const holdMs = dashFoldMs(STAGES) + DASH_STREAK_MS;
@@ -95,9 +97,10 @@ test('a failed Wind Dash fizzles and ends the marks', () => {
   const results = play([
     [7, 7], [0, 0],
     { skill: WIND_DASH, target: { from: { x: 7, y: 7 }, to: { x: 9, y: 9 } } },
+    [13, 13], // the rabbit plants, which ends its turn
     [9, 9], // the bear takes the target
   ]);
-  const specs = visualsForEvents(results[3].events);
+  const specs = visualsForEvents(results[4].events);
   assert.deepEqual(kinds(specs), ['place', 'dashFizzle', 'banner']);
   assert.deepEqual(specs[1], { kind: 'dashFizzle', from: { x: 7, y: 7 }, to: { x: 9, y: 9 } });
   assert.equal(heldCell(specs[1], STAGES), null);
@@ -107,14 +110,18 @@ test('a failed Wind Dash fizzles and ends the marks', () => {
 test('Tornado Zone: the swirl shows over the zone; a seed planted there bursts in a storm and flies anywhere in an arc', () => {
   const results = play([
     { skill: TORNADO_ZONE, target: { x: 7, y: 7 } },
+    [14, 14], // the rabbit plants, which ends its turn
     [7, 7], // the bear plants inside the zone; random 0 throws it to the first empty plot outside, (0, 0)
   ], { random: () => 0 });
   const announced = visualsForEvents(results[0].events);
-  assert.deepEqual(announced[0], { kind: 'castRing', x: 7, y: 7, player: X });
-  assert.equal(announced[1].kind, 'tornado');
-  assert.equal(announced[1].cells.length, 9);
+  // Changed with the Free Action rework (part 1): a secret zone plays no cast
+  // ring, whose twinkles would still be round the secret centre when the turn
+  // passes to the other seat; the swirl alone shows it and follows the state.
+  assert.equal(kinds(announced).includes('castRing'), false, 'no cast ring at the secret centre');
+  assert.equal(announced[0].kind, 'tornado');
+  assert.equal(announced[0].cells.length, 9);
 
-  const thrown = visualsForEvents(results[1].events);
+  const thrown = visualsForEvents(results[2].events);
   assert.deepEqual(kinds(thrown), ['place', 'storm', 'throw', 'tornadoEnd', 'banner']);
   assert.deepEqual(thrown[1], { kind: 'storm', x: 7, y: 7, cells: [{ x: 7, y: 7 }] });
   assert.deepEqual(thrown[2], { kind: 'throw', from: { x: 7, y: 7 }, to: { x: 0, y: 0 }, player: O });
@@ -127,6 +134,7 @@ test('Terrain Creation: the rock falls with a light shake and crumbles when it b
   const results = play([
     [0, 0],
     { skill: TERRAIN_CREATION, target: { x: 7, y: 7 } },
+    [14, 14], // the bear plants, which ends the turn the rock fell in
     [1, 0], [2, 0], [3, 0], [4, 5], // the rock breaks at the end of the 4th turn after it fell
   ]);
   const fell = visualsForEvents(results[1].events);
@@ -136,8 +144,8 @@ test('Terrain Creation: the rock falls with a light shake and crumbles when it b
   assert.equal(regrowCell(fell[1], STAGES), null, 'a rock does not grow');
   assert.equal(shakeStrength(fell[1]), SHAKE3D_LIGHT);
 
-  for (const result of results.slice(2, 5)) assert.ok(!kinds(visualsForEvents(result.events)).includes('rockCrumble'));
-  const broke = visualsForEvents(results[5].events);
+  for (const result of results.slice(2, 6)) assert.ok(!kinds(visualsForEvents(result.events)).includes('rockCrumble'));
+  const broke = visualsForEvents(results[6].events);
   assert.deepEqual(broke.filter((s) => s.kind === 'rockCrumble'), [{ kind: 'rockCrumble', x: 7, y: 7 }]);
 });
 
@@ -159,7 +167,9 @@ test('a win ends the lingering marks, since it drops a pending dash and the zone
   const results = play([
     [0, 0], [0, 5], [1, 0], [1, 5], [2, 0], [2, 5], [3, 0],
     { skill: TERRAIN_CREATION, target: { x: 10, y: 10 } },
+    [14, 14],
     { skill: TORNADO_ZONE, target: { x: 12, y: 12 } },
+    [14, 0],
     [9, 9],
     [4, 0], // five in a row
   ]);
@@ -174,7 +184,9 @@ test('skill banners in 3D use the same texts as the 2D game', () => {
   const results = play([
     [7, 7],
     { skill: TERRAIN_CREATION, target: { x: 3, y: 3 } },
+    [14, 14],
     { skill: TORNADO_ZONE, target: { x: 10, y: 10 } },
+    [13, 0],
     { skill: STONE_CONVERSION, target: { x: 7, y: 7 } },
   ]);
   for (const result of results) {

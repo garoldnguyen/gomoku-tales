@@ -5,6 +5,7 @@ import { EMPTY, X, O, ROCK } from '../src/logic/board.js';
 import { STONE_CONVERSION, TERRAIN_CREATION, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
 import { createInitialState, isGameOver, placeStone, skillCooldown, useSkill } from '../src/logic/game.js';
 import { tornadoCells } from '../src/logic/wind-rabbit-skills.js';
+import { skillTurn } from './skill-turn.js';
 
 // Builds a playing state with cells set directly: [[x, y, value], ...].
 function stateWith(cells, currentPlayer = X) {
@@ -45,26 +46,29 @@ const types = (events) => events.map((e) => e.type);
 // X stone at (3, 3) announces a dash to (6, 3) on turn 1.
 const DASH = { from: { x: 3, y: 3 }, to: { x: 6, y: 3 } };
 
+// The cell where the caster plants to end the turn of a skill (Free Action).
+const SPARE = { x: 14, y: 14 };
+
+// The dash is announced and X planted a seed to end turn 1: O is to move.
 function announcedDash(cells = []) {
   const state = stateWith([[3, 3, X], ...cells]);
-  return skillResult(state, X, WIND_DASH, DASH).state;
+  return skillTurn(state, X, WIND_DASH, DASH, SPARE);
 }
 
 // --- WIND DASH: announce ---
 
-test('Wind Dash is announced without moving the stone and uses the turn', () => {
+test('Wind Dash is announced without moving the stone and does not end the turn', () => {
   const state = stateWith([[3, 3, X]]);
   const result = skillResult(state, X, WIND_DASH, DASH);
   assert.equal(result.state.board[3][3], X, 'the stone has not moved yet');
   assert.equal(result.state.board[3][6], EMPTY);
   assert.deepEqual(result.state.pendingDash, { player: X, from: DASH.from, to: DASH.to, resolvesAfterTurn: 2 });
-  assert.equal(result.state.currentPlayer, O);
-  assert.equal(result.state.turn, 2);
-  assert.equal(skillCooldown(result.state, X, WIND_DASH), COOLDOWN_SHORT);
+  assert.equal(result.state.currentPlayer, X, 'X still has to plant');
+  assert.equal(result.state.turn, 1);
+  assert.equal(skillCooldown(result.state, X, WIND_DASH), COOLDOWN_SHORT, 'the full cooldown starts at once');
   assert.deepEqual(result.events, [
     { type: 'skillUsed', player: X, skill: WIND_DASH, target: DASH },
     { type: 'dashAnnounced', player: X, from: DASH.from, to: DASH.to },
-    { type: 'turnEnded', player: X, turn: 1 },
   ]);
   assert.equal(state.pendingDash, null, 'the given state is not mutated');
   assert.deepEqual(JSON.parse(JSON.stringify(result.state)), result.state);
@@ -90,7 +94,7 @@ test('Wind Dash needs one of your own stones and an empty target cell on the boa
 
 // --- WIND DASH: resolve ---
 
-test('Wind Dash resolves when the opponent\'s next turn ends', () => {
+test('a Wind Dash cast and then a planting resolves when the opponent\'s next turn ends', () => {
   const state = announcedDash();
   const result = placeResult(state, O, 10, 10);
   assert.equal(result.state.board[3][3], EMPTY, 'the source becomes empty');
@@ -102,13 +106,18 @@ test('Wind Dash resolves when the opponent\'s next turn ends', () => {
     { type: 'dashResolved', player: X, from: DASH.from, to: DASH.to },
     { type: 'turnEnded', player: O, turn: 2 },
   ]);
+  // The caster's own planting in the cast turn did not resolve it.
+  assert.deepEqual(announcedDash().pendingDash, { player: X, from: DASH.from, to: DASH.to, resolvesAfterTurn: 2 });
 });
 
-test('Wind Dash also resolves when the opponent uses a skill on their turn', () => {
-  const result = skillResult(announcedDash(), O, TERRAIN_CREATION, { x: 10, y: 10 });
+test('Wind Dash also resolves when the opponent uses a skill and plants on their turn', () => {
+  const used = skillResult(announcedDash(), O, TERRAIN_CREATION, { x: 10, y: 10 });
+  assert.equal(used.state.board[3][6], EMPTY, 'a skill alone does not end the turn, so the dash waits');
+  assert.deepEqual(types(used.events), ['skillUsed', 'rockPlaced']);
+  const result = placeResult(used.state, O, 12, 12);
   assert.equal(result.state.board[3][6], X);
   assert.equal(result.state.board[10][10], ROCK);
-  assert.deepEqual(types(result.events), ['skillUsed', 'rockPlaced', 'dashResolved', 'turnEnded']);
+  assert.deepEqual(types(result.events), ['stonePlaced', 'dashResolved', 'turnEnded']);
 });
 
 test('Wind Dash fails if the opponent takes the target cell, and the cooldown still applies', () => {
@@ -121,19 +130,22 @@ test('Wind Dash fails if the opponent takes the target cell, and the cooldown st
 });
 
 test('Wind Dash fails if the opponent drops a rock on the target cell', () => {
-  const result = skillResult(announcedDash(), O, TERRAIN_CREATION, { x: 6, y: 3 });
+  const used = skillResult(announcedDash(), O, TERRAIN_CREATION, { x: 6, y: 3 });
+  const result = placeResult(used.state, O, 12, 12);
   assert.equal(result.state.board[3][3], X);
   assert.equal(result.state.board[3][6], ROCK);
   assert.equal(result.events.find((e) => e.type === 'dashFailed').reason, 'targetTaken');
 });
 
 test('Wind Dash fails if the source stone is converted', () => {
-  const result = skillResult(announcedDash(), O, STONE_CONVERSION, DASH.from);
+  const used = skillResult(announcedDash(), O, STONE_CONVERSION, DASH.from);
+  assert.deepEqual(types(used.events), ['skillUsed', 'stoneConverted']);
+  const result = placeResult(used.state, O, 12, 12);
   assert.equal(result.state.board[3][3], O, 'the converted stone stays');
   assert.equal(result.state.board[3][6], EMPTY);
   assert.equal(result.state.pendingDash, null);
-  assert.deepEqual(types(result.events), ['skillUsed', 'stoneConverted', 'dashFailed', 'turnEnded']);
-  assert.equal(result.events[2].reason, 'sourceLost');
+  assert.deepEqual(types(result.events), ['stonePlaced', 'dashFailed', 'turnEnded']);
+  assert.equal(result.events[1].reason, 'sourceLost');
   assert.equal(skillCooldown(result.state, X, WIND_DASH), COOLDOWN_SHORT);
 });
 
@@ -152,7 +164,7 @@ test('a Wind Dash landing that makes five in a row wins for Wind Rabbit', () => 
   // X X X X at (2..5, 7); the dash moves (3, 3) into (6, 7).
   const cells = [2, 3, 4, 5].map((x) => [x, 7, X]);
   const state = stateWith([[3, 3, X], ...cells]);
-  const announced = skillResult(state, X, WIND_DASH, { from: { x: 3, y: 3 }, to: { x: 6, y: 7 } }).state;
+  const announced = skillTurn(state, X, WIND_DASH, { from: { x: 3, y: 3 }, to: { x: 6, y: 7 } }, SPARE);
   assert.equal(announced.winner, null, 'no win while the dash is only announced');
 
   const result = placeResult(announced, O, 10, 10);
@@ -179,19 +191,18 @@ test('a Wind Dash landing inside a Tornado Zone is not thrown', () => {
 
 // --- TORNADO ZONE: announce ---
 
-test('Tornado Zone covers the 3x3 cells around the centre and uses the turn', () => {
+test('Tornado Zone covers the 3x3 cells around the centre and does not end the turn', () => {
   const state = stateWith([]);
   const result = skillResult(state, X, TORNADO_ZONE, { x: 7, y: 7 });
   const cells = [];
   for (let y = 6; y <= 8; y++) for (let x = 6; x <= 8; x++) cells.push({ x, y });
   assert.deepEqual(result.state.tornado, { player: X, x: 7, y: 7, cells, endsAfterTurn: 2 });
   assert.deepEqual(result.state.board, state.board);
-  assert.equal(result.state.currentPlayer, O);
+  assert.equal(result.state.currentPlayer, X, 'X still has to plant');
   assert.equal(skillCooldown(result.state, X, TORNADO_ZONE), COOLDOWN_LONG);
   assert.deepEqual(result.events, [
     { type: 'skillUsed', player: X, skill: TORNADO_ZONE, target: { x: 7, y: 7 } },
     { type: 'tornadoAnnounced', player: X, x: 7, y: 7, cells },
-    { type: 'turnEnded', player: X, turn: 1 },
   ]);
   assert.equal(state.tornado, null, 'the given state is not mutated');
 });
@@ -219,9 +230,10 @@ test('Tornado Zone needs a centre on the board', () => {
 
 // --- TORNADO ZONE: the throw ---
 
-// Wind Rabbit puts a zone centred on (7, 7) on turn 1; Earth Bear is to move.
+// Wind Rabbit puts a zone centred on (7, 7) on turn 1 and plants a seed to
+// end the turn; Earth Bear is to move.
 function activeTornado(cells = [], centre = { x: 7, y: 7 }) {
-  return skillResult(stateWith(cells), X, TORNADO_ZONE, centre).state;
+  return skillTurn(stateWith(cells), X, TORNADO_ZONE, centre, SPARE);
 }
 
 // The empty plots outside the zone in row order (the throw's choices).
@@ -261,10 +273,12 @@ test('a stone planted outside the zone, or a skill used, is not thrown; the zone
   const outside = placeStone(activeTornado(), { player: O, x: 9, y: 7 }, { random: noRandom });
   assert.equal(outside.state.board[7][9], O);
   assert.deepEqual(types(outside.events), ['stonePlaced', 'tornadoEnded', 'turnEnded']);
-  const skillTurn = skillResult(activeTornado(), O, TERRAIN_CREATION, { x: 7, y: 7 });
-  assert.equal(skillTurn.state.board[7][7], ROCK);
-  assert.equal(skillTurn.state.tornado, null);
-  const xTurn = placeResult(skillTurn.state, X, 0, 14).state;
+  const used = skillResult(activeTornado(), O, TERRAIN_CREATION, { x: 7, y: 7 });
+  assert.equal(used.state.board[7][7], ROCK);
+  assert.notEqual(used.state.tornado, null, 'a skill does not end the turn, so the zone is still there');
+  const oTurn = placeResult(used.state, O, 9, 7).state;
+  assert.equal(oTurn.tornado, null, 'the zone ends with the planting that ends the turn');
+  const xTurn = placeResult(oTurn, X, 0, 14).state;
   const later = placeStone(xTurn, { player: O, x: 6, y: 6 }, { random: noRandom });
   assert.equal(later.state.board[6][6], O, 'two turns later the old zone is plain soil');
 });

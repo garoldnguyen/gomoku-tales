@@ -27,6 +27,7 @@ import { hudViewModel, SPECTATOR_VIEW } from '../src/ui/hud-view.js';
 import { SKILL_INFO } from '../src/ui/skill-info.js';
 import { STRINGS } from '../src/ui/strings.js';
 import { targetClick, targetPreview, targetPrompt } from '../src/ui/targeting.js';
+import { skillTurn } from './skill-turn.js';
 
 function ok(result) {
   assert.equal(result.ok, true, result.error);
@@ -39,7 +40,8 @@ function eagleGame() {
 }
 
 const place = (state, player, x, y) => ok(placeStone(state, { player, x, y }));
-const useCloud = (state, player, x, y) => ok(useSkill(state, { player, skill: CLOUD, target: { x, y } }));
+// The cloud, then a planting that ends the turn (a skill does not end it).
+const useCloud = (state, player, x, y, cell = null) => skillTurn(state, player, CLOUD, { x, y }, cell);
 const key = ({ x, y }) => `${x},${y}`;
 
 // --- the look ---

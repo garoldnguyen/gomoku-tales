@@ -420,6 +420,7 @@ test('the host makes the Tornado Zone random choice and the guest gets the resul
   };
   const { host, guest, guestEvents } = setup({ character: WIND_RABBIT, random });
   assert.equal(host.useSkill(TORNADO_ZONE, { x: 7, y: 7 }).ok, true);
+  assert.equal(host.place(0, 0).ok, true, 'the host plants to end the turn of its skill');
   guest.place(7, 7);
   assert.equal(calls, 1);
   assert.equal(host.state.board[7][7], EMPTY, 'the stone was thrown');

@@ -4,9 +4,10 @@
 import { X, O, isEmptyCell } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
 import { canUseSkill, characterOf, isGameOver, newGame, placeStone, skillCooldown, useSkill } from '../logic/game.js';
-import { getSkill } from '../logic/skills.js';
+import { getSkill, isPassiveSkill } from '../logic/skills.js';
 import { isSkillLocked } from '../logic/jade-serpent-skills.js';
 import { coveredActionError, localViewEvents, localViewState } from '../logic/cloud.js';
+import { STRINGS } from './strings.js';
 import { needsTarget, startTargeting, targetClick, targetPreview, targetPrompt } from './targeting.js';
 
 // takeEvents' answer when nothing happened, shared so the render loop makes
@@ -202,13 +203,18 @@ export function skillLockReason(state, player, skillId) {
   const left = skillCooldown(state, player, skillId);
   if (skill && left > 0) return `${skill.name} is locked for ${left} more ${left === 1 ? 'turn' : 'turns'}.`;
   if (isSkillLocked(state, player)) return 'Hiss: you cannot use a skill this turn.';
+  if (state.skillUsed) return STRINGS.skillAlreadyUsedError; // Free Action: one skill per turn
   return 'That skill cannot be used now.';
 }
 
-// Everything a player panel shows (docs/design.md section 3.1).
+// Everything a player panel shows (docs/design.md section 3.1). A skill
+// that is ready but cannot be used because the player to move already used
+// one this turn (Free Action) has note STRINGS.skillUsedState, which the 2D
+// panel draws in place of Ready on a dimmed button; other skills have null.
 export function panelView(state, player, { you = false, targeting = null, hoverSkill = null } = {}) {
   const character = characterOf(state, player);
   const active = !isGameOver(state) && state.currentPlayer === player;
+  const usedSkill = active && Boolean(state.skillUsed);
   return {
     player,
     name: character.name,
@@ -224,6 +230,7 @@ export function panelView(state, player, { you = false, targeting = null, hoverS
         cooldown,
         locked: cooldown > 0,
         usable: canUseSkill(state, player, skillId),
+        note: usedSkill && cooldown === 0 && !isPassiveSkill(skillId) ? STRINGS.skillUsedState : null,
         selected: active && targeting?.skill === skillId,
         hovered: hoverSkill?.player === player && hoverSkill?.skillId === skillId,
       };
@@ -239,6 +246,7 @@ export function playerLabel(player, state = null) {
 export function statusText(state) {
   if (state.winner) return `${playerLabel(state.winner, state)} wins! Press R to restart.`;
   if (state.draw) return 'Draw! Press R to restart.';
+  if (state.skillUsed) return STRINGS.plantToEndTurn; // a skill does not end the turn
   return `${playerLabel(state.currentPlayer, state)} to move`;
 }
 

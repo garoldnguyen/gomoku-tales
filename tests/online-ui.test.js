@@ -9,6 +9,7 @@ import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { BAD_CODE_ERROR, GAME, GAME_OVER, JOIN, LOBBY, MENU, WAITING_SCREEN, createApp } from '../src/ui/app.js';
 import { gameOutcome, statusLine } from '../src/ui/online-game.js';
+import { STRINGS } from '../src/ui/strings.js';
 import { pickAndReady } from './room-start.js';
 
 // Windows that share one fake network (one room) and one fake clock. Each
@@ -253,12 +254,23 @@ test('online: a guest playing Jade Serpent uses Hiss and Venom through the host'
   assert.equal(serpent.clickSkill(X, HISS), true);
   assert.equal(serpent.getTargeting(), null);
   assert.equal(state().skillLock?.player, O);
+  // A skill does not end the turn: the serpent is still to move and plants.
+  assert.equal(state().currentPlayer, X);
+  assert.equal(serpent.getView().status, STRINGS.plantToEndTurn);
+  assert.equal(serpent.clickSkill(X, VENOM), false, 'one skill per turn');
+  assert.equal(serpent.getView().message, STRINGS.skillAlreadyUsedError);
+  assert.equal(rabbit.clickSkill(O, WIND_DASH), false);
+  assert.equal(rabbit.getView().message, "It is your opponent's turn.");
+  assert.equal(serpent.click({ x: 0, y: 14 }), true); // X plants, which ends the turn
   assert.equal(rabbit.clickSkill(O, WIND_DASH), false);
   assert.equal(rabbit.getView().message, 'Hiss: you cannot use a skill this turn.');
   assert.equal(rabbit.click({ x: 0, y: 0 }), true); // O
   assert.equal(serpent.clickSkill(X, VENOM), true);
   assert.equal(serpent.click({ x: 8, y: 8 }), true);
   assert.equal(state().board[8][8], EMPTY);
+  assert.equal(state().currentPlayer, X, 'Venom does not end the turn either');
+  assert.equal(serpent.click({ x: 1, y: 14 }), true);
+  assert.equal(state().currentPlayer, O);
   assert.deepEqual(serpent.getView().state, rabbit.getView().state);
 });
 
@@ -274,12 +286,13 @@ test('a full game between two windows with all four skills ends on the Game over
   assert.equal(bear.click({ x: 0, y: 0 }), true); // turn 2
   assert.equal(rabbit.click({ x: 8, y: 7 }), true); // turn 3
 
-  // Turn 4: Terrain Creation.
+  // Turn 4: Terrain Creation, then a planting (a skill does not end the turn).
   assert.equal(bear.clickSkill(O, TERRAIN_CREATION), true);
   assert.equal(status(host), 'Terrain Creation: choose an empty cell');
   assert.equal(bear.click({ x: 9, y: 7 }), true);
   assert.equal(board()[7][9], ROCK);
   assert.equal(rabbit.getView().message, 'Terrain Creation! A rock fell.');
+  assert.equal(bear.click({ x: 3, y: 0 }), true, 'the bear plants, which ends the turn');
   same();
 
   // Turn 5: the rock blocks placement.
@@ -292,11 +305,13 @@ test('a full game between two windows with all four skills ends on the Game over
   assert.equal(bear.clickSkill(O, STONE_CONVERSION), true);
   assert.equal(bear.click({ x: 7, y: 8 }), true);
   assert.equal(board()[8][7], O);
+  assert.equal(bear.click({ x: 5, y: 0 }), true);
   same();
 
   // Turn 7: Tornado Zone, the guest's skill flow runs through the host.
   assert.equal(rabbit.clickSkill(X, TORNADO_ZONE), true);
   assert.equal(rabbit.click({ x: 5, y: 5 }), true);
+  assert.equal(rabbit.click({ x: 12, y: 12 }), true);
   assert.equal(rabbit.getView().state.tornado.cells.length, 9, 'the rabbit sees its zone');
   assert.deepEqual(Object.keys(bear.getView().state.tornado).sort(), ['endsAfterTurn', 'hidden', 'player'], 'the bear never sees where');
 
@@ -311,6 +326,7 @@ test('a full game between two windows with all four skills ends on the Game over
   assert.equal(rabbit.clickSkill(X, WIND_DASH), true);
   assert.equal(rabbit.click({ x: 7, y: 7 }), false); // choose the stone
   assert.equal(rabbit.click({ x: 7, y: 10 }), true); // choose the target
+  assert.equal(rabbit.click({ x: 13, y: 12 }), true); // plant, which ends the turn
   assert.deepEqual(bear.getView().state.pendingDash.to, { x: 7, y: 10 });
   assert.equal(bear.click({ x: 1, y: 1 }), true); // turn 10
   assert.equal(board()[7][7], EMPTY);
