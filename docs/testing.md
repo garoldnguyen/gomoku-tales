@@ -220,7 +220,7 @@ Resolve cases (announce a new dash each time the cooldown allows):
 - [ ] E picks a plot (a card flash in pale yellow, white feathers float out of E's card). **E's window (and a spectator):** a translucent cloud with everything under it visible. **The opponent's window:** a dense, almost opaque cloud with now and then a flash of lightning, and a small cloud puff on every taken plot (never showing whose plant or a rock). The empty plots under it take a seed as usual.
 - [ ] Look at both windows at once from both seats: the opponent never learns what is under the cloud, E sees all.
 - [ ] A skill target on a covered plot is refused for the opponent: "That cell is under a cloud." A seed on a taken covered plot: "That cell is not empty."
-- [ ] A mud puddle (and a seed sunk in mud) on a plot under the cloud is hidden from the opponent, who sees only the cloud and the puff on a taken plot; E and a spectator still see it. A poison zone under the cloud is public and stays visible to both seats.
+- [ ] A mud puddle (and a seed sunk in mud) on a plot under the cloud is hidden from the opponent, who sees only the cloud and the puff on a taken plot; E and a spectator still see it. The poison zone itself is public, but its plots under the cloud are not drawn for the opponent (no withered soil, fog or bubble there); the cloud owner and a spectator still see them.
 - [ ] After E's next 2 turns the cloud thins away and the plots show again.
 - [ ] Sky Watch (E's side and spectators only): every empty plot where the opponent would make 4 or more in a row with one more plant glows pale yellow with an outline and a drifting cloud; a sunk seed counts for nobody; never shown for the opponent, under their cloud, or after the game is over.
 

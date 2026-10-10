@@ -181,7 +181,7 @@ test('the cloud overlay for the owner: a translucent cloud over its 5 by 5 area 
   assert.ok(cloudOverlayCells(state, null).every((cell) => cell.look === SEE_THROUGH));
 });
 
-test('the cloud overlay for the other seat: a light mist over the area, a cloud puff on every taken plot, no plant shown', () => {
+test('the cloud overlay for the other seat: a dense cloud over the area, a cloud puff on every taken plot, no plant shown', () => {
   let state = cloudedGame();
   state = place(state, X, 6, 6); // X plants under its own cloud, hidden from O
   const shown = maskForViewer(state, O);
@@ -189,7 +189,7 @@ test('the cloud overlay for the other seat: a light mist over the area, a cloud 
   assert.equal(cells.length, CLOUD_SIZE * CLOUD_SIZE);
   assert.ok(cells.every((cell) => cell.look === COVER));
   for (const cell of cells) assert.ok(shown.board[cell.y][cell.x] === EMPTY || shown.board[cell.y][cell.x] === HIDDEN, `${key(cell)} shows no plant`);
-  assert.deepEqual(cells.map(key), shown.covered.map(key), 'the mist is exactly the covered cells');
+  assert.deepEqual(cells.map(key), shown.covered.map(key), 'the dense cloud is exactly the covered cells');
   const puffs = hiddenPuffCells(shown, O);
   assert.ok(puffs.map(key).includes('6,6'), 'a puff on the plot X just took');
   for (const cell of shown.covered) {
