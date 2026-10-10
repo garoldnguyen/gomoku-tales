@@ -228,7 +228,7 @@ function cooldownTimeline(player, skillId, ownTurns) {
     xStone = next();
     state = place(state, X, xStone.x, xStone.y);
   }
-  // Stone Conversion needs an X stone, Wind Dash an X stone and a free
+  // Petrification needs an X stone, Wind Dash an X stone and a free
   // cell; the other skills get a free cell.
   const targets = { [PETRIFICATION]: xStone, [WIND_DASH]: DASH };
   state = skillTurn(state, player, skillId, targets[skillId] ?? { x: 7, y: 0 });

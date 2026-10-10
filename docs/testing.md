@@ -1,7 +1,7 @@
 # Gomoku Tales: Manual Test (two windows)
 
-A step-by-step check of online play in two browser windows, the four skills and the
-disconnect handling. The rules are in [design.md](design.md); the unit tests
+A step-by-step check of online play in two browser windows, the skills of the four
+characters (Free Action) and the disconnect handling. The rules are in [design.md](design.md); the unit tests
 (`node --test`) cover the rules in detail, so this test focuses on what you see
 and what reaches the other window.
 
@@ -20,9 +20,11 @@ example (8, 8) is the centre of the 15x15 board.
 ## 1. Before you start
 
 - [ ] Run the unit tests from the project root: `node --test`. All tests pass.
-- [ ] Use Chrome (or another Chromium browser) in a normal profile. Do not use
-      Incognito or a guest window for only one of the two windows: rooms link windows
-      through a BroadcastChannel, which only works inside one browser profile.
+- [ ] Use Chrome (or another Chromium browser) in a normal profile. Served by
+      `python3 -m http.server` there is no relay, so this guide opens the game with
+      `?transport=broadcast`: rooms then link windows through a BroadcastChannel, which only
+      works inside one browser profile (do not use Incognito or a guest window for only one
+      of the two windows). Over the relay (docs/deploy.md) two computers work too.
 
 ## 2. Start the server
 
@@ -35,9 +37,9 @@ example (8, 8) is the centre of the 15x15 board.
 
 3. Leave the terminal open. It prints a line for every file the browser loads.
 
-- [ ] Open http://localhost:8000 in Chrome. The lobby shows the title "Gomoku Tales" over
-      the 3D Breeze Hill scene (blurred behind the card) with the buttons Create Room and
-      Join Room.
+- [ ] Open http://localhost:8000/?transport=broadcast in Chrome. The menu shows over the 3D
+      farm scene with the buttons Play Online, Play on this computer, Watch a match, How
+      to Play and Settings. Play Online opens the lobby with Create Room and Join Room.
 - [ ] Open DevTools (F12) and check the Console. There are no script errors. A "404 (File
       not found)" line for each missing art file is expected while `assets/` holds only
       `manifest.json`; placeholders are drawn instead.
@@ -45,8 +47,8 @@ example (8, 8) is the centre of the 15x15 board.
 ## 3. Open two windows side by side
 
 1. In the first window press Ctrl+N (Cmd+N on macOS) to open a second window of the same
-   profile, and open http://localhost:8000 in it. Use a new window, not a new tab, so
-   both stay visible.
+   profile, and open http://localhost:8000/?transport=broadcast in it. Use a new window,
+   not a new tab, so both stay visible.
 2. Put the windows side by side: on Windows press Win+Left in one and Win+Right in the
    other; on macOS or Linux drag them to the two halves of the screen.
 3. Keep both windows visible for the whole test. Browsers slow the timers of hidden or
@@ -55,9 +57,8 @@ example (8, 8) is the centre of the 15x15 board.
 Call the left window **A** (it creates the room and is the host) and the right window
 **B** (it joins).
 
-- [ ] Both windows show the lobby over the 3D scene, scaled to fit the window at 16:9
-      (letterboxed if needed). Each window shows its own "Quality medium [Q]  FPS NN" in the
-      top-left corner.
+- [ ] Both windows show the menu over the 3D scene, which fills the whole window. Each
+      window has its own quality switch (Q key).
 
 ## 4. Create and join a room
 
@@ -73,36 +74,36 @@ Call the left window **A** (it creates the room and is the host) and the right w
 
 ### 4.2 Create the room (window A)
 
-- [ ] Click Create Room. The screen asks you to pick Wind Rabbit (X stones, moves first)
-      or Earth Bear (O stones).
-- [ ] Press Back, then Create Room again: the choice screen comes back.
-- [ ] Pick **Wind Rabbit**. The Waiting screen shows a 5 character room code (only
-      capital letters and digits, never 0, O, 1 or I), a Copy button, the text
-      "Waiting for opponent" and "You play Wind Rabbit."
+- [ ] Click Play Online, then Create Room. The room is made at once, with no character
+      choice here: the Waiting screen shows a 5 character room code (only capital letters
+      and digits, never 0, O, 1 or I), a Copy button and the text "Waiting for opponent".
 - [ ] Press Copy: "Copied!" shows for a moment.
+- [ ] Press Leave: you are back at the menu and the room is closed. Create a room again.
 
-### 4.3 Join the room (window B)
+### 4.3 Join the room and pick the characters (window B)
 
-- [ ] Click Join Room, paste the code (Ctrl+V), and press Join. Lower case and spaces
-      are fine: `ab cde` works the same as `ABCDE`.
-- [ ] Both windows switch to the game screen at once.
-- [ ] Window A's top line says "Room CODE | You play Wind Rabbit (X)"; window B's says
-      "... You play Earth Bear (O)". The joiner got the other character.
-- [ ] The Wind Rabbit panel is on the left and the Earth Bear panel on the right in both
-      windows, with the board between them. In 3D the panels are quiet glass cards
-      (docs/art-direction-v3.md section 8), each with the portrait, the name, "Plays X" or
-      "Plays O" with the planted count, a status chip and two skill rows with an icon, the
-      name and "Ready"; the rabbit and bear are not drawn in the world for now
-      (SHOW_WORLD_CHARACTERS). [2D: tall panels beside the board, each with a portrait
-      (placeholder square with a letter) above the name.]
-- [ ] Only your own panel has the green "You" tag (left in A, right in B).
-- [ ] The Wind Rabbit panel has the yellow turn highlight and "Taking a turn". The status
-      line under the board says "Your turn" in A and "Opponent's turn" in B.
+- [ ] In window B click Play Online, then Join Room, paste the code (Ctrl+V), and press
+      Join. Lower case and spaces are fine: `ab cde` works the same as `ABCDE`.
+- [ ] Both windows switch to the character select ("Pick your character") with four
+      cards: Wind Rabbit, Earth Bear, Jade Serpent and Cloud Eagle, each with its two
+      skills and rest turns. Each window shows both seats and Ready.
+- [ ] A picks Wind Rabbit: in B that card is now disabled and says Taken. B picks Earth
+      Bear. Both press Ready (a press on Ready reads Unready until the other is ready).
+- [ ] Both windows enter the game at the same moment. The first pick (A, Wind Rabbit)
+      plays X and moves first. A character card is never tied to X or O: the first pick
+      plays X whichever character it is.
+- [ ] The X card is on the left and the O card on the right in both windows, with the
+      board between them. In 3D the cards are quiet glass cards (docs/art-direction-v3.md
+      section 8), each with the portrait, the name, "Plays X" or "Plays O" with the
+      planted count, a status chip and two skill rows with an icon, the name and "Ready".
+- [ ] Only your own card has the "You" tag (left in A, right in B).
+- [ ] The X card has the turn highlight and "Your turn" in A, and "Waiting" in B. The turn
+      pill says "Plant a seed" in A and "Opponent's turn" in B.
 
 ### 4.4 Full room (a third window)
 
-- [ ] Open a third window (Ctrl+N), go to http://localhost:8000, Join Room with the same
-      code: the error "Room CODE is full." shows. Close the third window. The game in
+- [ ] Open a third window (Ctrl+N), go to http://localhost:8000/?transport=broadcast,
+      Play Online, Join Room with the same code: the error "Room CODE is full." shows. Close the third window. The game in
       A and B goes on without a countdown.
 
 ## 5. Basic play
@@ -119,136 +120,126 @@ Call the left window **A** (it creates the room and is the host) and the right w
 - [ ] 3D: no straight wind streak lines anywhere; on High, petals and leaves drift from the
       upper left toward the lower right. [2D: faint wind streaks drift left to right.]
 
-## 6. Skills checklist
+## 6. Skills checklist (Free Action)
 
-Cooldowns count only the owner's own turns. After a player uses a skill:
+A skill does not use the turn (docs/design.md section 4, docs/free-action-design.md). On your turn you may use at most one skill that is ready, and then you MUST plant a seed: planting is the only thing that ends the turn. Cooldowns count only the owner's own turns and start at once when the skill is used:
 
-- short cooldown (Wind Dash, Terrain Creation): the button shows "Locked: 3 turns" with a
-  grey overlay and a big 3 on the icon, and stays locked for that player's next 3 turns
-  (3, 2, 1). It is Ready again on their 4th turn after using it.
-- long cooldown (Tornado Zone, Stone Conversion): the same with 6.
+- short cooldown (Wind Dash, Mud Trap, Hiss): right after the skill is used its row shows "Ready in 3 turns" with a cooling ring and a big 3 on the icon. It stays that way for the owner's next 3 turns (3, 2, 1) and is Ready again on the 4th turn after.
+- long cooldown (Tornado Zone, Petrification, Venom, Cloud): the same with 6.
 
-Using a skill uses your whole turn. For every skill check that:
+Sky Watch is passive: it shows "Always on", is never clicked and has no cooldown.
 
-- the skill banner (for example "Wind Dash!") shows in both windows,
-- the turn passes to the opponent,
-- both windows show the same board afterwards,
-- the other player's window shows the skill's marker or result too.
+To meet every skill, play two rooms: the first with A = Wind Rabbit and B = Earth Bear (sections 6.1 to 6.4), the second with A = Jade Serpent and B = Cloud Eagle (sections 6.5 to 6.7). In each room pick in the character select and press Ready in both windows. The first pick plays X. The same checks can be repeated in `?local=1` (section 9).
 
-Targeting in general:
+### 6.0 The Free Action turn
 
-- [ ] Clicking a Ready skill button on your turn makes it "Choosing..." with a yellow
-      border and the status line shows what to pick.
-- [ ] Clicking the same button again, pressing Esc, or right-clicking cancels it.
-- [ ] Clicking a locked button shows "SKILL is locked for N more turns." and does nothing
-      else.
-- [ ] Clicking a skill button when it is not your turn shows "It is your opponent's
-      turn."
+- [ ] A uses a ready skill (any, with a legal target): A is still to move. A's turn pill, the status line and the banner say "Now plant a seed to end your turn." and B's window does not start B's turn yet.
+- [ ] A's card flashes the colour of A's character on its border for a moment, in both windows (Wind Rabbit blue, Earth Bear ochre red, Jade Serpent jade green, Venom deep purple, Cloud Eagle pale yellow).
+- [ ] The other skill row of A reads "Already used a skill this turn." and clicking it shows "You already used a skill this turn." The skill that was used shows its full cooldown (3 or 6) at once.
+- [ ] A refused skill (a wrong target, for example an own plant for Petrification) uses nothing: A may pick again, the cooldown and the one skill of the turn are still free.
+- [ ] There is no way to end the turn without planting: no pass button, and the turn does not move on until A plants a seed.
+- [ ] A plants a seed: the turn passes to B. The skill A used keeps its full cooldown through that turn end and counts down at the end of each of A's later turns (3, 2, 1, Ready).
+- [ ] A cannot use a skill after planting (it is B's turn: "It is not your turn." / the rows are disabled).
+- [ ] A skill never wins or ends a game on its own, only a planting, a landing dash, a thrown seed or a surfacing seed can.
+- [ ] Clicking a skill row that cannot be used explains why in the status line: the cooldown ("Wind Dash is on cooldown for 2 more turns."), "You already used a skill this turn.", "Hiss: you cannot use a skill this turn.", or "It is not your turn." Clicking a Ready skill again, pressing Esc or right-clicking cancels the target step.
+
+For every skill also check that the other window shows the same board afterwards and that nothing you were not allowed to see was shown (the secret cross, a covered plot).
 
 ### 6.1 Wind Dash (Wind Rabbit, short cooldown)
 
-Play a few normal moves first so Wind Rabbit has some stones on the board.
+Play a few normal moves first so Wind Rabbit has some plants on the board.
 
-- [ ] A clicks Wind Dash: "Wind Dash: choose one of your stones". Clicking an empty cell
-      or an O stone shows "Choose one of your own stones."
-- [ ] A clicks one of its X stones: it gets a pale blue whirl and the status says
-      "Wind Dash: choose an empty target cell". Hovering empty cells shows a red frame.
-      Clicking a taken cell shows "Choose an empty target cell." Clicking another X stone
-      picks that one instead; clicking the chosen stone again un-picks it.
-- [ ] A clicks an empty target: the banner "Wind Dash!" shows. **Nothing moves yet.** In
-      both windows the target cell has a red translucent frame and the source stone a
-      whirl. The message says "Wind Dash! The stone dashes after the next turn."
-- [ ] Wind Dash is now locked for 3 of A's turns.
+- [ ] A clicks Wind Dash: the prompt asks for one of A's plants. Clicking an empty plot or an O plant shows "Choose one of your own stones." A seed sunk in mud (6.3) shows "That plant is sunk in mud."
+- [ ] A clicks one of its X plants: it gets a pale blue whirl. Hovering plots shows a red frame on the target. Clicking another X plant picks that one instead; clicking the chosen plant again un-picks it.
+- [ ] **Range:** a target within 3 plots of the source in any direction, diagonals included (a 7 by 7 square around it), is accepted. A target 4 plots away shows "That cell is too far for Wind Dash." A taken plot shows "The target cell is not empty." A mud plot shows "A Wind Dash cannot land on mud." A poisoned plot (6.6) shows "A Wind Dash cannot land on poison."
+- [ ] A clicks a legal empty target: **nothing moves yet.** In both windows the target has a red translucent frame and the source plant a whirl. A must still plant a seed to end the turn.
+- [ ] Wind Dash now shows its cooldown, 3 turns.
 
 Resolve cases (announce a new dash each time the cooldown allows):
 
-- [ ] **Lands:** B places a stone somewhere else. When B's turn ends the X stone moves
-      from the source to the target in both windows, the source cell is empty, and
-      "Wind Dash landed!" shows.
-- [ ] **Lands after a skill turn:** B uses a skill (for example Terrain Creation on
-      another cell) instead of placing. The dash still lands at the end of that turn.
-- [ ] **Target taken:** B places an O stone on the red-framed target. The dash fails
-      ("Wind Dash failed: the target cell is taken."), the X stone stays, and Wind Dash is
-      still locked.
-- [ ] **Rock on target:** B uses Terrain Creation on the target. The dash fails the same
-      way.
-- [ ] **Source converted:** B uses Stone Conversion on the source stone. It turns into an
-      O stone and the dash fails ("Wind Dash failed: the stone is gone.").
-- [ ] **Dash wins:** set up four X stones in a row with the fifth cell empty, then dash
-      another X stone into that cell. After B's next turn the dash lands, the five are
-      outlined in yellow, and A wins (see section 7).
-- [ ] **Opponent wins first:** while a dash is announced, B completes five O stones. B
-      wins at once, the dash never happens, and the red frame and whirl are gone from the
-      final board.
+- [ ] **Lands:** B plants somewhere else. When B's turn ends the X plant folds into a seed, flies in an arc and sprouts on the target in both windows, the source plot is empty and the win check runs.
+- [ ] **Lands after a skill turn:** B uses a skill and then plants. The dash lands at the end of that turn.
+- [ ] **Target taken:** B plants on the red-framed target. The dash fails, the X plant stays and Wind Dash keeps its cooldown.
+- [ ] **Mud on target:** B uses Mud Trap on the target (it is empty) and plants elsewhere. The dash fails the same way.
+- [ ] **Source petrified:** B uses Petrification on the source plant and plants. The plant is a rock, the dash fails (it has no source any more).
+- [ ] **Dash wins:** set up four X plants in a row with the fifth plot empty, then dash another X plant into that plot. After B's next turn the dash lands, the five are marked, and A wins (see section 7).
+- [ ] **Opponent wins first:** while a dash is announced, B completes five O plants. B wins at once, the dash never happens, and the red frame and whirl are gone from the final board.
 
-### 6.2 Tornado Zone (Wind Rabbit, long cooldown)
+### 6.2 Tornado Zone (Wind Rabbit, long cooldown): the secret cross trap
 
-- [ ] A clicks Tornado Zone: "Tornado Zone: choose the zone centre". Hovering shows a 3x3
-      translucent swirl. Any cell can be the centre, even a taken one.
-- [ ] A picks a centre in the middle of the board: in both windows the 3x3 zone shows a
-      swirling overlay with a dashed edge, the banner "Tornado Zone!" and the message
-      "Tornado Zone! It lasts through the next turn." Tornado Zone is locked for 6 turns.
-- [ ] **Edge clipping:** on a later use, pick a corner cell such as (1, 1): the zone
-      covers only the 2x2 cells on the board. A centre on an edge (not a corner) covers
-      2x3 cells.
-- [ ] **Throw:** B places an O stone inside the zone. It is thrown to one of the empty
-      cells next to where it was placed ("Whoosh!", "The tornado threw the stone!"). Both
-      windows show it in the **same** cell, because only the host picks the random cell.
-- [ ] **Only empty neighbours:** the stone never lands on a stone, a rock or off the
-      board. Try placing on a zone cell at the board edge, next to stones and rocks.
-- [ ] **Nowhere to go:** B places inside the zone on a cell whose neighbours are all
-      stones, rocks or off the board (a corner cell with its 3 neighbours filled is the
-      easiest). The stone stays: "The tornado had nowhere to throw the stone."
-- [ ] **Outside the zone:** B places outside the zone: the stone is not thrown.
-- [ ] **One turn only:** after B's turn (placing or using a skill) the overlay is gone. On
-      B's next turn, stones placed in the old zone stay.
-- [ ] **Skills are not thrown:** B uses Terrain Creation or Stone Conversion inside the
-      zone: nothing is thrown.
-- [ ] **Throw wins:** a stone thrown into a spot that makes five O stones wins for B.
-- [ ] **Throw spoils a win:** B completes five inside the zone but the stone is thrown
-      away: no win, the game goes on.
-- [ ] **Stuck stone still wins:** if the stone cannot be thrown and makes five where it
-      was placed, B wins.
+- [ ] A clicks Tornado Zone: the prompt says "Tornado Zone: choose the trap centre". Hovering shows a cross of 5 plots (the centre and the four plots up, down, left and right). Any plot can be the centre, even a taken one.
+- [ ] A picks a centre in the middle of the board: **in A's window** faint blue petals and a cross mark drift over the 5 plots. **In B's window nothing at all shows on the board**: only the banner "Wind Rabbit placed a trap!" and A's card flash. B's window never shows the cross while the trap waits (check the state again after each turn).
+- [ ] **Edge clipping:** on a later use, pick a corner plot such as (1, 1): the cross covers only 3 plots. A centre on an edge (not a corner) covers 4.
+- [ ] **Armed after the cast turn:** A plants a seed on one of the cross plots in the cast turn: nothing happens (the trap is armed only from the end of the cast turn).
+- [ ] **Fire:** on B's next turn (or A's following turn) a seed planted on a plot of the cross, by either player, fires the trap at once: the cross is revealed in both windows as a whirlwind, the seed spins up and is thrown to a random free plot next to it (one of the 8 neighbours, same plot in both windows, because only the host picks), with a small dust puff, then it sprouts. The trap is used up: a second seed on the cross is not thrown.
+- [ ] **Only free neighbours:** the seed never lands on a taken plot, a rock, a mud plot, a poisoned plot or off the board.
+- [ ] **Nowhere to go:** a seed planted on a cross plot whose 8 neighbours are all taken, rocks, mud, poisoned or off the board stays ("throw blocked", only the whirlwind plays).
+- [ ] **Nobody fires it:** after 2 turns (B's, then A's) the trap ends with no reveal and no visual in B's window.
+- [ ] **Outside the cross:** a seed planted outside the cross is never thrown. Skills are not thrown.
+- [ ] **Throw wins:** a seed thrown to a spot that makes five wins for its planter. **Throw spoils a win:** five completed on the cross but the seed is thrown away: no win, the game goes on.
 
-### 6.3 Terrain Creation (Earth Bear, short cooldown)
+### 6.3 Mud Trap (Earth Bear, short cooldown)
 
-- [ ] B clicks Terrain Creation: "Terrain Creation: choose an empty cell". Hovering an
-      empty cell shows a faint rock. Clicking a stone shows "Choose an empty cell."
-- [ ] B picks an empty cell: a rock appears in both windows (it falls from above with a
-      growing shadow; 2D: a grey square at once), with dust and a light screen shake. "Terrain Creation! A rock fell." Terrain Creation is
-      locked for 3 turns.
-- [ ] **Blocks placing:** clicking the rock (either player, on their turn) shows "That
-      cell is not empty." A skill cannot target it: Wind Dash to it, Stone Conversion on
-      it and another Terrain Creation on it are all refused.
+- [ ] B clicks Mud Trap: the prompt asks for a plot. A taken plot is refused ("That cell is not empty."), a mud plot "That cell is already mud." and a poisoned plot "That cell is poisoned."
+- [ ] B picks an empty plot: a bubbling brown mud puddle spreads out on it in both windows. B still plants a seed.
+- [ ] **The sinking seed:** either player plants on the puddle (B too, in the same turn): the seed lands, sinks below the ground (the plant drawn pushed down and dim) and the puddle is used up. The sunk seed counts for no row: four plants and a sunk fifth do not win.
+- [ ] **Surfacing:** at the end of the next turn (the opponent's turn after the planting) the mud dries and cracks and the sprout pops up in both windows. It counts normally from now on, and if it completes five, its owner wins at that moment (even though the other player acted).
+- [ ] **Both complete five:** if the acting player completes five in the same turn as the opponent's seed surfaces into five, the acting player wins.
+- [ ] **A puddle nobody uses** dries and cracks at the end of the 4th turn after the cast turn (the opponent, the caster, the opponent, the caster).
+- [ ] A sunk seed cannot be the source of a Wind Dash or the target of Petrification ("That plant is sunk in mud."). Venom may target it (6.6).
+- [ ] A Wind Dash cannot land on mud and a Tornado throw never lands on mud (see 6.1 and 6.2).
+- [ ] **Draw edge:** if the last empty plot is mud and gets planted the board is full, the seed surfaces at once in the same turn (win check for its owner) and only then the draw is decided if nobody has five.
+
+### 6.4 Petrification (Earth Bear, long cooldown)
+
+- [ ] B clicks Petrification: "choose an opponent's plant". Clicking an empty plot, a rock, one of B's own plants or a seed sunk in mud is refused ("Choose one of your opponent's stones." / "That plant is sunk in mud."), using no turn and no cooldown.
+- [ ] B picks an X plant: B's card shakes slightly and puffs gold and green dust. In both windows the plant is wrapped in gold energy from below, turns grey, shatters and becomes a mossy rock with dust rising and a light shake. B still plants a seed.
+- [ ] **Permanent:** the rock never breaks, however many turns pass. Nobody can plant, dash or throw onto it, and no skill can target it.
 - [ ] **Breaks lines:** X X rock X X in a row is not a win for anyone.
-- [ ] **Lifetime:** count the turns after the rock fell: A, B, A, B. The rock stays through
-      all four and crumbles (dust, "A rock crumbled.") at the end of the fourth, that is
-      when B's second turn after dropping it ends. The cell is then empty and can be used.
-- [ ] **Blocks the tornado throw:** a stone thrown by the tornado never lands on a rock.
+- [ ] **Pending dash:** petrifying the source plant of an announced Wind Dash makes the dash fail (see 6.1).
 
-### 6.4 Stone Conversion (Earth Bear, long cooldown)
+### 6.5 Hiss (Jade Serpent, short cooldown)
 
-- [ ] B clicks Stone Conversion: "Stone Conversion: choose an opponent's stone". Clicking
-      an empty cell, a rock or an O stone shows "Choose one of your opponent's stones."
-- [ ] B picks an X stone: it turns into an O stone in both windows (it glows, lifts, flips
-      and lands as a flower bud; 2D: at once), with sparkles.
-      "Stone Conversion! The stone changed sides." Stone Conversion is locked for 6 turns.
-- [ ] **Conversion wins:** with O O _ O O in a row and an X stone in the gap, converting
-      that X stone gives five and B wins at once.
-- [ ] **Pending dash:** converting the source stone of an announced Wind Dash makes the
-      dash fail (see 6.1).
+- [ ] J clicks Hiss (no target needed): J's card glows and a purple sonic wave crosses to the opponent's card, which shakes lightly. Jade sound rings cross the field.
+- [ ] The opponent's card shows a red blinking lock rune with "Locked: 1 turn" and its skill icons dim to grey (about 40 percent). The opponent may still plant. J must still plant too.
+- [ ] On the opponent's turn every skill row is disabled; clicking one shows "Hiss: you cannot use a skill this turn."
+- [ ] The lock ends when the opponent's turn ends and the rune is gone. Casting Hiss does not change any cooldown, but the locked turn ends like any turn: the opponent's running cooldowns count down by 1 after their planting (a skill at 2 reads 1).
+- [ ] If the game ends on the locked turn, the lock is dropped.
+
+### 6.6 Venom (Jade Serpent, long cooldown)
+
+- [ ] J clicks Venom: "choose an opponent's plant". Hovering a plant shows a 3 by 3 purple preview. An empty plot, a rock, J's own plant is refused. A seed sunk in mud may be chosen.
+- [ ] J picks an O plant: a deep purple card flash, venom sap drops fall on the plant, it droops a little and stays on the board. The empty plots of the 3 by 3 square (clipped at the edges) turn withered purple with low fog and toxic bubbles hugging the ground. Both windows show it. J still plants a seed (not on a poisoned plot).
+- [ ] **Poisoned plots:** nobody (J too) can plant on an empty poisoned plot: "That cell is poisoned." Hovering one shows a red crossed-out border. A Wind Dash, a Mud Trap or a Tornado throw cannot reach it. Plants already inside stay and keep counting for their row.
+- [ ] **Duration:** the zone lasts through the opponent's next turn and J's next turn, then thins away (fog and bubbles fade) after the end of that second turn.
+- [ ] **No room:** Venom is refused with "There would be no room left to plant." when the zone would leave no empty unpoisoned plot on the board. A lasting zone that would leave the next player no plot to plant on ends early.
+
+### 6.7 Cloud and Sky Watch (Cloud Eagle)
+
+- [ ] E clicks Cloud: "choose where the cloud goes". Hovering shows a faint 4 by 4 cloud under the pointer: it reaches 1 plot up and left of the plot and 2 plots down and right of it (the clicked plot is the upper left of the middle 2 by 2), cut at the board edge.
+- [ ] E picks a plot (a card flash in pale yellow, white feathers float out of E's card). **E's window (and a spectator):** a translucent cloud with everything under it visible. **The opponent's window:** a dense, almost opaque cloud with now and then a flash of lightning, and a small cloud puff on every taken plot (never showing whose plant or a rock). The empty plots under it take a seed as usual.
+- [ ] Look at both windows at once from both seats: the opponent never learns what is under the cloud, E sees all.
+- [ ] A skill target on a covered plot is refused for the opponent: "That cell is under a cloud." A seed on a taken covered plot: "That cell is not empty."
+- [ ] A mud puddle (and a seed sunk in mud) on a plot under the cloud is hidden from the opponent, who sees only the cloud and the puff on a taken plot; E and a spectator still see it. A poison zone under the cloud is public and stays visible to both seats.
+- [ ] After E's next 2 turns the cloud thins away and the plots show again.
+- [ ] Sky Watch (E's side and spectators only): every empty plot where the opponent would make 4 or more in a row with one more plant glows pale yellow with an outline and a drifting cloud; a sunk seed counts for nobody; never shown for the opponent, under their cloud, or after the game is over.
 
 ## 7. Game over
 
-- [ ] When a player makes five or more in a row, the winning stones are outlined in
-      yellow, the winner's panel says "WINNER!", and the status line shows the result.
-      About 1.5 seconds later both windows show the Game over screen: "You win!" in the
-      winner's window and "You lose." in the other, with "NAME made five in a row."
+- [ ] When a player makes five or more in a row, the winning plants are marked (each sends
+      a ring and twinkles in the winner's colour, one after another) and the winner's card
+      says Winner. The Game over card shows at the top centre, so the finished board stays
+      visible: "You win" in the winner's window and "You lose" in the other, with the
+      winning character.
 - [ ] Six in a row also wins.
-- [ ] Press Back to Lobby in both windows: both return to the lobby.
-- [ ] Create and join a new room with A picking **Earth Bear** this time. B gets Wind
-      Rabbit and moves first; the panels stay Wind Rabbit left and Earth Bear right, and
-      the "You" tag is on the right in A.
+- [ ] A win by a sunk seed that surfaced, a landing Wind Dash or a thrown seed ends the game
+      the same way (see sections 6.1 to 6.3).
+- [ ] Press Rematch in both windows: a clean board starts with the same characters on the
+      same sides, X first, and no mud, rock, zone, cloud or cooldown is left over. Press
+      Back to Menu in both windows: both return to the menu.
+- [ ] Create and join a new room, this time with B picking first (**Earth Bear**) and A
+      second (**Wind Rabbit**). B plays X and moves first; the X card (Earth Bear) is on the
+      left in both windows and the "You" tag is on the right in A.
 
 ## 8. Disconnect test
 
@@ -259,7 +250,7 @@ Start a fresh room for each case and play a few moves first.
       "Opponent left, you win!".
 - [ ] **Host closes:** close window A instead. B counts down the same way and wins.
 - [ ] **Reload:** reloading a window counts as leaving: the other window counts down and
-      wins. The reloaded window is back in the lobby.
+      wins. The reloaded window is back at the menu.
 - [ ] **Silence, then back:** in window B open DevTools, go to Sources and press Pause
       (F8) to freeze the page. About 3 seconds later A starts the countdown. Resume (F8)
       in B before it reaches 0: the countdown stops in A and the game goes on normally.
@@ -270,14 +261,15 @@ Start a fresh room for each case and play a few moves first.
       line. At 0 the Game over screen shows as usual.
 - [ ] **After the game ended:** finish a game by five in a row, then close one window on
       the Game over screen. The other window keeps its result; nobody gets a second win.
-- [ ] **Waiting room:** in the Waiting screen press Cancel (or close A). Joining that code
+- [ ] **Waiting room:** in the Waiting screen press Leave (or close A). Joining that code
       from B now gives "No room found with code CODE."
 
 ## 9. Local dev mode (optional)
 
-- [ ] Open http://localhost:8000/?local=1. One window plays both sides; the "You" tag is on
-      the panel of the player to move. All the skill checks in section 6 can be repeated
-      here without a room. Press R to restart.
+- [ ] Open http://localhost:8000/?local=1. One window plays both sides: first the character
+      select for Player 1 and Player 2 (each picks, both press Ready), then the game. The
+      "You" tag is not shown. All the skill checks in section 6 can be repeated
+      here without a room (the secret Tornado cross shows while its caster is still to move and is gone once the turn passes to the other player). Press R to restart.
 
 ## 10. 3D checks (two WebGL windows)
 
@@ -360,10 +352,10 @@ Hidden tabs get no animation frames, but the room keeps running on timers.
 - [ ] Start a game. On A's turn, open a new tab in B (Ctrl+T) so B's game tab is hidden.
       In A, place a stone. Wait about 10 seconds, then close the new tab in B: B's board
       shows A's stone at once, and A never showed a leave countdown.
-- [ ] Hide B again on A's turn and in A use Tornado Zone (or announce a Wind Dash). Show B
-      again: the zone overlay and its swirling column (or the red frame and the whirl) are
+- [ ] Hide B again on A's turn and in A announce a Wind Dash (or use Mud Trap or Venom).
+      Show B again: the red frame and the whirl (or the puddle, or the poisoned plots) are
       there at once, without a burst of old sparkles, a stack of old banners, or a camera
-      shake.
+      shake. A Tornado Zone cast meanwhile shows nothing in B's window.
 - [ ] While B was hidden, its FPS counter did not drop to a tiny number when it came back,
       and its quality did not step down to "(auto)".
 - [ ] Minimise A for a few seconds and restore it: the same holds for A.

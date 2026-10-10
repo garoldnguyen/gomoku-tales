@@ -35,7 +35,7 @@ Files in `assets/3d/v3/` (sizes are frame size, frames in one row, anchor is the
 | farm-board-low | farm-board-low.png | 480x480 | 1 | none | Low board texture: same plots, bolder furrows, darker gutters, no crumbs |
 | plant-x | plant-x.png | 36x40 | 5 | (18, 36) = plot centre | blue X growth, stages drop, land, sprout, open, rest |
 | plant-o | plant-o.png | 36x40 | 5 | (18, 36) = plot centre | red O growth, same stages |
-| rock-v3 | rock.png | 32x32 | 1 | bottom centre | Terrain Creation rock, mossy boulder |
+| rock-v3 | rock.png | 32x32 | 1 | bottom centre | Petrification rock (a petrified plant), mossy boulder |
 | rock-small | rock-small.png | 16x12 | 1 | bottom centre | scenery pebble and stepping stone |
 | trees | trees.png | 34x48 | 3 | trunk base | round, wide, tall tree |
 | bushes | bushes.png | 22x15 | 3 | bottom centre | plain, flowering, small |
@@ -54,6 +54,10 @@ Files in `assets/3d/v3/` (sizes are frame size, frames in one row, anchor is the
 | decal-win-v3 | decal-win.png | 32x32 | 1 | plot centre | gold sparkle under each of the five winning plants |
 | decal-dash-target-v3 | decal-dash-target.png | 32x32 | 1 | plot centre | red corner brackets on a Wind Dash target |
 | decal-zone-v3 | decal-zone.png | 96x96 | 1 | zone centre | blue dashed frame with corner brackets on the 3x3 Tornado Zone |
+| decal-zone-cross | decal-zone-cross.png | 96x96 | 1 | zone centre | Free Action: the secret cross of the Tornado Zone trap (5 plots), shown to the caster only |
+| mud-puddle | mud-puddle.png | 32x32 | 1 | plot centre | Free Action: the Mud Trap puddle on a plot |
+| poison-plot | poison-plot.png | 32x32 | 1 | plot centre | Free Action: the withered purple soil of one poisoned empty plot of the Venom zone |
+| decal-forbidden | decal-forbidden.png | 32x32 | 1 | plot centre | Free Action: the red crossed-out border on a poisoned plot under the pointer |
 | portrait-wind-rabbit-v3, portrait-earth-bear-v3 | portrait-*.png | 32x32 | 1 | none | HUD portraits, shown at 2x |
 
 Fonts: `assets/fonts/dm-sans-latin-{400,500,600,700}-normal.woff2`, licence in `DM-Sans-OFL.txt`. The only UI font.
@@ -79,7 +83,7 @@ Path (Medium and High). From the middle of the front edge toward the camera, 1.2
 Marks on plots (all levels, flat decals lying on the plot, slightly above it to avoid z-fighting):
 
 - Hover: `decal-hover-v3` on the empty plot under the pointer. Gold, always visible, never dimmed by shadows or fog.
-- Chosen source (Wind Dash, Stone Conversion): `decal-select-v3`.
+- Chosen source (Wind Dash): `decal-select-v3`.
 - Wind Dash target: `decal-dash-target-v3`.
 - Tornado Zone: `decal-zone-v3` centred on the 3x3 zone.
 - Last move: `decal-last-x` or `decal-last-o` on the newest plant, blue or red by team, fades in with the Open stage and stays until the next move.
@@ -105,7 +109,7 @@ The whole sequence is 1.2 seconds. The player's next move may be made as soon as
 
 Reverse growth. Skill visuals may play stages backwards (a plant folding back into a seed) at 2.5 times speed.
 
-Rocks (Terrain Creation) use `rock-v3` (the manifest key `rock` is the old 2D sprite and stays untouched): a mossy boulder, bottom centre on the plot. A rock lasts 4 turns by the rules; the renderer only follows the game events.
+Rocks (a plant turned to stone by Petrification) use `rock-v3` (the manifest key `rock` is the old 2D sprite and stays untouched): a mossy boulder, bottom centre on the plot. A rock is permanent by the rules; the renderer only follows the game events.
 
 Placement. Draw the plant as an upright camera-facing sprite exactly as the existing piece sprites are drawn (same code path, same blob or sun shadow, same NearestFilter), but anchor pixel (18, 36) of the frame on the plot centre. The sprite is 36 by 40 art pixels, so it stands a little taller than one cell and its bloom overhangs the plot behind it. Draw order must keep a plant in front of the plots behind it and behind the plots in front of it, so rows read correctly. The flat plot is part of the board texture, not the sprite.
 
@@ -228,9 +232,10 @@ Build a pure function `hudViewModel(gameState, uiState, localPlayer)` that retur
 Visuals only follow logic events; they never change rules.
 
 - Wind Dash: the source bloom folds back into a seed (stages in reverse), the seed rides a short gust of petals along a curve to the target, and regrows there from Land. The target shows the red brackets before it resolves.
-- Tornado Zone: a translucent swirl of petals and leaves over the 3x3 zone, the plants inside bend toward the swirl, thrown plants fly off as seeds in an arc and land with a soil puff, then regrow from Land.
-- Terrain Creation: a rock falls from above with a growing shadow, lands with a soil puff and, on High, a light screen shake. When it breaks it crumbles into soil crumbs and pebbles and the plot is plain soil again.
-- Stone Conversion: the plant wilts back to the sprout stage, a small spark passes through the soil, and it regrows as the other team's plant from Land. The conversion must also show the shape change: X becomes O or O becomes X.
+- Tornado Zone (Free Action: a secret cross trap of 5 plots): the caster sees faint blue petals drifting over the cross and the other seat sees nothing; when it fires the cross is revealed as a whirlwind, the plants inside bend toward it, the seed is spun up and thrown in an arc to a free neighbour plot and lands with a soil puff, then regrows from Land.
+- Mud Trap: the plot sinks into a bubbling brown puddle; a seed planted in it sinks below the ground, dim, and pops up out of the dried, cracked mud when it surfaces.
+- Petrification: the plant is wrapped in earth energy from below, loses its colour, shatters and becomes a mossy rock with dust rising.
+- Venom, Hiss and Cloud: see docs/design.md section 8.1. The details of all Free Action effects are in docs/design.md sections 5 and 8.1 and docs/free-action-design.md section 8.
 
 Quality: Low shows the marks and plain slides, Medium adds a few particles, High adds everything.
 

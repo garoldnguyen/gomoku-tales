@@ -12,13 +12,13 @@ Names in this file (flow.js, strings.js, newGame, start, rematch and so on) are 
 
 ## 2. Decisions
 1. Menu: five buttons. Play Online (goes to the lobby), Play on this computer (the ?local=1 mode, two players in one window), Watch a match (a spectator of an online room, sections 3.8 and 3.9), How to Play, Settings.
-2. Characters are picked inside the game, never in the lobby. There are three (Wind Rabbit, Earth Bear, Jade Serpent) and two seats. Each player picks a character for their seat and presses Ready. A character picked by one seat is disabled for the other seat. The first pick plays X and moves first, the second plays O (assignSides). A seat may change its pick until it is Ready (it keeps its place in the pick order); Ready needs a pick and locks it. The game starts when both seats are Ready. There is no automatic start and no timer (WAITING_START_DELAY_MS is gone), and there is no request button.
+2. Characters are picked inside the game, never in the lobby. There are four (Wind Rabbit, Earth Bear, Jade Serpent, Cloud Eagle) and two seats. Each player picks a character for their seat and presses Ready. A character picked by one seat is disabled for the other seat. The first pick plays X and moves first, the second plays O (assignSides). A seat may change its pick until it is Ready (it keeps its place in the pick order); Ready needs a pick and locks it. The game starts when both seats are Ready. There is no automatic start and no timer (WAITING_START_DELAY_MS is gone), and there is no request button.
    - Online: the host owns the start. The guest sends its pick and its Ready to the host, the host checks them with the same seat rules (src/logic/seats.js), updates the room and answers with the seats. When both seats are Ready the host sends start with round 1. The guest enters the game only on start.
    - Local (Play on this computer): the game screen opens on the character select with the seats Player 1 and Player 2, both picked in the one window; the local game starts when both are Ready.
 3. Rematch needs both players to press it. Same characters, same sides, X (the first pick) moves first. Swapping sides is not part of this version.
 4. A join is accepted only while the room is in phase waiting. In any other phase the answer is full.
 5. Online play uses the transport of ONLINE_TRANSPORT (src/config.js, read only by chooseTransport): broadcast links windows of the same browser on the same computer (BroadcastChannel), websocket goes through the relay server (worker/) so players on different computers can meet. The UI learns which one from a single function, onlineSameBrowserOnly(config) in src/net/transport.js (true only for broadcast); there is no separate flag. Only for broadcast the lobby shows the same-browser hint line. With websocket the host's Create reads Connecting until its relay connection is open, a host that cannot connect stays on the lobby with the connection error, and a guest the relay refuses sees No room found at once. A relay connection lost after it opened closes the room: a pending join shows the connection error on Join Room, and the waiting room (host or seated guest), a game in play and the game over card go to the lobby with it (a game in play is not left to the presence countdown, which would call the disconnected window the winner).
-6. Out of scope: computer opponent, Vietnamese text, sound and music, phone touch layout, accounts, more maps.
+6. Out of scope: computer opponent, Vietnamese text, sound and music, accounts, more maps. (The phone touch layout of section 3.10 and play across two computers over the relay exist now.)
 
 ## 3. Screens
 Every screen is a DOM layer over the existing 3D world in the Ivory look (see 3.0). No second WebGL renderer and no new canvas. Every screen is drawn from a pure view model so that shot mode can draw it without a network.
@@ -45,11 +45,11 @@ Every screen is a DOM layer over the existing 3D world in the Ivory look (see 3.
 ### 3.2 How to Play
 - A glass panel at most 720 px wide and 80 percent of the viewport high. It scrolls inside itself. The Close button is 44 px. Escape closes it and focus returns to the button that opened it.
 - Six rules lines, produced by a pure rulesLines(config) that reads the numbers from src/config.js. Reference wording (the builder must check each sentence against src/logic and fix the sentence, never the rules):
-  1. Two players take turns. Wind Rabbit plants X and always goes first. Earth Bear plants O.
-  2. On your turn do one thing: plant on an empty plot, or use a skill. A skill takes your whole turn.
+  1. Two players take turns. The player who picked first plants X and always goes first; the other plants O. (Not tied to a character: any of the four may be X or O.)
+  2. On your turn you may use one skill that is ready. Then you must plant a seed on an empty plot to end your turn. (Free Action, docs/design.md section 4)
   3. Five or more of your plants in an unbroken row, across, down or diagonally, win the game. (number: WIN_LENGTH)
   4. After you use a skill it rests for your next 3 turns (Wind Dash, Mud Trap) or your next 6 turns (Tornado Zone, Petrification). (numbers: COOLDOWN_SHORT, COOLDOWN_LONG)
-  5. A mud puddle dries after 4 turns and a seed planted in it counts for no row for 1 turn; a rock blocks a plot for both players for good. (numbers: MUD_LIFETIME_TURNS, MUD_SINK_TURNS)
+  5. A mud puddle dries after 4 turns, counting both players' turns. A seed planted in it counts for no row for 1 turn. A rock blocks a plot for both players for good. (numbers: MUD_LIFETIME_TURNS, MUD_SINK_TURNS)
   6. If the board fills up and nobody has five in a row, the game is a draw.
 - Then the four skills grouped by character: portrait, name, stone letter, and for each skill the icon, the name, the cooldown number and the description from SKILL_INFO. Skill text is never copied; it is read from SKILL_INFO.
 
@@ -76,8 +76,8 @@ The look follows the approved design in docs/reference/v5/character-select-deskt
 |  +------------+  +------------+  +------------+  +------------+         |
 |  | (cross) GH |  | (bloom) MB |  | (leaf)  JS |  | (cloud) CE |         |
 |  | Wind Rabbit|  | Earth Bear |  | Jade Serp. |  | Cloud Eagle|         |
-|  | Wind Dash 3|  | Terrain   3|  | Hiss      3|  | Sky Watch  |         |
-|  | Tornado   6|  | Stone Conv6|  | Venom     6|  | Cloud     6|         |
+|  | Wind Dash 3|  | Mud Trap  3|  | Hiss      3|  | Sky Watch  |         |
+|  | Tornado   6|  | Petrific. 6|  | Venom     6|  | Cloud     6|         |
 |  +------------+  +------------+  +------------+  +------------+         |
 |  [ Leave ]  (X You: Wind Rabbit) (Opponent: Choosing)          [Ready]  |
 +-------------------------------------------------------------------------+
@@ -242,7 +242,7 @@ Host rules, in order:
 
 Recovery: the host's pings in phase starting carry the seats, so a guest whose pick or ready (or its answer) was lost sends it again; a guest still in starting whose start was lost sees the round in the host's ping and asks again (join), and the host answers with welcome and start.
 
-newGame (pure, shared by the host, local mode and rematch): empty board, no rocks, no pending Wind Dash, no active Tornado Zone, every cooldown 0, X (the first pick) to move, same characters on the same sides, no winner. Random picks keep using the injected random function.
+newGame (pure, shared by the host, local mode and rematch): empty board, no rocks, no mud, no sunk seed, no pending Wind Dash, no active Tornado Zone trap, no Venom zone, no Hiss lock, no skill used, every cooldown 0, X (the first pick) to move, same characters on the same sides, no winner. Random picks keep using the injected random function.
 
 ## 6. Presence by phase
 | Phase | Peer silent or leave message |
@@ -275,7 +275,7 @@ New scenes for docs/shots.md (static, no network, every one built from a fixed v
 2. Play on this computer: the game starts. Play until someone wins. Press Rematch: a clean board appears at once, no old plants, rocks or banners. Press Back to Menu.
 3. How to Play: the skill numbers read 3, 6 and 4 turns, the four skill texts are there, nothing is cut off at the window size you use.
 4. Settings: switch Low, Medium, High. The page does not reload. The Fullscreen button works.
-5. Two windows of the same browser: window A creates a room and picks Wind Rabbit, window B joins with the code. B sees Wind Rabbit taken and picks another character. Both press Ready: both enter the game at once, A plays X.
+5. Two windows (two computers over the relay, or two windows of the same browser with ?transport=broadcast): window A creates a room, window B joins with the code. In the character select A picks Wind Rabbit; B sees Wind Rabbit taken and picks another character. Both press Ready: both enter the game at once, A (the first pick) plays X.
 6. Type a code containing C, F, Z, H or V in the join box. Nothing else happens (no fullscreen, no HUD toggle).
 7. Wrong code: a clear message appears under the box, no pop-up.
 8. In an online game close window B. Window A shows the 10 second countdown, then the game over card. Rematch is disabled with Opponent left. Back to Menu works.
@@ -283,9 +283,9 @@ New scenes for docs/shots.md (static, no network, every one built from a fixed v
 10. Leave in the waiting room: the menu appears. Join with the old code from the other window: not found.
 
 ## 10. Later ideas (not in this version)
-- An invite link that opens the lobby and joins by itself.
+- An invite link that opens the lobby and joins by itself (done: section 3.10).
 - Swap sides on rematch (Gomoku gives the first player a real advantage).
-- A Menu or Leave button during a game (it would send the existing leave message, so the other player gets the normal countdown).
+- A Menu or Leave button during a game (done: Leave match, section 3.13).
 - Remember the last chosen character.
-- A WebSocket transport and real play across two computers (then onlineSameBrowserOnly(config) is false).
+- A WebSocket transport and real play across two computers (done: the relay, worker/, docs/deploy.md; onlineSameBrowserOnly(config) is false for it).
 - Vietnamese text (strings.js is the single place to translate).

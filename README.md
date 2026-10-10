@@ -4,10 +4,10 @@ A two-player, turn-based Gomoku (five in a row) browser game with character skil
 See [docs/design.md](docs/design.md) for the rules and screens, and
 [docs/art-direction-hd2d.md](docs/art-direction-hd2d.md) for the look.
 
-The game is drawn HD-2D style: cute pixel art sprites standing in a small 3D scene
-(Windy Spring Breeze Hill) under a fixed camera, with soft light, depth of field and a
-little bloom. The HUD (panels, skill buttons, status line, banners) and the lobby and room
-screens stay 2D on top of it.
+The game is drawn in a small 3D scene (Windy Spring Breeze Hill, a farm field of tilled
+plots) with cute pixel art plants and sprites, soft light, depth of field and a little
+bloom. The HUD (glass cards, skill buttons, turn pill, banners) and the menu, lobby and
+room screens are HTML layers on top of it.
 
 Plain HTML, CSS and JavaScript (ES modules). There's no build step and nothing to install.
 Three.js 0.186.1 is vendored in `vendor/` (see [vendor/VERSION.txt](vendor/VERSION.txt))
@@ -29,7 +29,7 @@ warning.
 
 | URL | What it opens |
 |---|---|
-| http://localhost:8000 | the game: lobby and online rooms, 3D world |
+| http://localhost:8000 | the game: menu, online rooms, 3D world |
 | http://localhost:8000/?local=1 | local dev mode: one window plays both sides, 3D world |
 | http://localhost:8000/?render=2d | the old flat 2D renderer (combine with `&local=1`) |
 | http://localhost:8000/hd2d-lab.html | the HD-2D look lab: a test scene, not playable |
@@ -72,7 +72,7 @@ http://localhost:8000/?render=2d&local=1) to play with the original flat Canvas 
 renderer. It has no quality levels. Both renderers draw the same game, and windows with
 different renderers can play in the same room.
 
-### Play online (two windows)
+### Play online
 
 The deployed game links players on different computers through the relay server
 (docs/deploy.md, `npx wrangler deploy`). Served by `python3 -m http.server` there is no
@@ -81,13 +81,20 @@ Chrome profile instead (a BroadcastChannel), or run `npx wrangler dev` and open
 http://localhost:8787. Keep both windows visible (hidden tabs slow their timers, which
 can start a false leave countdown).
 
-1. In the first window click Create Room and pick Wind Rabbit or Earth Bear. The Waiting
-   screen shows the 5 character room code; Copy puts it on the clipboard.
-2. In the second window click Join Room, type or paste the code and press Join. The
-   joiner gets the other character and the game starts in both windows.
-3. Wind Rabbit (X) moves first. Each window can only place its own stones and use its own
-   skills. The window that created the room is the host and checks every move.
-4. When the game ends the Game over screen shows the result; Back to Lobby leaves the room.
+1. In the first window press Play Online, then Create Room. The room is made at once and
+   the Waiting screen shows the 5 character room code; Copy puts it on the clipboard
+   (Copy invite link copies a link that joins by itself). No character is chosen here.
+2. In the second window press Play Online, then Join Room, type or paste the code and
+   press Join. Both windows now show the character select.
+3. Each player picks a character for their own seat (one taken by the other seat is
+   disabled) and presses Ready. The first pick plays X and moves first, the second pick
+   plays O. When both are Ready the game starts in both windows at the same moment.
+4. Each window can only plant its own seeds and use its own skills. On your turn you may
+   use at most one skill, then you must plant a seed to end the turn (docs/design.md
+   section 4). The window that created the room is the host and checks every move.
+5. When the game ends the Game over card shows the result; Rematch (needs both players)
+   starts a clean board with the same characters and sides, and Back to Menu leaves the
+   room.
 
 If a window closes or goes quiet mid-game, the other one shows "Opponent left. You win
 in 10" and counts down; at 0 it shows "Opponent left, you win!". If the opponent comes
@@ -102,12 +109,14 @@ needs (section 10).
 
 ### Local dev mode
 
-Open http://localhost:8000/?local=1 to play both sides in one window. Click a cell to
-place a stone for whoever is to move, press R to restart and Q to change the quality.
+Open http://localhost:8000/?local=1 to play both sides in one window. Pick a character
+for each player and press Ready, then click a plot to plant a seed for whoever is to
+move; press R to restart and Q to change the quality.
 
-To use a skill, click its button on the mover's panel (Wind Rabbit on the left, Earth
-Bear on the right), then click its target on the board. The status line tells you what
-to pick. Press Esc, right click, or click the same button again to cancel.
+To use a skill, click its button on the mover's card (the X player's card is on the left,
+the O player's on the right), then click its target on the board. The status line tells
+you what to pick. A skill does not end the turn: after it you must still plant a seed.
+Press Esc, right click, or click the same button again to cancel.
 
 ## Art
 
@@ -141,8 +150,9 @@ Test files go in `tests/` and are named `*.test.js`.
 
 ## Project layout
 
-- `index.html`: the game page: the WebGL canvas, the 960x540 HUD canvas above it, the
-  lobby and room screens, and the import map for Three.js
+- `index.html`: the game page: the WebGL canvas that fills the window, the HTML layers
+  above it (the glass HUD cards, the menu, lobby and room screens) and the import map for
+  Three.js
 - `hd2d-lab.html`: the HD-2D look lab page
 - `src/main.js`: entry point; picks the renderer and the mode from the URL
 - `src/config.js`: all tunable values (board size, cooldowns, timings, sizes, camera,
@@ -152,7 +162,7 @@ Test files go in `tests/` and are named `*.test.js`.
 - `src/render/`: the 2D renderer, the shared 2D HUD drawing and the asset loader
 - `src/render3d/`: the 3D world (scene, sprites, effects, post-processing, quality
   levels) and the lab; pure helpers here have no Three.js imports and are unit tested
-- `src/ui/`: screens (lobby, room, game over) and input
+- `src/ui/`: screens (menu, lobby, room, game over), the glass HUD and input
 - `vendor/three/`: the vendored Three.js files and licence
 - `assets/`: images and manifest
 - `tests/`: unit tests

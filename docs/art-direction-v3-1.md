@@ -136,12 +136,14 @@ One table `SKILL_INFO` (for example in `src/ui/skill-info.js`). The skill detail
 
 | skill | description | hint |
 |---|---|---|
-| Wind Dash | Pick one of your plants, then a target plot. The plant folds back into a seed, rides a gust of petals to the target and grows again there. | Click to select, then choose a plot |
-| Tornado Zone | Pick the centre of a {zone} by {zone} zone. A swirl of petals and leaves throws the plants inside off their plots. | Click to select, then choose the zone centre |
-| Terrain Creation | Drops a rock on a plot. The rock stays for {rockTurns} turns, then crumbles back into plain soil. | Click to select, then choose a plot |
-| Stone Conversion | Pick a plant. It wilts and regrows as the other team's plant: X becomes O, or O becomes X. | Click to select, then choose a plant |
+| Wind Dash | Pick one of your plants, then an empty target plot up to {range} plots away. The plant folds back into a seed, rides a gust of petals to the target and grows again there. | Click to select, then choose a plot |
+| Tornado Zone | Secretly pick the centre of a cross of {cross} plots. The first seed anyone plants on it fires the trap and is thrown to a free plot next to it. | Click to select, then choose the trap centre |
+| Mud Trap | Turns an empty plot into a mud puddle that dries after {mudTurns} turns. A seed planted in it sinks and counts for no line for {sinkTurns} turn. | Click to select, then choose a plot |
+| Petrification | Pick one of the opponent's plants. It turns to stone: a rock that stays for good. | Click to select, then choose a plant |
 
-Accuracy rule: before writing the strings, read the real skill rules in the game logic and `docs/design.md`. If a sentence says something the code does not do (for example who can be targeted, or the real zone size or rock lifetime), change that sentence as little as possible so it is true, and list each change in the task summary. A wrong description is worse than none.
+(Free Action update: this table is the first draft. The current texts of all eight skills are the `SKILL_INFO` table in `src/ui/skill-info.js`, with the numbers read from `src/config.js`.)
+
+Accuracy rule: before writing the strings, read the real skill rules in the game logic and `docs/design.md`. If a sentence says something the code does not do (for example who can be targeted, or the real zone size or how long a mud puddle stays), change that sentence as little as possible so it is true, and list each change in the task summary. A wrong description is worse than none.
 
 State texts stay as in v3 section 8: `Ready`, `Selected`, `Ready in N turns` (`Ready in 1 turn`), `Wait for your turn`.
 

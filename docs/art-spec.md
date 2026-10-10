@@ -70,8 +70,7 @@ Drawn by the 2D canvas panels and by the 3D game's glass HUD (src/ui/hud.js).
 |---|---|---|---|---|---|
 | `icon-wind-dash.png` | 32x32 | 1 | - | 32x32 | Wind Dash: a sprout piece streaking sideways with blue wind lines behind it. |
 | `icon-tornado-zone.png` | 32x32 | 1 | - | 32x32 | Tornado Zone: a small pale blue tornado over a 3x3 grid. |
-| `icon-terrain-creation.png` | 32x32 | 1 | - | 32x32 | Terrain Creation: a grey boulder falling onto a board cell with dust. |
-| `icon-stone-conversion.png` | 32x32 | 1 | - | 32x32 | Stone Conversion: a sprout turning into a flower bud, with a curved arrow and a golden glow. |
+| (retired) | 32x32 | - | - | - | The 32x32 icons of Earth Bear's two old skills are not in `assets/manifest.json` any more (Free Action replaced the skills, see docs/free-action-design.md). Their PNG files stay in `assets/` unused. |
 
 ### Character portraits and skill icons of the glass HUD (`use: 3d`, `assets/3d/v5/`)
 
@@ -92,8 +91,8 @@ grid (128 for the select portrait) and stored at a whole-number scale.
 | `icon-wind-dash-v5.png` | 128x128 | 64 px at 2x | Wind Dash: a seed riding a gust of petals between plots. |
 | `icon-tornado-zone-v5.png` | 128x128 | 64 px at 2x | Tornado Zone: a tornado of petals and leaves over 3x3 plots. |
 | `portrait-earth-bear-v5.png` | 128x128 | 64 px at 2x | Earth Bear's HUD portrait. |
-| `icon-terrain-creation-v5.png` | 128x128 | 64 px at 2x | Terrain Creation: a boulder slamming into the soil with a shockwave. |
-| `icon-stone-conversion-v5.png` | 128x128 | 64 px at 2x | Stone Conversion: a flower of no team reborn ochre brown (no team colours, since any character may be the opponent). |
+| `icon-mud-trap.png` | 128x128 | 64 px at 2x | Mud Trap: a bubbling brown mud puddle with a seed in it (manifest name `icon-mud-trap`). |
+| `icon-petrification.png` | 128x128 | 64 px at 2x | Petrification: a flower with an arrow curving over to a mossy grey boulder (manifest name `icon-petrification`). The two 128x128 icons of Earth Bear's old skills stay in `assets/3d/v5/` unused. |
 
 The 32 px `icon-*.png` skill icons in `assets/` are kept for the 2D renderer (`?render=2d`); the glass HUD uses the 64 px grid files above.
 
@@ -105,7 +104,7 @@ The 32 px `icon-*.png` skill icons in `assets/` are kept for the 2D renderer (`?
 | `board.png` | 372x372 | 1 | - | 372x372 | Wooden board with its frame: a 6 px frame around 15x15 cells of 24 px. |
 | `stone-x.png` | 24x24 | 1 | - | 24x24 | X piece: a young twig or vine sprout in a little blue seed pot, centred in the cell. |
 | `stone-o.png` | 24x24 | 1 | - | 24x24 | O piece: a round closed flower bud on a leafy stem in a little red seed pot. |
-| `rock.png` | 24x24 | 1 | - | 24x24 | Rock from Terrain Creation: a grey boulder with a crack and a bit of moss. |
+| `rock.png` | 24x24 | 1 | - | 24x24 | Rock (a petrified plant): a grey boulder with a crack and a bit of moss. |
 | `tornado.png` | 72x72 | 4 | 120 ms | 288x72 | Tornado Zone overlay spanning 3x3 cells: a translucent spinning whirlwind. Loops. |
 | `panel-wind-rabbit.png` | 240x372 | 1 | - | 240x372 | Wind Rabbit's player panel: an old wooden or stone signboard frame with a blue accent. The middle stays plain, text and buttons are drawn on it. |
 | `panel-earth-bear.png` | 240x372 | 1 | - | 240x372 | Earth Bear's panel, the same with a red accent. |

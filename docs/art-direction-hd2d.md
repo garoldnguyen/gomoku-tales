@@ -43,9 +43,9 @@ Reference: the HD-2D style of Octopath Traveler. Cute 16-bit pixel art sprites s
 Effects react to events returned by src/logic and never change rules.
 - Stone placed: the sprite pops in with a small bounce, sparkles, a dust puff, a light camera shake.
 - Wind Dash: a pale blue swirl around the source stone, a red translucent frame decal on the target cell, and when it resolves the stone streaks across with a trail.
-- Tornado Zone: a translucent swirling column of particles over the 3x3 zone. Thrown stones fly in an arc and land with a dust puff.
-- Terrain Creation: a rock falls from above with a growing shadow, impact dust and camera shake. It crumbles with dust when it breaks.
-- Stone Conversion: the stone glows, lifts, flips and lands as the other colour.
+- Tornado Zone: a translucent swirling column of particles over the secret cross of 5 plots (docs/design.md section 5.1). Thrown stones fly in an arc and land with a dust puff.
+- Mud Trap: a bubbling mud puddle on the plot; a stone planted in it sinks into the ground and comes back up when it surfaces.
+- Petrification: the enemy stone is wrapped in energy, turns grey and shatters into a rock with dust and a light camera shake. The rock stays for good.
 - Skill banner text is HUD text. Wind streaks always drift.
 - No sound in version 2.
 
