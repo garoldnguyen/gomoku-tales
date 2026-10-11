@@ -333,7 +333,7 @@ test('hud-layout: no overlaps and everything inside, collapsed and expanded', ()
 });
 
 test('hud-layout: at 1920x1080 the pill is at most 280 by 80 and sits at the card anchor', () => {
-  assert.ok(PILL_WIDTH <= 280 && PILL_WIDTH >= 240, `width ${PILL_WIDTH}`);
+  assert.ok(PILL_WIDTH <= 280 && PILL_WIDTH >= 220, `width ${PILL_WIDTH}`);
   assert.ok(PILL_HEIGHT <= 80 && PILL_HEIGHT >= 64, `height ${PILL_HEIGHT}`);
   const open = hudBoxes(1920, 1080, { collapsed: ALL_EXPANDED });
   const folded = hudBoxes(1920, 1080, { collapsed: ALL_COLLAPSED });

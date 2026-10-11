@@ -160,6 +160,8 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
     player,
     side: player === X ? 'left' : 'right',
     name: character.name,
+    // The character id: hud.css gives each character its own card (data-character).
+    character: character.id,
     portrait: PORTRAIT_ART[character.id],
     // Online the player's name leads the line (players of uiState).
     meta: `${playerName ? `${playerName} · ` : ''}Plays ${player}, ${countStones(state.board, player)} planted`,

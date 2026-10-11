@@ -36,6 +36,7 @@ import { characterForStone } from '../logic/characters.js';
 import { getSkill } from '../logic/skills.js';
 import { HISS_WAVE_MS, HUD_SHAKE_MS, SKILL_BANNER_MS, SKILL_BANNER_SPARKS } from '../config.js';
 import { DUST_COUNT, FEATHER_COUNT, castCssVars, castDurationMs, shakeFrames } from './cast-view.js';
+import { CARD_ART_HTML, RULE_ART_HTML } from './hud-ornaments.js';
 import { CARD_HEIGHT, chevronSize, hudFoldLayout, pillScale, topBarLayout } from './hud-layout.js';
 import { PORTRAIT_ART, QUALITY_CHOICES, SKILL_ICON_ART, skillPopupViewModel } from './hud-view.js';
 import { FACTS_MAX, RULES_MAX } from './skill-info.js';
@@ -251,6 +252,11 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     const card = el('section', `card ${player === X ? 'left' : 'right'} glass`, root);
     card.setAttribute('aria-label', character.name);
     card.dataset.hudBox = `card-${team}`;
+    // The character's own look (hud.css [data-character]) and its ornaments.
+    card.dataset.character = character.id;
+    const orn = el('div', 'orn', card);
+    orn.setAttribute('aria-hidden', 'true');
+    orn.innerHTML = CARD_ART_HTML;
     const whoRow = el('div', 'who-row', card);
     const tile = el('div', 'tile', whoRow);
     const portrait = artImage(tile, PORTRAIT_ART[character.id], character.name[0]);
@@ -278,23 +284,30 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     rune.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg><span class="lock-text"></span>';
     const runeText = rune.querySelector('.lock-text');
     el('div', 'rule', body);
-    el('div', 'label', body).textContent = 'SKILLS';
+    const label = el('div', 'label', body);
+    label.textContent = 'SKILLS';
+    const ruleArt = el('span', 'rule-art', label);
+    ruleArt.setAttribute('aria-hidden', 'true');
+    ruleArt.innerHTML = RULE_ART_HTML;
     const list = el('div', 'skills', body);
     const skills = character.skills.map((skillId, s) => {
       const slot = { id: skillId };
       const button = skillButton('skill', list, player, slot, c, s);
       button.dataset.hudBox = `skill-${skillId}`;
+      button.dataset.skill = skillId;
       const ico = el('span', 'ico', button);
       const icon = artImage(ico, SKILL_ICON_ART[skillId], skillLetters(skillId));
       const ring = el('span', 'ring', ico);
-      const count = el('span', 'count', ico);
       const t = el('span', 't', button);
       const title = el('span', 'title', t);
       const state = el('span', 'state', t);
+      // The cooldown badge at the end of the row (the turns left).
+      const count = el('span', 'count', button);
 
       // The pill's button for the same skill.
       const pill = skillButton('pskill', pillSkills, player, slot, c, s);
       pill.dataset.hudBox = `pill-skill-${skillId}`;
+      pill.dataset.skill = skillId;
       const pico = el('span', 'ico', pill);
       const picon = artImage(pico, SKILL_ICON_ART[skillId], skillLetters(skillId));
       const svg = document.createElementNS(SVG, 'svg');
@@ -694,6 +707,8 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     row.slot.id = skillId;
     row.button.dataset.hudBox = `skill-${skillId}`;
     row.pill.dataset.hudBox = `pill-skill-${skillId}`;
+    row.button.dataset.skill = skillId;
+    row.pill.dataset.skill = skillId;
     for (const icon of [row.icon, row.picon]) {
       icon.name = SKILL_ICON_ART[skillId];
       icon.initial.textContent = skillLetters(skillId);
@@ -719,8 +734,9 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
 
       vm.cards.forEach((card, c) => {
         const dom = cards[c];
-        // The portrait of the character playing this side (a new game may
-        // seat other characters).
+        // The card of the character playing this side (a new game may seat
+        // other characters): its look, and its portrait.
+        if (card.character && dom.card.dataset.character !== card.character) dom.card.dataset.character = card.character;
         if (dom.portrait.name !== card.portrait) {
           dom.portrait.name = card.portrait;
           dom.portrait.initial.textContent = card.name[0];

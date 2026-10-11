@@ -497,3 +497,230 @@
   .hud .lock-rune, .hud .card.is-collapsed.is-locked .tile::after { animation: none; }
   .hud .skill-popup { animation: none; }
 }
+
+/* ===== Character HUDs (docs/hud-characters.md) ===============================
+   Every card and pill takes the look of the character that plays it
+   (data-character, set by hud.js from the view model). The shapes are the same
+   for all four: a rounded square portrait, rounded square skill icons that
+   fill their frame edge to edge, a rounded square chevron and count badge, a
+   status chip with a diamond, and a round pill with round icons. Only the
+   materials differ: each block below is a token block (the colours, gradients
+   and shadows of one character) and the rules after them only read the tokens,
+   so a new colour is a new token. The ornaments are the SVG of
+   src/ui/hud-ornaments.js, drawn in the card's .orn layer behind the content.
+   Wind Rabbit: breezy blue glass, wind curves and a dandelion seed. Earth
+   Bear: pressed clay with stitching, rivets and a sprouting mound. Jade
+   Serpent: scaled jade with gems and a coiled snake, Venom in purple. Cloud
+   Eagle: gold rimmed sky glass with stars, a cloud and a feather. */
+.hud .card[data-character="windRabbit"] {
+  --c-radius: 32px; --c-row-radius: 30px; --c-bw: 2px; --c-text: #f4f7fb; --c-light: #cfe4ff; --c-meta: rgba(207, 228, 255, 0.82);
+  --c-chrome: linear-gradient(162deg, rgba(52, 110, 214, 0.68), rgba(16, 32, 72, 0.8) 52%, rgba(9, 18, 44, 0.88));
+  --c-border: rgba(207, 228, 255, 0.4);
+  --c-shadow: 0 18px 44px rgba(8, 20, 60, 0.45), 0 0 38px rgba(59, 140, 255, 0.3); --c-shadow-wait: 0 14px 34px rgba(8, 20, 60, 0.4);
+  --c-edge: rgba(232, 243, 255, 0.9); --c-tile: radial-gradient(circle at 32% 24%, rgba(220, 238, 255, 0.55), rgba(59, 140, 255, 0.32) 70%); --c-tile-bevel: 0 4px 10px rgba(0, 24, 80, 0.4);
+  --c-icon: radial-gradient(circle at 35% 25%, #2a4f93, #0f2250);
+  --c-row: rgba(255, 255, 255, 0.09); --c-row-line: rgba(207, 228, 255, 0.28); --c-row-bevel: 0 0 0 transparent;
+  --c-row-off: rgba(255, 255, 255, 0.05); --c-row-line-off: rgba(207, 228, 255, 0.14);
+  --c-sel-a: rgba(59, 140, 255, 0.42); --c-sel-b: rgba(59, 140, 255, 0.16); --c-sel-line: rgba(207, 228, 255, 0.8); --c-glow: rgba(94, 170, 255, 0.7);
+  --c-chev-bg: rgba(255, 255, 255, 0.1); --c-chev-line: rgba(207, 228, 255, 0.5); --c-chev-ink: #e8f3ff; --c-chev-bevel: 0 0 0 transparent;
+  --c-chip-bg: rgba(59, 140, 255, 0.34); --c-chip-line: rgba(207, 228, 255, 0.6); --c-chip-ink: #e8f3ff; --c-chip-bevel: 0 0 0 transparent;
+  --c-wait-bg: rgba(255, 255, 255, 0.08); --c-wait-line: rgba(207, 228, 255, 0.22); --c-wait-ink: rgba(207, 228, 255, 0.72);
+  --c-solid: #16306a; --c-acc: #9fdcff;
+  --c-ready: conic-gradient(#9fdcff, #3b8cff, #e3f2ff, #3b8cff, #9fdcff); --c-arc: #3b8cff; --c-sweep: rgba(8, 18, 44, 0.5);
+  --c-badge-bg: rgba(255, 255, 255, 0.12); --c-badge-ink: #fff; --c-badge-line: rgba(207, 228, 255, 0.5);
+  --c-inlay: 0 solid transparent; --c-pill-orn: linear-gradient(180deg, rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0) 52%); --c-gem: none;
+  --o-a: rgba(207, 228, 255, 0.5); --o-b: #fff6d8; --r-s1: rgba(207, 228, 255, 0.5);
+}
+.hud .card[data-character="earthBear"] {
+  --c-radius: 18px; --c-row-radius: 11px; --c-bw: 2px; --c-text: #fbf1e6; --c-light: #f3c9a0; --c-meta: rgba(243, 201, 160, 0.9);
+  --c-chrome: radial-gradient(circle at 18% 12%, rgba(255, 214, 170, 0.12) 0 2px, transparent 3px) 0 0 / 34px 34px, radial-gradient(circle at 70% 60%, rgba(0, 0, 0, 0.2) 0 2px, transparent 3px) 0 0 / 46px 46px, linear-gradient(180deg, rgba(128, 70, 38, 0.76), rgba(44, 25, 16, 0.9));
+  --c-border: rgba(243, 201, 160, 0.55);
+  --c-shadow: inset 0 2px 0 rgba(255, 225, 190, 0.35), inset 0 -4px 0 rgba(20, 10, 5, 0.5), 0 18px 40px rgba(25, 10, 0, 0.5), 0 0 34px rgba(201, 112, 58, 0.35);
+  --c-shadow-wait: inset 0 2px 0 rgba(255, 225, 190, 0.25), inset 0 -4px 0 rgba(20, 10, 5, 0.5), 0 14px 32px rgba(25, 10, 0, 0.45);
+  --c-edge: #f3c9a0; --c-tile: linear-gradient(145deg, #a85d2e, #5a2e17);
+  --c-tile-bevel: inset 0 3px 0 rgba(255, 235, 210, 0.45), inset 0 -5px 0 rgba(0, 0, 0, 0.35), 0 5px 0 rgba(30, 12, 4, 0.55);
+  --c-icon: linear-gradient(145deg, #8f4d28, #4a2614);
+  --c-row: linear-gradient(180deg, rgba(255, 226, 196, 0.16), rgba(255, 226, 196, 0.06)); --c-row-line: rgba(243, 201, 160, 0.34);
+  --c-row-bevel: inset 0 2px 0 rgba(255, 235, 210, 0.22), inset 0 -3px 0 rgba(0, 0, 0, 0.35);
+  --c-row-off: linear-gradient(180deg, rgba(255, 226, 196, 0.07), rgba(255, 226, 196, 0.02)); --c-row-line-off: rgba(243, 201, 160, 0.16);
+  --c-sel-a: rgba(217, 140, 82, 0.45); --c-sel-b: rgba(168, 93, 46, 0.28); --c-sel-line: #ffd9b0; --c-glow: rgba(217, 140, 82, 0.6);
+  --c-chev-bg: linear-gradient(180deg, rgba(255, 226, 196, 0.2), rgba(255, 226, 196, 0.06)); --c-chev-line: rgba(243, 201, 160, 0.6); --c-chev-ink: #f3c9a0;
+  --c-chev-bevel: inset 0 2px 0 rgba(255, 235, 210, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.3);
+  --c-chip-bg: #c9703a; --c-chip-line: #f3c9a0; --c-chip-ink: #2b1810; --c-chip-bevel: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+  --c-wait-bg: rgba(243, 201, 160, 0.12); --c-wait-line: rgba(243, 201, 160, 0.3); --c-wait-ink: rgba(243, 201, 160, 0.8);
+  --c-solid: #4a2a18; --c-acc: #ffd9b0;
+  --c-ready: conic-gradient(#f3c9a0, #c9703a, #f3c9a0, #c9703a, #f3c9a0); --c-arc: #e3a064; --c-sweep: rgba(30, 14, 6, 0.5);
+  --c-badge-bg: linear-gradient(180deg, #d98c52, #a85d2e); --c-badge-ink: #2b1810; --c-badge-line: #f3c9a0;
+  --c-inlay: 2px dashed rgba(243, 201, 160, 0.3); --c-pill-orn: none; --c-gem: radial-gradient(circle at 35% 30%, #ffe2c0, #8a4a26);
+  --o-a: #5a3320; --o-b: #6e3d24; --o-c: #8fc45a; --o-d: #a9d878;
+  --r-s1: rgba(243, 201, 160, 0.3); --r-f1: #c9703a; --r-f2: #a85d2e; --r-f3: #d98c52; --r-f4: #8a4a26;
+}
+.hud .card[data-character="jadeSerpent"] {
+  --c-radius: 18px; --c-row-radius: 11px; --c-bw: 2px; --c-text: #eefbf3; --c-light: #b9f2d3; --c-meta: rgba(185, 242, 211, 0.9);
+  --c-chrome: radial-gradient(circle at 50% 0, transparent 0 8px, rgba(185, 242, 211, 0.1) 8.5px 9.5px, transparent 10px) 0 0 / 20px 12px, linear-gradient(180deg, rgba(20, 112, 78, 0.78), rgba(5, 34, 26, 0.92));
+  --c-border: rgba(185, 242, 211, 0.55);
+  --c-shadow: inset 0 2px 0 rgba(200, 255, 225, 0.3), inset 0 -4px 0 rgba(0, 16, 10, 0.5), 0 18px 40px rgba(0, 24, 14, 0.5), 0 0 34px rgba(47, 191, 122, 0.35);
+  --c-shadow-wait: inset 0 2px 0 rgba(200, 255, 225, 0.22), inset 0 -4px 0 rgba(0, 16, 10, 0.5), 0 14px 32px rgba(0, 24, 14, 0.45);
+  --c-edge: #b9f2d3; --c-tile: linear-gradient(145deg, #1f8a62, #07281e);
+  --c-tile-bevel: inset 0 3px 0 rgba(220, 255, 235, 0.45), inset 0 -5px 0 rgba(0, 0, 0, 0.35), 0 5px 0 rgba(0, 22, 12, 0.55);
+  --c-icon: linear-gradient(145deg, #1f8a62, #07281e);
+  --c-row: linear-gradient(180deg, rgba(185, 242, 211, 0.16), rgba(185, 242, 211, 0.05)); --c-row-line: rgba(185, 242, 211, 0.34);
+  --c-row-bevel: inset 0 2px 0 rgba(220, 255, 235, 0.2), inset 0 -3px 0 rgba(0, 20, 12, 0.4);
+  --c-row-off: linear-gradient(180deg, rgba(185, 242, 211, 0.07), rgba(185, 242, 211, 0.02)); --c-row-line-off: rgba(185, 242, 211, 0.16);
+  --c-sel-a: rgba(47, 191, 122, 0.42); --c-sel-b: rgba(47, 191, 122, 0.24); --c-sel-line: #dcffec; --c-glow: rgba(47, 191, 122, 0.6);
+  --c-chev-bg: linear-gradient(180deg, rgba(185, 242, 211, 0.2), rgba(185, 242, 211, 0.06)); --c-chev-line: rgba(185, 242, 211, 0.6); --c-chev-ink: #b9f2d3;
+  --c-chev-bevel: inset 0 2px 0 rgba(220, 255, 235, 0.3), inset 0 -3px 0 rgba(0, 0, 0, 0.3);
+  --c-chip-bg: #2fbf7a; --c-chip-line: #b9f2d3; --c-chip-ink: #06231a; --c-chip-bevel: inset 0 -3px 0 rgba(0, 0, 0, 0.25);
+  --c-wait-bg: rgba(185, 242, 211, 0.12); --c-wait-line: rgba(185, 242, 211, 0.3); --c-wait-ink: rgba(185, 242, 211, 0.8);
+  --c-solid: #0b3a2b; --c-acc: #b9f2d3;
+  --c-ready: conic-gradient(#b9f2d3, #2fbf7a, #b9f2d3, #2fbf7a, #b9f2d3); --c-arc: #2fbf7a; --c-sweep: rgba(4, 20, 14, 0.5);
+  --c-badge-bg: linear-gradient(180deg, #7be0ae, #2fbf7a); --c-badge-ink: #06231a; --c-badge-line: #b9f2d3;
+  --c-inlay: 1px solid rgba(185, 242, 211, 0.26); --c-gem: radial-gradient(circle at 35% 30%, #eafff3, #1f8a62);
+  --c-pill-orn: radial-gradient(circle at 50% 0, transparent 0 7px, rgba(185, 242, 211, 0.12) 7.5px 8.5px, transparent 9px) 0 0 / 18px 11px;
+  --o-a: #0b3f2e; --o-b: #2fbf7a; --o-c: #b9f2d3; --o-d: #ff8b97; --o-e: #06231a;
+  --r-s1: #2fbf7a; --r-s2: #ff8b97;
+}
+/* Venom is purple on the serpent's card */
+.hud .card[data-character="jadeSerpent"] [data-skill="venom"] {
+  --c-edge: #d9b6ff; --c-icon: linear-gradient(145deg, #5b2f86, #1e0b33);
+  --c-ready: conic-gradient(#d9b6ff, #9a62d0, #d9b6ff, #9a62d0, #d9b6ff); --c-arc: #9a62d0; --c-glow: rgba(154, 98, 208, 0.65);
+  --c-sel-a: rgba(154, 98, 208, 0.46); --c-sel-b: rgba(123, 63, 176, 0.26);
+  --c-badge-bg: linear-gradient(180deg, #d9b6ff, #9a62d0); --c-badge-line: #d9b6ff;
+}
+.hud .card[data-character="cloudEagle"] {
+  --c-radius: 18px; --c-row-radius: 11px; --c-bw: 2px; --c-text: #fffbe6; --c-light: #fff2a8; --c-meta: #c6dcff;
+  --c-chrome: radial-gradient(ellipse at 50% 0, rgba(255, 242, 168, 0.3), transparent 62%), radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.14) 0 1.5px, transparent 2px) 0 0 / 38px 38px, radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.1) 0 1.5px, transparent 2px) 0 0 / 52px 52px, linear-gradient(180deg, rgba(76, 106, 170, 0.8), rgba(24, 36, 72, 0.93));
+  --c-border: rgba(255, 242, 168, 0.72);
+  --c-shadow: inset 0 2px 0 rgba(255, 250, 210, 0.4), inset 0 -4px 0 rgba(8, 14, 34, 0.5), 0 18px 40px rgba(8, 16, 40, 0.5), 0 0 34px rgba(255, 242, 168, 0.34);
+  --c-shadow-wait: inset 0 2px 0 rgba(255, 250, 210, 0.3), inset 0 -4px 0 rgba(8, 14, 34, 0.5), 0 14px 32px rgba(8, 16, 40, 0.45);
+  --c-edge: #fff2a8; --c-tile: linear-gradient(145deg, #7da3df, #2b4678);
+  --c-tile-bevel: inset 0 3px 0 rgba(255, 250, 220, 0.5), inset 0 -5px 0 rgba(10, 18, 44, 0.4), 0 5px 0 rgba(8, 14, 36, 0.55);
+  --c-icon: linear-gradient(145deg, #7da3df, #2b4678);
+  --c-row: linear-gradient(180deg, rgba(255, 242, 168, 0.17), rgba(255, 242, 168, 0.05)); --c-row-line: rgba(255, 242, 168, 0.38);
+  --c-row-bevel: inset 0 2px 0 rgba(255, 250, 220, 0.22), inset 0 -3px 0 rgba(10, 18, 44, 0.4);
+  --c-row-off: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)); --c-row-line-off: rgba(255, 242, 168, 0.16);
+  --c-sel-a: rgba(255, 242, 168, 0.42); --c-sel-b: rgba(255, 242, 168, 0.16); --c-sel-line: #fff8cc; --c-glow: rgba(255, 242, 168, 0.6);
+  --c-chev-bg: linear-gradient(180deg, rgba(255, 242, 168, 0.22), rgba(255, 242, 168, 0.07)); --c-chev-line: rgba(255, 242, 168, 0.7); --c-chev-ink: #fff2a8;
+  --c-chev-bevel: inset 0 2px 0 rgba(255, 250, 220, 0.35), inset 0 -3px 0 rgba(10, 18, 44, 0.3);
+  --c-chip-bg: #fff2a8; --c-chip-line: #fff8cc; --c-chip-ink: #243b6b; --c-chip-bevel: inset 0 -3px 0 rgba(10, 18, 44, 0.25);
+  --c-wait-bg: rgba(255, 242, 168, 0.1); --c-wait-line: rgba(255, 242, 168, 0.28); --c-wait-ink: rgba(198, 220, 255, 0.78);
+  --c-solid: #2a3c70; --c-acc: #fff2a8;
+  --c-ready: conic-gradient(#fff8cc, #f2c14e, #fff8cc, #f2c14e, #fff8cc); --c-arc: #f2c14e; --c-sweep: rgba(14, 24, 48, 0.5);
+  --c-badge-bg: linear-gradient(180deg, #fff2a8, #f2c14e); --c-badge-ink: #243b6b; --c-badge-line: #fff8cc;
+  --c-inlay: 1px solid rgba(255, 242, 168, 0.3); --c-gem: #fff2a8;
+  --c-pill-orn: radial-gradient(ellipse at 50% 0, rgba(255, 242, 168, 0.26), transparent 70%);
+  --o-a: #b9cdf0; --o-b: #eaf2ff; --o-c: #f2c14e; --o-d: #fff2a8;
+  --r-s1: rgba(255, 242, 168, 0.75); --r-s2: #243b6b; --r-f1: #fff2a8;
+}
+
+/* the card: material, rim, inlay line and the ornament layer behind the content */
+.hud .card { isolation: isolate; }
+.hud .card[data-character] { background: var(--c-chrome); border: var(--c-bw) solid var(--c-border); border-radius: var(--c-radius); box-shadow: var(--c-shadow-wait); color: var(--c-text); }
+.hud .card.is-active[data-character] { box-shadow: var(--c-shadow); }
+.hud .card.is-waiting:not(.is-collapsed)[data-character] { opacity: 0.88; }
+.hud .card[data-character]::before { content: ""; left: 6px; right: 6px; top: 6px; bottom: 6px; height: auto; background: none; opacity: 1;
+  border: var(--c-inlay); border-radius: calc(var(--c-radius) - 8px); }
+.hud .card .orn { position: absolute; inset: 0; z-index: -1; border-radius: inherit; overflow: hidden; pointer-events: none; }
+.hud .orn .gem, .hud .orn .oa { display: none; position: absolute; }
+.hud .orn .g1 { left: 11px; top: 11px; } .hud .orn .g2 { right: 11px; top: 11px; } .hud .orn .g3 { left: 11px; bottom: 11px; } .hud .orn .g4 { right: 11px; bottom: 11px; }
+.hud .card[data-character="earthBear"] .orn .gem { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--c-gem); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); }
+.hud .card[data-character="jadeSerpent"] .orn .gem { display: block; width: 8px; height: 8px; transform: rotate(45deg); background: var(--c-gem); box-shadow: 0 1px 0 rgba(0, 0, 0, 0.5); }
+.hud .card[data-character="cloudEagle"] .orn .gem { display: block; width: 11px; height: 11px; background: var(--c-gem);
+  clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.hud .card[data-character="windRabbit"] .orn .oa-windRabbit, .hud .card[data-character="earthBear"] .orn .oa-earthBear,
+.hud .card[data-character="jadeSerpent"] .orn .oa-jadeSerpent, .hud .card[data-character="cloudEagle"] .orn .oa-cloudEagle { display: block; }
+.hud .orn .oa-curves { left: 0; top: 0; width: 100%; height: 100%; opacity: 0.8; }
+.hud .orn .oa-seed { right: 58px; top: 2px; width: 26px; height: 26px; }
+.hud .orn .oa-earthBear { right: 52px; bottom: -4px; width: 66px; }
+.hud .orn .oa-jadeSerpent, .hud .orn .oa-cloudEagle { right: 50px; bottom: -6px; width: 76px; }
+.hud .orn .fa { fill: var(--o-a); } .hud .orn .fb { fill: var(--o-b); } .hud .orn .fc { fill: var(--o-c); } .hud .orn .fd { fill: var(--o-d); } .hud .orn .fe { fill: var(--o-e); }
+.hud .orn .sa { stroke: var(--o-a); } .hud .orn .sb { stroke: var(--o-b); } .hud .orn .sc { stroke: var(--o-c); } .hud .orn .sd { stroke: var(--o-d); }
+.hud .card.is-collapsed .orn .gem, .hud .card.is-collapsed .orn .oa { display: none; }
+
+/* the portrait: a rounded square for every character */
+.hud .card[data-character] .tile { position: relative; box-sizing: border-box; border: 2px solid var(--c-edge); background: var(--c-tile); box-shadow: var(--c-tile-bevel); }
+.hud .card[data-character] .tile img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; border-radius: 10px; display: block; }
+.hud:not(.is-compact) .card[data-character]:not(.is-collapsed) .tile { width: 58px; height: 58px; border-radius: 12px; }
+.hud:not(.is-compact) .card[data-character]:not(.is-collapsed) .who-row { gap: 8px; }
+.hud:not(.is-compact) .card[data-character] .name { font-size: 16px; }
+.hud:not(.is-compact) .card[data-character] .meta { font-size: 12px; }
+.hud .card[data-character] .name { color: var(--c-text); font-weight: 600; }
+.hud .card[data-character] .meta { color: var(--c-meta); }
+.hud .card[data-character] .chevron { border: 2px solid var(--c-chev-line); border-radius: 10px; background: var(--c-chev-bg); color: var(--c-chev-ink); box-shadow: var(--c-chev-bevel); }
+.hud .card[data-character] .chevron svg { width: 18px; height: 18px; }
+
+/* the status chip: a small slab with a diamond */
+.hud:not(.is-compact) .card[data-character] .chip { display: inline-flex; align-items: center; height: 26px; padding: 0 11px; border-radius: 8px; box-sizing: border-box;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.02em; background: var(--c-chip-bg); border: 2px solid var(--c-chip-line); color: var(--c-chip-ink); box-shadow: var(--c-chip-bevel); }
+.hud:not(.is-compact) .card.is-waiting[data-character] .chip { background: var(--c-wait-bg); border-color: var(--c-wait-line); color: var(--c-wait-ink); }
+.hud:not(.is-compact) .card.is-winner[data-character] .chip { background: var(--gold); border-color: var(--gold-ink); color: var(--card-solid); }
+.hud:not(.is-compact) .card[data-character] .chip-text::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 7px; border-radius: 2px; transform: rotate(45deg); background: currentColor; }
+.hud:not(.is-compact) .card[data-character] .lock-rune { margin-left: 8px; }
+
+/* SKILLS and the rule art after it */
+.hud:not(.is-compact) .card[data-character] .rule { display: none; }
+.hud:not(.is-compact) .card[data-character] .label { display: flex; align-items: center; gap: 10px; font-weight: 700; letter-spacing: 0.26em; color: var(--c-light); }
+.hud .label .rule-art { flex: 1; min-width: 0; height: 14px; display: flex; align-items: center; gap: 6px; letter-spacing: 0; }
+.hud .rule-art .ra { display: none; flex: 1; min-width: 0; height: 100%; }
+.hud .rule-art .rf { display: none; flex: none; width: 24px; height: 13px; }
+.hud .card[data-character="windRabbit"] .rule-art .ra-windRabbit, .hud .card[data-character="earthBear"] .rule-art .ra-earthBear,
+.hud .card[data-character="jadeSerpent"] .rule-art .ra-jadeSerpent, .hud .card[data-character="cloudEagle"] .rule-art .ra-cloudEagle { display: block; }
+.hud .rule-art .rs1 { stroke: var(--r-s1); } .hud .rule-art .rs2 { stroke: var(--r-s2); }
+.hud .rule-art .rf1 { fill: var(--r-f1); } .hud .rule-art .rf2 { fill: var(--r-f2); } .hud .rule-art .rf3 { fill: var(--r-f3); } .hud .rule-art .rf4 { fill: var(--r-f4); }
+
+/* a skill row: a slab with the icon tile inset at its start; the icon fills the tile */
+.hud .card[data-character] .skill { background: var(--c-row); border: 1px solid var(--c-row-line); box-shadow: var(--c-row-bevel); }
+.hud .card[data-character] .skill .ico { box-sizing: border-box; border: 2px solid var(--c-edge); background: var(--c-icon); }
+.hud .card[data-character] .skill .ico img { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; transform: scale(1.14); }
+.hud .card[data-character] .skill.is-selected { border-color: var(--c-row-line); background: linear-gradient(180deg, var(--c-sel-a), var(--c-sel-b));
+  box-shadow: inset 0 0 0 1px var(--c-sel-line), 0 0 18px var(--c-glow), var(--c-row-bevel); }
+.hud .card[data-character] .skill.is-selected .state { color: var(--c-text); }
+.hud .card[data-character] .skill.is-cooling, .hud .card[data-character] .skill.is-off { background: var(--c-row-off); border-color: var(--c-row-line-off); }
+.hud:not(.is-compact) .card[data-character] .skill { gap: 11px; padding: 0 10px 0 7px; border-radius: var(--c-row-radius); }
+.hud:not(.is-compact) .card[data-character] .skill .ico { width: 46px; height: 46px; flex: none; border-radius: 9px; }
+.hud:not(.is-compact) .card[data-character] .skill .t { flex: 1; padding-right: 0; }
+.hud:not(.is-compact) .card[data-character] .skill .title { font-size: 15px; font-weight: 700; }
+/* cooling down: the icon dims, a dark sweep wipes over it and the turns left show in a badge at the end of the row */
+.hud .card[data-character] .skill .ring { display: none; position: absolute; left: -30%; top: -30%; width: 160%; height: 160%; border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent calc(var(--p, 0) * 3.6deg), var(--c-sweep) 0); -webkit-mask: none; mask: none; }
+.hud .card[data-character] .skill.is-cooling .ring { display: block; }
+.hud .card[data-character] .skill.is-cooling .ico img, .hud .card[data-character] .skill.is-off .ico img { opacity: 0.75; }
+.hud:not(.is-compact) .card[data-character] .skill .count { display: none; position: static; inset: auto; flex: none; width: 28px; height: 28px; box-sizing: border-box; border-radius: 7px;
+  align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: var(--c-badge-ink); background: var(--c-badge-bg); border: 2px solid var(--c-badge-line); text-shadow: none; }
+.hud:not(.is-compact) .card[data-character] .skill.is-cooling .count { display: flex; }
+.hud.is-compact .card[data-character] .skill .count { display: none !important; }
+
+/* the slim bars keep their layout and take the colours */
+.hud.is-compact .card[data-character] { --c-radius: 22px; }
+.hud.is-compact .card[data-character]::before, .hud.is-compact .card[data-character] .orn { display: none; }
+.hud.is-compact .card[data-character] .tile { border-radius: 12px; }
+.hud.is-compact .card[data-character] .skill { border-radius: 10px; }
+.hud.is-compact .card[data-character] .skill .ico img { transform: none; }
+
+/* the pill: one round capsule, round portrait and round skill buttons */
+.hud .card.is-collapsed[data-character] { padding: 6px; gap: 8px; border-radius: 999px; }
+.hud .card.is-collapsed[data-character]::before { left: 3px; right: 3px; top: 3px; bottom: 3px; border-radius: 999px; }
+.hud .card.is-collapsed[data-character] .orn::after { content: ""; position: absolute; inset: 0; border-radius: 999px; background: var(--c-pill-orn); }
+.hud .card.is-collapsed[data-character] .tile { width: 48px; height: 48px; border-radius: 50%; box-shadow: none; }
+.hud .card.is-collapsed[data-character] .tile img { border-radius: 50%; }
+.hud .card.is-collapsed[data-character] .turn-dot { left: -3px; top: -3px; right: auto; width: 13px; height: 13px; box-sizing: border-box; background: var(--c-acc); border: 2px solid var(--c-solid); box-shadow: 0 0 8px var(--c-acc); }
+.hud .card.is-collapsed.is-active[data-character] { box-shadow: var(--c-shadow); }
+.hud .card.is-collapsed[data-character] .pill-skills { gap: 8px; }
+.hud .card[data-character] .pskill { width: 48px; height: 48px; border: 0; border-radius: 50%; background: var(--c-ready); box-shadow: 0 0 10px var(--c-glow); }
+.hud .card[data-character] .pskill .ico { inset: 3px; width: auto; height: auto; border-radius: 50%; background: var(--c-icon); }
+.hud .card[data-character] .pskill .ico img { transform: scale(1.2); }
+.hud .card[data-character] .pskill.is-selected { border: 0; background: var(--ink); box-shadow: 0 0 16px var(--c-glow); }
+.hud .card[data-character] .pskill.is-selected .ico { border-radius: 50%; }
+.hud .card[data-character] .pskill.is-cooling { background: transparent; box-shadow: none; }
+.hud .card[data-character] .pskill.is-off { background: rgba(255, 255, 255, 0.18); box-shadow: none; }
+.hud .card[data-character] .pskill.is-dimmed { background: rgba(255, 120, 135, 0.6); box-shadow: none; }
+.hud .card[data-character] .pskill.is-cooling .ico img { opacity: 0.5; }
+.hud .card[data-character] .pskill .pring .track { stroke: rgba(255, 255, 255, 0.2); }
+.hud .card[data-character] .pskill .pring .arc { stroke: var(--c-arc); }
+.hud .card[data-character] .pskill .count { inset: 3px; border-radius: 50%; font-size: 19px; font-weight: 700; background: rgba(8, 14, 30, 0.4); }
+.hud .card[data-character] .pskill .ready-dot { right: -2px; bottom: -2px; width: 13px; height: 13px; box-sizing: border-box; border: 2px solid var(--c-solid); }
+.hud .card.is-collapsed[data-character] .chevron { margin-left: -2px; background: transparent; border: 0; box-shadow: none; }
+.hud .card.is-collapsed[data-character] .chevron svg { box-sizing: content-box; width: 14px; height: 14px; padding: 5px; border: 2px solid currentColor; border-radius: 50%; }
+
+/* Low quality: solid and flat, as the other glass */
+.hud[data-quality="low"] .card[data-character] { -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }

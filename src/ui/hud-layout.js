@@ -50,20 +50,24 @@ export const RAIL_WIDTH_STACKED = 108;
 const RAIL_WIDTH_MAX = 180;
 
 // A collapsed card (docs/art-direction-v3-1.md section 4.1, hud.css
-// .is-collapsed): one pill at the card's anchor. Padding 8, gap 8: the 56 px
-// portrait tile, two 56 px skill buttons, the 44 px chevron (4 px more space
-// before it) and a 1 px border. (72 px tiles before the owner asked for a
-// smaller pill.)
-export const PILL_PAD = 8;
-export const PILL_TILE = 56;
+// .is-collapsed; the character pills of docs/hud-characters.md): one round
+// pill at the card's anchor. Padding 6 and a 2 px border all round, gap 8:
+// the 48 px round portrait, two 48 px round skill buttons and the 44 px
+// chevron button, which is drawn 2 px closer to the last skill (its visible
+// circle is only 28 px; the rest is touch room).
+export const PILL_PAD = 6;
+export const PILL_BORDER = 2;
+export const PILL_GAP = 8;
+export const PILL_TILE = 48;
 export const CHEVRON_SIZE = 44;
-export const PILL_WIDTH = 2 * PILL_PAD + 3 * PILL_TILE + 3 * PILL_PAD + 4 + CHEVRON_SIZE + 2;
-export const PILL_HEIGHT = 2 * PILL_PAD + PILL_TILE + 2;
+const PILL_CHEVRON_PULL = 2;
+export const PILL_WIDTH = 2 * (PILL_PAD + PILL_BORDER) + 3 * PILL_TILE + 3 * PILL_GAP + CHEVRON_SIZE - PILL_CHEVRON_PULL;
+export const PILL_HEIGHT = 2 * (PILL_PAD + PILL_BORDER) + PILL_TILE;
 // The pill's skill buttons keep a 44 px touch target, so it never shrinks
 // below this scale even where the cards do.
 export const MIN_PILL_SCALE = 44 / PILL_TILE;
 // The portrait tile of the full card; its row grows when the chevron is taller.
-export const CARD_TILE = 56;
+export const CARD_TILE = 58;
 
 // The top bar (hud.css), for hudBoxes(): the quality switch at its widest
 // (the full and the slim size), the turn pill's room and heights. The turn
