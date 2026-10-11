@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { BOARD_SIZE, SHOT_READY_FRAMES, SHOT_TIME_MS } from '../src/config.js';
 import { EMPTY, O, ROCK, X, findWinLine } from '../src/logic/board.js';
 import { createInitialState, isGameOver, placeStone, useSkill } from '../src/logic/game.js';
-import { PETRIFICATION, MUD_TRAP } from '../src/logic/skills.js';
+import { PETRIFICATION, MUD_TRAP, SKILLS, TORNADO_ZONE, VENOM } from '../src/logic/skills.js';
 import { createLocalGame } from '../src/ui/local-game.js';
-import { parseShotParams, SHOT_SCENES, setUpShotScene } from '../src/ui/shot-mode.js';
+import { parsePopupParam, parseShotParams, SHOT_SCENES, setUpShotScene } from '../src/ui/shot-mode.js';
 import { SHOT_FIELD } from '../src/ui/shot-position.js';
 
 const count = (board, kind) => board.flat().filter((cell) => cell === kind).length;
@@ -77,16 +77,28 @@ test('parseShotParams reads the scene and the quality', () => {
     'field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting', 'select', 'gameover', 'gameover-pending',
     'spectate', 'spectate-game', 'room-closed', 'freeaction', 'venomcloud',
   ]);
-  assert.deepEqual(parseShotParams('?shot=field&quality=high'), { scene: 'field', quality: 'high', hud: null });
-  assert.deepEqual(parseShotParams('?shot=empty&quality=low'), { scene: 'empty', quality: 'low', hud: null });
-  assert.deepEqual(parseShotParams(new URLSearchParams('shot=EMPTY&quality=Medium')), { scene: 'empty', quality: 'medium', hud: null });
-  assert.deepEqual(parseShotParams('?shot=field&quality=%20high%20'), { scene: 'field', quality: 'high', hud: null });
+  assert.deepEqual(parseShotParams('?shot=field&quality=high'), { scene: 'field', quality: 'high', hud: null, popup: null });
+  assert.deepEqual(parseShotParams('?shot=empty&quality=low'), { scene: 'empty', quality: 'low', hud: null, popup: null });
+  assert.deepEqual(parseShotParams(new URLSearchParams('shot=EMPTY&quality=Medium')), { scene: 'empty', quality: 'medium', hud: null, popup: null });
+  assert.deepEqual(parseShotParams('?shot=field&quality=%20high%20'), { scene: 'field', quality: 'high', hud: null, popup: null });
 });
 
 test('parseShotParams falls back to the field scene and medium quality', () => {
-  assert.deepEqual(parseShotParams('?shot='), { scene: 'field', quality: 'medium', hud: null });
-  assert.deepEqual(parseShotParams('?shot=castle&quality=ultra'), { scene: 'field', quality: 'medium', hud: null });
-  assert.deepEqual(parseShotParams('?shot=field'), { scene: 'field', quality: 'medium', hud: null });
+  assert.deepEqual(parseShotParams('?shot='), { scene: 'field', quality: 'medium', hud: null, popup: null });
+  assert.deepEqual(parseShotParams('?shot=castle&quality=ultra'), { scene: 'field', quality: 'medium', hud: null, popup: null });
+  assert.deepEqual(parseShotParams('?shot=field'), { scene: 'field', quality: 'medium', hud: null, popup: null });
+});
+
+test('popup=<skill> names the skill whose popup opens in the first card (docs/shots.md section 4)', () => {
+  assert.equal(parseShotParams('?shot=venomcloud&popup=venom').popup, VENOM);
+  assert.equal(parseShotParams('?shot=field&popup=tornadozone').popup, TORNADO_ZONE);
+  assert.equal(parseShotParams('?shot=field&popup=TornadoZone').popup, TORNADO_ZONE);
+  assert.equal(parseShotParams('?shot=field&popup=tornado-zone').popup, TORNADO_ZONE);
+  assert.equal(parseShotParams('?shot=field').popup, null);
+  assert.equal(parseShotParams('?shot=field&popup=').popup, null);
+  assert.equal(parseShotParams('?shot=field&popup=fireball').popup, null);
+  for (const id of Object.keys(SKILLS)) assert.equal(parsePopupParam(id), id, id);
+  assert.equal(parsePopupParam(null), null);
 });
 
 test('the venomcloud scene is legal: Venom on turn 3, the Cloud on turn 4, X to move, the lightning lit at the frozen time', async () => {

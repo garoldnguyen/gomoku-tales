@@ -226,17 +226,6 @@
 .hud .pskill[aria-disabled="true"] { cursor: not-allowed; }
 /* A long touch press shows the tooltip: no text selection or callout. */
 .hud .skill, .hud .pskill { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; touch-action: manipulation; }
-/* The shared skill tooltip (placed by tooltipPosition() in src/ui/tooltip-position.js). */
-.hud .tooltip { position: fixed; left: 0; top: 0; z-index: 2; width: 356px; max-width: calc(100vw - 24px); padding: 16px 18px; border-radius: 22px; display: flex; flex-direction: column; gap: 8px; pointer-events: none;
-  background: rgba(14, 20, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.22); -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.34); }
-.hud[data-quality="low"] .tooltip { background: var(--card-solid); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
-.hud .tip-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.hud .tip-title { font-size: 17px; font-weight: 600; }
-.hud .tip-state { padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; background: rgba(255, 255, 255, 0.14); color: rgba(244, 247, 251, 0.86); }
-.hud .tip-state[data-state="ready"] { background: color-mix(in srgb, var(--ready) 18%, transparent); color: var(--ready); }
-.hud .tip-text { font-size: 14px; line-height: 1.45; color: rgba(244, 247, 251, 0.88); }
-.hud .tip-rule { height: 1px; background: var(--hair); }
-.hud .tip-hint { font-size: 12px; font-weight: 500; color: rgba(244, 247, 251, 0.7); }
 /* Full cards: the turn pill never reaches the quality switch (TURN_SIDE_ROOM in hud-layout.js). */
 .hud:not(.is-compact) .turn { max-width: calc(100vw - 712px); min-width: 0; }
 .hud.no-fullscreen:not(.is-compact) .turn { max-width: calc(100vw - 608px); }
@@ -290,13 +279,44 @@
 .hud .pskill .ico { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 15px; overflow: hidden; }
 .hud .pskill.is-selected .ico { border-radius: 17px; }
 .hud .pskill .ico img { width: 100%; height: 100%; object-fit: cover; border-radius: 0; }
-/* The skill detail popup, opened by a click on a skill button (hud.js),
-   placed under or over its card by tooltipPosition(). */
-.hud .skill-popup { position: fixed; left: 0; top: 0; z-index: 2; width: 300px; max-width: calc(100vw - 24px); padding: 16px 18px; border-radius: 22px; display: flex; flex-direction: column; gap: 10px; pointer-events: none; /* it only reads: a press on it reaches the board below (and closes it) */
+/* The shared skill tooltip (placed by tooltipPosition() in src/ui/tooltip-position.js)
+   and the skill detail popup, opened by a click on a skill button (hud.js):
+   one compact glass card (docs/skill-popup-design.md section 1), 280 px wide.
+   The tooltip shows the header, the brief and the facts; the popup also the
+   rules and the hint. Neither takes a press: it only reads, and a press on it
+   reaches the board below (and closes the popup). */
+.hud .tooltip, .hud .skill-popup { position: fixed; left: 0; top: 0; z-index: 2; width: 280px; max-width: calc(100vw - 24px); padding: 16px 18px; border-radius: 22px; display: flex; flex-direction: column; gap: 10px; pointer-events: none;
   background: rgba(14, 20, 34, 0.8); border: 1px solid rgba(255, 255, 255, 0.22); -webkit-backdrop-filter: blur(var(--blur)); backdrop-filter: blur(var(--blur)); box-shadow: 0 18px 44px rgba(10, 20, 40, 0.34); }
-.hud[data-quality="low"] .skill-popup { background: var(--card-solid); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
-.hud .pop-title { font-size: 18px; font-weight: 600; }
-.hud .pop-text { font-size: 14px; line-height: 1.5; color: rgba(244, 247, 251, 0.88); }
+.hud[data-quality="low"] .tooltip, .hud[data-quality="low"] .skill-popup { background: var(--card-solid); -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+/* the phone layout: the same content, never wider than the window */
+.hud.is-compact .tooltip, .hud.is-compact .skill-popup { width: min(280px, calc(100vw - 24px)); }
+/* 120 ms fade in; only opacity animates (stopped under reduced motion below) */
+@keyframes hud-pop-in { from { opacity: 0; } to { opacity: 1; } }
+.hud .skill-popup { animation: hud-pop-in 120ms ease-out; }
+/* header: the skill icon, the title over the character name, the state chip */
+.hud .pop-head { display: flex; align-items: center; gap: 12px; }
+.hud .pop-ico { position: relative; width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; overflow: hidden; }
+.hud .pop-ico img { display: block; width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
+.hud .pop-ico.no-art { border-radius: 12px; background: rgba(255, 255, 255, 0.1); }
+.hud .pop-ico .initial { font-size: 18px; }
+.hud .pop-who { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.hud .pop-title { font-family: var(--display); font-size: 17px; font-weight: 500; line-height: 1.15; overflow-wrap: break-word; }
+.hud .pop-char { font-family: var(--label); font-size: 10px; font-weight: 500; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
+/* the state chip stays at the right of the header; a long text (Wait for your turn) wraps in two lines instead of squeezing the title */
+.hud .tip-state { flex-shrink: 0; max-width: 84px; padding: 4px 10px; border-radius: 14px; font-size: 12px; font-weight: 600; line-height: 1.2; text-align: center; background: rgba(255, 255, 255, 0.14); color: rgba(244, 247, 251, 0.86); }
+.hud .tip-state[data-state="ready"] { background: color-mix(in srgb, var(--ready) 18%, transparent); color: var(--ready); }
+.hud .pop-hair { height: 1px; background: linear-gradient(90deg, var(--accent-line), var(--hair) 70%, transparent); }
+.hud .pop-brief { font-size: 14px; line-height: 1.4; color: rgba(244, 247, 251, 0.88); }
+/* facts: label over value, no boxes; a long value wraps the row, never the text */
+.hud .pop-facts { display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.hud .pop-fact { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.hud .pop-fact-label { font-family: var(--label); font-size: 10px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); }
+.hud .pop-fact-value { font-size: 15px; font-weight: 500; white-space: nowrap; }
+/* rules: a small gold dot each, a wrapped line hangs under its text */
+.hud .pop-rules { display: flex; flex-direction: column; gap: 5px; }
+.hud .pop-rule { position: relative; padding-left: 14px; font-size: 13px; line-height: 1.35; color: rgba(244, 247, 251, 0.82); }
+.hud .pop-rule::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+.hud .pop-hint { font-size: 12px; font-weight: 500; color: var(--ink-3); }
 
 /* Ivory accents (docs/flow-design.md section 3.10): the HUD keeps its dark
    glass, and borrows the menus' language for its words. The whole HUD is
@@ -310,7 +330,6 @@
 .hud .turn.glass { border-color: var(--accent-line); }
 .hud .card::before { content: ""; position: absolute; left: 28px; right: 28px; top: -1px; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.7; pointer-events: none; }
 .hud .card.is-collapsed::before { left: 36px; right: 36px; }
-.hud .tip-title, .hud .pop-title { font-family: var(--display); font-size: 16px; font-weight: 500; }
 .hud.is-compact .name { font-size: 16px; }
 .hud.is-compact .turn .who { font-size: 15px; }
 .hud.is-compact.is-rail .name { font-size: 13px; }
@@ -378,4 +397,5 @@
 @media (prefers-reduced-motion: reduce) {
   .hud .card.is-cast::after { animation: none; opacity: 1; }
   .hud .lock-rune, .hud .card.is-collapsed.is-locked .tile::after { animation: none; }
+  .hud .skill-popup { animation: none; }
 }

@@ -139,6 +139,10 @@ def named_sets():
         ("medium", "small", {"hud": "expanded"}),
         ("medium", "small", {"hud": "collapsed"}),
         ("medium", "phone", {}),
+        # The skill popup (docs/skill-popup-design.md section 1), opened in the first card by popup=<skill>:
+        # Venom on the Jade Serpent card at fhd, and the Tornado Zone on the phone shape.
+        ("medium", "fhd", {"popup": "venom"}, "venomcloud"),
+        ("medium", "phone", {"popup": "tornadozone"}),
     ]
     full = list(levels)
     for item in shapes:

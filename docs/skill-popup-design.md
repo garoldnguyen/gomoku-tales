@@ -38,6 +38,8 @@ Numbers are never typed in a string: they are built from the config constants.
 - Header: the skill icon (the same art as the button, 40 px, radius 12 px), the title, the character
   name, the state chip. The chip shows the existing `stateText` of the skill ("Ready", "Rests 3",
   "Locked", "Used", "Always on") and keeps `data-state`; the colours stay the existing state tokens.
+  A long state text ("Wait for your turn", "Ready in 6 turns") wraps in two lines inside the chip
+  (at most 84 px wide) so the title never breaks in the middle of a word.
 - Facts and rules are separate blocks with a quiet gap (10 to 12 px). No boxes around the facts, no
   icons inside them, only text. At most one hairline (under the header).
 - Everything uses the HUD tokens already in `hud.css` (`--accent`, `--hair`, `--font`, `--display`,

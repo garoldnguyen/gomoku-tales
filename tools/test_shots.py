@@ -58,7 +58,12 @@ class ParseTests(unittest.TestCase):
 class SetTests(unittest.TestCase):
     def test_sets_have_expected_sizes(self):
         sizes = {k: len(v) for k, v in shots.named_sets().items()}
-        self.assertEqual(sizes, {"quick": 1, "levels": 3, "shapes": 5, "hud": 5, "full": 7, "flow": 24})
+        self.assertEqual(sizes, {"quick": 1, "levels": 3, "shapes": 5, "hud": 7, "full": 7, "flow": 24})
+
+    def test_hud_set_has_the_two_popup_pictures(self):
+        planned = shots.plan_shots(set_name="hud")
+        popups = {(s["scene"], s["shape"], s["params"]["popup"]) for s in planned if "popup" in s["params"]}
+        self.assertEqual(popups, {("venomcloud", "fhd", "venom"), ("field", "phone", "tornadozone")})
 
     def test_flow_set_has_its_scenes_at_fhd_and_hd(self):
         planned = shots.plan_shots(set_name="flow", scene="field")

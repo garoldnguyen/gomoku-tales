@@ -7,8 +7,8 @@
 //
 // Each card folds into a pill (docs/art-direction-v3-1.md section 4): a
 // chevron button per card, the pill's own skill buttons calling the same
-// onSkill, and one shared tooltip with the skill's description, placed by
-// tooltipPosition(). The slim layouts of narrow windows never fold.
+// onSkill, and one shared tooltip with the skill's header, brief and facts,
+// placed by tooltipPosition(). The slim layouts of narrow windows never fold.
 //
 // Free Action (docs/free-action-design.md section 8): the view model says
 // which card just cast a skill (cast), which card a Hiss hit (reaction) and
@@ -19,12 +19,14 @@
 // Nothing here decides what to show or reads a cell.
 //
 // Design v4: a click on a skill button still runs onSkill and also opens
-// the skill detail popup (skillPopupViewModel) next to its card: title,
-// state, the full description and the hint (not in the slim layouts of
-// phones, where it would cover the board). Escape or a press outside it
-// closes it; neither is swallowed, so Escape still cancels a target flow
-// and a press on the board still picks the target. It takes no presses
-// itself: one on it goes through to the board.
+// the skill detail popup (skillPopupViewModel) next to its card, the compact
+// card of docs/skill-popup-design.md section 1: the header (icon, title,
+// character name, state chip), the brief, the facts, the rules and the hint
+// (not opened by a click in the slim layouts of phones, where it would cover
+// the board; openSkillPopup() opens it there for the screenshot tool).
+// Escape or a press outside it closes it; neither is swallowed, so Escape
+// still cancels a target flow and a press on the board still picks the
+// target. It takes no presses itself: one on it goes through to the board.
 
 import { X, O } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
@@ -33,6 +35,7 @@ import { HISS_WAVE_MS, HUD_SHAKE_MS } from '../config.js';
 import { DUST_COUNT, FEATHER_COUNT, castCssVars, castDurationMs, shakeFrames } from './cast-view.js';
 import { CARD_HEIGHT, chevronSize, hudFoldLayout, pillScale, topBarLayout } from './hud-layout.js';
 import { PORTRAIT_ART, QUALITY_CHOICES, SKILL_ICON_ART, skillPopupViewModel } from './hud-view.js';
+import { FACTS_MAX, RULES_MAX } from './skill-info.js';
 import { TOOLTIP_LONG_PRESS_MS, TOOLTIP_SHOW_MS, tooltipPosition } from './tooltip-position.js';
 
 const LOOK_CLASSES = { selected: 'is-selected', cooling: 'is-cooling', off: 'is-off', ready: null };
@@ -124,18 +127,75 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     }
   };
 
+  // The compact skill card of the tooltip and the popup (docs/skill-popup-design.md
+  // section 1): the header (icon, title, character name, state chip), a gold
+  // hairline, the brief and the facts; the popup (withRules) also has the rules
+  // and the hint. The cells for the most facts and rules are made once and
+  // hidden when a skill has fewer.
+  const skillCard = (parent, withRules) => {
+    const head = el('div', 'pop-head', parent);
+    const icon = artImage(el('span', 'ico pop-ico', head), null, '');
+    const who = el('div', 'pop-who', head);
+    const card = {
+      icon,
+      title: el('div', 'pop-title', who),
+      character: el('div', 'pop-char', who),
+      state: el('div', 'tip-state', head),
+      brief: null,
+      facts: [],
+      rules: [],
+      hint: null,
+    };
+    el('div', 'pop-hair', parent);
+    card.brief = el('div', 'pop-brief', parent);
+    const facts = el('div', 'pop-facts', parent);
+    for (let i = 0; i < FACTS_MAX; i++) {
+      const cell = el('div', 'pop-fact', facts);
+      card.facts.push({ cell, label: el('span', 'pop-fact-label', cell), value: el('span', 'pop-fact-value', cell) });
+    }
+    if (withRules) {
+      const rules = el('div', 'pop-rules', parent);
+      for (let i = 0; i < RULES_MAX; i++) card.rules.push(el('div', 'pop-rule', rules));
+      card.hint = el('div', 'pop-hint', parent);
+    }
+    return card;
+  };
+  const setHidden = (node, hidden) => {
+    if (node.hidden !== hidden) node.hidden = hidden;
+  };
+  // Shows the skill view (a row of the view model, or skillPopupViewModel()).
+  const fillSkillCard = (card, view) => {
+    setText(card.title, view.title);
+    setText(card.character, view.characterName);
+    setText(card.state, view.stateText);
+    setAttr(card.state, 'data-state', view.state);
+    if (card.icon.name !== view.icon) {
+      card.icon.name = view.icon;
+      card.icon.initial.textContent = skillLetters(view.id);
+      card.icon.img.removeAttribute('src');
+      showArt();
+    }
+    setText(card.brief, view.brief);
+    card.facts.forEach((slot, i) => {
+      const fact = view.facts[i];
+      setHidden(slot.cell, !fact);
+      setText(slot.label, fact?.label ?? '');
+      setText(slot.value, fact?.value ?? '');
+    });
+    card.rules.forEach((line, i) => {
+      setHidden(line, i >= view.rules.length);
+      setText(line, view.rules[i] ?? '');
+    });
+    if (card.hint) setText(card.hint, view.hint);
+  };
+
   // The shared skill tooltip (filled and placed in showTip below).
   const tip = el('div', 'tooltip', root);
   tip.id = TOOLTIP_ID;
   tip.setAttribute('role', 'tooltip');
   tip.dataset.hudBox = 'tooltip';
   tip.hidden = true;
-  const tipHead = el('div', 'tip-head', tip);
-  const tipTitle = el('div', 'tip-title', tipHead);
-  const tipState = el('div', 'tip-state', tipHead);
-  const tipText = el('div', 'tip-text', tip);
-  el('div', 'tip-rule', tip);
-  const tipHint = el('div', 'tip-hint', tip);
+  const tipCard = skillCard(tip, false);
 
   // The skill detail popup (filled and placed in openPopup below).
   const popup = el('div', 'skill-popup', root);
@@ -143,12 +203,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   popup.setAttribute('role', 'dialog');
   popup.dataset.hudBox = 'skill-popup';
   popup.hidden = true;
-  const popHead = el('div', 'tip-head', popup);
-  const popTitle = el('div', 'pop-title', popHead);
-  const popState = el('div', 'tip-state', popHead);
-  const popText = el('div', 'pop-text', popup);
-  el('div', 'tip-rule', popup);
-  const popHint = el('div', 'tip-hint', popup);
+  const popCard = skillCard(popup, true);
 
   // A skill button: a row of the expanded card or a button of the pill.
   // Both run onSkill, unless a long press just showed the tooltip. slot.id
@@ -439,12 +494,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   let pressed = false;
   function fillTip() {
     const view = cards[tipOwner.c].skills[tipOwner.s].view;
-    if (!view) return;
-    setText(tipTitle, view.title);
-    setText(tipState, view.stateText);
-    setAttr(tipState, 'data-state', view.state);
-    setText(tipText, view.description);
-    setText(tipHint, view.hint);
+    if (view) fillSkillCard(tipCard, view);
   }
   function showTip(button, c, s) {
     clearTimeout(hoverTimer);
@@ -526,11 +576,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   function fillPopup() {
     const view = lastVm && skillPopupViewModel(lastVm, popupOwner.player, popupOwner.skillId);
     if (!view) return;
-    setText(popTitle, view.title);
-    setText(popState, view.stateText);
-    setAttr(popState, 'data-state', view.state);
-    setText(popText, view.description);
-    setText(popHint, view.hint);
+    fillSkillCard(popCard, view);
     setAttr(popup, 'aria-label', view.title);
   }
   function openPopup(button, player, skillId, c) {
@@ -671,6 +717,19 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
 
     // Sets data-quality: Low is solid, Medium blurs 10 px, High 18 px.
     setQuality,
+
+    // Opens the popup of `skillId` on the card of `player` as a click would,
+    // also in the slim layouts (the screenshot tool shows it on the phone
+    // shape). Needs a rendered view model; false when there is no such skill
+    // or its button is not drawn.
+    openSkillPopup(player, skillId) {
+      const c = player === X ? 0 : 1;
+      const row = lastVm && cards[c].skills.find((r) => r.slot.id === skillId);
+      if (!row) return false;
+      hideTip();
+      openPopup(cards[c].folded ? row.pill : row.button, player, skillId, c);
+      return popupOwner !== null;
+    },
 
     show(visible) {
       if (root.hidden === visible) {

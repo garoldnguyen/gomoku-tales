@@ -8,6 +8,7 @@
 import { X } from '../logic/board.js';
 import { WIND_RABBIT } from '../logic/characters.js';
 import { createSeats, pickCharacter } from '../logic/seats.js';
+import { SKILLS } from '../logic/skills.js';
 import { HOST, ROOM_SEATS } from '../net/room.js';
 import { normalizeQuality } from '../render3d/quality.js';
 import { GAME_OVER, LOBBY, ROOM_CLOSED_SCREEN, SELECT, SPECTATE_SCREEN, WAITING_SCREEN, WATCH } from './app.js';
@@ -180,11 +181,21 @@ export function stillRoomApp(view) {
 
 const DEFAULT_SCENE = 'field';
 
+// The popup parameter (popup=venom, popup=tornadozone): the skill whose popup
+// opens in the first HUD card (docs/skill-popup-design.md section 1). The
+// value is a skill id in any case, with or without separators; anything else
+// is null (no popup).
+export function parsePopupParam(value) {
+  const name = String(value ?? '').toLowerCase().replace(/[^a-z]/g, '');
+  return Object.keys(SKILLS).find((id) => id.toLowerCase() === name) ?? null;
+}
+
 // The shot and quality parameters of a URL search string (or
 // URLSearchParams): null without the shot parameter, else { scene,
-// quality, hud }. An unknown or empty scene is `field`; quality is low, medium
-// or high (missing or unknown values are medium, as for ?quality=); hud is
-// 'expanded' or 'collapsed' (both HUD cards, over any stored choice) or null.
+// quality, hud, popup }. An unknown or empty scene is `field`; quality is low,
+// medium or high (missing or unknown values are medium, as for ?quality=); hud
+// is 'expanded' or 'collapsed' (both HUD cards, over any stored choice) or
+// null; popup is a skill id (parsePopupParam) or null.
 export function parseShotParams(search) {
   const params = typeof search === 'string' || search == null ? new URLSearchParams(search ?? '') : search;
   const shot = params.get('shot');
@@ -194,6 +205,7 @@ export function parseShotParams(search) {
     scene: SHOT_SCENES.includes(name) ? name : DEFAULT_SCENE,
     quality: normalizeQuality(params.get('quality')),
     hud: parseHudParam(params.get('hud')),
+    popup: parsePopupParam(params.get('popup')),
   };
 }
 

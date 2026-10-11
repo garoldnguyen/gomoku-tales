@@ -475,7 +475,7 @@ function startAppMode({ local = false } = {}) {
 // two pictures are the same. No input is attached, so there is no hover.
 // window.__SHOT__.ready turns true once the art and the HUD images are
 // loaded and SHOT_READY_FRAMES frames were drawn at the current window size.
-async function startShotMode({ scene }) {
+async function startShotMode({ scene, popup }) {
   const game = createLocalGame({ random: seededRandom(SHOT_SEED), characters: shotCharacters(scene) });
   const staged = setUpShotScene(game, scene);
   // The menu, howto and settings scenes show the menu layer over the empty
@@ -524,6 +524,7 @@ async function startShotMode({ scene }) {
   state.info.rocks = rocks.length;
   state.info.turn = turn;
   state.info.timeMs = SHOT_TIME_MS;
+  let popupAsked = popup === null; // popup=<skill>: its popup opens once in the first card
   let width = -1;
   let height = -1;
   let drawn = 0;
@@ -540,6 +541,10 @@ async function startShotMode({ scene }) {
       renderer.drawGameScreen(ctx, frameViewOf(view, SHOT_TIME_MS, effects, null));
       if (overView) view.status = null; // the turn pill reads the winner, as at the end of a game
       if (hud) showHud(game, view, hudPlayer, hudWinner, null);
+      if (hud && !popupAsked) {
+        popupAsked = true;
+        state.info.popup = hud.openSkillPopup(X, popup) ? 1 : 0;
+      }
     }
     shotScreens?.setFrosted(blursMenus(renderer.features));
     drawn++;

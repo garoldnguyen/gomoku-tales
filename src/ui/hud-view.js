@@ -56,6 +56,7 @@ export const STATE_COOLING = 'cooling';
 export const STATE_WAITING = 'waiting';
 
 export const PLANT_HINT = 'Plant a seed';
+const NO_LINES = Object.freeze([]);
 // The localPlayer of a spectator (Watch a match): no card is its own, so
 // every skill row is disabled and the turn pill never asks it to plant.
 export const SPECTATOR_VIEW = 'spectator';
@@ -173,6 +174,7 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
     lock,
     skills: character.skills.map((skillId) => skillView(state, player, skillId, {
       over, active, yours, targeting, usedSkill: active && !over && Boolean(state.skillUsed), locked: lock !== null,
+      characterName: character.name,
     })),
   };
 }
@@ -184,7 +186,7 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
 // usedSkill (Free Action): the player to move already used a skill this
 // turn, so every other skill is off until the next turn; the skill used keeps
 // the cooldown it started at once, which is checked first and shows at once.
-function skillView(state, player, skillId, { over, active, yours, targeting, usedSkill, locked }) {
+function skillView(state, player, skillId, { over, active, yours, targeting, usedSkill, locked, characterName }) {
   const info = skillInfo(skillId);
   const title = info?.title ?? getSkill(skillId).name;
   const passive = isPassiveSkill(skillId);
@@ -232,6 +234,7 @@ function skillView(state, player, skillId, { over, active, yours, targeting, use
     id: skillId,
     player,
     title,
+    characterName,
     icon: SKILL_ICON_ART[skillId],
     state: skillState,
     stateText: text,
@@ -246,15 +249,24 @@ function skillView(state, player, skillId, { over, active, yours, targeting, use
     disabled: passive || look === OFF || look === COOLING || !yours,
     ariaLabel: `${title}: ${text}`,
     description: info?.description ?? '',
+    // The compact popup and tooltip text (skill-info.js): the shared frozen
+    // arrays of SKILL_INFO, so a render allocates nothing.
+    brief: info?.brief ?? '',
+    facts: info?.facts ?? NO_LINES,
+    rules: info?.rules ?? NO_LINES,
     hint: usedSkill && !passive ? STRINGS.skillUsedHint : info?.hint ?? '',
   };
 }
 
-// The skill detail popup (Design v4): what a click on a skill button opens
-// next to its card, read from a view model of hudViewModel(). Returns
-// { player, id, title, state, stateText, description, hint } or null when
-// the card has no such skill. The text comes from SKILL_INFO through the
-// skill row, never typed again.
+// The skill detail popup (docs/skill-popup-design.md section 1) and the
+// tooltip: what a click on a skill button opens next to its card, read from a
+// view model of hudViewModel(). Returns { player, id, title, characterName,
+// icon, state, stateText, brief, facts, rules, hint, description } or null
+// when the card has no such skill. characterName is the name of the character
+// of that player's card (CHARACTERS), icon the art key of the skill icon. The
+// text comes from SKILL_INFO through the skill row, never typed again; the
+// tooltip shows the header, the brief and the facts, the popup also the rules
+// and the hint.
 export function skillPopupViewModel(vm, player, skillId) {
   const row = vm.cards.find((c) => c.player === player)?.skills.find((s) => s.id === skillId);
   if (!row) return null;
@@ -262,10 +274,15 @@ export function skillPopupViewModel(vm, player, skillId) {
     player,
     id: skillId,
     title: row.title,
+    characterName: row.characterName,
+    icon: row.icon,
     state: row.state,
     stateText: row.stateText,
-    description: row.description,
+    brief: row.brief,
+    facts: row.facts,
+    rules: row.rules,
     hint: row.hint,
+    description: row.description,
   };
 }
 
