@@ -39,6 +39,9 @@ pixel ratio on a phone.
    Medium on a phone draws a third fewer pixels. A picture of the board with and without it looks the same
    at the size of a phone.
 
+3. The HUD paper (`docs/hud-characters.md`) has no `backdrop-filter`: it is 97 percent opaque, so the blur never
+   showed, and it was the costliest thing the browser did over the moving scene.
+
 What did not change: the quality table's other rows, the art, the rules, the shot mode (its own loop), and
 how a computer looks: the pace on a computer is 60 while playing.
 

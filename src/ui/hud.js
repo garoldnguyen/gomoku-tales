@@ -36,7 +36,6 @@ import { characterForStone } from '../logic/characters.js';
 import { getSkill } from '../logic/skills.js';
 import { HISS_WAVE_MS, HUD_SHAKE_MS, SKILL_BANNER_MS, SKILL_BANNER_SPARKS } from '../config.js';
 import { DUST_COUNT, FEATHER_COUNT, castCssVars, castDurationMs, shakeFrames } from './cast-view.js';
-import { CARD_ART_HTML, RULE_ART_HTML } from './hud-ornaments.js';
 import { CARD_HEIGHT, chevronSize, hudFoldLayout, pillScale, topBarLayout } from './hud-layout.js';
 import { PORTRAIT_ART, QUALITY_CHOICES, SKILL_ICON_ART, skillPopupViewModel } from './hud-view.js';
 import { FACTS_MAX, RULES_MAX } from './skill-info.js';
@@ -141,6 +140,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     const icon = artImage(el('span', 'ico pop-ico', head), null, '');
     const who = el('div', 'pop-who', head);
     const card = {
+      root: parent,
       icon,
       title: el('div', 'pop-title', who),
       character: el('div', 'pop-char', who),
@@ -176,6 +176,8 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   };
   // Shows the skill view (a row of the view model, or skillPopupViewModel()).
   const fillSkillCard = (card, view) => {
+    setAttr(card.root, 'data-character', view.character ?? '');
+    setAttr(card.root, 'data-skill', view.id);
     setText(card.title, view.title);
     setText(card.character, view.characterName);
     setText(card.state, view.stateText);
@@ -252,11 +254,8 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     const card = el('section', `card ${player === X ? 'left' : 'right'} glass`, root);
     card.setAttribute('aria-label', character.name);
     card.dataset.hudBox = `card-${team}`;
-    // The character's own look (hud.css [data-character]) and its ornaments.
+    // The character's own colour (hud.css [data-character]).
     card.dataset.character = character.id;
-    const orn = el('div', 'orn', card);
-    orn.setAttribute('aria-hidden', 'true');
-    orn.innerHTML = CARD_ART_HTML;
     const whoRow = el('div', 'who-row', card);
     const tile = el('div', 'tile', whoRow);
     const portrait = artImage(tile, PORTRAIT_ART[character.id], character.name[0]);
@@ -284,11 +283,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     rune.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg><span class="lock-text"></span>';
     const runeText = rune.querySelector('.lock-text');
     el('div', 'rule', body);
-    const label = el('div', 'label', body);
-    label.textContent = 'SKILLS';
-    const ruleArt = el('span', 'rule-art', label);
-    ruleArt.setAttribute('aria-hidden', 'true');
-    ruleArt.innerHTML = RULE_ART_HTML;
+    el('div', 'label', body).textContent = 'SKILLS';
     const list = el('div', 'skills', body);
     const skills = character.skills.map((skillId, s) => {
       const slot = { id: skillId };
@@ -770,6 +765,7 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
           }
           for (const button of [row.button, row.pill]) button.classList.toggle('is-dimmed', skill.dimmed);
           setAttr(row.pill, 'data-state', skill.state);
+          setAttr(row.button, 'data-state', skill.state);
           setText(row.title, skill.title);
           setText(row.state, skill.stateText);
           const count = skill.cooldownTurns > 0 ? String(skill.cooldownTurns) : '';

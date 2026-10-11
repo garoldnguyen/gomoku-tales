@@ -181,7 +181,7 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
     lock,
     skills: character.skills.map((skillId) => skillView(state, player, skillId, {
       over, active, yours, targeting, usedSkill: active && !over && Boolean(state.skillUsed), locked: lock !== null,
-      characterName: character.name,
+      characterName: character.name, characterId: character.id,
     })),
   };
 }
@@ -193,7 +193,7 @@ function cardView(state, player, { over, winner, toMove, localPlayer, targeting,
 // usedSkill (Free Action): the player to move already used a skill this
 // turn, so every other skill is off until the next turn; the skill used keeps
 // the cooldown it started at once, which is checked first and shows at once.
-function skillView(state, player, skillId, { over, active, yours, targeting, usedSkill, locked, characterName }) {
+function skillView(state, player, skillId, { over, active, yours, targeting, usedSkill, locked, characterName, characterId }) {
   const info = skillInfo(skillId);
   const title = info?.title ?? getSkill(skillId).name;
   const passive = isPassiveSkill(skillId);
@@ -242,6 +242,8 @@ function skillView(state, player, skillId, { over, active, yours, targeting, use
     player,
     title,
     characterName,
+    // hud.css gives the tooltip and popup of a skill its character's colour (data-character)
+    character: characterId,
     icon: SKILL_ICON_ART[skillId],
     state: skillState,
     stateText: text,
@@ -283,6 +285,7 @@ export function skillPopupViewModel(vm, player, skillId) {
     id: skillId,
     title: row.title,
     characterName: row.characterName,
+    character: row.character,
     icon: row.icon,
     state: row.state,
     stateText: row.stateText,
