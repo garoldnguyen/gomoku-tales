@@ -261,17 +261,17 @@ export function describeEvents(events) {
 function describeEvent(event) {
   switch (event.type) {
     case 'dashAnnounced':
-      return 'Wind Dash! The stone dashes after the next turn.';
+      return 'Wind Dash! The plant dashes after the next turn.';
     case 'dashResolved':
       return 'Wind Dash landed.';
     case 'dashFailed':
-      return event.reason === 'targetTaken' ? 'Wind Dash failed: the target cell is taken.' : 'Wind Dash failed: the stone is gone.';
+      return event.reason === 'targetTaken' ? 'Wind Dash failed: the target cell is taken.' : 'Wind Dash failed: the plant is gone.';
     case 'tornadoAnnounced':
       return event.hidden ? 'Tornado Zone! Somewhere a storm is waiting.' : `Tornado Zone! The trap waits for ${TORNADO_TURNS} ${TORNADO_TURNS === 1 ? 'turn' : 'turns'}.`;
     case 'tornadoStorm':
-      return 'The dandelion storm threw the stone away!';
+      return 'The dandelion storm threw the plant away!';
     case 'throwBlocked':
-      return 'The storm had nowhere to throw the stone.';
+      return 'The storm had nowhere to throw the plant.';
     case 'mudPlaced':
       return 'Mud Trap! A mud puddle.';
     case 'mudDried':

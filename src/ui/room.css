@@ -1083,3 +1083,47 @@
     animation: none;
   }
 }
+
+/* A window shorter than the panel (docs/mobile.md): a phone in Safari or an in-app browser, where the
+   toolbars take 100 to 150 px of an 844 px screen, or a phone turned sideways. The panel is centred in
+   the window, so the part that did not fit was cut off at the top and the bottom with no way to reach
+   it: Ready and Leave were out of the window. Now the panel scrolls inside the window and its seats,
+   Ready and Back or Leave stay at the bottom of it, so no button is ever out of reach. The bar takes
+   the panel's padding as its own (negative margins), so it does not change the panel's height. */
+@media (max-width: 600px), (max-height: 600px) {
+  #screens .card.select-card {
+    --bar-pad-x: calc(var(--u) * 24);
+    --bar-pad-y: calc(var(--u) * 15);
+    max-height: calc(var(--vh100) - var(--u) * 24);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #screens .select-card .select-actions {
+    position: sticky;
+    bottom: calc(var(--bar-pad-y) * -1);
+    z-index: 1;
+    box-sizing: border-box;
+    margin: -8px calc(var(--bar-pad-x) * -1) calc(var(--bar-pad-y) * -1);
+    width: auto;
+    padding: 8px var(--bar-pad-x) var(--bar-pad-y);
+  }
+}
+
+@media (max-width: 600px) {
+  #screens .card.select-card {
+    --bar-pad-x: 14px;
+    --bar-pad-y: 12px;
+  }
+}
+
+/* Where the panel may scroll, the bar is solid paper with a hairline above it, so what scrolls under
+   it never shows through. (A tall window keeps the bar clear, like the rest of the see-through panel.) */
+@media (max-width: 600px) and (max-height: 880px), (max-height: 600px) {
+  #screens .select-card .select-actions {
+    background: var(--card-solid);
+    box-shadow: 0 -1px 0 var(--hair);
+  }
+}

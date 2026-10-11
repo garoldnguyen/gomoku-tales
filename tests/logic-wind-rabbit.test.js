@@ -78,9 +78,9 @@ test('Wind Dash needs one of your own stones and an empty target cell on the boa
   const state = stateWith([[3, 3, X], [4, 4, O], [5, 5, ROCK], [6, 6, X]]);
   const action = (from, to) => ({ player: X, skill: WIND_DASH, target: { from, to } });
   const free = { x: 10, y: 10 };
-  assertSkillRejected(state, action({ x: 0, y: 0 }, free), /your own stones/);
-  assertSkillRejected(state, action({ x: 4, y: 4 }, free), /your own stones/);
-  assertSkillRejected(state, action({ x: 5, y: 5 }, free), /your own stones/);
+  assertSkillRejected(state, action({ x: 0, y: 0 }, free), /your own plants/);
+  assertSkillRejected(state, action({ x: 4, y: 4 }, free), /your own plants/);
+  assertSkillRejected(state, action({ x: 5, y: 5 }, free), /your own plants/);
   assertSkillRejected(state, action({ x: -1, y: 3 }, free), /on the board/);
   assertSkillRejected(state, action({ x: 3, y: 3 }, { x: 6, y: 6 }), /not empty/);
   assertSkillRejected(state, action({ x: 3, y: 3 }, { x: 4, y: 4 }), /not empty/);

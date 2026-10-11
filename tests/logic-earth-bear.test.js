@@ -330,9 +330,9 @@ test('Petrification refuses an empty cell, a rock, an own plant, a sunk seed and
   state.rocks = [{ x: 5, y: 5 }];
   state.sunk = [{ x: 8, y: 8, player: X, surfacesAfterTurn: 9 }];
   const action = (target) => ({ player: O, skill: PETRIFICATION, target });
-  assertSkillRejected(state, action({ x: 4, y: 4 }), /opponent's stones/);
-  assertSkillRejected(state, action({ x: 5, y: 5 }), /opponent's stones/);
-  assertSkillRejected(state, action({ x: 0, y: 0 }), /opponent's stones/);
+  assertSkillRejected(state, action({ x: 4, y: 4 }), /opponent's plants/);
+  assertSkillRejected(state, action({ x: 5, y: 5 }), /opponent's plants/);
+  assertSkillRejected(state, action({ x: 0, y: 0 }), /opponent's plants/);
   assertSkillRejected(state, action({ x: 8, y: 8 }), /That plant is sunk in mud\./);
   assertSkillRejected(state, action({ x: BOARD_SIZE, y: 0 }), /on the board/);
   assertSkillRejected(state, action({ x: -1, y: 0 }), /on the board/);
@@ -360,7 +360,7 @@ test('a petrified plant is a rock for good: nobody plants on it and it never bre
   }
   assert.deepEqual(state.rocks, [{ x: 7, y: 7 }]);
   assertSkillRejected({ ...state, currentPlayer: O, cooldowns: { ...state.cooldowns, O: { ...state.cooldowns.O, [PETRIFICATION]: 0 } } },
-    { player: O, skill: PETRIFICATION, target: { x: 7, y: 7 } }, /opponent's stones/);
+    { player: O, skill: PETRIFICATION, target: { x: 7, y: 7 } }, /opponent's plants/);
 });
 
 test('a petrified plant breaks the opponent\'s line', () => {

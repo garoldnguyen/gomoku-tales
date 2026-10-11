@@ -432,7 +432,7 @@ test('the status lines say to plant a seed after a skill', () => {
   assert.equal(statusLine({ state: used, you: X, yourTurn: true }), STRINGS.plantToEndTurn);
   assert.equal(statusLine({ state: used, you: O, yourTurn: false }), "Opponent's turn");
   assert.equal(statusLine({ state: newGame(), you: X, yourTurn: true }), 'Your turn');
-  assert.equal(statusLine({ state: used, you: X, yourTurn: true, targeting: { skill: WIND_DASH, from: null } }), 'Wind Dash: choose one of your stones');
+  assert.equal(statusLine({ state: used, you: X, yourTurn: true, targeting: { skill: WIND_DASH, from: null } }), 'Wind Dash: choose one of your plants');
 });
 
 test('the banner tells the player who used a skill to plant, once, and never a spectator or the other seat', () => {

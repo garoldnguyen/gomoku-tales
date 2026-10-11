@@ -63,9 +63,9 @@ function stateWith(cells, currentPlayer = X) {
 test('Wind Dash targeting: pick an own stone, then an empty cell', () => {
   const state = stateWith([[2, 2, X], [3, 3, O], [5, 5, X]]);
   let t = startTargeting(WIND_DASH);
-  assert.equal(targetPrompt(t), 'Wind Dash: choose one of your stones');
-  assert.deepEqual(targetClick(state, X, t, { x: 3, y: 3 }), { error: 'Choose one of your own stones.' });
-  assert.deepEqual(targetClick(state, X, t, { x: 0, y: 0 }), { error: 'Choose one of your own stones.' });
+  assert.equal(targetPrompt(t), 'Wind Dash: choose one of your plants');
+  assert.deepEqual(targetClick(state, X, t, { x: 3, y: 3 }), { error: 'Choose one of your own plants.' });
+  assert.deepEqual(targetClick(state, X, t, { x: 0, y: 0 }), { error: 'Choose one of your own plants.' });
 
   t = targetClick(state, X, t, { x: 2, y: 2 }).targeting;
   assert.deepEqual(t.from, { x: 2, y: 2 });
@@ -110,9 +110,9 @@ test('Mud Trap needs an empty plot that is not mud; Petrification needs an oppon
   assert.deepEqual(targetClick(state, O, mud, { x: 6, y: 6 }), { target: { x: 6, y: 6 } });
 
   const petrify = startTargeting(PETRIFICATION);
-  assert.equal(targetPrompt(petrify), "Petrification: choose an opponent's stone");
+  assert.equal(targetPrompt(petrify), "Petrification: choose an opponent's plant");
   for (const cell of [{ x: 2, y: 2 }, { x: 3, y: 3 }, { x: 6, y: 6 }]) {
-    assert.deepEqual(targetClick(state, O, petrify, cell), { error: "Choose one of your opponent's stones." });
+    assert.deepEqual(targetClick(state, O, petrify, cell), { error: "Choose one of your opponent's plants." });
   }
   assert.deepEqual(targetClick(state, O, petrify, { x: 4, y: 4 }), { error: 'That plant is sunk in mud.' });
   assert.deepEqual(targetClick(state, O, petrify, { x: 1, y: 1 }), { target: { x: 1, y: 1 } });
@@ -261,9 +261,9 @@ test('an invalid target keeps the flow running with a message', () => {
   const game = createLocalGame();
   game.clickSkill(X, WIND_DASH);
   assert.equal(game.click({ x: 4, y: 4 }), false);
-  assert.equal(game.getView().message, 'Choose one of your own stones.');
+  assert.equal(game.getView().message, 'Choose one of your own plants.');
   assert.equal(game.getTargeting().skill, WIND_DASH);
-  assert.equal(game.getView().status, 'Wind Dash: choose one of your stones');
+  assert.equal(game.getView().status, 'Wind Dash: choose one of your plants');
 });
 
 test('Wind Dash end to end: announce, red frame data, opponent turn, landing', () => {
@@ -281,7 +281,7 @@ test('Wind Dash end to end: announce, red frame data, opponent turn, landing', (
   assert.deepEqual(state.pendingDash.to, { x: 5, y: 5 });
   assert.equal(state.currentPlayer, X, 'the turn goes on after a skill');
   assert.equal(game.getTargeting(), null);
-  assert.equal(game.getView().message, 'Wind Dash! The stone dashes after the next turn.');
+  assert.equal(game.getView().message, 'Wind Dash! The plant dashes after the next turn.');
   assert.equal(game.getView().status, STRINGS.plantToEndTurn);
 
   game.click({ x: 3, y: 14 }); // X plants, which ends its turn
@@ -322,7 +322,7 @@ test('Tornado Zone end to end: on one screen the zone is hidden, and a seed plan
   assert.equal(state.board[7][7], null);
   assert.equal(state.board[0][0], O);
   assert.equal(state.tornado, null);
-  assert.equal(game.getView().message, 'The dandelion storm threw the stone away!');
+  assert.equal(game.getView().message, 'The dandelion storm threw the plant away!');
 });
 
 test('Mud Trap end to end: a puddle appears, sinks a seed and dries', () => {
@@ -363,7 +363,7 @@ test('Petrification end to end: an X plant turns into a rock for good', () => {
   game.click({ x: 7, y: 7 }); // X
   game.clickSkill(O, PETRIFICATION);
   assert.equal(game.click({ x: 0, y: 0 }), false);
-  assert.equal(game.getView().message, "Choose one of your opponent's stones.");
+  assert.equal(game.getView().message, "Choose one of your opponent's plants.");
   assert.equal(game.click({ x: 7, y: 7 }), true);
   assert.equal(game.getState().board[7][7], ROCK);
   assert.deepEqual(game.getState().rocks, [{ x: 7, y: 7 }]);
@@ -392,6 +392,6 @@ test('describeEvents skips plain placements and joins skill messages', () => {
   assert.equal(describeEvents([{ type: 'stonePlaced' }, { type: 'turnEnded' }]), null);
   assert.equal(
     describeEvents([{ type: 'stonePlaced' }, { type: 'dashFailed', reason: 'sourceLost' }, { type: 'mudDried' }]),
-    'Wind Dash failed: the stone is gone. The mud dried.',
+    'Wind Dash failed: the plant is gone. The mud dried.',
   );
 });

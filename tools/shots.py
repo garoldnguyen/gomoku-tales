@@ -46,6 +46,8 @@ SHAPES = {
     "small": (800, 600),  # 4:3, small laptop window
     "portrait": (720, 1280),  # 9:16
     "phone": (390, 844),  # about 9:19.5
+    "phone-bar": (390, 690),  # the same phone in Safari or an in-app browser: the toolbars take the rest (docs/mobile.md)
+    "phone-land": (844, 390),  # the phone turned sideways
 }
 
 DEFAULT_CONFIG = {
@@ -318,14 +320,51 @@ def load_config(path=CONFIG_PATH):
 
 JS_PAGE_INFO = """() => {
   const round = (n) => Math.round(n * 10) / 10;
+  // A box inside a panel that scrolls (the character select on a short window, docs/mobile.md) is
+  // measured as the player sees it: cut to the panel's window and to what its sticky bottom bar
+  // leaves. A box wholly out of sight is reachable by scrolling and is left out.
+  const scrollerOf = (el) => {
+    for (let p = el.parentElement; p; p = p.parentElement) {
+      const o = getComputedStyle(p).overflowY;
+      if ((o === 'auto' || o === 'scroll') && p.scrollHeight > p.clientHeight + 1) return p;
+    }
+    return null;
+  };
+  const stickyOf = (el, scroller) => {
+    for (let p = el; p && p !== scroller; p = p.parentElement) {
+      if (getComputedStyle(p).position === 'sticky') return p;
+    }
+    return null;
+  };
+  const bars = new Map();
+  const barsOf = (scroller) => {
+    if (!bars.has(scroller)) {
+      bars.set(scroller, [...scroller.querySelectorAll('*')]
+        .filter((e) => getComputedStyle(e).position === 'sticky').map((e) => e.getBoundingClientRect()));
+    }
+    return bars.get(scroller);
+  };
   const boxes = [];
   for (const el of document.querySelectorAll('[data-hud-box]')) {
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || Number(cs.opacity) < 0.01) continue;
     const r = el.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) continue;
+    let x = r.x, y = r.y, w = r.width, h = r.height;
+    const scroller = scrollerOf(el);
+    if (scroller && !stickyOf(el, scroller)) {
+      const sr = scroller.getBoundingClientRect();
+      const top = Math.max(y, sr.y + scroller.clientTop);
+      let bottom = Math.min(y + h, sr.y + scroller.clientTop + scroller.clientHeight);
+      for (const bar of barsOf(scroller)) {
+        if (bottom > bar.y) bottom = Math.max(Math.min(bottom, bar.y), top);
+      }
+      y = top;
+      h = bottom - top;
+      if (h < 1) continue;
+    }
     boxes.push({ name: el.getAttribute('data-hud-box') || el.id || el.tagName.toLowerCase(),
-                 x: round(r.x), y: round(r.y), w: round(r.width), h: round(r.height) });
+                 x: round(x), y: round(y), w: round(w), h: round(h) });
   }
   // Every visible button element, for the smallest button side.
   const buttons = [];

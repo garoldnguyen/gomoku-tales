@@ -28,7 +28,7 @@ bash tools/shots.sh --url http://127.0.0.1:8000  use a server that is already ru
 python3 -m unittest discover -s tools -p "test_*.py"   unit tests of the tool itself
 ```
 
-Window shapes (device pixel ratio 1): hd 1280x720, fhd 1920x1080, wide 1680x720 (21:9), tablet 1024x768, small 800x600, portrait 720x1280, phone 390x844.
+Window shapes (device pixel ratio 1): hd 1280x720, fhd 1920x1080, wide 1680x720 (21:9), tablet 1024x768, small 800x600, portrait 720x1280, phone 390x844, phone-bar 390x690 (a phone in Safari or an in-app browser, whose toolbars take the rest of the screen), phone-land 844x390 (a phone turned sideways). A box inside a panel that scrolls (the character select on a short window) is measured as the player sees it: cut to the panel and to what its sticky bottom bar leaves; a box wholly out of sight is left out, because it is reachable by scrolling.
 
 Exit codes: 0 all good, 1 problems found, 2 the tool could not run (setup, server or usage).
 

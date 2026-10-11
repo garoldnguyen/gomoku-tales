@@ -149,7 +149,7 @@ For every skill also check that the other window shows the same board afterwards
 
 Play a few normal moves first so Wind Rabbit has some plants on the board.
 
-- [ ] A clicks Wind Dash: the prompt asks for one of A's plants. Clicking an empty plot or an O plant shows "Choose one of your own stones." A seed sunk in mud (6.3) shows "That plant is sunk in mud."
+- [ ] A clicks Wind Dash: the prompt asks for one of A's plants. Clicking an empty plot or an O plant shows "Choose one of your own plants." A seed sunk in mud (6.3) shows "That plant is sunk in mud."
 - [ ] A clicks one of its X plants: it gets a pale blue whirl. Hovering plots shows a red frame on the target. Clicking another X plant picks that one instead; clicking the chosen plant again un-picks it.
 - [ ] **Range:** a target within 3 plots of the source in any direction, diagonals included (a 7 by 7 square around it), is accepted. A target 4 plots away shows "That cell is too far for Wind Dash." A taken plot shows "The target cell is not empty." A mud plot shows "A Wind Dash cannot land on mud." A poisoned plot (6.6) shows "A Wind Dash cannot land on poison."
 - [ ] A clicks a legal empty target: **nothing moves yet.** In both windows the target has a red translucent frame and the source plant a whirl. A must still plant a seed to end the turn.
@@ -192,7 +192,7 @@ Resolve cases (announce a new dash each time the cooldown allows):
 
 ### 6.4 Petrification (Earth Bear, long cooldown)
 
-- [ ] B clicks Petrification: "choose an opponent's plant". Clicking an empty plot, a rock, one of B's own plants or a seed sunk in mud is refused ("Choose one of your opponent's stones." / "That plant is sunk in mud."), using no turn and no cooldown.
+- [ ] B clicks Petrification: "choose an opponent's plant". Clicking an empty plot, a rock, one of B's own plants or a seed sunk in mud is refused ("Choose one of your opponent's plants." / "That plant is sunk in mud."), using no turn and no cooldown.
 - [ ] B picks an X plant: B's card shakes slightly and puffs gold and green dust. In both windows the plant is wrapped in gold energy from below, turns grey, shatters and becomes a mossy rock with dust rising and a light shake. B still plants a seed.
 - [ ] **Permanent:** the rock never breaks, however many turns pass. Nobody can plant, dash or throw onto it, and no skill can target it.
 - [ ] **Breaks lines:** X X rock X X in a row is not a win for anyone.

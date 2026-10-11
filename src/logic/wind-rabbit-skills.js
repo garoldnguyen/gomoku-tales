@@ -25,8 +25,8 @@ export function dashDistance(from, to) {
 export function windDash(state, player, target) {
   const from = target?.from ?? {};
   const to = target?.to ?? {};
-  if (!inBounds(state.board, from.x, from.y)) return { error: 'Choose one of your stones on the board.' };
-  if (state.board[from.y][from.x] !== player) return { error: 'Choose one of your own stones.' };
+  if (!inBounds(state.board, from.x, from.y)) return { error: 'Choose one of your plants on the board.' };
+  if (state.board[from.y][from.x] !== player) return { error: 'Choose one of your own plants.' };
   if (isSunk(state, from.x, from.y)) return { error: SUNK_PLANT_ERROR };
   if (!inBounds(state.board, to.x, to.y)) return { error: 'Choose a target cell on the board.' };
   if (dashDistance(from, to) > WIND_DASH_RANGE) return { error: DASH_TOO_FAR_ERROR };

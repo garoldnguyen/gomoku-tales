@@ -29,13 +29,13 @@ export function startTargeting(skillId) {
 export function targetPrompt(targeting) {
   switch (targeting.skill) {
     case WIND_DASH:
-      return targeting.from ? 'Wind Dash: choose an empty target cell' : 'Wind Dash: choose one of your stones';
+      return targeting.from ? 'Wind Dash: choose an empty target cell' : 'Wind Dash: choose one of your plants';
     case TORNADO_ZONE:
       return STRINGS.tornadoTargetPrompt;
     case MUD_TRAP:
       return 'Mud Trap: choose an empty cell';
     case PETRIFICATION:
-      return "Petrification: choose an opponent's stone";
+      return "Petrification: choose an opponent's plant";
     case VENOM:
       return STRINGS.venomTargetPrompt;
     case CLOUD:
@@ -59,7 +59,7 @@ export function targetClick(state, player, targeting, cell) {
     case WIND_DASH: {
       const { from } = targeting;
       if (!from) {
-        if (content !== player) return { error: 'Choose one of your own stones.' };
+        if (content !== player) return { error: 'Choose one of your own plants.' };
         if (isSunk(state, x, y)) return { error: SUNK_PLANT_ERROR };
         return { targeting: { ...targeting, from: { x, y } } };
       }
@@ -83,7 +83,7 @@ export function targetClick(state, player, targeting, cell) {
       return { target: { x, y } };
     case PETRIFICATION:
     case VENOM:
-      if (content !== opponentOf(player)) return { error: "Choose one of your opponent's stones." };
+      if (content !== opponentOf(player)) return { error: "Choose one of your opponent's plants." };
       if (targeting.skill === PETRIFICATION && isSunk(state, x, y)) return { error: SUNK_PLANT_ERROR };
       return { target: { x, y } };
     default:

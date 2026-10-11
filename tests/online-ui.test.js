@@ -418,7 +418,7 @@ test('a skill prompt still shows under the countdown', () => {
   guest.app.close();
   const view = game.getView();
   assert.equal(view.status, 'Opponent left. You win in 10');
-  assert.equal(view.message, 'Wind Dash: choose one of your stones');
+  assert.equal(view.message, 'Wind Dash: choose one of your plants');
 });
 
 test('the Game over screen shows the host result when both sides counted down at once', () => {

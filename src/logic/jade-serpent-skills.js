@@ -34,7 +34,7 @@ export function venom(state, player, target) {
   const { x, y } = target ?? {};
   if (!inBounds(state.board, x, y)) return { error: 'Choose a cell on the board.' };
   const opponent = player === X ? O : X;
-  if (state.board[y][x] !== opponent) return { error: 'Choose one of your opponent\'s stones.' };
+  if (state.board[y][x] !== opponent) return { error: 'Choose one of your opponent\'s plants.' };
 
   const cells = poisonCells(state.board, x, y);
   if (!hasPlantableCell({ board: state.board, poison: { cells } })) return { error: NO_ROOM_ERROR };

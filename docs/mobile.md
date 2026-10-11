@@ -15,6 +15,7 @@ what the game does about it, and where the code lives. Nothing here changes a ru
 | Tap on a text box under 16 px | iOS zooms into the box and does not zoom back | Join code, name and chat boxes are at least 16 px | `src/ui/screens.css`, `src/ui/chat.css` |
 | Long press | The browser's menu (copy, share, save image) opened over the board; the contextmenu event was also read as a right click and cancelled the preview or the skill | The menu is always suppressed (except in a text box); a finger never counts as a right click on the board or the HUD; a second finger (not primary) is not a press | `src/ui/mobile-guards.js`, `src/ui/input.js`, `src/ui/hud.js` |
 | Text selection, tap highlight, callout | Blue selection on cards, grey flash on taps | `user-select: none` (text boxes keep selection), transparent tap highlight, `-webkit-touch-callout: none` | `index.html` |
+| Browser toolbars take the screen (Safari, in-app browsers) | A phone screen of 844 px shows about 690 px of page. The character select and the waiting room are 805 px tall and were centred, so the top and the bottom were cut off with no way to scroll: Ready and Leave were out of the window, and the Chat button lay over Copy | On a window narrower than 600 px or shorter than 600 px the panel scrolls inside the window and its seats, Ready and Back or Leave stay at the bottom on a solid bar (the bar takes the panel's padding, so the panel's height does not change); a tall window looks as before | `src/ui/room.css` (end of file) |
 | Menus too small | The screens are drawn in a 960 x 540 unit (`--u`), which is tiny on a 390 px wide phone, and the lobby card was wider than the window | A floor for `--u` on narrow windows and on short touch windows; the lobby, join, watch and closed cards fit the width | `src/ui/screens.css` |
 | Screen dims and locks during a slow turn | The lock closes the page's connection: the opponent sees an empty room and the game ends | Screen Wake Lock while past the menu (a game or a room); asked again when the page shows again and on a touch; a refusal or a missing API is ignored | `src/ui/wake-lock.js` |
 | Back button or edge swipe | Left the page and lost the match without a word | One extra history entry while past the menu; Back presses the button the screen shows (Stay of the Leave card, Close of a panel, Back / Leave room / Back to menu, Leave match). On the menu Back leaves as usual | `src/ui/back-guard.js` |
@@ -45,6 +46,10 @@ Open the game on a phone (or Chrome's device mode with touch) and try, in this o
 5. Leave the page for 20 seconds from one phone: the other phone says "Opponent is away. Waiting for them."
    and does not count down. Come back: the game goes on.
 6. Wait two minutes without touching: the screen does not dim (Chrome and Safari 16.4 and later).
+
+Shot shapes `phone-bar` (390 x 690, the phone in Safari) and `phone-land` (844 x 390) show these cases: `bash tools/shots.sh --scene waiting --shape phone-bar`. In a scrolling panel the tool measures each box as the player sees it (cut to the panel, and to what the sticky bar leaves), because a box out of sight is reachable by scrolling.
+
+Not covered: the game over card and the watched game on a phone turned sideways (844 x 390) still lie over the HUD cards.
 
 Tests: `tests/mobile.test.js` (shell, guards, long press, wake lock, back guard, share, status line) and the
 "away" tests at the end of `tests/net.test.js`.

@@ -42,7 +42,7 @@ export function petrification(state, player, target) {
   const { x, y } = target ?? {};
   if (!inBounds(state.board, x, y)) return { error: 'Choose a cell on the board.' };
   const opponent = player === X ? O : X;
-  if (state.board[y][x] !== opponent) return { error: 'Choose one of your opponent\'s stones.' };
+  if (state.board[y][x] !== opponent) return { error: 'Choose one of your opponent\'s plants.' };
   if (isSunk(state, x, y)) return { error: SUNK_PLANT_ERROR };
 
   const board = cloneBoard(state.board);

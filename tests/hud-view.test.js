@@ -73,7 +73,7 @@ test('a skill is selected: Selected on its row and the targeting prompt in the p
   assert.equal(row.selected, true);
   assert.equal(card(vm, X).chip, 'Your turn');
   assert.equal(skill(vm, X, TORNADO_ZONE).stateText, 'Ready');
-  assert.equal(vm.turn.hint, 'Wind Dash: choose one of your stones');
+  assert.equal(vm.turn.hint, 'Wind Dash: choose one of your plants');
   const next = hudViewModel(midGame(), { targeting: { skill: WIND_DASH, from: { x: 7, y: 7 } } }, X);
   assert.equal(next.turn.hint, 'Wind Dash: choose an empty target cell');
 });

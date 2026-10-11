@@ -117,7 +117,7 @@ test('local mode: Jade Serpent can use Hiss (no target) and Venom (an opponent s
   assert.equal(game.clickSkill(X, VENOM), true);
   assert.equal(game.getView().status, STRINGS.venomTargetPrompt);
   assert.equal(game.click({ x: 7, y: 7 }), false);
-  assert.equal(game.getView().message, "Choose one of your opponent's stones.");
+  assert.equal(game.getView().message, "Choose one of your opponent's plants.");
   assert.equal(game.click({ x: 8, y: 8 }), true);
   assert.equal(game.getState().board[8][8], O, 'the plant stays on the board');
   assert.equal(game.getState().poison.cells.length, 9);
