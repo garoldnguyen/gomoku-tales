@@ -117,8 +117,11 @@ export function attachGameInput(canvas, { onHover, onClick, onCancel, onRestart 
   };
 
   // The kind of pointer of the last press ('mouse', 'pen' or 'touch'),
-  // passed with the click (createTouchConfirm).
-  let pointerType = 'mouse';
+  // passed with the click (createTouchConfirm). null: no press seen yet.
+  // The click's own pointerType is not trusted: Safari on iOS 18.2 and later sends a
+  // finger's click as a PointerEvent that says "mouse" (WebKit bug 282988), which made the
+  // first tap plant at once with no preview. Every click follows a pointerdown, whose type is right.
+  let pointerType = null;
   const handlePointerDown = (event) => {
     if (event.isPrimary === false) return; // a second finger (a pinch, a rest of the palm) is not a press
     pointerType = event.pointerType || 'mouse';
@@ -133,7 +136,7 @@ export function attachGameInput(canvas, { onHover, onClick, onCancel, onRestart 
   };
   const handleClick = (event) => {
     if (event.button !== 0) return;
-    onClick({ ...pointFromEvent(event), pointerType: event.pointerType || pointerType });
+    onClick({ ...pointFromEvent(event), pointerType: pointerType ?? (event.pointerType || 'mouse') });
   };
   // A right click cancels. A long press on a touch screen sends the same event, but it is only a
   // finger resting on the board (aiming), so it must not throw the preview or the skill away.

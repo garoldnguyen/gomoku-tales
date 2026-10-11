@@ -9,7 +9,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { installMobileGuards } from '../src/ui/mobile-guards.js';
 import { createWakeLock } from '../src/ui/wake-lock.js';
 import { BACK_TARGETS, createBackGuard, pickBackTarget } from '../src/ui/back-guard.js';
-import { attachGameInput } from '../src/ui/input.js';
+import { TOUCH_ACT, TOUCH_PREVIEW, attachGameInput, createTouchConfirm } from '../src/ui/input.js';
 import { shareInvite } from '../src/ui/room-screens.js';
 import { statusLine } from '../src/ui/online-game.js';
 import { STRINGS } from '../src/ui/strings.js';
@@ -152,6 +152,40 @@ test('long press: a second finger does not change what kind of pointer pressed',
     assert.equal(cancels, 0);
     canvas.fire('click', { button: 0, clientX: 10, clientY: 10 });
     assert.deepEqual(clicks, ['touch'], 'the tap still counts as a finger tap');
+  });
+});
+
+test('Safari on iOS 18.2 says "mouse" on a finger\'s click: the press that came first decides, so the first tap only previews', () => {
+  withFakeWindow(() => {
+    const canvas = fakeTarget({ width: 960, height: 540, getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 }) });
+    const confirm = createTouchConfirm();
+    const seen = [];
+    attachGameInput(canvas, {
+      onHover() {},
+      onClick: ({ pointerType }) => seen.push(confirm.decide(pointerType, { x: 3, y: 4 })),
+      onCancel() {},
+    });
+    for (let tap = 0; tap < 2; tap += 1) {
+      canvas.fire('pointerdown', { pointerType: 'touch', isPrimary: true });
+      canvas.fire('pointerup', { pointerType: 'touch', isPrimary: true });
+      canvas.fire('click', { button: 0, clientX: 10, clientY: 10, pointerType: 'mouse' }); // WebKit bug 282988
+    }
+    assert.deepEqual(seen, [TOUCH_PREVIEW, TOUCH_ACT], 'preview on the first tap, plant on the second');
+  });
+});
+
+test('a click takes the kind of pointer of the press before it: a mouse after a finger acts at once, and a click with no press falls back to its own', () => {
+  withFakeWindow(() => {
+    const canvas = fakeTarget({ width: 960, height: 540, getBoundingClientRect: () => ({ left: 0, top: 0, width: 960, height: 540 }) });
+    const types = [];
+    attachGameInput(canvas, { onHover() {}, onClick: (point) => types.push(point.pointerType), onCancel() {} });
+    canvas.fire('click', { button: 0, clientX: 1, clientY: 1 });
+    canvas.fire('click', { button: 0, clientX: 1, clientY: 1, pointerType: 'pen' });
+    canvas.fire('pointerdown', { pointerType: 'touch', isPrimary: true });
+    canvas.fire('click', { button: 0, clientX: 1, clientY: 1 });
+    canvas.fire('pointerdown', { pointerType: 'mouse', isPrimary: true });
+    canvas.fire('click', { button: 0, clientX: 1, clientY: 1, pointerType: 'touch' });
+    assert.deepEqual(types, ['mouse', 'pen', 'touch', 'mouse']);
   });
 });
 
