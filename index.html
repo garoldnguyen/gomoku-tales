@@ -2,9 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <!-- The phone (docs/mobile.md): no pinch or double tap zoom, the keyboard shrinks only the visible
-       part of the page (the layout stays), and the browser bar and the system bars take the page's colour. -->
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, interactive-widget=resizes-visual">
+  <!-- The phone (docs/mobile.md): pinch zoom stays (the player may want a closer look at the board;
+       double tap zoom is off, see touch-action below), the keyboard shrinks only the visible part of the
+       page (the layout stays), and the browser bar and the system bars take the page's colour. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-visual">
   <meta name="theme-color" content="#14121c">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -24,10 +25,11 @@
       height: 100%;
       overflow: hidden;
       background: #14121c;
-      /* Touch: no pull to refresh or rubber band, no double tap or pinch zoom, no text selection or
-         callout menu on a long press, no grey flash on a tap. Text boxes and the room code stay selectable. */
+      /* Touch: no pull to refresh or rubber band, no double tap zoom (a pinch still zooms), no text
+         selection or callout menu on a long press, no grey flash on a tap. Text boxes and the room code
+         stay selectable. */
       overscroll-behavior: none;
-      touch-action: pan-x pan-y;
+      touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
       -webkit-touch-callout: none;
       -webkit-user-select: none;
@@ -94,9 +96,10 @@
       height: min(var(--vh100), calc(100vw * 9 / 16));
       pointer-events: none;
     }
-    /* The board takes the finger as it is: no scroll, zoom or long press menu starts on it. */
+    /* The board takes one finger as it is: no scroll, double tap zoom or long press menu starts on it,
+       so a second tap on a plot plants. Two fingers still pinch the page. */
     #world {
-      touch-action: none;
+      touch-action: pinch-zoom;
     }
     /* Behind the lobby and room screens the 3D world is blurred (not on
        LOW quality, see src/render3d/quality.js menuBlur). The slight zoom

@@ -8,7 +8,7 @@ what the game does about it, and where the code lives. Nothing here changes a ru
 
 | What the phone does | What went wrong | What the game does | Where |
 |---|---|---|---|
-| Pinch or double tap zooms the page | The board jumped and the HUD scaled | Viewport `maximum-scale=1, user-scalable=no`; `touch-action: pan-x pan-y`; the 3D view has `touch-action: none`; iOS Safari ignores the viewport, so `gesturestart/change/end` and two finger `touchmove` are cancelled | `index.html`, `src/ui/mobile-guards.js` |
+| Double tap zooms the page | The second tap of tap to preview, tap to plant zoomed the page instead of planting | `touch-action: manipulation` on the page (pan and pinch, no double tap zoom) and `pinch-zoom` on the 3D view (one finger is the game's, two fingers pinch). Pinch zoom stays on purpose (the owner wants to zoom in on the board); the viewport has no `maximum-scale` or `user-scalable=no`, and no gesture is cancelled | `index.html`, `src/ui/mobile-guards.js` |
 | Pull down to refresh, rubber band scroll | A drag on the board could reload the page and lose the match | `overscroll-behavior: none`, body `position: fixed` | `index.html` |
 | Address bar slides in and out | `100vh` is taller than what is visible, the bottom of the screen was cut | `--vh100` is `100dvh` where the browser has it, `100vh` elsewhere; the stage and the 3D view use it | `index.html` |
 | Soft keyboard opens | The layout jumped and the game shrank | `interactive-widget=resizes-visual`: the keyboard shrinks only the visible area | `index.html` |
@@ -40,9 +40,9 @@ frame loop, so the frame path stays free of allocation (the FRAME_PATH test of `
 
 Open the game on a phone (or Chrome's device mode with touch) and try, in this order:
 
-1. Menu: pinch, double tap, pull down. Nothing zooms or reloads.
+1. Menu: pinch zooms in and out, double tap does nothing, pull down does not reload.
 2. Create Room, then Back on the phone: the Leave card or the lobby, never the page's previous site.
-3. Join Room: tap the code box. The page does not zoom; the keyboard does not push the cards off screen.
+3. Join Room: tap the code box. The page does not jump in; the keyboard does not push the cards off screen.
 4. In a game: press and hold on a plot (the preview stays), then tap again to plant.
 5. Leave the page for 20 seconds from one phone: the other phone says "Opponent is away. Waiting for them."
    and does not count down. Come back: the game goes on.

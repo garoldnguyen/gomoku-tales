@@ -402,7 +402,7 @@ function startAppMode({ local = false } = {}) {
   // Tell the opponent at once when this window closes or reloads.
   window.addEventListener('pagehide', () => app.close());
 
-  // The phone (docs/mobile.md): the browser's own gestures and menus stay out of the game, the screen
+  // The phone (docs/mobile.md): the browser's long press menu stays out of the game, the screen
   // stays on while a game or a room is open, and the Back button answers as the screen's own Back or
   // Leave button instead of leaving the page. A reload keeps the guard's history entry: forget its mark.
   installMobileGuards(window);

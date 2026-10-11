@@ -46,18 +46,20 @@ function fakeTarget(extra = {}) {
 
 // --- The page shell ---------------------------------------------------------------------------
 
-test('index.html: a viewport that never zooms, a dynamic height, no pull to refresh, no selection', () => {
+test('index.html: pinch zoom stays, a dynamic height, no pull to refresh, no selection, no double tap zoom', () => {
   const viewport = html.match(/<meta name="viewport" content="([^"]*)"/)?.[1] ?? '';
-  for (const part of ['width=device-width', 'initial-scale=1', 'maximum-scale=1', 'user-scalable=no', 'interactive-widget=resizes-visual']) {
+  for (const part of ['width=device-width', 'initial-scale=1', 'interactive-widget=resizes-visual']) {
     assert.ok(viewport.includes(part), `viewport has ${part}`);
   }
+  assert.doesNotMatch(viewport, /maximum-scale|user-scalable/, 'the player can pinch zoom');
   assert.match(html, /:root \{ --vh100: 100vh; \}/, 'the plain height first');
   assert.match(html, /@supports \(height: 100dvh\) \{ :root \{ --vh100: 100dvh; \} \}/, 'the dynamic height where it exists');
   assert.match(html, /overscroll-behavior: none/);
-  assert.match(html, /touch-action: pan-x pan-y/);
+  assert.match(html, /html, body \{[^}]*touch-action: manipulation/s, 'pan and pinch, but no double tap zoom');
+  assert.doesNotMatch(html, /touch-action: (none|pan-x pan-y)/, 'nothing takes the pinch away');
   assert.match(html, /-webkit-touch-callout: none/);
   assert.match(html, /user-select: none/);
-  assert.match(html, /#world \{[^}]*touch-action: none/s, 'a finger on the 3D view is the game\'s, not a scroll');
+  assert.match(html, /#world \{[^}]*touch-action: pinch-zoom/s, 'one finger on the board is the game\'s, two fingers still pinch');
 });
 
 test('index.html: installable on a phone (manifest, theme colour, home screen icon)', () => {
@@ -95,21 +97,18 @@ test('style sheets: a phone floor for the screen unit, and text boxes of at leas
 
 // --- Guards --------------------------------------------------------------------------------
 
-test('installMobileGuards: pinch gestures, two finger moves and long press menus are cancelled', () => {
+test('installMobileGuards: the long press menu is cancelled, pinch gestures are left alone', () => {
   const doc = fakeTarget();
   const off = installMobileGuards({ document: doc }, doc);
-  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
-    assert.equal(doc.fire(type).defaultPrevented, true, type);
-  }
-  assert.equal(doc.fire('touchmove', { touches: [{}, {}] }).defaultPrevented, true, 'two fingers');
-  assert.equal(doc.fire('touchmove', { touches: [{}] }).defaultPrevented, false, 'one finger still scrolls or drags');
   assert.equal(doc.fire('contextmenu', { target: { tagName: 'CANVAS' } }).defaultPrevented, true);
   assert.equal(doc.fire('contextmenu', { target: { tagName: 'INPUT' } }).defaultPrevented, false, 'a text box keeps its paste menu');
+  for (const type of ['gesturestart', 'gesturechange', 'gestureend']) {
+    assert.equal(doc.count(type), 0, `${type} is not taken: the page zooms`);
+  }
+  assert.equal(doc.count('touchmove'), 0, 'two fingers are not taken either');
   off();
-  assert.equal(doc.count('gesturestart'), 0);
-  assert.equal(doc.count('touchmove'), 0);
   assert.equal(doc.count('contextmenu'), 0);
-  assert.equal(doc.fire('gesturestart').defaultPrevented, false, 'taken off');
+  assert.equal(doc.fire('contextmenu', { target: { tagName: 'CANVAS' } }).defaultPrevented, false, 'taken off');
 });
 
 // --- Long press ----------------------------------------------------------------------------
