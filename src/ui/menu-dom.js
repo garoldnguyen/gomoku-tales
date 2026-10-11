@@ -156,13 +156,13 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
     for (const line of vm.rules) el('li', null, rules).textContent = line;
     el('h3', 'skills-title', howto.body).textContent = vm.skillsTitle;
     for (const character of vm.characters) {
-      const group = el('section', `character team-${character.team}`, howto.body);
+      const group = el('section', 'character', howto.body);
       group.dataset.character = character.id;
+      group.style.setProperty('--team', character.colour);
       const who = el('div', 'who', group);
       artImage(el('div', 'portrait', who), character.portrait, character.name.charAt(0));
       const name = el('div', 'who-name', who);
       el('span', 'name', name).textContent = character.name;
-      el('span', 'stone', name).textContent = character.stone;
       for (const skill of character.skills) {
         const row = el('div', 'skill', group);
         row.dataset.skill = skill.id;

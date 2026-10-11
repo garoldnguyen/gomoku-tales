@@ -415,10 +415,11 @@
   margin-top: 6px;
 }
 
+/* --team is the character's own mark colour, set by menu-dom.js (a character has no fixed side) */
 #flow .character {
   --team: var(--blue);
-  --team-tile: var(--blue-tile);
-  --team-ink: var(--blue-ink);
+  --team-tile: color-mix(in srgb, var(--team) 24%, transparent);
+  --team-ink: color-mix(in srgb, var(--team) 40%, white);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -427,12 +428,6 @@
   border-top: 1px solid var(--hair);
   border-radius: 0;
   background: none;
-}
-
-#flow .character.team-red {
-  --team: var(--red);
-  --team-tile: var(--red-tile);
-  --team-ink: var(--red-ink);
 }
 
 #flow .character + .character {
@@ -505,16 +500,6 @@
   font-family: var(--display);
   font-size: 28px;
   font-weight: 600;
-}
-
-#flow .stone {
-  padding: 2px 10px;
-  border-radius: 0;
-  font-family: var(--label);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--team-ink);
-  background: var(--team-tile);
 }
 
 #flow .skill {

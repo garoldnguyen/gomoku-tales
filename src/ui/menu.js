@@ -4,9 +4,9 @@
 // draws, so node tests and shot mode see the same screens.
 
 import * as CONFIG from '../config.js';
-import { X } from '../logic/board.js';
-import { CHARACTERS, EARTH_BEAR, WIND_RABBIT, stoneForCharacter } from '../logic/characters.js';
-import { LONG, getSkill } from '../logic/skills.js';
+import { CHARACTERS } from '../logic/characters.js';
+import { LONG, getSkill, isPassiveSkill } from '../logic/skills.js';
+import { markLookFor } from '../render3d/character-look.js';
 import { QUALITY_LEVELS } from '../render3d/quality.js';
 import { FLOW_EVENTS, OVERLAYS, SCREENS } from './flow.js';
 import { fullscreenViewModel } from './fullscreen.js';
@@ -102,37 +102,39 @@ export const MENU_EVENTS = Object.freeze([...MENU_BUTTONS.map((button) => button
 // the focus back.
 export const OVERLAY_OPENER = Object.freeze({ [OVERLAYS.HOWTO]: 'howto', [OVERLAYS.SETTINGS]: 'settings' });
 
-// The six rules lines of How to Play with the numbers of `config` (the
+// The seven rules lines of How to Play with the numbers of `config` (the
 // game's src/config.js unless a test injects its own).
 export function rulesLines(config = CONFIG) {
   return howToRules(config);
 }
 
-// How to Play: the rules lines, then each character with its skills. The
-// skill text is SKILL_INFO's own, never a copy.
+// How to Play: the rules lines, then each of the four characters with its
+// skills, in the order of the character table. A character has no fixed side
+// (the pick order decides who plays X), so a group is coloured by the
+// character's own mark colour, not by a team. The skill text is SKILL_INFO's
+// own, never a copy; a passive skill (Sky Watch) says Always on, not a rest.
 export function howToViewModel(config = CONFIG) {
   return {
     title: STRINGS.howToTitle,
     close: STRINGS.close,
     rules: rulesLines(config),
     skillsTitle: STRINGS.howToSkillsTitle,
-    characters: [WIND_RABBIT, EARTH_BEAR].map((id) => {
+    characters: Object.keys(CHARACTERS).map((id) => {
       const character = CHARACTERS[id];
-      const stone = stoneForCharacter(id);
       return {
         id,
         name: character.name,
-        stone,
-        team: stone === X ? 'blue' : 'red',
+        colour: markLookFor(id).colour,
         portrait: PORTRAIT_ART[id],
         skills: character.skills.map((skillId) => {
-          const turns = getSkill(skillId).cooldownClass === LONG ? config.COOLDOWN_LONG : config.COOLDOWN_SHORT;
+          const passive = isPassiveSkill(skillId);
+          const turns = passive ? 0 : getSkill(skillId).cooldownClass === LONG ? config.COOLDOWN_LONG : config.COOLDOWN_SHORT;
           return {
             id: skillId,
             icon: SKILL_ICON_ART[skillId],
             title: SKILL_INFO[skillId].title,
             cooldown: turns,
-            cooldownText: `${STRINGS.howToCooldown} ${turns} ${STRINGS.howToTurns}`,
+            cooldownText: passive ? STRINGS.howToAlwaysOn : `${STRINGS.howToCooldown} ${turns} ${STRINGS.howToTurns}`,
             description: SKILL_INFO[skillId].description,
           };
         }),

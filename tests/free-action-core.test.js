@@ -529,5 +529,5 @@ test('How to Play says one skill and then a planting, not that a skill uses the 
   assert.match(rule, /one skill/);
   assert.match(rule, /plant a seed/);
   assert.doesNotMatch(rule, /whole turn|takes your/);
-  for (let n = 1; n <= 6; n++) assert.doesNotMatch(STRINGS[`howToRule${n}`], /uses? (up )?(the|your) (whole )?turn/i);
+  for (let n = 1; n <= 7; n++) assert.doesNotMatch(STRINGS[`howToRule${n}`], /uses? (up )?(the|your) (whole )?turn/i);
 });

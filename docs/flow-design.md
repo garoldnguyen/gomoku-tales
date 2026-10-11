@@ -45,14 +45,15 @@ Every screen is a DOM layer over the existing 3D world in the Ivory look (see 3.
 
 ### 3.2 How to Play
 - A glass panel at most 720 px wide and 80 percent of the viewport high. It scrolls inside itself. The Close button is 44 px. Escape closes it and focus returns to the button that opened it.
-- Six rules lines, produced by a pure rulesLines(config) that reads the numbers from src/config.js. Reference wording (the builder must check each sentence against src/logic and fix the sentence, never the rules):
-  1. Two players take turns. The player who picked first plants X and always goes first; the other plants O. (Not tied to a character: any of the four may be X or O.)
-  2. On your turn you may use one skill that is ready. Then you must plant a seed on an empty plot to end your turn. (Free Action, docs/design.md section 4)
-  3. Five or more of your plants in an unbroken row, across, down or diagonally, win the game. (number: WIN_LENGTH)
-  4. After you use a skill it rests for your next 3 turns (Wind Dash, Mud Trap) or your next 6 turns (Tornado Zone, Petrification). (numbers: COOLDOWN_SHORT, COOLDOWN_LONG)
+- Seven rules lines, produced by a pure rulesLines(config) that reads the numbers from src/config.js and the skill names from the skill table and SKILL_INFO. Each sentence was checked against src/logic and the rules are never changed to fit a sentence:
+  1. Two players take turns. The player who picked a character first plants X and always goes first. The other plants O. (No character is named: the side comes from the pick order, any of the four may be X or O.)
+  2. On your turn you may use one skill that is ready. A skill is a free action: it never ends your turn. Then you must plant a seed on an empty plot to end your turn. (Free Action, docs/design.md section 4)
+  3. 5 or more of your plants in an unbroken row, across, down or diagonally, win the game. (number: WIN_LENGTH)
+  4. After you use a skill it rests for your next 3 turns (Wind Dash, Mud Trap, Hiss) or your next 6 turns (Tornado Zone, Petrification, Venom, Cloud). Sky Watch is always on and never rests. (numbers: COOLDOWN_SHORT, COOLDOWN_LONG; the two lists follow the cooldown class of each skill in src/logic/skills.js)
   5. A mud puddle dries after 4 turns, counting both players' turns. A seed planted in it counts for no row for 1 turn. A rock blocks a plot for both players for good. (numbers: MUD_LIFETIME_TURNS, MUD_SINK_TURNS)
-  6. If the board fills up and nobody has five in a row, the game is a draw.
-- Then the four skills grouped by character: portrait, name, stone letter, and for each skill the icon, the name, the cooldown number and the description from SKILL_INFO. Skill text is never copied; it is read from SKILL_INFO.
+  6. If the board fills up and nobody has 5 in a row, the game is a draw.
+  7. Point at a plot to see the plant that would grow there, and click to plant it. On a touch screen, tap once to preview and tap again to plant. (the glowing hover plot and its ghost plant, docs/art-direction-v3.md section 3)
+- Then all four characters in the order of the character table (Wind Rabbit, Earth Bear, Jade Serpent, Cloud Eagle), each with its portrait, its name and, for each of its two skills, the icon, the name, the rest ("Rests 3 turns", or "Always on" for the passive Sky Watch) and the description from SKILL_INFO. A character has no fixed side, so there is no X or O letter and each group takes the mark colour of its character (`--team`, set from CHARACTER_LOOK). Skill text is never copied; it is read from SKILL_INFO.
 
 ### 3.3 Settings
 - Graphics quality: a segmented choice with one option per level of the table in src/render3d/quality.js, in table order. Names are read from the table (no other code tests a level name). One short help line per level from strings.js. Choosing a level applies at once, saves through the existing saving function and never reloads the page.
@@ -274,7 +275,7 @@ New scenes for docs/shots.md (static, no network, every one built from a fixed v
 ## 9. Owner checklist (after step 7)
 1. Reload the page. The menu is the first screen, the farm is behind it, there are five buttons.
 2. Play on this computer: the game starts. Play until someone wins. Press Rematch: a clean board appears at once, no old plants, rocks or banners. Press Back to Menu.
-3. How to Play: the skill numbers read 3, 6 and 4 turns, the four skill texts are there, nothing is cut off at the window size you use.
+3. How to Play: the seven rules lines, all four characters with their eight skills (the rests read 3 and 6 turns, Sky Watch Always on), nothing is cut off at the window size you use.
 4. Settings: switch Low, Medium, High. The page does not reload. The Fullscreen button works.
 5. Two windows (two computers over the relay, or two windows of the same browser with ?transport=broadcast): window A creates a room, window B joins with the code. In the character select A picks Wind Rabbit; B sees Wind Rabbit taken and picks another character. Both press Ready: both enter the game at once, A (the first pick) plays X.
 6. Type a code containing C, F, Z, H or V in the join box. Nothing else happens (no fullscreen, no HUD toggle).

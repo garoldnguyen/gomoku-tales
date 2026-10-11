@@ -5,9 +5,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as config from '../src/config.js';
-import { CHARACTERS, EARTH_BEAR, WIND_RABBIT, stoneForCharacter } from '../src/logic/characters.js';
+import { CHARACTERS } from '../src/logic/characters.js';
+import { cooldownTurns, isPassiveSkill } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
+import { markLookFor } from '../src/render3d/character-look.js';
 import { QUALITY_LEVELS } from '../src/render3d/quality.js';
 import { GAME, LOBBY, MENU, SELECT, createApp } from '../src/ui/app.js';
 import { FLOW_EVENTS, OVERLAYS, SCREENS, flowReducer, initialFlow } from '../src/ui/flow.js';
@@ -97,10 +99,10 @@ test('?local=1 still starts in the local game; the menu, howto and settings shot
 
 // --- How to Play ---
 
-test('rulesLines: six lines whose numbers come from the injected config', () => {
+test('rulesLines: seven lines whose numbers come from the injected config', () => {
   const lines = rulesLines();
-  assert.equal(lines.length, 6);
-  assert.deepEqual(lines, [1, 2, 3, 4, 5, 6].map((n) => STRINGS[`howToRule${n}`]));
+  assert.equal(lines.length, 7);
+  assert.deepEqual(lines, [1, 2, 3, 4, 5, 6, 7].map((n) => STRINGS[`howToRule${n}`]));
   const changed = rulesLines({ ...config, COOLDOWN_SHORT: 11, COOLDOWN_LONG: 17, MUD_LIFETIME_TURNS: 9, MUD_SINK_TURNS: 2, WIN_LENGTH: 7 });
   assert.notDeepEqual(changed, lines);
   assert.ok(changed[2].startsWith('7 or more'));
@@ -117,26 +119,32 @@ test('rulesLines: six lines whose numbers come from the injected config', () => 
 test('How to Play: every skill of every character, with the SKILL_INFO text and the config cooldown', () => {
   const vm = howToViewModel();
   const shown = vm.characters.flatMap((c) => c.skills.map((s) => s.id));
-  // The How to Play page shows the two characters of the lobby (Wind
-  // Rabbit X, Earth Bear O by DEFAULT_SIDES); Jade Serpent joins with the
-  // character select (Game v5 part 2 and 3).
-  const all = [WIND_RABBIT, EARTH_BEAR].flatMap((id) => CHARACTERS[id].skills);
-  assert.deepEqual([...shown].sort(), [...all].sort());
+  // All four characters, in the order of the character table (a character has no fixed side).
+  const all = Object.keys(CHARACTERS).flatMap((id) => CHARACTERS[id].skills);
+  assert.deepEqual(vm.characters.map((c) => c.id), Object.keys(CHARACTERS));
+  assert.equal(all.length, 8);
+  assert.deepEqual(shown, all);
   for (const character of vm.characters) {
     assert.deepEqual(character.skills.map((s) => s.id), CHARACTERS[character.id].skills, 'grouped by character');
     assert.equal(character.name, CHARACTERS[character.id].name);
-    assert.equal(character.stone, stoneForCharacter(character.id));
+    assert.equal(character.colour, markLookFor(character.id).colour, 'the group takes the mark colour of the character');
+    assert.equal('stone' in character, false, 'no fixed X or O for a character');
     assert.ok(character.portrait);
     for (const skill of character.skills) {
       assert.equal(skill.description, SKILL_INFO[skill.id].description, 'the text is SKILL_INFO\'s');
       assert.equal(skill.title, SKILL_INFO[skill.id].title);
       assert.ok(skill.icon);
-      assert.ok([config.COOLDOWN_SHORT, config.COOLDOWN_LONG].includes(skill.cooldown));
-      assert.ok(skill.cooldownText.includes(String(skill.cooldown)));
+      if (isPassiveSkill(skill.id)) {
+        assert.equal(skill.cooldown, 0);
+        assert.equal(skill.cooldownText, STRINGS.howToAlwaysOn, 'a passive skill never rests');
+      } else {
+        assert.equal(skill.cooldown, cooldownTurns(skill.id));
+        assert.ok(skill.cooldownText.includes(String(skill.cooldown)));
+      }
     }
   }
   const changed = howToViewModel({ ...config, COOLDOWN_SHORT: 11, COOLDOWN_LONG: 17 });
-  assert.deepEqual(changed.characters.flatMap((c) => c.skills.map((s) => s.cooldown)).sort(), [11, 11, 17, 17]);
+  assert.deepEqual(changed.characters.flatMap((c) => c.skills.map((s) => s.cooldown)).sort((a, b) => a - b), [0, 11, 11, 11, 17, 17, 17, 17]);
 });
 
 test('menu-dom.js fills How to Play only from the view model (no skill text copied into the DOM code)', () => {

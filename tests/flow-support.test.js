@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as config from '../src/config.js';
 import { CHARACTERS, EARTH_BEAR, WIND_RABBIT } from '../src/logic/characters.js';
-import { PETRIFICATION, MUD_TRAP, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
+import { SKILLS } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
 import { ROOM_PHASES } from '../src/net/phase.js';
@@ -127,14 +127,21 @@ test('strings.js: one flat object of English strings for the menu, How to Play, 
 });
 
 test('strings.js: numbers and names in the rules come from the config, the characters and SKILL_INFO', () => {
-  assert.ok(STRINGS.howToRule1.includes(CHARACTERS[WIND_RABBIT].name));
-  assert.ok(STRINGS.howToRule1.includes(CHARACTERS[EARTH_BEAR].name));
+  // the side comes from the pick order, so rule 1 names no character
+  assert.ok(STRINGS.howToRule1.includes('picked a character first plants X'));
+  for (const character of Object.values(CHARACTERS)) assert.ok(!STRINGS.howToRule1.includes(character.name), character.name);
+  assert.ok(/free action/i.test(STRINGS.howToRule2) && STRINGS.howToRule2.includes('never ends your turn'));
   assert.ok(STRINGS.howToRule3.startsWith(`${config.WIN_LENGTH} or more`));
   assert.ok(STRINGS.howToRule4.includes(`next ${config.COOLDOWN_SHORT} turns`));
   assert.ok(STRINGS.howToRule4.includes(`next ${config.COOLDOWN_LONG} turns`));
-  for (const id of [WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION]) {
-    assert.ok(STRINGS.howToRule4.includes(SKILL_INFO[id].title), id);
+  // every active skill is listed once, by its cooldown class; Sky Watch is the passive one
+  const [shortPart, longPart] = STRINGS.howToRule4.split(' or your next ');
+  for (const skill of Object.values(SKILLS)) {
+    const title = SKILL_INFO[skill.id].title;
+    if (skill.cooldownClass === 'passive') assert.ok(STRINGS.howToRule4.includes(`${title} is always on`), title);
+    else assert.ok((skill.cooldownClass === 'short' ? shortPart : longPart).includes(title), `${title} is under its cooldown`);
   }
+  assert.ok(STRINGS.howToRule7.includes('tap once to preview and tap again to plant'));
   assert.ok(STRINGS.howToRule5.includes(`after ${config.MUD_LIFETIME_TURNS} turns`));
   assert.ok(STRINGS.howToRule5.includes(`no row for ${config.MUD_SINK_TURNS} turn.`));
 });
