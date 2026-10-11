@@ -42,10 +42,6 @@ import { FACTS_MAX, RULES_MAX } from './skill-info.js';
 import { TOOLTIP_LONG_PRESS_MS, TOOLTIP_SHOW_MS, tooltipPosition } from './tooltip-position.js';
 
 const LOOK_CLASSES = { selected: 'is-selected', cooling: 'is-cooling', off: 'is-off', ready: null };
-const SVG = 'http://www.w3.org/2000/svg';
-// The pill's cooldown ring: viewBox 72, radius 33, stroke 4.
-const RING_RADIUS = 33;
-const RING_LENGTH = 2 * Math.PI * RING_RADIUS;
 const TOOLTIP_ID = 'hud-tooltip';
 const POPUP_ID = 'hud-skill-popup';
 
@@ -292,7 +288,6 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       button.dataset.skill = skillId;
       const ico = el('span', 'ico', button);
       const icon = artImage(ico, SKILL_ICON_ART[skillId], skillLetters(skillId));
-      const ring = el('span', 'ring', ico);
       const t = el('span', 't', button);
       const title = el('span', 'title', t);
       const state = el('span', 'state', t);
@@ -305,27 +300,11 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       pill.dataset.skill = skillId;
       const pico = el('span', 'ico', pill);
       const picon = artImage(pico, SKILL_ICON_ART[skillId], skillLetters(skillId));
-      const svg = document.createElementNS(SVG, 'svg');
-      svg.setAttribute('class', 'pring');
-      svg.setAttribute('viewBox', '0 0 72 72');
-      svg.setAttribute('aria-hidden', 'true');
-      const track = document.createElementNS(SVG, 'circle');
-      const arc = document.createElementNS(SVG, 'circle');
-      for (const circle of [track, arc]) {
-        circle.setAttribute('cx', '36');
-        circle.setAttribute('cy', '36');
-        circle.setAttribute('r', String(RING_RADIUS));
-        svg.append(circle);
-      }
-      track.setAttribute('class', 'track');
-      arc.setAttribute('class', 'arc');
-      arc.setAttribute('transform', 'rotate(-90 36 36)');
-      pill.append(svg);
       const pcount = el('span', 'count', pill);
       el('span', 'ready-dot', pill);
 
       return {
-        slot, icon, picon, button, ico, ring, count, title, state, pill, arc, pcount, look: null, progress: null, view: null,
+        slot, icon, picon, button, ico, count, title, state, pill, pcount, look: null, view: null,
       };
     });
     // Decorative specks for the Petrification dust and the Cloud feathers,
@@ -771,13 +750,6 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
           const count = skill.cooldownTurns > 0 ? String(skill.cooldownTurns) : '';
           setText(row.count, count);
           setText(row.pcount, count);
-          const percent = Math.round(skill.cooldownProgress * 100);
-          if (row.progress !== percent) {
-            row.ring.style.setProperty('--p', String(percent));
-            const dash = (RING_LENGTH * percent) / 100;
-            row.arc.setAttribute('stroke-dasharray', `${dash.toFixed(1)} ${RING_LENGTH.toFixed(1)}`);
-            row.progress = percent;
-          }
           for (const button of [row.button, row.pill]) {
             setAttr(button, 'aria-label', skill.ariaLabel);
             setAttr(button, 'aria-disabled', String(skill.disabled));

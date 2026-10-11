@@ -448,7 +448,6 @@ export const POISON_OPACITY = 0.9; // a withered purple poisoned empty plot (Ven
 export const POISON_PREVIEW_OPACITY = 0.35; // the Venom zone being chosen, under the pointer
 export const SHAKE3D_MS = 240; // camera shake length
 export const SHAKE3D_LIGHT = 0.04; // world units at the start of a light shake (a rock popping in after a Petrification, the Tornado Zone storm)
-export const SHAKE3D_HEAVY = 0.13; // a strong shake (unused by the farm visuals)
 export const BANNER_3D_Y = 84; // top of the skill banner on the 3D HUD, under the title and hint
 
 // Character placement effects (src/render3d/character-look.js): what plays

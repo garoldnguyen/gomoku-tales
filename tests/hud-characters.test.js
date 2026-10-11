@@ -165,11 +165,11 @@ test('the pill is one round capsule whose size the layout knows', () => {
 });
 
 test('cooling down is one thing for every character: a dim icon and a badge, no ring and no bar', () => {
+  assert.doesNotMatch(css, /\.ring\b|\.pring\b/, 'the old cooldown rings are gone from the styles');
+  assert.doesNotMatch(hudSource, /'ring'|pring|RING_/, 'and from the DOM');
   assert.match(SECTION, /\.skill\.is-cooling \.ico img, [^{]*\{ opacity: 0\.5; \}/);
   assert.match(SECTION, /\.skill \.count \{ display: none;/);
   assert.match(SECTION, /\.skill\.is-cooling \.count \{ display: flex; \}/);
-  assert.match(SECTION, /\.skill \.ring \{ display: none !important; \}/);
-  assert.match(SECTION, /\.pskill \.pring \{ display: none !important; \}/);
 });
 
 test('the whole HUD is paper: the turn pill, the quality switch and the toast read their tokens', () => {

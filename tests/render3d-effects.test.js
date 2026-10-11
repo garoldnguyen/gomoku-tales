@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CAMERA_DISTANCE, CAMERA_FOV, CONVERT_SPARK_MS, DASH_LIFT, DASH_STREAK_MS, PLANT_DROP_PX, REVERSE_GROWTH_SPEED,
-  SHAKE3D_HEAVY, SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_ARC_MAX, THROW_DELAY_MS, THROW_MS, THROW_MS_MAX,
+  SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_ARC_MAX, THROW_DELAY_MS, THROW_MS, THROW_MS_MAX,
 } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
@@ -467,12 +467,12 @@ test('the camera shake stays within its strength and dies out on time', () => {
     return { x, y };
   };
   for (let t = 0; t < SHAKE3D_MS; t += 7) {
-    const { x, y } = offset(t, SHAKE3D_HEAVY);
-    assert.ok(Math.abs(x) <= SHAKE3D_HEAVY && Math.abs(y) <= SHAKE3D_HEAVY);
+    const { x, y } = offset(t, SHAKE3D_LIGHT);
+    assert.ok(Math.abs(x) <= SHAKE3D_LIGHT && Math.abs(y) <= SHAKE3D_LIGHT);
   }
-  assert.ok(offset(10, SHAKE3D_HEAVY).x !== 0, 'it moves while it lasts');
-  assert.deepEqual(offset(SHAKE3D_MS, SHAKE3D_HEAVY), { x: 0, y: 0 });
-  assert.deepEqual(offset(-5, SHAKE3D_HEAVY), { x: 0, y: 0 });
+  assert.ok(offset(10, SHAKE3D_LIGHT).x !== 0, 'it moves while it lasts');
+  assert.deepEqual(offset(SHAKE3D_MS, SHAKE3D_LIGHT), { x: 0, y: 0 });
+  assert.deepEqual(offset(-5, SHAKE3D_LIGHT), { x: 0, y: 0 });
   assert.deepEqual(offset(Infinity, 0), { x: 0, y: 0 }, 'no shake yet');
   assert.equal(shakeLeft(0, SHAKE3D_LIGHT), SHAKE3D_LIGHT);
   assert.ok(shakeLeft(SHAKE3D_MS / 2, SHAKE3D_LIGHT) < SHAKE3D_LIGHT);

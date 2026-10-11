@@ -56,7 +56,7 @@ Numbers to quote in a summary:
 - `hudBoxes`: name, x, y, w, h of every visible `data-hud-box` element, for size limits.
 - `shot.info`: free numbers the game puts in `window.__SHOT__.info`.
 - `overlaps` (pairs of box names), `outside` (box names that stick out of the window) and `minButtonSide` with `minButtonName`: the smallest side in px of every visible `button` element (`buttons` lists them). In the flow scenes (`menu`, `howto`, `settings`, `lobby`, `waiting`, `starting`, `select`, `gameover`, `gameover-pending`, `spectate`, `spectate-game`, `room-closed`) a button under 44 px is a problem. The tool prints these three per picture at the end.
-- `cardShare` (the `gameover` scenes only): the height of the box `gameover-card` as a share of the window height. Above 0.24, or no card box at all, is a problem. Printed per picture as `card ... percent of the height`.
+- `cardShare` (the `gameover` scenes only): the height of the box `gameover-card` as a share of the window height. Above 0.6 (the large centred card), or no card box at all, is a problem. Printed per picture as `card ... percent of the height`.
 
 ## 4. Page contract (shot mode)
 

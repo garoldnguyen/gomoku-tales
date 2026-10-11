@@ -53,7 +53,6 @@ Files in `assets/3d/v3/` (sizes are frame size, frames in one row, anchor is the
 | decal-last-x, decal-last-o | decal-last-x.png, decal-last-o.png | 32x32 | 1 | plot centre | ring under the newest plant, blue for X and red for O |
 | decal-win-v3 | decal-win.png | 32x32 | 1 | plot centre | gold sparkle under each of the five winning plants |
 | decal-dash-target-v3 | decal-dash-target.png | 32x32 | 1 | plot centre | red corner brackets on a Wind Dash target |
-| decal-zone-v3 | decal-zone.png | 96x96 | 1 | zone centre | blue dashed frame with corner brackets on the 3x3 Tornado Zone |
 | decal-zone-cross | decal-zone-cross.png | 96x96 | 1 | zone centre | Free Action: the secret cross of the Tornado Zone trap (5 plots), shown to the caster only |
 | mud-puddle | mud-puddle.png | 32x32 | 1 | plot centre | Free Action: the Mud Trap puddle on a plot |
 | poison-plot | poison-plot.png | 32x32 | 1 | plot centre | Free Action: the withered purple soil of one poisoned empty plot of the Venom zone |
@@ -86,7 +85,7 @@ Marks on plots (all levels, flat decals lying on the plot, slightly above it to 
 - The grown plants (open and rest frames of `plant-x` and `plant-o`) have a short stem: the bloom head sits on the soil mound and rises at most one plot row above the root (a plot row on the screen is 32 x sin(pitch) art pixels), so a plant never hides the plot behind it. The stem rows were cut pixel for pixel, nothing is resampled (`tests/plant-hover-art.test.js`).
 - Chosen source (Wind Dash): `decal-select-v3`.
 - Wind Dash target: `decal-dash-target-v3`.
-- Tornado Zone: `decal-zone-v3` centred on the 3x3 zone.
+- Tornado Zone: `decal-zone-cross` on the 5 plots of the cross (the 3x3 frame `decal-zone-v3` was removed with its file).
 - Last move: `decal-last-x` or `decal-last-o` on the newest plant, blue or red by team, fades in with the Open stage and stays until the next move.
 - Winner: `decal-win-v3` under each of the five plants, pulsing between 70 and 100 percent opacity once a second.
 

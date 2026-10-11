@@ -44,8 +44,6 @@ export function isTypingTarget(element) {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
 
-// The older name of isTypingTarget.
-export const isTextEntry = isTypingTarget;
 
 // Wraps a global key shortcut handler so that it returns early for a key
 // typed into a text box.

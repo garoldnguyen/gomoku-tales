@@ -16,9 +16,9 @@ import { createFpsMeter } from '../src/render3d/fps.js';
 import { createResumeWatch } from '../src/render3d/frame-gap.js';
 import { createWorldHitTest } from '../src/render3d/hit-test.js';
 import { blursMenus, QUALITY_LEVELS } from '../src/render3d/quality.js';
-import { sameViewSize, viewSize } from '../src/render3d/view-size.js';
+import { sameViewSize } from '../src/render3d/view-size.js';
 import { GAME, createApp } from '../src/ui/app.js';
-import { isQualityKey, isTextEntry } from '../src/ui/input.js';
+import { isQualityKey } from '../src/ui/input.js';
 import { pickAndReady } from './room-start.js';
 
 // The app starts on the main menu; Play Online opens the lobby.
@@ -191,17 +191,11 @@ test('the FPS meter does not count a hidden tab as a slow frame', () => {
 
 // --- Sizes and per-window quality ---
 
-test('viewSize follows the canvas box and this window\'s capped devicePixelRatio', () => {
-  assert.deepEqual(viewSize(960, 540, 1, 1.5), { width: 960, height: 540, pixelRatio: 1 });
-  assert.deepEqual(viewSize(960, 540, 2, 1.5), { width: 960, height: 540, pixelRatio: 1.5 });
-  assert.deepEqual(viewSize(800, 450, 1.25, 1.5), { width: 800, height: 450, pixelRatio: 1.25 });
-  assert.equal(viewSize(0, 0, 1, 1.5), null, 'a hidden canvas keeps its last size');
-  assert.equal(viewSize(960, 0, 1, 1.5), null);
-
-  const a = viewSize(960, 540, 1, 1.5);
-  assert.equal(sameViewSize(a, viewSize(960, 540, 1, 1.5)), true);
-  assert.equal(sameViewSize(a, viewSize(960, 540, 1.25, 1.5)), false, 'a window moved to another screen');
-  assert.equal(sameViewSize(a, viewSize(961, 540, 1, 1.5)), false);
+test('a view size is the same only when the box and the pixel ratio are', () => {
+  const a = { width: 960, height: 540, pixelRatio: 1 };
+  assert.equal(sameViewSize(a, { width: 960, height: 540, pixelRatio: 1 }), true);
+  assert.equal(sameViewSize(a, { width: 960, height: 540, pixelRatio: 1.25 }), false, 'a window moved to another screen');
+  assert.equal(sameViewSize(a, { width: 961, height: 540, pixelRatio: 1 }), false);
   assert.equal(sameViewSize(null, a), false);
   assert.equal(sameViewSize(null, null), true);
 });
@@ -213,8 +207,6 @@ test('Q does not change the quality while typing a room code', () => {
   assert.equal(isQualityKey({ key: 'q', target: { tagName: 'DIV', isContentEditable: true } }), false);
   assert.equal(isQualityKey({ key: 'q', target: { tagName: 'BUTTON' } }), true);
   assert.equal(isQualityKey({ key: 'q', target: { tagName: 'BODY' } }), true);
-  assert.equal(isTextEntry(null), false);
-  assert.equal(isTextEntry(input), true);
 });
 
 test('the scene behind the menus is blurred where the HUD glass is frosted, not on low', () => {

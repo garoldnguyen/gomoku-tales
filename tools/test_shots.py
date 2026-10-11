@@ -168,8 +168,10 @@ class JudgeTests(unittest.TestCase):
     def test_game_over_card_height_limit(self):
         def card(h):
             return [{"name": "gameover-card", "x": 400, "y": 96, "w": 480, "h": h}]
+        # The large centred card may take up to 60 percent of the window height (GAMEOVER_MAX_HEIGHT_SHARE).
         self.assertEqual(shots.judge(measurement(scene="gameover", hudBoxes=card(172)), CFG)[0], [])
-        self.assertEqual(len(shots.judge(measurement(scene="gameover-pending", hudBoxes=card(180)), CFG)[0]), 1)
+        self.assertEqual(shots.judge(measurement(scene="gameover", hudBoxes=card(430)), CFG)[0], [])
+        self.assertEqual(len(shots.judge(measurement(scene="gameover-pending", hudBoxes=card(440)), CFG)[0]), 1)
         self.assertEqual(len(shots.judge(measurement(scene="gameover", hudBoxes=[]), CFG)[0]), 1, "the card must be there")
         self.assertEqual(shots.judge(measurement(scene="field", hudBoxes=[]), CFG)[0], [])
         self.assertAlmostEqual(shots.card_share(card(180), 720), 0.25)

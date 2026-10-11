@@ -85,12 +85,6 @@
 .hud .skill.is-cooling, .hud .skill.is-off { border-color: rgba(255, 255, 255, 0.1); background: var(--row-off); color: var(--ink-3); }
 .hud .skill.is-cooling .state, .hud .skill.is-off .state { color: var(--ink-3); }
 .hud .skill.is-cooling .ico img, .hud .skill.is-off .ico img { opacity: 0.55; }
-/* cooldown ring: --p is the share of the cooldown already served, 0 to 100 */
-.hud .skill .ring { display: none; position: absolute; inset: -3px; border-radius: 12px; pointer-events: none;
-  background: conic-gradient(var(--team) calc(var(--p, 0) * 1%), rgba(255, 255, 255, 0.12) 0);
-  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px));
-  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2px)); }
-.hud .skill.is-cooling .ring { display: block; }
 .hud .skill .count { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 22px; font-weight: 600; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6); }
 .hud .skill.is-cooling .count { display: flex; }
 
@@ -121,7 +115,6 @@
 .hud.is-compact .skill { width: 48px; height: 48px; padding: 0; justify-content: center; border-radius: 14px; }
 .hud.is-compact .skill .t { display: none; }
 .hud.is-compact .skill .ico, .hud.is-compact .skill .ico img { width: 32px; height: 32px; }
-.hud.is-compact .skill .ring { inset: -2px; border-radius: 16px; }
 @media (prefers-reduced-motion: reduce) { .hud * { transition: none !important; animation: none !important; } }
 
 /* Game additions (not in the reference): the font urls above are relative to
@@ -216,11 +209,6 @@
 .hud .pskill.is-cooling, .hud .pskill.is-off { border-color: rgba(255, 255, 255, 0.12); background: var(--row-off); }
 .hud .pskill.is-off .ico img { opacity: 0.55; }
 .hud .pskill.is-cooling .ico img { opacity: 0.4; }
-.hud .pskill .pring { display: none; position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
-.hud .pskill.is-cooling .pring { display: block; }
-.hud .pskill .pring circle { fill: none; stroke-width: 4; }
-.hud .pskill .pring .track { stroke: rgba(255, 255, 255, 0.22); }
-.hud .pskill .pring .arc { stroke: var(--ready); stroke-linecap: round; }
 .hud .pskill .count { display: none; position: absolute; inset: 0; align-items: center; justify-content: center; font-size: 24px; font-weight: 600; color: var(--ink); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); }
 .hud .pskill.is-cooling .count { display: flex; }
 .hud .pskill[aria-disabled="true"] { cursor: not-allowed; }
@@ -269,7 +257,6 @@
 .hud .skill .t { min-width: 0; padding-right: 8px; gap: 2px; }
 .hud .skill .title { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hud .skill .state { font-size: 12px; }
-.hud .skill .ring { inset: 0; border-radius: inherit; }
 /* The slim bars keep their 32 px icons and the ring around them. */
 .hud.is-compact .skill { overflow: visible; }
 .hud.is-compact .skill .ico { border-radius: var(--r-icon); overflow: visible; }
@@ -567,7 +554,6 @@
 .hud:not(.is-compact) .card[data-character] .skill .ico { width: 44px; height: 44px; flex: none; border-radius: 12px; }
 .hud:not(.is-compact) .card[data-character] .skill .t { flex: 1; padding-right: 0; }
 .hud:not(.is-compact) .card[data-character] .skill .title { font-size: 15px; font-weight: 500; }
-.hud .card[data-character] .skill .ring { display: none !important; }
 .hud .card[data-character] .skill.is-selected { background: linear-gradient(90deg, color-mix(in srgb, var(--c-acc) 40%, transparent), color-mix(in srgb, var(--c-acc) 10%, transparent) 78%);
   box-shadow: 0 8px 18px color-mix(in srgb, var(--c-acc) 30%, transparent); }
 .hud .card[data-character] .skill.is-selected .ico { box-shadow: 0 5px 14px color-mix(in srgb, var(--c-acc) 60%, transparent); }
@@ -602,7 +588,6 @@
 .hud .card[data-character] .pskill.is-selected .ico { border-radius: 50%; }
 .hud .card[data-character] .pskill.is-cooling, .hud .card[data-character] .pskill.is-off { background: var(--row); box-shadow: none; }
 .hud .card[data-character] .pskill.is-cooling .ico img, .hud .card[data-character] .pskill.is-off .ico img { opacity: 0.5; }
-.hud .card[data-character] .pskill .pring { display: none !important; }
 .hud .card[data-character] .pskill .count { inset: 0; border-radius: 50%; font-size: 20px; font-weight: 600; color: var(--ink); text-shadow: none; background: var(--paper-soft); }
 .hud .card[data-character] .pskill .ready-dot { right: -1px; bottom: -1px; width: 12px; height: 12px; box-sizing: border-box; background: var(--c-acc); border: 0; box-shadow: 0 0 0 2px var(--card-solid); }
 .hud .card.is-collapsed[data-character] .chevron { margin-left: -2px; background: transparent; }
