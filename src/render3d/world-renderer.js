@@ -198,14 +198,15 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       effects.setMudState(view.state.mud, view.state.sunk);
       effects.setPoisonState(view.state);
       effects.update(time);
-      world.render(time);
+      world.render(time, view.frameMs, view.idle);
 
       ctx.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
       effects.drawBanner(ctx, time);
       drawQuality(ctx);
     },
 
-    drawMenuScreen(ctx, time = performance.now(), title = true) {
+    // frameMs and idle: the frame pace of main.js (see world.render).
+    drawMenuScreen(ctx, time = performance.now(), title = true, frameMs = 0, idle = false) {
       pieces.sync(EMPTY_BOARD, time, effects);
       world.characters.setActive(null);
       decals.show(NO_DECALS, 0, time, effects);
@@ -217,7 +218,7 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       effects.setPoisonState(null);
       effects.setCovered(null);
       effects.update(time);
-      world.render(time);
+      world.render(time, frameMs, idle);
 
       ctx.clearRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
       if (title) drawText(ctx, 'Gomoku Tales', INTERNAL_WIDTH / 2, 90, TITLE_STYLE);

@@ -31,19 +31,20 @@ export function sameViewSize(a, b) {
 // (width over height) and fovDeg (the camera's vertical field of view,
 // fitView). The renderer, the camera and the picking all take their
 // numbers from it, so they always agree.
-export function windowView(windowWidth, windowHeight, quality, devicePixelRatio = 1) {
+export function windowView(windowWidth, windowHeight, quality, devicePixelRatio = 1, coarse = false) {
   return windowViewInto(windowWidth, windowHeight, quality, devicePixelRatio,
-    { width: 0, height: 0, pixelRatio: 0, aspect: 0, fovDeg: 0 });
+    { width: 0, height: 0, pixelRatio: 0, aspect: 0, fovDeg: 0 }, coarse);
 }
 
 // windowView written into `out` (no allocation, for the render loop): returns `out`.
-export function windowViewInto(windowWidth, windowHeight, quality, devicePixelRatio, out) {
+// coarse: a touch device, which takes the level's touchPixelRatioCap when that is lower.
+export function windowViewInto(windowWidth, windowHeight, quality, devicePixelRatio, out, coarse = false) {
   const row = typeof quality === 'string' ? qualityFeatures(quality) : quality;
   const width = wholePixels(windowWidth);
   const height = wholePixels(windowHeight);
   out.width = width;
   out.height = height;
-  out.pixelRatio = cappedPixelRatio(devicePixelRatio, row.pixelRatioCap);
+  out.pixelRatio = cappedPixelRatio(devicePixelRatio, coarse ? Math.min(row.pixelRatioCap, row.touchPixelRatioCap) : row.pixelRatioCap);
   out.aspect = width / height;
   out.fovDeg = fitView(out.aspect);
   return out;

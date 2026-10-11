@@ -327,6 +327,20 @@ export const PETAL_FIELD_FADE = 1; // cells: near-lane petals fade out over this
 export const TARGET_FRAME_MS = 20;
 export const QUALITY_STEP_DOWN_MS = 3000; // the average must stay above TARGET_FRAME_MS this long
 export const QUALITY_STALL_MS = 250; // a longer frame is a stall (hidden tab, shader compile), not load
+// Frame pacing for battery and heat (docs/performance.md; the pure rules are in
+// src/render3d/frame-governor.js). The scene is drawn at the active rate while
+// the player is doing something and for FRAME_ACTIVE_MS after it, and at the
+// idle rate when nothing happens; touch devices (phones, tablets) draw less
+// often than a computer. A level with background motion (High: wind, clouds)
+// keeps the active rate. A menu with a frosted backdrop draws the least.
+export const FRAME_ACTIVE_MS = 4000; // full rate this long after the last input, event or change
+export const FRAME_ACTIVE_FPS = Object.freeze({ touch: 30, desktop: 60 });
+export const FRAME_IDLE_FPS = Object.freeze({ touch: 8, desktop: 15 });
+export const FRAME_FROSTED_FPS = 3; // the scene behind a blurred menu
+export const FRAME_TOLERANCE_MS = 4; // a frame may come this early, so a 60 Hz screen keeps 30 fps and a 120 Hz screen 60
+export const FRAME_SLEEP_MIN_MS = 12; // a wait longer than this is slept through with a timer, not by waking on every screen refresh
+export const FRAME_SLEEP_EARLY_MS = 4; // the timer fires this much before the frame is due, and the next animation frame draws it
+export const FRAME_SLOW_FACTOR = 1.25; // the slow-frame watch allows this share over the frame time the pace asks for
 export const RESUME_GAP_MS = 1000; // a longer gap between frames means the page was hidden; events from meanwhile show settled, without replaying their effects
 // High: a gentle depth of field (src/render3d/depth-of-field.js). Every
 // depth from DOF_SHARP_MARGIN world units in front of the field's front edge

@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import {
   CAMERA_DISTANCE, CELL_SIZE,
-  FPS_SAMPLE_MS, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS, TARGET_FRAME_MS,
+  FPS_SAMPLE_MS, FRAME_SLOW_FACTOR, QUALITY_STALL_MS, QUALITY_STEP_DOWN_MS, TARGET_FRAME_MS,
 } from '../config.js';
 import { createAssetStore } from '../render/assets.js';
 import { artMeta, artSource, setArtAssets } from './art.js';
@@ -23,6 +23,7 @@ import { createFarmField } from './farm-field.js';
 import { zonePieceUv } from './farm-layout.js';
 import { snapToStep, worldUnitsPerPixel } from './effect-plans.js';
 import { createFpsMeter } from './fps.js';
+import { isCoarsePointer } from './frame-governor.js';
 import { STAGE_REST } from './growth.js';
 import { cellToWorldInto, pickCell } from './picking.js';
 import { createPostProcessing } from './post-processing.js';
@@ -77,7 +78,10 @@ export function createWorld(canvas, {
   meta,
   warn = () => {},
   fx = parseFxSwitches(globalThis.location?.search ?? ''),
-  createRenderer = (target) => new THREE.WebGLRenderer({ canvas: target, antialias: true }),
+  // A touch device (phone, tablet) is drawn without multisampling, at its lower pixel ratio cap
+  // and with the low-power GPU hint: the battery and the heat (docs/performance.md).
+  coarse = isCoarsePointer(globalThis.matchMedia?.bind(globalThis)),
+  createRenderer = (target) => new THREE.WebGLRenderer({ canvas: target, antialias: !coarse, powerPreference: 'low-power' }),
 } = {}) {
   setArtAssets(assets, { warn, meta });
   const renderer = createRenderer(canvas);
@@ -173,7 +177,7 @@ export function createWorld(canvas, {
   let sized = false; // false until viewSizeNow holds the buffer's size
   function resize() {
     if (!(canvas.clientWidth > 0 && canvas.clientHeight > 0)) return; // hidden or not laid out yet: keep the last size
-    const next = windowViewInto(canvas.clientWidth, canvas.clientHeight, features, globalThis.devicePixelRatio, viewSizeNext);
+    const next = windowViewInto(canvas.clientWidth, canvas.clientHeight, features, globalThis.devicePixelRatio, viewSizeNext, coarse);
     if (sized && sameViewSize(viewSizeNow, next)) return;
     applyViewSize(next);
   }
@@ -338,10 +342,13 @@ export function createWorld(canvas, {
 
     // Advances the scene to `now` (a requestAnimationFrame timestamp) and
     // draws it. Steps the quality down when frames stay slow.
-    render(now) {
+    // frameMs is the time the frame pace asks between frames (0: every animation frame) and
+    // idle says the page is at the idle rate: neither is a reason to step the level down.
+    render(now, frameMs = 0, idle = false) {
       resize();
       fpsMeter.tick(now);
-      if (stepsDown && slowFrames.tick(now) && quality !== lowerQuality(quality)) applyQuality(lowerQuality(quality), true);
+      if (idle) slowFrames.forget();
+      else if (stepsDown && slowFrames.tick(now, Math.max(TARGET_FRAME_MS, frameMs * FRAME_SLOW_FACTOR)) && quality !== lowerQuality(quality)) applyQuality(lowerQuality(quality), true);
       // Clamp the step so a hidden tab does not make everything jump on return.
       const dtMs = lastNow === null ? 0 : Math.min(now - lastNow, 100);
       lastNow = now;

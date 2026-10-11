@@ -1,4 +1,7 @@
-import { INTERNAL_WIDTH, INTERNAL_HEIGHT, RESUME_GAP_MS, SHOT_EFFECTS_SEED, SHOT_READY_FRAMES, SHOT_SEED, SHOT_TIME_MS } from './config.js';
+import {
+  FRAME_ACTIVE_FPS, FRAME_ACTIVE_MS, FRAME_FROSTED_FPS, FRAME_IDLE_FPS, FRAME_SLEEP_EARLY_MS, FRAME_SLEEP_MIN_MS, FRAME_TOLERANCE_MS, INTERNAL_WIDTH, INTERNAL_HEIGHT, RESUME_GAP_MS,
+  SHOT_EFFECTS_SEED, SHOT_READY_FRAMES, SHOT_SEED, SHOT_TIME_MS,
+} from './config.js';
 import { O, X } from './logic/board.js';
 import { CHARACTERS } from './logic/characters.js';
 import { loadAssets, USES_3D } from './render/assets.js';
@@ -6,6 +9,7 @@ import { loadCanvasFont } from './render/canvas-font.js';
 import { createEffects } from './render/effects.js';
 import { drawGameScreen, drawMenuScreen, setAssets } from './render/game-renderer.js';
 import { createResumeWatch } from './render3d/frame-gap.js';
+import { createFrameGovernor, isCoarsePointer, stateSignature } from './render3d/frame-governor.js';
 import { blursMenus, browserStorage, cycleQuality, startQuality } from './render3d/quality.js';
 import { seededRandom } from './render3d/seeded-random.js';
 import { loadForestMeta, withForestMeta } from './render3d/forest-meta.js';
@@ -76,8 +80,36 @@ const worldCanvas = document.getElementById('world');
 // Hidden pages get no animation frames, so events from an online opponent
 // pile up meanwhile; this tells the first frame back (see showEvents).
 const resumeWatch = createResumeWatch(RESUME_GAP_MS);
+// The frame pace (docs/performance.md): a still scene is not drawn 60 or 120 times a
+// second. The page is active for FRAME_ACTIVE_MS after every input, event or change, and
+// draws at the idle rate otherwise; a phone draws less often than a computer.
+const coarse = isCoarsePointer(window.matchMedia?.bind(window));
+const idleFps = coarse ? FRAME_IDLE_FPS.touch : FRAME_IDLE_FPS.desktop;
+const governor = createFrameGovernor({
+  activeFps: coarse ? FRAME_ACTIVE_FPS.touch : FRAME_ACTIVE_FPS.desktop,
+  idleFps,
+  holdMs: FRAME_ACTIVE_MS,
+  toleranceMs: FRAME_TOLERANCE_MS,
+});
+// While the frame loop sleeps between frames (a timer, not an animation frame), an input
+// wakes it at once: sleepTimer is the timer, wakeFrame asks for the animation frame.
+let sleepTimer = 0;
+let wakeFrame = null;
+const wake = () => {
+  governor.poke(performance.now());
+  if (sleepTimer !== 0 && wakeFrame !== null) {
+    clearTimeout(sleepTimer);
+    sleepTimer = 0;
+    wakeFrame();
+  }
+};
+for (const type of ['pointerdown', 'pointermove', 'pointerup', 'keydown', 'wheel', 'touchstart', 'resize', 'orientationchange']) {
+  window.addEventListener(type, wake, { capture: true, passive: true });
+}
+wake();
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) resumeWatch.markHidden();
+  else wake();
 });
 
 // Each window has its own renderer, WebGL context and quality level; Q
@@ -296,6 +328,8 @@ function frameViewOf(view, time, effects, hint) {
   frameView.time = time;
   frameView.effects = effects;
   frameView.hint = hint;
+  frameView.frameMs = governor.intervalMs; // the pace the 3D world's slow-frame watch allows for
+  frameView.idle = governor.idle;
   return frameView;
 }
 
@@ -420,15 +454,48 @@ function startAppMode({ local = false } = {}) {
     ? 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts.'
     : 'LOCAL MODE: one window plays both sides. Esc or right click cancels a skill. R restarts. Q quality.';
 
+  let lastScreen = null;
+  let lastSignature = null;
+  // The next frame: when it is due soon, the next animation frame; when it is not (idle, or
+  // the 30 fps pace), a timer sleeps until just before it, so the browser's frame pipeline
+  // is off in between.
+  const wakeAfterSleep = () => {
+    sleepTimer = 0;
+    requestAnimationFrame(frame);
+  };
+  const next = () => {
+    const wait = governor.dueIn(performance.now());
+    if (wait > FRAME_SLEEP_MIN_MS) {
+      sleepTimer = setTimeout(wakeAfterSleep, wait - FRAME_SLEEP_EARLY_MS);
+    } else {
+      requestAnimationFrame(frame);
+    }
+  };
   const frame = (time) => {
+    if (!governor.shouldRun(time)) {
+      next(); // a tick the pace skips: nothing is drawn and nothing is touched
+      return;
+    }
     const resumed = resumeWatch.tick(time);
     const screen = app.getScreen();
+    if (screen !== lastScreen) {
+      lastScreen = screen;
+      governor.poke(time);
+    }
     const game = app.getGame();
     const inGame = (screen === GAME || screen === GAME_OVER || screen === WATCH) && game !== null;
     if (newGame.check(inGame ? game : null, app.getGameNumber())) hintCode = null; // a new game may be a new character
     if (inGame) {
       const view = game.getView();
-      showEvents(game.takeEvents(), effects, time, resumed, view.state.characters);
+      const events = game.takeEvents();
+      if (events.length > 0) governor.poke(time); // something happened: its effects play at the active rate
+      showEvents(events, effects, time, resumed, view.state.characters);
+      const signature = stateSignature(view.state);
+      if (signature !== lastSignature) {
+        lastSignature = signature;
+        governor.poke(time); // the game moved on (a seed, a skill, the end)
+      }
+      if (view.hover) governor.poke(time); // the pointer is on a plot: its glow stays smooth
       pointerCanvas.style.cursor = screen === GAME && view.pointer ? 'pointer' : 'default';
       const local = app.getFlow().mode === MODES.LOCAL;
       const you = local ? null : view.you ?? SPECTATOR_VIEW;
@@ -449,22 +516,25 @@ function startAppMode({ local = false } = {}) {
       // Every DOM screen (the menu, the lobby cards and the character
       // select) has its own Ivory title, so the canvas draws none.
       menuShown(); // keeps the menu in step with the quality level
-      renderer.drawMenuScreen(ctx, time, false);
+      renderer.drawMenuScreen(ctx, time, false, governor.intervalMs, governor.idle);
       hud?.show(false);
     }
     // The Game over screen keeps the final board and the poses in view,
     // and the menu the empty farm. The character select keeps the map
     // sharp around its see-through panel, which frosts what is behind it
     // itself (screens.setFrosted, room.css).
+    governor.setAlways(Boolean(renderer.features?.backgroundMotion)); // High keeps its wind and clouds moving
     const frosted = blursMenus(renderer.features);
     const blur = screen !== GAME && screen !== GAME_OVER && screen !== WATCH && screen !== MENU && !PICKING_SCREENS.includes(screen) && frosted;
     if (blur !== blurred) {
       blurred = blur;
       stage.classList.toggle('backdrop-blur', blur);
     }
+    governor.setIdleFps(blur ? FRAME_FROSTED_FPS : idleFps); // the scene behind a blurred menu is drawn the least
     screens.setFrosted(frosted);
-    requestAnimationFrame(frame);
+    next();
   };
+  wakeFrame = () => requestAnimationFrame(frame);
   requestAnimationFrame(frame);
 }
 

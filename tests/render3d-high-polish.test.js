@@ -440,10 +440,11 @@ test('the render loop makes no Three.js object at any level once its pools are w
 // and name: the 3D frame path. The walk must reach exactly these, so a new
 // function on the frame path has to be added here (and is then checked).
 const FRAME_PATH = {
-  'main.js': ['frame', 'frameViewOf', 'menuShown', 'showEvents', 'showHud'],
+  'main.js': ['frame', 'frameViewOf', 'menuShown', 'next', 'showEvents', 'showHud'],
   'render3d/art.js': ['artMeta'],
   'render3d/board-marks.js': ['addDecal', 'boardMarksInto', 'hoverGlowOpacity', 'lastMoveOpacity', 'setGhost', 'winPulseOpacity'],
   'render3d/breeze-hill.js': ['update'],
+  'render3d/frame-governor.js': ['dueIn', 'intervalOf', 'poke', 'setAlways', 'setIdleFps', 'shouldRun', 'stateSignature'],
   'render3d/character-poses.js': ['characterFrame', 'glowPulse', 'poseAtInto', 'stepGlow'],
   'render3d/characters3d.js': ['frameFor', 'setActive', 'update'],
   'render3d/cloud-overlay.js': ['overlayFor', 'viewerOf'],
@@ -477,7 +478,7 @@ const FRAME_PATH = {
   'render3d/petals.js': ['fieldFade', 'petalAt', 'smoothstep', 'trailAt'],
   'render3d/picking.js': ['cellToWorldInto'],
   'render3d/post-processing.js': ['render', 'resize'],
-  'render3d/quality.js': ['blursMenus', 'cappedPixelRatio', 'clear', 'dropOldest', 'lowerQuality', 'normalizeQuality', 'particleScale',
+  'render3d/quality.js': ['blursMenus', 'cappedPixelRatio', 'clear', 'dropOldest', 'forget', 'lowerQuality', 'normalizeQuality', 'particleScale',
     'qualityFeatures',
     'plainSlides', 'tick'],
   'render3d/seeded-random.js': ['fill', 'random', 'step'],

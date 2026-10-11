@@ -16,6 +16,7 @@ export const QUALITY_LEVELS = deepFreeze({
     name: 'low',
     goal: 'clear and easy to play',
     pixelRatioCap: 1,
+    touchPixelRatioCap: 1, // on a phone or tablet the cap is lower still: the battery and the heat
     boardTexture: 'farm-board-low',
     ground: 'mown', // flat mown meadow: two greens in 3-cell stripes, nothing else
     scenery: false, // trees, bushes, hay, fence, path, stepping stones (the curb always shows)
@@ -43,6 +44,7 @@ export const QUALITY_LEVELS = deepFreeze({
     name: 'medium',
     goal: 'shades and a lived-in farm',
     pixelRatioCap: 1.5,
+    touchPixelRatioCap: 1.25,
     boardTexture: 'farm-board',
     ground: 'painted', // painted mottled meadow, grass tufts
     scenery: true,
@@ -70,6 +72,7 @@ export const QUALITY_LEVELS = deepFreeze({
     name: 'high',
     goal: 'shades, depth, clouds and wind',
     pixelRatioCap: 2,
+    touchPixelRatioCap: 1.5,
     boardTexture: 'farm-board',
     ground: 'painted-ripples', // painted meadow plus slow lighter wind ripples
     scenery: true,
@@ -269,7 +272,8 @@ export function lowerQuality(level) {
   return QUALITY_ORDER[Math.min(indexOf(level) + 1, QUALITY_ORDER.length - 1)];
 }
 
-// Pixel ratio for the renderer: the screen's, capped at the level's pixelRatioCap.
+// Pixel ratio for the renderer: the screen's, capped at the level's pixelRatioCap
+// (its touchPixelRatioCap on a touch device, see windowViewInto).
 export function cappedPixelRatio(devicePixelRatio, cap) {
   const ratio = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0 ? devicePixelRatio : 1;
   return Math.min(ratio, cap);
@@ -302,7 +306,9 @@ export function createSlowFrameWatch({ targetFrameMs, holdMs, stallMs, capacity 
   }
 
   return {
-    tick(nowMs) {
+    // targetMs: the frame time to stay under for this frame (default targetFrameMs); a
+    // frame loop that paces itself to 30 fps passes a longer one.
+    tick(nowMs, targetMs = targetFrameMs) {
       if (lastNow === null || !Number.isFinite(nowMs)) {
         lastNow = Number.isFinite(nowMs) ? nowMs : null;
         return false;
@@ -319,13 +325,19 @@ export function createSlowFrameWatch({ targetFrameMs, holdMs, stallMs, capacity 
       sum += dt;
       // Keep only the newest frames that still cover holdMs.
       while (count > 1 && sum - durations[head] >= holdMs) dropOldest();
-      if (sum >= holdMs && sum / count > targetFrameMs) {
+      if (sum >= holdMs && sum / count > targetMs) {
         clear();
         return true;
       }
       return false;
     },
     reset() {
+      clear();
+      lastNow = null;
+    },
+    // A frame the pace skipped on purpose (an idle page) is not load: the watch starts over
+    // (the same as reset(); its own name, so the frame path can name it).
+    forget() {
       clear();
       lastNow = null;
     },
