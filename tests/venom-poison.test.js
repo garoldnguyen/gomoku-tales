@@ -333,8 +333,13 @@ test('a Tornado throw never lands on a poisoned plot', () => {
   const planted = placeStone(state, { player: X, x: 3, y: 3 }, { random: () => 0 });
   assert.equal(planted.ok, true, planted.error);
   const thrown = planted.events.find((e) => e.type === 'stoneThrown');
-  assert.deepEqual(thrown.to, { x: 3, y: 2 }, 'without the poison the first free neighbour would be (2, 2)');
-  assert.equal(planted.state.board[2][2], EMPTY);
+  assert.deepEqual(thrown.to, { x: 3, y: 0 }, 'the zone (0..2, 0..2) is skipped: without the poison the first free plot would be (0, 0)');
+  assert.equal(planted.state.board[0][0], EMPTY);
+  for (const r of [0, 0.001, 0.01, 0.1, 0.3, 0.6, 0.99]) {
+    const again = placeStone(state, { player: X, x: 3, y: 3 }, { random: () => r });
+    const { to } = again.events.find((e) => e.type === 'stoneThrown');
+    assert.equal(isPoisoned(again.state, to.x, to.y), false, `random ${r} never lands on a poisoned plot`);
+  }
 });
 
 // --- Hidden information: the zone is public ---

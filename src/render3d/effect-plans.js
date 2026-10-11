@@ -16,8 +16,8 @@ import {
   CONVERT_SPARK_MS, DASH_CURVE, DASH_LIFT, DASH_STREAK_MS, DRY_MS, MUD_FORM_FROM, MUD_FORM_MS,
   PETRIFY_FLICKER_FROM, PETRIFY_FLICKER_STEPS, PETRIFY_GREY_FROM, PETRIFY_SETTLE_MS, PETRIFY_SHATTER_MS, PETRIFY_SQUASH,
   PETRIFY_WRAP_MS, REVERSE_GROWTH_SPEED, SHAKE3D_LIGHT, SHAKE3D_MS, SINK_DELAY_MS, SINK_MS, SKY_WATCH_PULSE_LOW,
-  SKY_WATCH_PULSE_MS, SURFACE_MS, SURFACE_OVERSHOOT, SURFACE_POP_AT, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_DROP_MS,
-  THROW_MS, THROW_SPIN_LIFT, THROW_SPIN_MS, THROW_SPIN_TURNS, POISON_FADE_MS, POISON_FORM_MS, VENOM_DROP_MS,
+  SKY_WATCH_PULSE_MS, SURFACE_MS, SURFACE_OVERSHOOT, SURFACE_POP_AT, THROW_ARC_HEIGHT, THROW_ARC_MAX, THROW_ARC_PER_PLOT, THROW_DELAY_MS, THROW_DROP_MS,
+  THROW_MS, THROW_MS_MAX, THROW_MS_PER_PLOT, THROW_SPIN_LIFT, THROW_SPIN_MS, THROW_SPIN_TURNS, POISON_FADE_MS, POISON_FORM_MS, VENOM_DROP_MS,
   VENOM_WILT_HOLD_MS, VENOM_WILT_IN_MS, VENOM_WILT_OUT_MS,
 } from '../config.js';
 import { TORNADO_ZONE } from '../logic/skills.js';
@@ -249,7 +249,7 @@ export function convertMs(stageStartMs) {
 export function heldCell(spec, stageStartMs) {
   switch (spec.kind) {
     case 'throw':
-      return { x: spec.to.x, y: spec.to.y, ms: THROW_DELAY_MS + THROW_MS };
+      return { x: spec.to.x, y: spec.to.y, ms: THROW_DELAY_MS + throwFlightMs(spec.from, spec.to) };
     case 'dashStreak':
       return { x: spec.to.x, y: spec.to.y, ms: dashFoldMs(stageStartMs) + DASH_STREAK_MS };
     case 'petrify':
@@ -339,24 +339,43 @@ export function dashPose(out, stageStartMs) {
   return out;
 }
 
+// How long a seed thrown from `from` to `to` flies, and how high its arc
+// rises: the next plot over takes THROW_MS and THROW_ARC_HEIGHT, and every
+// plot farther adds THROW_MS_PER_PLOT and THROW_ARC_PER_PLOT, up to
+// THROW_MS_MAX and THROW_ARC_MAX. The Tornado throw can land anywhere on
+// the field, so a far throw must not look like a short one sped up. Pure,
+// called once per throw.
+export function throwFlightMs(from, to) {
+  const extra = Math.max(0, Math.hypot(to.x - from.x, to.y - from.y) - 1);
+  return Math.min(THROW_MS_MAX, THROW_MS + THROW_MS_PER_PLOT * extra);
+}
+
+export function throwArcHeight(from, to) {
+  const extra = Math.max(0, Math.hypot(to.x - from.x, to.y - from.y) - 1);
+  return Math.min(THROW_ARC_MAX, THROW_ARC_HEIGHT + THROW_ARC_PER_PLOT * extra);
+}
+
 // A thrown seed pose.ageMs after it was planted: it drops onto its plot
 // for THROW_DROP_MS (pose.dropPx art pixels above it, as a growing seed
 // drops), the whirlwind spins it up off its plot for THROW_SPIN_MS (pose.lift
 // world units up, pose.spinScale the width it shows turning round and round),
-// then it flies in an arc for THROW_MS (with `plain`, quality.js plainSlides,
-// it slides along the ground instead and is not lifted). pose.progress along
-// the way, pose.height (the arc), pose.done. The seed is on its way down from
-// pose.lift to the ground as it flies: y = lift * (1 - progress) + height.
+// then it flies in an arc for pose.flightMs (THROW_MS when it is not set, see
+// throwFlightMs; with `plain`, quality.js plainSlides, it slides along the
+// ground instead and is not lifted). pose.progress along the way, pose.height
+// (the arc, pose.arc high at the top, THROW_ARC_HEIGHT when it is not set),
+// pose.done. The seed is on its way down from pose.lift to the ground as it
+// flies: y = lift * (1 - progress) + height.
 export function throwPose(out, plain = false) {
   const { ageMs } = out;
   out.dropPx = dropOffsetPx(ageMs);
   const spin = clamp01((ageMs - THROW_DROP_MS) / THROW_SPIN_MS);
   out.lift = plain ? 0 : THROW_SPIN_LIFT * smoothstep(spin);
   out.spinScale = spin > 0 && spin < 1 ? Math.max(THROW_SPIN_MIN_WIDTH, Math.abs(Math.cos(spin * THROW_SPIN_TURNS * Math.PI * 2))) : 1;
-  const t = clamp01((ageMs - THROW_DELAY_MS) / THROW_MS);
+  const flight = out.flightMs > 0 ? out.flightMs : THROW_MS;
+  const t = clamp01((ageMs - THROW_DELAY_MS) / flight);
   out.progress = t;
-  out.height = plain ? 0 : arcHeight(t, THROW_ARC_HEIGHT);
-  out.done = ageMs >= THROW_DELAY_MS + THROW_MS;
+  out.height = plain ? 0 : arcHeight(t, out.arc > 0 ? out.arc : THROW_ARC_HEIGHT);
+  out.done = ageMs >= THROW_DELAY_MS + flight;
   return out;
 }
 

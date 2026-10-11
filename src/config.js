@@ -377,7 +377,11 @@ export const THROW_DELAY_MS = THROW_DROP_MS + THROW_SPIN_MS; // ...before it is 
 export const THROW_SPIN_LIFT = 0.8; // world units the whirlwind lifts the seed on its plot
 export const THROW_SPIN_TURNS = 3; // times the seed turns round (edge on, then flat) while it is spun up
 export const THROW_MS = 560; // flight time of a thrown seed
-export const THROW_ARC_HEIGHT = 1.6; // world units at the top of the arc
+export const THROW_ARC_HEIGHT = 1.6; // world units at the top of the arc of a throw to the next plot
+export const THROW_MS_PER_PLOT = 45; // a seed thrown farther than one plot flies this much longer for every plot more...
+export const THROW_MS_MAX = 1400; // ...up to this flight time (the far side of the field)
+export const THROW_ARC_PER_PLOT = 0.12; // ...and its arc rises this much higher for every plot more...
+export const THROW_ARC_MAX = 4; // ...up to this height in world units
 // Petrification (effect-plans.js petrifyPose, skill-plans.js petrifyPlan): earth
 // energy wraps the enemy plant and its colour drains to grey, it shatters and
 // a mossy rock pops in where it stood, with dust rising. The rock then stays.

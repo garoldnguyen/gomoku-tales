@@ -54,7 +54,7 @@ export function createInitialState(size = BOARD_SIZE, characters = DEFAULT_SIDES
     mud: [], // [{ x, y, player, driesAfterTurn }] Mud Trap puddles on empty plots
     sunk: [], // [{ x, y, player, surfacesAfterTurn }] seeds sunk in mud: on the board, but they count for no line
     pendingDash: null, // { player, from, to, resolvesAfterTurn } while a Wind Dash is announced
-    tornado: null, // { player, x, y, cells, armedAfterTurn, endsAfterTurn } while a Tornado Zone trap waits (secret cross)
+    tornado: null, // { player, x, y, cells, endsAfterTurn } while a Tornado Zone trap waits (secret cross)
     poison: null, // { player, x, y, cells, endsAfterTurn } while a Venom zone lasts: nobody plants on its empty cells
     skillLock: null, // { player, endsAfterTurn } while a Hiss keeps that player from using skills
     skillUsed: null, // id of the skill the player to move used this turn, or null (Free Action)
@@ -93,11 +93,12 @@ export function canUseSkill(state, player, skillId) {
 }
 
 // Places a stone for the acting player. Planting is the only action that
-// ends a turn (Free Action). A seed planted on a cell of an armed Tornado
-// Zone cross (by either player, the caster too) fires the trap: it is used
-// up at once and the seed is thrown to a random free neighbour plot, or
-// stays when there is none. options.random (default Math.random) picks the
-// plot, so only the host runs it and tests can inject it.
+// ends a turn (Free Action). A seed planted on a cell of a Tornado Zone
+// cross that still lasts (by either player, the caster too, also in the
+// cast turn) fires the trap: it is used up at once and the seed is thrown
+// to a random free plot anywhere on the board, or stays when there is none.
+// options.random (default Math.random) picks the plot, so only the host runs
+// it and tests can inject it.
 export function placeStone(state, action, options = {}) {
   const { random = Math.random } = options;
   const { player, x, y } = action;

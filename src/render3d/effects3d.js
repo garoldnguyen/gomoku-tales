@@ -81,7 +81,7 @@ import {
   HISS_RING_GAP_MS, HISS_RING_MS, HISS_RING_TO, HISS_RINGS, HISS_WOBBLE, HISS_WOBBLE_WAVES, MARK_FADE_MS,
   PLACE_DUST_COUNT, PLACEMENT_SLOTS, PLANT_OPEN_SPARKLES, PX_WORLD, RING_DOT_PX, RING_LIGHTEN, RING_MAX_DOTS, RING_SLOTS,
   DASH_GHOST_OPACITY, DASH_WIND_RATE, DASH_WIND_SPEED, PETRIFY_GLOW, PETRIFY_WRAP_MS, SHAKE3D_LIGHT, SKILL_RUN_SLOTS, SOIL_PUFF_MAX,
-  SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, STORM_MS, THROW_ARC_HEIGHT, TORNADO_BEND_PX,
+  SOIL_PUFF_MIN, SOIL_PUFF_MS, SPRITE_STRETCH_Y, STORM_MS, TORNADO_BEND_PX,
   TORNADO_ARM, VINE_POINT_PX, VINE_POINTS, WIN_RING_DOTS,
   WIN_RING_MS, WIN_RING_TO, WIN_SPARKLES, WIN_STAGGER_MS,
 } from '../config.js';
@@ -96,7 +96,7 @@ import { ART } from './art-assets.js';
 import { CHARACTER_LOOK, PLAN_SEED, placementPlan } from './character-look.js';
 import {
   catchUpVisuals, convertPose, dashCurveInto, dashPose, heldCell, PETRIFY_STAGE_ROCK, petrifyPose, regrowCell,
-  shakeLeft, shakeOffset3d, shakeStrength, sparkPathInto, throwPose, visualsForEvents, zoneVisible,
+  shakeLeft, shakeOffset3d, shakeStrength, sparkPathInto, throwArcHeight, throwFlightMs, throwPose, visualsForEvents, zoneVisible,
 } from './effect-plans.js';
 import { STAGE_DROP, STAGE_REST } from './growth.js';
 import {
@@ -235,7 +235,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
   // The pose functions read ageMs (and progress, spark) and write the pose here.
   const pose = {
     ageMs: 0.5, frame: 0, done: false, flying: false, progress: 0.5, spark: 0.5, x: 0.5, z: 0.5, lift: 0.5,
-    spinScale: 0.5, dropPx: 0.5, height: 0.5, up: 0.5, stage: 0, grey: 0, scaleX: 0.5, scaleY: 0.5,
+    spinScale: 0.5, dropPx: 0.5, height: 0.5, up: 0.5, flightMs: 0.5, arc: 0.5, stage: 0, grey: 0, scaleX: 0.5, scaleY: 0.5,
   };
   const at = { x: 0.5, y: 0.5, z: 0.5 }; // where a trail is left this frame
   const cellAt = { x: 0.5, z: 0.5 }; // a cell centre, for the growth cues
@@ -784,13 +784,15 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       case 'throw':
         // The whirlwind spins the seed up off its plot (pose.lift, turning
         // round), then throws it: it comes down from that height as it flies.
+        pose.flightMs = record.flightMs;
+        pose.arc = record.arc;
         throwPose(pose, frame.plain);
         a.sprite.setFrame(STAGE_DROP);
         moveAlong(record, a, pose.progress);
         pose.up = pose.lift * (1 - pose.progress) + pose.height; // world units above its plot now
         a.sprite.plane.position.y = pose.dropPx * PX * SPRITE_STRETCH_Y + pose.up;
         a.sprite.plane.scale.x = pose.spinScale;
-        a.setShadow(Math.max(0.4, 1 - (0.5 * pose.up) / THROW_ARC_HEIGHT));
+        a.setShadow(Math.max(0.4, 1 - (0.5 * pose.up) / pose.arc));
         if (pose.lift > 0 || pose.progress > 0) {
           at.y = 0.15 + pose.up;
           fluffTrail(emit(record, DASH_TRAIL_RATE * 0.6 * frame.scale, frame.dtS));
@@ -993,6 +995,8 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
       case 'throw': {
         const record = startTimeline('throw', spec.from, spec.to, stages);
         record.a = actors.acquire(spec.player, spec.from);
+        record.flightMs = throwFlightMs(spec.from, spec.to);
+        record.arc = throwArcHeight(spec.from, spec.to);
         break;
       }
       case 'throwBlocked': {
@@ -1308,7 +1312,7 @@ export function createEffects3d(world, { regrow = () => {} } = {}) {
 // becomes covered).
 function newTimeline() {
   return {
-    active: false, kind: null, start: 0.5, fx: 0.5, fz: 0.5, tx: 0.5, tz: 0.5, fromCell: 0, toCell: 0, stages: null, a: null, b: null, c: null, landed: false, carry: 0.5, color: 0,
+    active: false, kind: null, start: 0.5, fx: 0.5, fz: 0.5, tx: 0.5, tz: 0.5, fromCell: 0, toCell: 0, stages: null, a: null, b: null, c: null, landed: false, carry: 0.5, color: 0, flightMs: 0.5, arc: 0.5,
   };
 }
 

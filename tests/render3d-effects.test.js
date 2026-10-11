@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   CAMERA_DISTANCE, CAMERA_FOV, CONVERT_SPARK_MS, DASH_LIFT, DASH_STREAK_MS, PLANT_DROP_PX, REVERSE_GROWTH_SPEED,
-  SHAKE3D_HEAVY, SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_DELAY_MS, THROW_MS,
+  SHAKE3D_HEAVY, SHAKE3D_LIGHT, SHAKE3D_MS, THROW_ARC_HEIGHT, THROW_ARC_MAX, THROW_DELAY_MS, THROW_MS, THROW_MS_MAX,
 } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { createInitialState, placeStone, useSkill } from '../src/logic/game.js';
@@ -11,7 +11,7 @@ import { bannerTexts } from '../src/render/effects.js';
 import {
   convertMs, convertPose, convertWiltMs, dashCurveInto, dashFoldMs, dashPose, heldCell, petrifyMs, regrowCell,
   reverseGrowthInto, reverseGrowthMs, shakeLeft, shakeOffset3d, shakeStrength, snapToStep,
-  SPARK_REACH, sparkPathInto, throwPose, visualsForEvents, worldUnitsPerPixel,
+  SPARK_REACH, sparkPathInto, throwArcHeight, throwFlightMs, throwPose, visualsForEvents, worldUnitsPerPixel,
 } from '../src/render3d/effect-plans.js';
 import { growthStage, STAGE_DROP, STAGE_LAND, STAGE_OPEN, STAGE_REST, STAGE_SPROUT } from '../src/render3d/growth.js';
 import { DEFAULT_V3_META, stageStartMs } from '../src/render3d/v3-meta.js';
@@ -108,11 +108,11 @@ test('a failed Wind Dash fizzles and ends the marks', () => {
   assert.equal(regrowCell(specs[1], STAGES), null);
 });
 
-test('Tornado Zone: the caster sees the cross; a seed planted on it reveals a whirlwind and is spun up and thrown to a neighbour plot in an arc', () => {
+test('Tornado Zone: the caster sees the cross; a seed planted on it reveals a whirlwind and is spun up and thrown to a random plot of the field in an arc', () => {
   const results = play([
     { skill: TORNADO_ZONE, target: { x: 7, y: 7 } },
     [14, 14], // the rabbit plants, which ends its turn
-    [7, 7], // the bear plants on the cross; random 0 throws it to the first free neighbour, (6, 6)
+    [7, 7], // the bear plants on the cross; random 0 throws it to the first free plot of the board, (0, 0)
   ], { random: () => 0 });
   const announced = visualsForEvents(results[0].events);
   // Changed with the Free Action rework (part 1): a secret zone plays no cast
@@ -126,9 +126,11 @@ test('Tornado Zone: the caster sees the cross; a seed planted on it reveals a wh
   // The fired trap is used up at once: no tornadoEnded event, no tornadoEnd spec.
   assert.deepEqual(kinds(thrown), ['place', 'storm', 'throw', 'banner']);
   assert.deepEqual(thrown[1], { kind: 'storm', x: 7, y: 7, cells: [{ x: 7, y: 6 }, { x: 6, y: 7 }, { x: 7, y: 7 }, { x: 8, y: 7 }, { x: 7, y: 8 }] });
-  assert.deepEqual(thrown[2], { kind: 'throw', from: { x: 7, y: 7 }, to: { x: 6, y: 6 }, player: O });
-  assert.deepEqual(heldCell(thrown[2], STAGES), { x: 6, y: 6, ms: THROW_DELAY_MS + THROW_MS });
-  assert.deepEqual(regrowCell(thrown[2], STAGES), { x: 6, y: 6, player: O, startMs: THROW_DELAY_MS + THROW_MS - STAGES[STAGE_LAND] });
+  assert.deepEqual(thrown[2], { kind: 'throw', from: { x: 7, y: 7 }, to: { x: 0, y: 0 }, player: O });
+  const flight = throwFlightMs({ x: 7, y: 7 }, { x: 0, y: 0 });
+  assert.ok(flight > THROW_MS, 'a far throw flies longer than a throw to the next plot');
+  assert.deepEqual(heldCell(thrown[2], STAGES), { x: 0, y: 0, ms: THROW_DELAY_MS + flight });
+  assert.deepEqual(regrowCell(thrown[2], STAGES), { x: 0, y: 0, player: O, startMs: THROW_DELAY_MS + flight - STAGES[STAGE_LAND] });
   assert.equal(shakeStrength(thrown[2]), 0);
 });
 
@@ -353,6 +355,33 @@ test('a thrown seed drops onto its plot, then flies in an arc and lands', () => 
   assert.equal(out.progress, 1);
   assert.equal(out.height, 0);
   assert.equal(out.done, true);
+});
+
+test('a far throw flies longer and higher than a short one, up to the caps', () => {
+  const near = { x: 7, y: 7 };
+  assert.equal(throwFlightMs(near, { x: 7, y: 8 }), THROW_MS, 'the next plot over keeps the base flight time');
+  assert.equal(throwArcHeight(near, { x: 8, y: 7 }), THROW_ARC_HEIGHT, 'and the base arc');
+  let lastMs = 0;
+  let lastArc = 0;
+  for (let d = 1; d <= 7; d++) {
+    const to = { x: 7, y: 7 + d }; // d plots straight down the field
+    const ms = throwFlightMs(near, to);
+    assert.ok(ms >= lastMs, 'never shorter for a longer throw');
+    if (d > 1) assert.ok(ms > lastMs, 'and longer for every plot more, below the cap');
+    lastMs = ms;
+    const arc = throwArcHeight(near, to);
+    assert.ok(arc >= lastArc, 'never lower for a longer throw');
+    lastArc = arc;
+  }
+  assert.equal(throwFlightMs({ x: 0, y: 0 }, { x: 14, y: 14 }), THROW_MS_MAX, 'the far corner hits the cap');
+  assert.equal(throwArcHeight({ x: 0, y: 0 }, { x: 14, y: 14 }) <= THROW_ARC_MAX, true);
+  // The pose reads the flight time and the arc the caller hands it.
+  const out = { flightMs: 1000, arc: 3 };
+  throwPose(at(out, THROW_DELAY_MS + 500));
+  assert.ok(Math.abs(out.height - 3) < 1e-9, 'the top of the arc is the arc it was given');
+  assert.equal(out.done, false);
+  throwPose(at(out, THROW_DELAY_MS + 1000));
+  assert.deepEqual([out.progress, out.done], [1, true]);
 });
 
 test('on plain-slide levels a thrown seed slides along the ground', () => {

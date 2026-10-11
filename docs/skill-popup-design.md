@@ -71,7 +71,7 @@ Every number comes from config: `COOLDOWN_SHORT`, `COOLDOWN_LONG` (through `cool
 | Skill | Brief | Facts (label: value) | Rules |
 |---|---|---|---|
 | Wind Dash | Send one of your plants to a nearby empty plot. | Rest: 3 turns; Range: 3 plots; Lands: After their turn | Diagonals count / Fails if the plot is taken by then / Cannot land on mud |
-| Tornado Zone | Hide a cross-shaped trap on the field. | Rest: 6 turns; Waits: 2 turns; Size: 5 plots | Cut at the edge of the field / Hidden from your opponent / First seed on it fires it, even yours / Throws that seed aside, then it is used up |
+| Tornado Zone | Hide a cross-shaped trap on the field. | Rest: 6 turns; Waits: 2 turns; Size: 5 plots | Cut at the edge of the field / Hidden from your opponent, one use / Armed at once: your own seed counts / Throws the first seed to a random free plot |
 | Mud Trap | Turn an empty plot into a mud puddle. | Rest: 3 turns; Puddle: 4 turns; Sinks: 1 turn | A seed planted in it sinks and counts for no line / Then it surfaces and counts again / Empty plots only, not mud already |
 | Petrification | Turn one enemy plant to stone. | Rest: 6 turns; Lasts: For good; Target: Enemy plant | The rock breaks every line / Cannot pick a seed sunk in mud |
 | Hiss | Silence your opponent's skills. | Rest: 3 turns; Locks: 1 turn; Target: None | They can still plant a seed / No target needed |

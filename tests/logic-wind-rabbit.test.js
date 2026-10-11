@@ -4,7 +4,7 @@ import { BOARD_SIZE, COOLDOWN_LONG, COOLDOWN_SHORT, TORNADO_ARM, TORNADO_TURNS, 
 import { EMPTY, X, O, ROCK } from '../src/logic/board.js';
 import { PETRIFICATION, MUD_TRAP, TORNADO_ZONE, WIND_DASH } from '../src/logic/skills.js';
 import { createInitialState, isGameOver, placeStone, skillCooldown, useSkill } from '../src/logic/game.js';
-import { tornadoCells } from '../src/logic/wind-rabbit-skills.js';
+import { throwTargets, tornadoCells } from '../src/logic/wind-rabbit-skills.js';
 import { skillTurn } from './skill-turn.js';
 
 // Builds a playing state with cells set directly: [[x, y, value], ...].
@@ -249,7 +249,7 @@ test('a Wind Dash landing that does not make five lets the game go on', () => {
 
 test('a Wind Dash landing on a cell of an armed Tornado Zone cross does not fire it', () => {
   const state = announcedDash();
-  state.tornado = { player: O, x: 6, y: 3, cells: tornadoCells(state.board, 6, 3), armedAfterTurn: 1, endsAfterTurn: 1 + TORNADO_TURNS };
+  state.tornado = { player: O, x: 6, y: 3, cells: tornadoCells(state.board, 6, 3), endsAfterTurn: 1 + TORNADO_TURNS };
   const result = placeStone(state, { player: O, x: 10, y: 10 }, { random: noRandom });
   assert.equal(result.state.board[3][6], X);
   assert.deepEqual(types(result.events), ['stonePlaced', 'dashResolved', 'turnEnded']);
@@ -261,13 +261,13 @@ test('a Wind Dash landing on a cell of an armed Tornado Zone cross does not fire
 
 const at = (x, y) => ({ x, y });
 
-test('Tornado Zone is a cross of 5 plots, armed from the end of the cast turn, and does not end the turn', () => {
+test('Tornado Zone is a cross of 5 plots, armed at once, and does not end the turn', () => {
   assert.equal(TORNADO_ARM, 1);
   assert.equal(TORNADO_TURNS, 2);
   const state = stateWith([]);
   const result = skillResult(state, X, TORNADO_ZONE, { x: 7, y: 7 });
   const cells = [at(7, 6), at(6, 7), at(7, 7), at(8, 7), at(7, 8)];
-  assert.deepEqual(result.state.tornado, { player: X, x: 7, y: 7, cells, armedAfterTurn: 1, endsAfterTurn: 1 + TORNADO_TURNS });
+  assert.deepEqual(result.state.tornado, { player: X, x: 7, y: 7, cells, endsAfterTurn: 1 + TORNADO_TURNS });
   assert.deepEqual(result.state.board, state.board);
   assert.equal(result.state.currentPlayer, X, 'X still has to plant');
   assert.equal(skillCooldown(result.state, X, TORNADO_ZONE), COOLDOWN_LONG);
@@ -278,7 +278,7 @@ test('Tornado Zone is a cross of 5 plots, armed from the end of the cast turn, a
   assert.equal(state.tornado, null, 'the given state is not mutated');
   // Cast later in the game, the turns count from the cast turn.
   const later = { ...stateWith([]), turn: 5 };
-  assert.deepEqual(skillResult(later, X, TORNADO_ZONE, { x: 7, y: 7 }).state.tornado, { player: X, x: 7, y: 7, cells, armedAfterTurn: 5, endsAfterTurn: 5 + TORNADO_TURNS });
+  assert.deepEqual(skillResult(later, X, TORNADO_ZONE, { x: 7, y: 7 }).state.tornado, { player: X, x: 7, y: 7, cells, endsAfterTurn: 5 + TORNADO_TURNS });
 });
 
 test('the cross has its 4 arms and centre in the middle, is cut at an edge and at a corner', () => {
@@ -317,14 +317,12 @@ function activeTornado(cells = [], centre = { x: 7, y: 7 }, spare = SPARE) {
   return skillTurn(stateWith(cells), X, TORNADO_ZONE, centre, spare);
 }
 
-// The free neighbours (empty, not mud, not poisoned) of (x, y) in the
-// throw's order: row by row.
-function freeNeighbours(state, x, y) {
+// Every free plot (empty, not mud, not poisoned) of the board in the
+// throw's order: row by row. These are the plots a thrown seed may land on.
+function freeCells(state) {
   const cells = [];
-  for (let cy = y - 1; cy <= y + 1; cy++) {
-    for (let cx = x - 1; cx <= x + 1; cx++) {
-      const inside = cy >= 0 && cy < BOARD_SIZE && cx >= 0 && cx < BOARD_SIZE;
-      if (!inside || (cx === x && cy === y)) continue;
+  for (let cy = 0; cy < BOARD_SIZE; cy++) {
+    for (let cx = 0; cx < BOARD_SIZE; cx++) {
       const mud = (state.mud ?? []).some((p) => p.x === cx && p.y === cy);
       const poison = (state.poison?.cells ?? []).some((p) => p.x === cx && p.y === cy);
       if (state.board[cy][cx] === EMPTY && !mud && !poison) cells.push(at(cx, cy));
@@ -333,30 +331,51 @@ function freeNeighbours(state, x, y) {
   return cells;
 }
 
-// Rocks on all 8 neighbours of (x, y) except the ones in `keep`.
-function wall(state, x, y, keep = []) {
-  for (let cy = y - 1; cy <= y + 1; cy++) {
-    for (let cx = x - 1; cx <= x + 1; cx++) {
-      if ((cx !== x || cy !== y) && !keep.some((k) => k.x === cx && k.y === cy)) state.board[cy][cx] = ROCK;
+// The same list without the plot (x, y), where the seed is planted.
+const freeCellsExcept = (state, x, y) => freeCells(state).filter((c) => c.x !== x || c.y !== y);
+
+// Rocks on every empty plot of the board except the ones in `keep`.
+function closeBoard(state, keep = []) {
+  for (let cy = 0; cy < BOARD_SIZE; cy++) {
+    for (let cx = 0; cx < BOARD_SIZE; cx++) {
+      if (state.board[cy][cx] === EMPTY && !keep.some((k) => k.x === cx && k.y === cy)) state.board[cy][cx] = ROCK;
     }
   }
   return state;
 }
 
-test('arming: the caster\'s planting in the cast turn does not fire the trap, even on the centre', () => {
-  const state = activeTornado([], { x: 7, y: 7 }, { x: 7, y: 7 });
-  assert.equal(state.board[7][7], X, 'the seed stays where it was planted');
-  assert.deepEqual(state.tornado.cells.length, 5);
-  assert.equal(state.tornado.armedAfterTurn, 1);
-  const events = [];
-  skillTurn(stateWith([]), X, TORNADO_ZONE, { x: 7, y: 7 }, { x: 8, y: 7 }, events);
-  assert.deepEqual(types(events), ['skillUsed', 'tornadoAnnounced', 'stonePlaced', 'turnEnded'], 'no storm in the cast turn');
+test('armed at once: the caster\'s own planting on the cross in the cast turn fires it', () => {
+  const cast = skillResult(stateWith([]), X, TORNADO_ZONE, { x: 7, y: 7 }).state;
+  assert.equal(cast.tornado.endsAfterTurn, 1 + TORNADO_TURNS);
+  const result = placeResult(cast, X, 7, 7, () => 0);
+  assert.deepEqual(result.events, [
+    { type: 'stonePlaced', player: X, x: 7, y: 7 },
+    { type: 'tornadoStorm', player: X, x: 7, y: 7, cells: cast.tornado.cells },
+    { type: 'stoneThrown', player: X, from: { x: 7, y: 7 }, to: at(0, 0) },
+    { type: 'turnEnded', player: X, turn: 1 },
+  ]);
+  assert.equal(result.state.board[7][7], EMPTY, 'the seed left the plot it was planted on');
+  assert.equal(result.state.board[0][0], X);
+  assert.equal(result.state.tornado, null, 'used up');
+  for (const [x, y] of [[7, 6], [6, 7], [8, 7], [7, 8]]) {
+    const arm = placeResult(cast, X, x, y, () => 0);
+    assert.deepEqual(arm.events[2].from, at(x, y), 'an arm cell fires it in the cast turn too');
+  }
 });
 
-test('the opponent\'s next planting on the cross fires it: the seed is thrown to a free neighbour', () => {
+test('the cast turn\'s planting off the cross does not fire it, and the trap waits', () => {
+  const state = activeTornado(); // the spare seed went to (14, 14)
+  assert.equal(state.board[14][14], X);
+  assert.notEqual(state.tornado, null);
+  const events = [];
+  skillTurn(stateWith([]), X, TORNADO_ZONE, { x: 7, y: 7 }, { x: 8, y: 8 }, events);
+  assert.deepEqual(types(events), ['skillUsed', 'tornadoAnnounced', 'stonePlaced', 'turnEnded'], 'no storm for a seed off the cross');
+});
+
+test('the opponent\'s next planting on the cross fires it: the seed is thrown to a random free plot anywhere on the board', () => {
   const state = activeTornado([[6, 6, X]]);
-  const choices = freeNeighbours(state, 7, 7);
-  assert.equal(choices.length, 7, 'the 8 neighbours minus the plant on (6, 6)');
+  const choices = freeCellsExcept(state, 7, 7);
+  assert.ok(choices.length > 200, 'the whole board, not the 8 neighbours');
   const first = placeResult(state, O, 7, 7, () => 0);
   assert.equal(first.state.board[7][7], EMPTY);
   assert.equal(first.state.board[choices[0].y][choices[0].x], O);
@@ -374,8 +393,11 @@ test('the opponent\'s next planting on the cross fires it: the seed is thrown to
   for (const r of [0.13, 0.5, 0.77]) {
     const { from, to } = placeResult(state, O, 8, 7, () => r).events[2];
     assert.deepEqual(from, { x: 8, y: 7 }, 'an arm cell fires it too');
-    assert.ok(Math.abs(to.x - from.x) <= 1 && Math.abs(to.y - from.y) <= 1 && (to.x !== from.x || to.y !== from.y), 'always a neighbour of the planted cell');
+    const expected = freeCellsExcept(state, 8, 7)[Math.floor(r * freeCellsExcept(state, 8, 7).length)];
+    assert.deepEqual(to, expected, 'the random number picks the plot');
   }
+  const far = placeResult(state, O, 7, 7, () => 0.95).events[2];
+  assert.ok(Math.max(Math.abs(far.to.x - 7), Math.abs(far.to.y - 7)) > 1, 'a high random is far from the cross');
 });
 
 test('the caster\'s next planting on the cross fires it too, and the storm event carries the whole cross', () => {
@@ -416,29 +438,41 @@ test('throw candidates exclude occupied, mud and poisoned plots', () => {
   const state = activeTornado([[6, 6, X], [8, 6, O], [6, 8, ROCK]]);
   state.mud = [{ x: 7, y: 6, player: O, driesAfterTurn: 9 }];
   state.poison = { player: O, x: 8, y: 8, cells: [at(8, 8), at(8, 7)], endsAfterTurn: 9 };
-  const choices = freeNeighbours(state, 7, 7);
-  assert.deepEqual(choices, [at(6, 7), at(7, 8)], 'only (6, 7) and (7, 8) are free');
-  for (const r of [0, 0.4, 0.5, 0.99]) {
+  const choices = freeCellsExcept(state, 7, 7);
+  const key = (c) => `${c.x},${c.y}`;
+  for (const [x, y] of [[6, 6], [8, 6], [6, 8], [7, 6], [8, 8], [8, 7], [7, 7], [14, 14]]) {
+    assert.equal(choices.some((c) => key(c) === `${x},${y}`), false, `(${x}, ${y}) is not a candidate`);
+  }
+  assert.ok(choices.some((c) => key(c) === '6,7'), 'a free plot next to the cross is');
+  for (const r of [0, 0.25, 0.5, 0.75, 0.99]) {
     const result = placeResult(state, O, 7, 7, () => r);
-    assert.ok(choices.some((c) => c.x === result.events[2].to.x && c.y === result.events[2].to.y));
+    const { to } = result.events[2];
+    assert.ok(choices.some((c) => key(c) === key(to)), `random ${r} lands on a candidate`);
     assert.equal(result.state.sunk.length, 0, 'a thrown seed lands on dry ground, nothing sinks');
   }
-  assert.deepEqual(placeResult(state, O, 7, 7, () => 0).events[2].to, at(6, 7));
-  assert.deepEqual(placeResult(state, O, 7, 7, () => 0.9).events[2].to, at(7, 8));
+  assert.deepEqual(placeResult(state, O, 7, 7, () => 0).events[2].to, choices[0]);
+  assert.deepEqual(placeResult(state, O, 7, 7, () => 0.9999).events[2].to, choices.at(-1));
+  const planted = placeStone(state, { player: O, x: 7, y: 7 }, { random: () => 0 }).state;
+  assert.equal(throwTargets(state).length, choices.length + 1, 'throwTargets lists the plot the seed is about to leave while it is empty');
+  assert.equal(throwTargets(planted).some((c) => key(c) === '7,7'), true, 'and, once the seed has been thrown, that plot is free again');
 });
 
-test('a cross at the edge only throws to neighbours on the board', () => {
+test('a cross at the edge throws anywhere on the board too', () => {
   const state = activeTornado([], { x: 7, y: 1 }); // the cross reaches (7, 0)
-  const choices = freeNeighbours(state, 7, 0);
-  assert.equal(choices.length, 5);
-  for (let i = 0; i < 5; i++) {
-    const { to } = placeResult(state, O, 7, 0, () => i / 5).events[2];
-    assert.ok(to.y >= 0 && to.y <= 1 && to.x >= 6 && to.x <= 8);
-  }
+  const choices = freeCellsExcept(state, 7, 0);
+  assert.ok(choices.length > 200);
+  const bottom = placeResult(state, O, 7, 0, () => 0.99).events[2].to;
+  assert.ok(bottom.y >= 10, 'a high random lands far from the top edge');
+  const seen = new Set();
+  for (let i = 0; i < 20; i++) seen.add(JSON.stringify(placeResult(state, O, 7, 0, () => i / 20).events[2].to));
+  assert.equal(seen.size, 20, 'twenty random numbers, twenty different plots');
 });
 
-test('with no free neighbour the seed stays where it was planted (throwBlocked)', () => {
-  const state = wall(activeTornado(), 7, 7);
+test('with no free plot left on the whole board the seed stays where it was planted (throwBlocked)', () => {
+  // A full board would be a draw, so one puddle stays: a seed can be planted on mud but not thrown onto it.
+  const state = closeBoard(activeTornado(), [at(7, 7), at(1, 1)]);
+  state.mud = [{ x: 1, y: 1, player: O, driesAfterTurn: 9 }];
+  assert.deepEqual(freeCells(state), [at(7, 7)], 'only the plot to plant on is free');
   const result = placeStone(state, { player: O, x: 7, y: 7 }, { random: noRandom });
   assert.equal(result.state.board[7][7], O);
   assert.equal(result.state.tornado, null, 'the trap is used up all the same');
@@ -448,23 +482,23 @@ test('with no free neighbour the seed stays where it was planted (throwBlocked)'
     { type: 'throwBlocked', player: O, x: 7, y: 7 },
     { type: 'turnEnded', player: O, turn: 2 },
   ]);
-  // Mud and poison close the free plots as well.
-  const mixed = activeTornado([[6, 6, X], [8, 6, X], [6, 8, X], [8, 8, X]]);
-  mixed.mud = [at(7, 6), at(6, 7)].map(({ x, y }) => ({ x, y, player: O, driesAfterTurn: 9 }));
-  mixed.poison = { player: O, x: 7, y: 8, cells: [at(7, 8), at(8, 7)], endsAfterTurn: 9 };
-  assert.deepEqual(freeNeighbours(mixed, 7, 7), []);
+  // Mud and poison close the last free plots as well.
+  const mixed = closeBoard(activeTornado(), [at(7, 7), at(1, 1), at(2, 2), at(3, 3)]);
+  mixed.mud = [at(1, 1)].map(({ x, y }) => ({ x, y, player: O, driesAfterTurn: 9 }));
+  mixed.poison = { player: O, x: 2, y: 2, cells: [at(2, 2), at(3, 3)], endsAfterTurn: 9 };
+  assert.deepEqual(freeCells(mixed), [at(7, 7)]);
   const stays = placeStone(mixed, { player: O, x: 7, y: 7 }, { random: noRandom });
   assert.equal(stays.state.board[7][7], O);
   assert.ok(types(stays.events).includes('throwBlocked'));
 });
 
 test('a seed that stays on a mud cell sinks; a seed thrown off a mud cell leaves the puddle', () => {
-  const blocked = wall(activeTornado(), 7, 7);
-  blocked.mud = [{ x: 7, y: 7, player: X, driesAfterTurn: 9 }];
+  const blocked = closeBoard(activeTornado(), [at(7, 7), at(1, 1)]);
+  blocked.mud = [at(7, 7), at(1, 1)].map(({ x, y }) => ({ x, y, player: X, driesAfterTurn: 9 }));
   const sunk = placeStone(blocked, { player: O, x: 7, y: 7 }, { random: noRandom });
   assert.deepEqual(types(sunk.events), ['stonePlaced', 'tornadoStorm', 'throwBlocked', 'stoneSunk', 'turnEnded']);
   assert.equal(sunk.state.sunk.length, 1);
-  assert.equal(sunk.state.mud.length, 0, 'the puddle is used up');
+  assert.equal(sunk.state.mud.some((m) => m.x === 7 && m.y === 7), false, 'the puddle it sank in is used up');
 
   const open = activeTornado();
   open.mud = [{ x: 7, y: 7, player: X, driesAfterTurn: 9 }];
@@ -475,9 +509,9 @@ test('a seed that stays on a mud cell sinks; a seed thrown off a mud cell leaves
 });
 
 test('a win after the throw is credited to the planting player, the trap\'s owner or not', () => {
-  // O O O O at (0..3, 0); the cross is centred on (5, 1) and (4, 0) is the only free neighbour of the planted cell.
+  // O O O O at (0..3, 0); the cross is centred on (5, 1) and (4, 0) is the only free plot left on the board.
   const four = [0, 1, 2, 3].map((x) => [x, 0, O]);
-  const state = wall(activeTornado(four, { x: 5, y: 1 }), 5, 1, [at(4, 0)]);
+  const state = closeBoard(activeTornado(four, { x: 5, y: 1 }), [at(5, 1), at(4, 0)]);
   const landed = placeResult(state, O, 5, 1, noRandomPick);
   assert.equal(landed.state.winner, O);
   assert.deepEqual(landed.state.winLine, [0, 1, 2, 3, 4].map((x) => ({ x, y: 0 })));
@@ -488,7 +522,7 @@ test('a win after the throw is credited to the planting player, the trap\'s owne
 
   // The caster fires its own trap on its next turn and wins where the seed lands.
   const mine = [0, 1, 2, 3].map((x) => [x, 0, X]);
-  const own = wall(activeTornado(mine, { x: 5, y: 1 }), 5, 1, [at(4, 0)]);
+  const own = closeBoard(activeTornado(mine, { x: 5, y: 1 }), [at(5, 1), at(4, 0), at(0, 14)]);
   const afterO = placeResult(own, O, 0, 14).state;
   const won = placeResult(afterO, X, 5, 1, noRandomPick);
   assert.equal(won.state.winner, X);
@@ -506,16 +540,20 @@ test('a seed blown out of a five does not win', () => {
   assert.equal(broken.state.winner, null);
 });
 
-test('a seed that makes five where it was planted on a cross it does not fire wins normally (cast turn)', () => {
+test('a seed that would make five on the cross is blown away in the cast turn too: no win', () => {
   const four = [2, 3, 4, 5].map((x) => [x, 7, X]);
-  const result = placeStone(skillResult(stateWith(four), X, TORNADO_ZONE, { x: 6, y: 7 }).state, { player: X, x: 6, y: 7 }, { random: noRandom });
-  assert.equal(result.state.winner, X, 'the cast turn does not arm the trap, so nothing throws the seed');
+  const result = placeStone(skillResult(stateWith(four), X, TORNADO_ZONE, { x: 6, y: 7 }).state, { player: X, x: 6, y: 7 }, { random: () => 0 });
+  assert.equal(result.state.winner, null, 'the trap is armed at once, so it throws the seed out of the row');
+  assert.equal(result.state.board[7][6], EMPTY);
+  assert.equal(result.state.board[0][0], X);
 });
 
-test('without an injected random the throw still lands on a free neighbour', () => {
-  const result = placeResult(activeTornado(), O, 7, 7);
+test('without an injected random the throw still lands on a free plot', () => {
+  const state = activeTornado();
+  const choices = freeCellsExcept(state, 7, 7);
+  const result = placeResult(state, O, 7, 7);
   const { to } = result.events[2];
-  assert.ok(Math.abs(to.x - 7) <= 1 && Math.abs(to.y - 7) <= 1 && (to.x !== 7 || to.y !== 7));
+  assert.ok(choices.some((c) => c.x === to.x && c.y === to.y));
   assert.equal(result.state.board[to.y][to.x], O);
   assert.deepEqual(JSON.parse(JSON.stringify(result.state)), result.state);
 });

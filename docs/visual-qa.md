@@ -77,7 +77,7 @@ marks and short slides but no particles.
       and a cross mark over 5 plots; the other seat sees nothing on the board, only the
       banner "Wind Rabbit placed a trap!". Check the other window never shows the cross
       before it fires. When a seed is planted on it the cross is revealed as a whirlwind,
-      the seed spins up and is thrown in an arc to a free neighbour plot with a small dust
+      the seed spins up and is thrown in a long arc to a random free plot of the field with a small dust
       puff, then sprouts. If nobody fires it, it ends with no visual in the other window.
 - [ ] **Wind Dash range:** the red target frame and the whirl on the source show in both
       windows; a target more than 3 plots away is refused with a message, not a crash.

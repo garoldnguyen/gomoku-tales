@@ -25,7 +25,7 @@ import { MUD_TRAP, PETRIFICATION, TORNADO_ZONE } from '../src/logic/skills.js';
 import { artProblem, ART, PLACEHOLDERS_3D, placeholderShape } from '../src/render3d/art-assets.js';
 import {
   dryAmount, heldCell, mudSpread, PETRIFY_STAGE_ROCK, PETRIFY_STAGE_SHATTER, PETRIFY_STAGE_WRAP, petrifyGrey, petrifyMs, petrifyPose,
-  shakeStrength, sinkAmount, surfaceDepth, throwPose, visualsForEvents,
+  shakeStrength, sinkAmount, surfaceDepth, throwFlightMs, throwPose, visualsForEvents,
 } from '../src/render3d/effect-plans.js';
 import { dryMudTileGrid, DRY_TILE_PX } from '../src/render3d/mud-dry-art.js';
 import { mudTileGrid } from '../src/render3d/mud-art.js';
@@ -883,10 +883,10 @@ test('the whirlwind reveals the cross to everybody and spins the seed up before 
   frames(2);
   castZone(game, 9, 9);
   deliver();
-  assert.equal(game.click({ x: 14, y: 14 }), true); // the rabbit plants, which arms the trap
+  assert.equal(game.click({ x: 14, y: 14 }), true); // the rabbit plants off the cross, which ends its turn
   deliver();
   frames(5);
-  assert.equal(game.click({ x: 9, y: 9 }), true); // the bear plants on the cross: random 0 throws the seed to (8, 8)
+  assert.equal(game.click({ x: 9, y: 9 }), true); // the bear plants on the cross: random 0 throws the seed to the first free plot, (0, 0)
   deliver();
   assert.equal(game.getState().tornado, null, 'the trap is used up');
   let thinnest = 1;
@@ -904,10 +904,10 @@ test('the whirlwind reveals the cross to everybody and spins the seed up before 
   assert.ok(highest > THROW_SPIN_LIFT * 0.85, `the seed is lifted off its plot (${highest})`);
   assert.ok(thinnest < 0.3, `and turns edge on as it spins (${thinnest})`);
   assert.ok(particles > 0, 'the whirlwind has its particles');
-  frames(Math.ceil((THROW_MS + STORM_MS + MARK_FADE_MS) / 16) + 6);
+  frames(Math.ceil((throwFlightMs({ x: 9, y: 9 }, { x: 0, y: 0 }) + STORM_MS + MARK_FADE_MS) / 16) + 6);
   assert.equal(zoneDecals(), 0, 'the revealed cross fades away');
   assert.equal(standing(9, 9).length, 0, 'the seed has left its plot');
-  assert.equal(standing(8, 8).length, 1, 'and grows on the plot it was thrown to');
+  assert.equal(standing(0, 0).length, 1, 'and grows on the plot it was thrown to, far across the field');
   assert.equal(mainParticles(gl.scene).length, 0, 'every particle is gone');
 });
 

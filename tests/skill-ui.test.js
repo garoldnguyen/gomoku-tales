@@ -317,10 +317,10 @@ test('Tornado Zone end to end: on one screen the zone is hidden, and a seed plan
   assert.equal(game.getView().message, null, 'O is to move and reads nothing of the cast');
   assert.deepEqual(Object.keys(game.getView().state.tornado).sort(), ['endsAfterTurn', 'hidden', 'player'], 'O is to move and must not see where');
 
-  game.click({ x: 7, y: 7 }); // O on the cross; random 0 picks the first free neighbour, (6, 6)
+  game.click({ x: 7, y: 7 }); // O on the cross; random 0 picks the first free plot of the board, (0, 0)
   const state = game.getState();
   assert.equal(state.board[7][7], null);
-  assert.equal(state.board[6][6], O);
+  assert.equal(state.board[0][0], O);
   assert.equal(state.tornado, null);
   assert.equal(game.getView().message, 'The dandelion storm threw the stone away!');
 });
