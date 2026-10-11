@@ -49,7 +49,7 @@
 
 import {
   BOARD_SIZE, CLOUD_FADE_OPACITY, CLOUD_LIGHTNING_GLOW, CLOUD_OPPONENT_OPACITY, CLOUD_PREVIEW_OPACITY, CLOUD_SEE_THROUGH_OPACITY, INTERNAL_HEIGHT, INTERNAL_WIDTH, PX_WORLD, CLOUD_PUFF_BOB, CLOUD_PUFF_DRIFT, CLOUD_PUFF_DRIFT_MS, CLOUD_PUFF_HEIGHT, CLOUD_PUFF_SCALE, SKY_WATCH_GLOW_OPACITY, SKY_WATCH_OPACITY, SKY_WATCH_PUFF_DRIFT, SKY_WATCH_PUFF_HEIGHT, SKY_WATCH_PUFF_MS,
-  SPRITE_STRETCH_Y, MUD_OPACITY, POISON_OPACITY, POISON_PREVIEW_OPACITY, SUNK_DEPTH_PX, SUNK_DIM, VENOM_WILT_DIM, VENOM_WILT_SQUASH,
+  HOVER_GHOST_BRIGHT, HOVER_GHOST_OPACITY, SHOW_HOVER_GHOST, SPRITE_STRETCH_Y, MUD_OPACITY, POISON_OPACITY, POISON_PREVIEW_OPACITY, SUNK_DEPTH_PX, SUNK_DIM, VENOM_WILT_DIM, VENOM_WILT_SQUASH,
 } from '../config.js';
 import { O, ROCK, X } from '../logic/board.js';
 import { DEFAULT_SIDES } from '../logic/characters.js';
@@ -58,7 +58,7 @@ import { createInitialState, isGameOver } from '../logic/game.js';
 import { drawText } from '../render/game-renderer.js';
 import { artMeta, artSource } from './art.js';
 import { ART, placeholderShape } from './art-assets.js';
-import { boardMarksInto, createBoardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
+import { boardMarksInto, createBoardMarks, hoverGlowOpacity, lastMoveOpacity, lastPlanted, winPulseOpacity } from './board-marks.js';
 import { placementCues } from './character-look.js';
 import {
   COVER, cloudTileGrid, createCloudOverlay, hiddenPuffGrid, lightningBoltGrid, skyWatchGlowGrid, skyWatchOutlineGrid, skyWatchPuffGrid,
@@ -77,7 +77,6 @@ import { sheetCanvas, sheetTopRow } from './sprites.js';
 import { metaAnchor, stageStartMs } from './v3-meta.js';
 import { createCellDecal, createPieceSprite, createWorld, decalMaterial, placeOnCell, zonePieceGeometry } from './world.js';
 
-const GHOST_OPACITY = 0.45; // see-through stone or rock where it would go
 const EMPTY_BOARD = createInitialState().board; // the menus show the board bare
 const NO_DECALS = [];
 const TITLE_STYLE = { size: 48 };
@@ -189,9 +188,13 @@ export function createWorldRenderer(worldCanvas, options = {}) {
       lastMove.show(view.state.board, time);
       clouds.show(view);
       clouds.update(time);
-      ghosts.show(marks.ghost);
-      // No hover ring on a poisoned plot: its red crossed-out border is the mark.
+      // The plant that would grow on the plot under the pointer, lit up, and the glowing hover plot
+      // under it: together they show which plot and row a click plants in.
+      const glow = hoverGlowOpacity(time);
+      ghosts.show(SHOW_HOVER_GHOST ? marks.ghost : null, glow);
+      // No hover plot on a poisoned plot: its red crossed-out border is the mark.
       world.setHoveredCell(marks.forbidden ? null : view.hover ?? null);
+      world.setHoverGlow(glow);
       effects.setMudState(view.state.mud, view.state.sunk);
       effects.setPoisonState(view.state);
       effects.update(time);
@@ -887,10 +890,10 @@ function createGhosts(world) {
     const sprite = world.addSprite(createPieceSprite(kind, sheet));
     const material = sprite.plane.material;
     material.transparent = true;
-    material.opacity = GHOST_OPACITY;
+    material.opacity = HOVER_GHOST_OPACITY;
     // Opacity scales the texel alpha before the cutout test, so the default
-    // threshold (0.5) would discard every pixel of a 0.45 ghost.
-    material.alphaTest = fadedAlphaTest(GHOST_OPACITY);
+    // threshold (0.5) would discard every pixel of a see-through ghost.
+    material.alphaTest = fadedAlphaTest(HOVER_GHOST_OPACITY);
     material.depthWrite = false;
     sprite.noBlobShadow = true;
     sprite.shadow.visible = false;
@@ -910,13 +913,18 @@ function createGhosts(world) {
       }
     },
 
-    show(ghost) {
+    // `glow` (0 to 1, hoverGlowOpacity) lights the shown ghost up to
+    // HOVER_GHOST_BRIGHT times its colours, so it stands out from the plants.
+    show(ghost, glow = 1) {
       for (let i = 0; i < kinds.length; i++) {
         const kind = kinds[i];
         const sprite = ghosts[kind];
         const visible = ghost !== null && ghost.kind === kind;
         sprite.object.visible = visible;
-        if (visible) placeOnCell(sprite, ghost.x, ghost.y);
+        if (visible) {
+          placeOnCell(sprite, ghost.x, ghost.y);
+          sprite.setDim(1 + (HOVER_GHOST_BRIGHT - 1) * glow);
+        }
       }
     },
   };

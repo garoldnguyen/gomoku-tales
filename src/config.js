@@ -134,6 +134,17 @@ export const CHARACTER_X = 9.75; // characters stand this far left and right of 
 // player cards carry the characters. Set to true to show them again; their
 // poses keep following the events either way.
 export const SHOW_WORLD_CHARACTERS = false;
+// Where a click would plant (the pointer, or the previewed plot of a touch) shows two things, so the
+// player can be sure which plot, and which row, the plant will grow in: the glowing hover plot
+// (decal-hover.png: a bright frame with corner brackets and a white glow inside, in the mark colour of
+// the player to move) and, standing on it, the plant that would grow there as a bright see-through
+// ghost. Both breathe once in HOVER_GLOW_MS, from HOVER_GLOW_MIN to full brightness (the ghost is
+// lit up to HOVER_GHOST_BRIGHT times its colours). SHOW_HOVER_GHOST turns the ghost off.
+export const HOVER_GLOW_MS = 1200;
+export const HOVER_GLOW_MIN = 0.7;
+export const SHOW_HOVER_GHOST = true;
+export const HOVER_GHOST_OPACITY = 0.8;
+export const HOVER_GHOST_BRIGHT = 2.1;
 
 // Living pieces and characters (sections D and G). They only animate; they
 // never change the game state.

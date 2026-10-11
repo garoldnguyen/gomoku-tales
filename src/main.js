@@ -475,7 +475,7 @@ function startAppMode({ local = false } = {}) {
 // two pictures are the same. No input is attached, so there is no hover.
 // window.__SHOT__.ready turns true once the art and the HUD images are
 // loaded and SHOT_READY_FRAMES frames were drawn at the current window size.
-async function startShotMode({ scene, popup }) {
+async function startShotMode({ scene, popup, hover }) {
   const game = createLocalGame({ random: seededRandom(SHOT_SEED), characters: shotCharacters(scene) });
   const staged = setUpShotScene(game, scene);
   // The menu, howto and settings scenes show the menu layer over the empty
@@ -508,6 +508,10 @@ async function startShotMode({ scene, popup }) {
   const shotSides = game.getView().state.characters;
   for (const plant of staged.growing) showEvents(planted(plant), effects, SHOT_TIME_MS - plant.ageMs, false, shotSides);
   if (staged.last) showEvents(planted(staged.last), effects, SHOT_TIME_MS - staged.last.ageMs, false, shotSides);
+  if (hover) {
+    game.cancel(); // hover=x,y: no skill flow, so the plot under the pointer shows its glow
+    game.setHover(hover);
+  }
   hud?.show(!flow);
   // The game's Leave match button on the field scenes (a still app: a
   // press does nothing).

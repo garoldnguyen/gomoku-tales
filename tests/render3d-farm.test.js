@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   BOARD_SIZE, CELL_SIZE, CURB_HEIGHT, CURB_HEIGHT_PX, CURB_PX, FENCE_OFFSET_CELLS,
-  FENCE_POST_EVERY, PATH_WIDTH_CELLS, PX_WORLD,
+  FENCE_POST_EVERY, HOVER_GLOW_MIN, HOVER_GLOW_MS, PATH_WIDTH_CELLS, PX_WORLD,
 } from '../src/config.js';
-import { boardMarks, lastMoveOpacity, lastPlanted, winPulseOpacity } from '../src/render3d/board-marks.js';
+import { boardMarks, hoverGlowOpacity, lastMoveOpacity, lastPlanted, winPulseOpacity } from '../src/render3d/board-marks.js';
 import { cameraRay, gameCamera, projectToNdc } from '../src/render3d/camera.js';
 import {
   CURB, CURB_FACES, CURB_SIDES, curbTopCorners, FENCE_RAIL_HEIGHTS, fencePosts, fenceRails, FIELD, fieldTexel, PATH, pathStones,
@@ -211,4 +211,15 @@ test('the wood board and the old decals are gone from the 3D render path', () =>
     assert.doesNotMatch(source, /BoxGeometry/, `${file} builds a slab`);
   }
   assert.doesNotMatch(read('farm-layout.js'), /from\s+['"]three/, 'farm-layout.js stays pure');
+});
+
+test('the hover plot breathes between HOVER_GLOW_MIN and 1 once every HOVER_GLOW_MS', () => {
+  assert.equal(hoverGlowOpacity(0), 1);
+  assert.ok(Math.abs(hoverGlowOpacity(HOVER_GLOW_MS / 2) - HOVER_GLOW_MIN) < 1e-9);
+  assert.ok(Math.abs(hoverGlowOpacity(HOVER_GLOW_MS) - 1) < 1e-9);
+  for (let t = 0; t < 3 * HOVER_GLOW_MS; t += 37) {
+    const glow = hoverGlowOpacity(t);
+    assert.ok(glow >= HOVER_GLOW_MIN - 1e-9 && glow <= 1 + 1e-9, `${t}: ${glow}`);
+  }
+  assert.ok(HOVER_GLOW_MIN > 0 && HOVER_GLOW_MIN < 1);
 });

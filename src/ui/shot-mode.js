@@ -5,6 +5,7 @@
 // the cell numbering: the scene is played through the local game's own
 // clicks.
 
+import { BOARD_SIZE } from '../config.js';
 import { X } from '../logic/board.js';
 import { WIND_RABBIT } from '../logic/characters.js';
 import { createSeats, pickCharacter } from '../logic/seats.js';
@@ -190,12 +191,25 @@ export function parsePopupParam(value) {
   return Object.keys(SKILLS).find((id) => id.toLowerCase() === name) ?? null;
 }
 
+// The hover parameter (hover=7,9): the plot (x,y) the pointer stands on, so a
+// picture shows the glowing hover plot (no mouse exists in shot mode). The field
+// scene's selected skill is cancelled then, because a skill target flow shows
+// its own marks instead. Anything but two numbers inside the board is null.
+export function parseHoverParam(value) {
+  const match = /^\s*(\d{1,2})\s*,\s*(\d{1,2})\s*$/.exec(String(value ?? ''));
+  if (!match) return null;
+  const x = Number(match[1]);
+  const y = Number(match[2]);
+  return x < BOARD_SIZE && y < BOARD_SIZE ? { x, y } : null;
+}
+
 // The shot and quality parameters of a URL search string (or
 // URLSearchParams): null without the shot parameter, else { scene,
-// quality, hud, popup }. An unknown or empty scene is `field`; quality is low,
+// quality, hud, popup, hover }. An unknown or empty scene is `field`; quality is low,
 // medium or high (missing or unknown values are medium, as for ?quality=); hud
 // is 'expanded' or 'collapsed' (both HUD cards, over any stored choice) or
-// null; popup is a skill id (parsePopupParam) or null.
+// null; popup is a skill id (parsePopupParam) or null; hover is { x, y }
+// (parseHoverParam) or null.
 export function parseShotParams(search) {
   const params = typeof search === 'string' || search == null ? new URLSearchParams(search ?? '') : search;
   const shot = params.get('shot');
@@ -206,6 +220,7 @@ export function parseShotParams(search) {
     quality: normalizeQuality(params.get('quality')),
     hud: parseHudParam(params.get('hud')),
     popup: parsePopupParam(params.get('popup')),
+    hover: parseHoverParam(params.get('hover')),
   };
 }
 

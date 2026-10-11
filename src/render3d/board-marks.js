@@ -24,6 +24,7 @@
 //   'win'         a cell of the winning line
 //   'cloudPreview' a cell of the Cloud being placed (Cloud Eagle)
 
+import { HOVER_GLOW_MIN, HOVER_GLOW_MS } from '../config.js';
 import { createPoisonPlots, isForbiddenPlot, poisonPlotsInto } from './poison-view.js';
 
 // Returns { decals: [{ kind, x, y, dx, dy }], ghost: { kind, x, y } | null }
@@ -134,6 +135,14 @@ const WIN_PULSE_MIN = 0.7;
 export function winPulseOpacity(timeMs) {
   const wave = 0.5 + 0.5 * Math.cos((2 * Math.PI * timeMs) / WIN_PULSE_MS);
   return WIN_PULSE_MIN + (1 - WIN_PULSE_MIN) * wave;
+}
+
+// Opacity of the glowing hover plot at `timeMs`: it breathes between
+// HOVER_GLOW_MIN and 1 once every HOVER_GLOW_MS, so the plot a click would
+// plant in always stands out from the plots and plants around it.
+export function hoverGlowOpacity(timeMs) {
+  const wave = 0.5 + 0.5 * Math.cos((2 * Math.PI * timeMs) / HOVER_GLOW_MS);
+  return HOVER_GLOW_MIN + (1 - HOVER_GLOW_MIN) * wave;
 }
 
 // Opacity of the last-move mark `ageMs` after its seed was planted: it

@@ -114,6 +114,8 @@ export function createWorld(canvas, {
   // Hover highlight: the gold decal on the plot under the pointer, always
   // fully visible (docs/art-direction-v3.md section 3).
   const hoverMaterial = decalMaterial(artSource(ART.v3.decal.hover));
+  // Added to the plot, not laid over it: the white glow of the decal lights the plot up.
+  hoverMaterial.blending = THREE.AdditiveBlending;
   const hover = createCellDecal(hoverMaterial);
   scene.add(hover);
   let hoveredCell = null;
@@ -257,6 +259,12 @@ export function createWorld(canvas, {
       hoveredCell = cell;
       hover.visible = cell !== null;
       if (cell) placeOnCell(hover, cell.x, cell.y);
+    },
+
+    // How brightly the hover plot glows now (0 to 1, hoverGlowOpacity).
+    // Called every frame: it only assigns.
+    setHoverGlow(opacity) {
+      if (hoverMaterial.opacity !== opacity) hoverMaterial.opacity = opacity;
     },
 
     // The texture of the hover decal (the ring tinted for the player to

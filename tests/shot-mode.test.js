@@ -5,7 +5,7 @@ import { EMPTY, O, ROCK, X, findWinLine } from '../src/logic/board.js';
 import { createInitialState, isGameOver, placeStone, useSkill } from '../src/logic/game.js';
 import { PETRIFICATION, MUD_TRAP, SKILLS, TORNADO_ZONE, VENOM } from '../src/logic/skills.js';
 import { createLocalGame } from '../src/ui/local-game.js';
-import { parsePopupParam, parseShotParams, SHOT_SCENES, setUpShotScene } from '../src/ui/shot-mode.js';
+import { parseHoverParam, parsePopupParam, parseShotParams, SHOT_SCENES, setUpShotScene } from '../src/ui/shot-mode.js';
 import { SHOT_FIELD } from '../src/ui/shot-position.js';
 
 const count = (board, kind) => board.flat().filter((cell) => cell === kind).length;
@@ -77,16 +77,16 @@ test('parseShotParams reads the scene and the quality', () => {
     'field', 'empty', 'menu', 'howto', 'settings', 'lobby', 'waiting', 'starting', 'select', 'gameover', 'gameover-pending',
     'spectate', 'spectate-game', 'room-closed', 'freeaction', 'venomcloud',
   ]);
-  assert.deepEqual(parseShotParams('?shot=field&quality=high'), { scene: 'field', quality: 'high', hud: null, popup: null });
-  assert.deepEqual(parseShotParams('?shot=empty&quality=low'), { scene: 'empty', quality: 'low', hud: null, popup: null });
-  assert.deepEqual(parseShotParams(new URLSearchParams('shot=EMPTY&quality=Medium')), { scene: 'empty', quality: 'medium', hud: null, popup: null });
-  assert.deepEqual(parseShotParams('?shot=field&quality=%20high%20'), { scene: 'field', quality: 'high', hud: null, popup: null });
+  assert.deepEqual(parseShotParams('?shot=field&quality=high'), { scene: 'field', quality: 'high', hud: null, popup: null, hover: null });
+  assert.deepEqual(parseShotParams('?shot=empty&quality=low'), { scene: 'empty', quality: 'low', hud: null, popup: null, hover: null });
+  assert.deepEqual(parseShotParams(new URLSearchParams('shot=EMPTY&quality=Medium')), { scene: 'empty', quality: 'medium', hud: null, popup: null, hover: null });
+  assert.deepEqual(parseShotParams('?shot=field&quality=%20high%20'), { scene: 'field', quality: 'high', hud: null, popup: null, hover: null });
 });
 
 test('parseShotParams falls back to the field scene and medium quality', () => {
-  assert.deepEqual(parseShotParams('?shot='), { scene: 'field', quality: 'medium', hud: null, popup: null });
-  assert.deepEqual(parseShotParams('?shot=castle&quality=ultra'), { scene: 'field', quality: 'medium', hud: null, popup: null });
-  assert.deepEqual(parseShotParams('?shot=field'), { scene: 'field', quality: 'medium', hud: null, popup: null });
+  assert.deepEqual(parseShotParams('?shot='), { scene: 'field', quality: 'medium', hud: null, popup: null, hover: null });
+  assert.deepEqual(parseShotParams('?shot=castle&quality=ultra'), { scene: 'field', quality: 'medium', hud: null, popup: null, hover: null });
+  assert.deepEqual(parseShotParams('?shot=field'), { scene: 'field', quality: 'medium', hud: null, popup: null, hover: null });
 });
 
 test('popup=<skill> names the skill whose popup opens in the first card (docs/shots.md section 4)', () => {
@@ -123,4 +123,11 @@ test('the venomcloud scene is legal: Venom on turn 3, the Cloud on turn 4, X to 
   assert.equal(cloudViewsOf(maskForViewer(state, X), X)[0].look, 'cover', 'X sees the dense cloud');
   const seed = CLOUD_LIGHTNING_SEED + SHOT_VENOM_CLOUD.cloudCell.y * BOARD_SIZE + SHOT_VENOM_CLOUD.cloudCell.x;
   assert.ok(lightningAmount(SHOT_TIME_MS, seed) > 0.3, 'a flash is lit in the picture');
+});
+
+test('hover=x,y names the plot under the pointer of a picture (docs/shots.md section 4)', () => {
+  assert.deepEqual(parseShotParams('?shot=field&hover=11,8').hover, { x: 11, y: 8 });
+  assert.deepEqual(parseHoverParam(' 0 , 14 '), { x: 0, y: 14 });
+  assert.equal(parseShotParams('?shot=field').hover, null);
+  for (const bad of ['', '11', '11;8', 'a,b', '15,3', '3,15', '-1,2', '1,2,3', null, undefined]) assert.equal(parseHoverParam(bad), null, String(bad));
 });

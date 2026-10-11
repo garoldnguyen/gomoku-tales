@@ -442,7 +442,7 @@ test('the render loop makes no Three.js object at any level once its pools are w
 const FRAME_PATH = {
   'main.js': ['frame', 'frameViewOf', 'menuShown', 'showEvents', 'showHud'],
   'render3d/art.js': ['artMeta'],
-  'render3d/board-marks.js': ['addDecal', 'boardMarksInto', 'lastMoveOpacity', 'setGhost', 'winPulseOpacity'],
+  'render3d/board-marks.js': ['addDecal', 'boardMarksInto', 'hoverGlowOpacity', 'lastMoveOpacity', 'setGhost', 'winPulseOpacity'],
   'render3d/breeze-hill.js': ['update'],
   'render3d/character-poses.js': ['characterFrame', 'glowPulse', 'poseAtInto', 'stepGlow'],
   'render3d/characters3d.js': ['frameFor', 'setActive', 'update'],
@@ -493,7 +493,7 @@ const FRAME_PATH = {
   'render3d/world-renderer.js': ['drawGameScreen', 'drawMenuScreen', 'drawQuality', 'features', 'flashLightning', 'hide', 'hideFading',
     'hideFrom', 'look', 'nextMesh', 'pieceKind', 'plantFramesOf', 'quality', 'rest', 'settle', 'show', 'sync', 'update', 'useSelectMap'],
   'render3d/world.js': ['addSprite', 'autoStepped', 'drawingHeight', 'features', 'fps', 'fpsLowest', 'placeOnCell',
-    'quality', 'render', 'resize', 'setCameraShake', 'setHoveredCell', 'setHoverMap', 'showShadow', 'zonePieceGeometry'],
+    'quality', 'render', 'resize', 'setCameraShake', 'setHoveredCell', 'setHoverGlow', 'setHoverMap', 'showShadow', 'zonePieceGeometry'],
 };
 const FRAME_ROOTS = ['frame'];
 const NOT_EACH_FRAME = {

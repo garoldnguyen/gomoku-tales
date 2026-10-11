@@ -48,7 +48,7 @@ Files in `assets/3d/v3/` (sizes are frame size, frames in one row, anchor is the
 | flower-daisy, tulip, bluebell, poppy, sunflower, lavender, cosmos, forgetmenot, marigold, hollyhock, mushroom, dandelion, clover | flower-NAME.png | see v3-meta.json | 1 to 3 looks | bottom centre | meadow flowers, one frame per look |
 | clouds | clouds.png | 148x56 | 6 | bottom centre | six painted cloud shapes |
 | wind-bits | wind-bits.png | 7x5 | 6 | centre | petal pink, petal white, petal yellow, petal lilac, leaf, seed fleck |
-| decal-hover-v3 | decal-hover.png | 32x32 | 1 | plot centre | gold corner brackets on the plot under the pointer |
+| decal-hover-v3 | decal-hover.png | 32x32 | 1 | plot centre | the glowing hover plot: a 2 px gold frame with thick corner brackets and a white glow inside (see section 3, Hover) |
 | decal-select-v3 | decal-select.png | 32x32 | 1 | plot centre | white brackets for a chosen source plant |
 | decal-last-x, decal-last-o | decal-last-x.png, decal-last-o.png | 32x32 | 1 | plot centre | ring under the newest plant, blue for X and red for O |
 | decal-win-v3 | decal-win.png | 32x32 | 1 | plot centre | gold sparkle under each of the five winning plants |
@@ -82,7 +82,8 @@ Path (Medium and High). From the middle of the front edge toward the camera, 1.2
 
 Marks on plots (all levels, flat decals lying on the plot, slightly above it to avoid z-fighting):
 
-- Hover: `decal-hover-v3` on the empty plot under the pointer. Gold, always visible, never dimmed by shadows or fog.
+- Hover (owner request, October 2026: the player must be sure which plot, and so which row, a click plants in): `decal-hover-v3` on the empty plot under the pointer, drawn with additive blending so it lights the plot up, always visible, never dimmed by shadows or fog. Its frame is the swapped colour (`HOVER_SOURCE`, tinted to the mark colour of the player to move); the glow inside is plain white (a partly see-through pixel must be white, because a canvas cannot keep a partly see-through colour exactly). It breathes once in `HOVER_GLOW_MS` between `HOVER_GLOW_MIN` and 1 (`hoverGlowOpacity` in `board-marks.js`). On it stands the plant that would grow there as a bright see-through ghost (`HOVER_GHOST_OPACITY`, lit up to `HOVER_GHOST_BRIGHT` times, breathing with the plot; `SHOW_HOVER_GHOST` turns it off). A touch screen shows the same on the first tap (the preview).
+- The grown plants (open and rest frames of `plant-x` and `plant-o`) have a short stem: the bloom head sits on the soil mound and rises at most one plot row above the root (a plot row on the screen is 32 x sin(pitch) art pixels), so a plant never hides the plot behind it. The stem rows were cut pixel for pixel, nothing is resampled (`tests/plant-hover-art.test.js`).
 - Chosen source (Wind Dash): `decal-select-v3`.
 - Wind Dash target: `decal-dash-target-v3`.
 - Tornado Zone: `decal-zone-v3` centred on the 3x3 zone.
