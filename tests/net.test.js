@@ -1,13 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS, ROOM_CODE_LENGTH } from '../src/config.js';
+import { HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, LEAVE_COUNTDOWN_S, PEER_AWAY_TIMEOUT_MS, PEER_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS, ROOM_CODE_LENGTH } from '../src/config.js';
 import { X, O, EMPTY } from '../src/logic/board.js';
 import { EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../src/logic/characters.js';
 import { SEAT_REJECT } from '../src/logic/seats.js';
 import { TORNADO_ZONE } from '../src/logic/skills.js';
 import { createFakeClock } from '../src/net/clock.js';
 import { createFakeNetwork } from '../src/net/fake-transport.js';
-import { COUNTDOWN, CONNECTED, GONE, checkPresence, createPresence, markHeard, markLeft } from '../src/net/presence.js';
+import { COUNTDOWN, CONNECTED, GONE, checkPresence, createPresence, isAway, markAway, markHeard, markLeft, resumePresence } from '../src/net/presence.js';
 import { ROOM_CODE_ALPHABET, generateRoomCode, isValidRoomCode, normalizeRoomCode } from '../src/net/room-code.js';
 import { CLOSED, FULL, JOINING, NOT_STARTED, NO_ROOM, OVER, PLAYING, STARTING, WAITING, createGuestRoom, createHostRoom } from '../src/net/room.js';
 import { channelName, createBroadcastTransport } from '../src/net/transport.js';
@@ -181,9 +181,8 @@ function pick({ status, secondsLeft }) {
 // default) the host picks character, the guest the other one (Wind Rabbit
 // first, so it plays X) and both press Ready, so the game is playing; the
 // heartbeat and silence timing then count from that moment.
-function setup({ character = WIND_RABBIT, random, join = true, start = true } = {}) {
+function setup({ character = WIND_RABBIT, random, join = true, start = true, clock = createFakeClock() } = {}) {
   const network = createFakeNetwork();
-  const clock = createFakeClock();
   const hostTransport = network.connect();
   const host = createHostRoom({ transport: hostTransport, code: 'AB2C9', clock, random, id: 'host' });
   const hostEvents = [];
@@ -1029,4 +1028,77 @@ test('a forfeit makes the phase over', () => {
   assert.deepEqual(host.getView().result, { winner: O, reason: 'opponentLeft' });
   assert.equal(host.phase, OVER);
   assert.equal(guest.phase, OVER, 'the guest takes the host result');
+});
+
+// --- A phone's page that is hidden or frozen (docs/mobile.md) ---
+
+test('an away peer is waited for 45 seconds instead of 3, and its return cancels the wait', () => {
+  const { clock, host, guest, guestTransport, hostEvents } = setup({ character: EARTH_BEAR });
+  clock.advance(500);
+  guest.setAway(true); // the guest's page was hidden: one ping that says so
+  guestTransport.setMuted(true); // and then nothing: a hidden page is frozen
+  clock.advance(PEER_AWAY_TIMEOUT_MS - 1);
+  assert.deepEqual(host.getView().peer, { status: CONNECTED, secondsLeft: null, away: true });
+  assert.equal(ofType(hostEvents, 'peer').at(-1).away, true, 'the screens learn it');
+  clock.advance(1);
+  assert.deepEqual(host.getView().peer, { status: COUNTDOWN, secondsLeft: 10, away: true });
+  // Back before the countdown ends: the guest speaks again and the host forgets the whole thing.
+  guestTransport.setMuted(false);
+  clock.advance(5000);
+  guest.setAway(false);
+  clock.advance(10);
+  assert.deepEqual(host.getView().peer, { status: CONNECTED, secondsLeft: null });
+  assert.equal(host.getView().result, null);
+});
+
+test('setAway sends the flag with every ping while hidden, and nothing without a peer', () => {
+  const { clock, guest, guestTransport } = setup();
+  guest.setAway(true);
+  clock.advance(HEARTBEAT_INTERVAL_MS * 2);
+  const pings = guestTransport.sent.filter((m) => m.type === 'ping').slice(-3);
+  assert.ok(pings.every((m) => m.away === true), 'every ping of a hidden page says so');
+  guest.setAway(false);
+  clock.advance(HEARTBEAT_INTERVAL_MS);
+  assert.equal(guestTransport.sent.filter((m) => m.type === 'ping').at(-1).away, undefined);
+  const lonely = setup({ join: false });
+  assert.doesNotThrow(() => lonely.host.setAway(true));
+  assert.equal(lonely.hostTransport.sent.filter((m) => m.type === 'ping').length, 0);
+});
+
+test('a page that was frozen does not blame the peer for the silence: it gets a new window', () => {
+  const base = createFakeClock();
+  let skew = 0;
+  const clock = { ...base, now: () => base.now() + skew };
+  const { host, guestTransport } = setup({ character: EARTH_BEAR, clock });
+  base.advance(500);
+  guestTransport.setMuted(true); // nothing came in while this page slept
+  skew = 20000; // the page woke up 20 seconds later: no timer ran in between
+  base.advance(PRESENCE_CHECK_INTERVAL_MS);
+  assert.deepEqual(host.getView().peer, { status: CONNECTED, secondsLeft: null }, 'not the countdown and not gone');
+  assert.equal(host.getView().result, null);
+  // The peer really is silent: the usual 3 seconds and 10 seconds still end it, counted from the wake up.
+  base.advance(PEER_TIMEOUT_MS + 10 * 1000 + 500);
+  assert.equal(host.getView().peer.status, GONE);
+  assert.equal(host.getView().result.reason, 'opponentLeft');
+});
+
+test('presence: away extends the silence limit, hearing the peer again clears it, resume gives a new window', () => {
+  let p = createPresence(0);
+  assert.equal(isAway(p), false);
+  p = markAway(p, 1000);
+  assert.equal(isAway(p), true);
+  assert.equal(checkPresence(p, 1000 + PEER_TIMEOUT_MS + 1).status, CONNECTED, 'not the usual 3 seconds');
+  assert.equal(checkPresence(p, 1000 + PEER_AWAY_TIMEOUT_MS).status, COUNTDOWN);
+  p = markHeard(p, 2000);
+  assert.equal(isAway(p), false);
+  assert.equal(checkPresence(p, 2000 + PEER_TIMEOUT_MS).status, COUNTDOWN, 'back to the usual limit');
+  const old = createPresence(0);
+  assert.equal(checkPresence(resumePresence(old, 60000), 60000 + 100).status, CONNECTED);
+  assert.notEqual(checkPresence(old, 60000 + 100).status, CONNECTED, 'without it the same silence is already over');
+  // An explicit leave is not forgiven by a resume, and a gone peer stays gone.
+  const left = markLeft(createPresence(0), 100);
+  assert.equal(checkPresence(resumePresence(left, 5000), 5000 + 11000).status, GONE);
+  const gone = checkPresence(createPresence(0), 20000).presence;
+  assert.equal(resumePresence(gone, 30000), gone);
+  assert.equal(markAway(gone, 30000), gone);
 });

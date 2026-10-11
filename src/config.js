@@ -22,6 +22,8 @@ export const INTERNAL_HEIGHT = 540;
 export const HEARTBEAT_INTERVAL_MS = 1000;
 export const PEER_TIMEOUT_MS = 3000;
 export const LEAVE_COUNTDOWN_S = 10;
+export const PEER_AWAY_TIMEOUT_MS = 45000; // a peer that said it is away (its page is hidden: another app, the lock button) is waited for this long before the leave countdown starts
+export const SUSPEND_GAP_MS = 2500; // a pause this long between two presence checks means this page was frozen (hidden or locked): the silence is its own, not the peer's
 export const ROOM_CODE_LENGTH = 5;
 
 // Networking timings not listed in docs/design.md section 10.

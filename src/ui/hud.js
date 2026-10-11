@@ -353,10 +353,15 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   let bannerKey = null;
   let bannerTimer = null;
 
+  // A right click on the HUD cancels the skill flow. A finger never does: a long press only shows a
+  // tooltip (on a skill) or rests on the card, and the menu that goes with it is not wanted.
+  let lastPointerType = 'mouse';
+  root.addEventListener('pointerdown', (event) => {
+    if (event.isPrimary !== false) lastPointerType = event.pointerType || 'mouse';
+  }, true);
   root.addEventListener('contextmenu', (event) => {
     event.preventDefault();
-    // A touch long press on a skill shows its tooltip, not a cancel.
-    if (pressed || skipClick) return;
+    if (pressed || skipClick || lastPointerType === 'touch') return;
     onCancel?.();
   });
 

@@ -262,7 +262,9 @@ test('the 3D page fills the whole window; the 2D renderer keeps its 16:9 stage',
   assert.match(stage3d, /position: fixed;/);
   assert.match(stage3d, /inset: 0;/);
   assert.match(rule('body.world-3d #game'), /pointer-events: none;/, 'the overlay lets the pointer through to the world');
-  assert.match(rule('#stage'), /width: min\(100vw, calc\(100vh \* 16 \/ 9\)\);/, 'the 2D stage is unchanged');
+  // The same 16:9 box; its height is the dynamic one on a phone (--vh100 is 100dvh where the browser has it, else 100vh).
+  assert.match(rule('#stage'), /width: min\(100vw, calc\(var\(--vh100\) \* 16 \/ 9\)\);/, 'the 2D stage is unchanged');
+  assert.match(html, /:root \{ --vh100: 100vh; \}[\s\S]*@supports \(height: 100dvh\) \{ :root \{ --vh100: 100dvh; \} \}/);
   const main = read('src/main.js');
   assert.match(main, /document\.body\.classList\.add\('world-3d'\)/);
   assert.match(main, /document\.body\.classList\.remove\('world-3d'\)/, 'the fallback to 2D goes back to the stage');

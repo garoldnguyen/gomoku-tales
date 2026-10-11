@@ -54,6 +54,20 @@
   z-index: 2; /* above the glass HUD (hud.css) */
 }
 
+/* Phones (docs/mobile.md): the unit is one pixel of a 960 by 540 screen, which makes a phone's lobby
+   card 40 percent of its size (6 px text). On a phone the unit never goes under what a 390 by 540
+   window gives (1 px on a portrait phone), and 0.8 px on a landscape phone. */
+@media (max-width: 600px) {
+  #screens { --u: max(calc(min(100vw, var(--vh100) * 16 / 9) / 960), min(calc(100vw / 390), calc(var(--vh100) / 540))); padding-inline: 12px; }
+  /* these cards fit the window with a margin: they are never wider than it */
+  #screens .card[data-screen="lobby"], #screens .card[data-screen="join"], #screens .card[data-screen="spectate"], #screens .card[data-screen="roomClosed"] {
+    box-sizing: border-box; min-width: 0; width: min(100%, calc(var(--u) * 380)); padding-inline: calc(var(--u) * 18);
+  }
+}
+@media (max-height: 500px) and (pointer: coarse) {
+  #screens { --u: max(calc(min(100vw, var(--vh100) * 16 / 9) / 960), 0.8px); }
+}
+
 /* The lobby, Join and Watch a match cards lie on the ivory wash of the
    menu (menu.css .scrim); the character select has its own (room.css),
    and the game over and watched game cards stay over the clear board. */
@@ -195,7 +209,7 @@
   box-sizing: border-box;
   padding: calc(var(--u) * 6) calc(var(--u) * 8);
   font: inherit;
-  font-size: calc(var(--u) * 20);
+  font-size: max(16px, calc(var(--u) * 20)); /* never under 16 px: iOS zooms into a smaller text box */
   font-family: var(--label);
   font-weight: 500;
   letter-spacing: calc(var(--u) * 3);
@@ -239,7 +253,7 @@
   box-sizing: border-box;
   padding: calc(var(--u) * 6) calc(var(--u) * 12);
   font: inherit;
-  font-size: calc(var(--u) * 18);
+  font-size: max(16px, calc(var(--u) * 18));
   text-align: center;
   color: var(--ink);
   background: var(--card-solid);

@@ -15,7 +15,7 @@ import { seededRandom } from './render3d/seeded-random.js';
 import { loadForestMeta, withForestMeta } from './render3d/forest-meta.js';
 import { loadV3Meta } from './render3d/v3-meta.js';
 import { GAME, GAME_OVER, MENU, SELECT, WAITING_SCREEN, WATCH, createApp } from './ui/app.js';
-import { MODES, SCREENS } from './ui/flow.js';
+import { MODES, OVERLAYS, SCREENS } from './ui/flow.js';
 import {
   fullscreenActive, fullscreenSupported, fullscreenViewModel, isFullscreenKey, onFullscreenChange, toggleFullscreen,
 } from './ui/fullscreen.js';
@@ -24,6 +24,9 @@ import { isCollapseKey, startCollapsed, toggleAll, withCollapsed, writeCollapsed
 import { createAnnouncer } from './ui/announce.js';
 import { attachChat } from './ui/chat-dom.js';
 import { attachLeaveMatch } from './ui/leave-match.js';
+import { createBackGuard } from './ui/back-guard.js';
+import { installMobileGuards } from './ui/mobile-guards.js';
+import { createWakeLock } from './ui/wake-lock.js';
 import { SPECTATOR_VIEW, hudViewModel } from './ui/hud-view.js';
 import { TOUCH_PREVIEW, attachGameInput, createTouchConfirm, hitTest, isQualityKey, shortcutKeyHandler } from './ui/input.js';
 import { createLocalGame } from './ui/local-game.js';
@@ -398,6 +401,26 @@ function startAppMode({ local = false } = {}) {
   }
   // Tell the opponent at once when this window closes or reloads.
   window.addEventListener('pagehide', () => app.close());
+
+  // The phone (docs/mobile.md): the browser's own gestures and menus stay out of the game, the screen
+  // stays on while a game or a room is open, and the Back button answers as the screen's own Back or
+  // Leave button instead of leaving the page. A reload keeps the guard's history entry: forget its mark.
+  installMobileGuards(window);
+  const wakeLock = createWakeLock({ navigator, document });
+  window.addEventListener('pointerdown', () => wakeLock.nudge(), { capture: true, passive: true });
+  if (window.history.state?.gomokuGuard) window.history.replaceState(null, '');
+  const backGuard = createBackGuard({ history: window.history, location: window.location, win: window });
+  // A hidden page (another app, the lock button) tells the opponent, who then waits for it; a page that
+  // shows again says so at once. A page restored from the browser's cache is back too.
+  document.addEventListener('visibilitychange', () => app.setAway(document.hidden));
+  window.addEventListener('pageshow', () => app.setAway(document.hidden));
+  const syncMobile = () => {
+    const past = app.getScreen() !== MENU || app.getFlow().overlay !== OVERLAYS.NONE; // a game, a room or a menu panel
+    wakeLock.setWanted(past);
+    backGuard.sync(past);
+  };
+  app.onChange(syncMobile);
+  syncMobile();
 
   // Only the Game screen takes input: a spectator's game (WATCH) is drawn
   // the same way but never gets a hover, a click or a skill.

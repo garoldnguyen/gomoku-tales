@@ -6,22 +6,41 @@
 // PEER_TIMEOUT_MS, or at once when a "leave" message arrives. Hearing from
 // the peer again cancels it. When it reaches 0 the peer is gone for good.
 
-import { LEAVE_COUNTDOWN_S, PEER_TIMEOUT_MS } from '../config.js';
+import { LEAVE_COUNTDOWN_S, PEER_AWAY_TIMEOUT_MS, PEER_TIMEOUT_MS } from '../config.js';
 
 export const CONNECTED = 'connected';
 export const COUNTDOWN = 'countdown';
 export const GONE = 'gone';
 
-const DEFAULTS = { timeoutMs: PEER_TIMEOUT_MS, countdownS: LEAVE_COUNTDOWN_S };
+const DEFAULTS = { timeoutMs: PEER_TIMEOUT_MS, awayMs: PEER_AWAY_TIMEOUT_MS, countdownS: LEAVE_COUNTDOWN_S };
 
 export function createPresence(now) {
-  return { lastHeardAt: now, leftAt: null, goneAt: null };
+  return { lastHeardAt: now, leftAt: null, goneAt: null, awayAt: null };
 }
 
-// Any message from the peer.
+// Any message from the peer. It also says the peer is back (no longer away).
 export function markHeard(presence, now) {
   if (presence.goneAt !== null) return presence;
-  return { ...presence, lastHeardAt: Math.max(presence.lastHeardAt, now), leftAt: null };
+  return { ...presence, lastHeardAt: Math.max(presence.lastHeardAt, now), leftAt: null, awayAt: null };
+}
+
+// A message from the peer that says its page is hidden (another app, the lock button): it is still
+// there, so the silence that follows is waited out for PEER_AWAY_TIMEOUT_MS instead of PEER_TIMEOUT_MS.
+export function markAway(presence, now) {
+  if (presence.goneAt !== null) return presence;
+  return { ...presence, lastHeardAt: Math.max(presence.lastHeardAt, now), leftAt: null, awayAt: now };
+}
+
+// True while the peer has said it is away.
+export function isAway(presence) {
+  return presence.goneAt === null && presence.awayAt !== null;
+}
+
+// This page was frozen (hidden, locked) and woke up: the silence of the peer is this page's own, so
+// the peer gets a whole new window. An explicit leave stays.
+export function resumePresence(presence, now) {
+  if (presence.goneAt !== null) return presence;
+  return { ...presence, lastHeardAt: Math.max(presence.lastHeardAt, now) };
 }
 
 // A "leave" message from the peer.
@@ -32,8 +51,8 @@ export function markLeft(presence, now) {
 
 // Time the countdown started, or null if it is not running.
 export function countdownStart(presence, now, options = {}) {
-  const { timeoutMs } = { ...DEFAULTS, ...options };
-  const silentSince = presence.lastHeardAt + timeoutMs;
+  const { timeoutMs, awayMs } = { ...DEFAULTS, ...options };
+  const silentSince = presence.lastHeardAt + (presence.awayAt !== null ? Math.max(timeoutMs, awayMs) : timeoutMs);
   const starts = [presence.leftAt, now >= silentSince ? silentSince : null].filter((t) => t !== null);
   return starts.length > 0 ? Math.min(...starts) : null;
 }

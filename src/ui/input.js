@@ -120,6 +120,7 @@ export function attachGameInput(canvas, { onHover, onClick, onCancel, onRestart 
   // passed with the click (createTouchConfirm).
   let pointerType = 'mouse';
   const handlePointerDown = (event) => {
+    if (event.isPrimary === false) return; // a second finger (a pinch, a rest of the palm) is not a press
     pointerType = event.pointerType || 'mouse';
   };
   const handlePointerMove = (event) => {
@@ -134,8 +135,11 @@ export function attachGameInput(canvas, { onHover, onClick, onCancel, onRestart 
     if (event.button !== 0) return;
     onClick({ ...pointFromEvent(event), pointerType: event.pointerType || pointerType });
   };
+  // A right click cancels. A long press on a touch screen sends the same event, but it is only a
+  // finger resting on the board (aiming), so it must not throw the preview or the skill away.
   const handleContextMenu = (event) => {
     event.preventDefault();
+    if (pointerType === 'touch') return;
     onCancel();
   };
   const handleKeyDown = (event) => {

@@ -172,6 +172,7 @@ export function createOnlineGame(room) {
       }));
       const buttonReady = panels.some((panel) => panel.skills.some((skill) => skill.hovered && skill.usable));
       const peerCountdown = !outcome && view.peer?.status === COUNTDOWN ? view.peer.secondsLeft : null;
+      const peerAway = !outcome && peerCountdown === null && view.peer?.away === true;
       return {
         state,
         you: player,
@@ -182,7 +183,7 @@ export function createOnlineGame(room) {
         panels,
         pointer: Boolean(canPlace || (preview && preview.type !== 'dash') || preview?.to || buttonReady),
         marker: outcome ? outcome.winner : state.currentPlayer,
-        status: statusLine({ state, you: player, result: view.result, targeting: canAct ? targeting : null, yourTurn: view.yourTurn, peerCountdown }),
+        status: statusLine({ state, you: player, result: view.result, targeting: canAct ? targeting : null, yourTurn: view.yourTurn, peerCountdown, peerAway }),
         message: peerCountdown !== null && targeting ? targetPrompt(targeting) : message,
         peerCountdown,
         players: playersOf(view),
@@ -198,10 +199,11 @@ export function createOnlineGame(room) {
 
 // Status line under the board (docs/design.md section 3.1). The leave
 // countdown comes first so it is always seen.
-export function statusLine({ state, you, result = null, targeting = null, yourTurn = false, peerCountdown = null }) {
+export function statusLine({ state, you, result = null, targeting = null, yourTurn = false, peerCountdown = null, peerAway = false }) {
   const outcome = gameOutcome(state, you, result);
   if (outcome) return outcome.title;
   if (peerCountdown !== null) return `Opponent left. You win in ${peerCountdown}`;
+  if (peerAway && !yourTurn) return STRINGS.peerAway; // waiting for a player whose page is hidden
   if (targeting) return targetPrompt(targeting);
   if (yourTurn && state.skillUsed) return STRINGS.plantToEndTurn; // a skill does not end the turn
   return yourTurn ? 'Your turn' : "Opponent's turn";

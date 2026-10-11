@@ -416,6 +416,19 @@ export async function copyRoomCode(code, clipboard) {
   }
 }
 
+// The share sheet of a phone (navigator.share) for the invite link: resolves to 'shared', to
+// 'cancelled' when the player closed the sheet, or to 'failed' where there is no share sheet or it
+// refused (the page then copies the link instead).
+export async function shareInvite(share, link) {
+  if (typeof share !== 'function') return 'failed';
+  try {
+    await share({ title: STRINGS.shareTitle, text: STRINGS.shareText, url: link });
+    return 'shared';
+  } catch (error) {
+    return error?.name === 'AbortError' ? 'cancelled' : 'failed';
+  }
+}
+
 // The invite link of a room (docs/flow-design.md section 3.10): this page
 // with ?join=CODE, the other parameters kept (a test page's ?local=1 and a
 // stale join dropped). Opening it goes to Join Room with the code sent.

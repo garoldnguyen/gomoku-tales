@@ -151,7 +151,7 @@
 //                                         'opponentLeft' }, or null when a guest's claim
 //                                         was dropped because the game ended by the rules
 
-import { CHAT_MIN_INTERVAL_MS, HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS } from '../config.js';
+import { CHAT_MIN_INTERVAL_MS, HEARTBEAT_INTERVAL_MS, JOIN_TIMEOUT_MS, PRESENCE_CHECK_INTERVAL_MS, SUSPEND_GAP_MS } from '../config.js';
 import { isGameOver, newGame, placeStone, useSkill } from '../logic/game.js';
 import { coveredActionError, maskErrorForViewer, maskEventsForViewer, maskForViewer } from '../logic/cloud.js';
 import { bothReady, clearSeat, createSeats, isSeats, pickCharacter, seatSides, seatStone, setReady, setUnready } from '../logic/seats.js';
@@ -159,7 +159,7 @@ import { CHAT, chatOf, cleanChatText, cleanName, namesOf } from './chat.js';
 import { AUDIENCE_TYPES, createAudience } from './audience.js';
 import { systemClock } from './clock.js';
 import { ROOM_PHASES } from './phase.js';
-import { CONNECTED, GONE, checkPresence, countdownStart, createPresence, markHeard, markLeft } from './presence.js';
+import { CONNECTED, GONE, checkPresence, countdownStart, createPresence, isAway, markAway, markHeard, markLeft, resumePresence } from './presence.js';
 
 export const HOST = 'host';
 export const GUEST = 'guest';
@@ -689,7 +689,9 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
   let presence = null;
   let pingTimer = null;
   let checkTimer = null;
-  let lastPeer = null; // last { status, secondsLeft } sent in a 'peer' event
+  let lastPeer = null; // last { status, secondsLeft, away } sent in a 'peer' event (away only when true in the event)
+  let lastCheckAt = null; // when the presence was last checked: a long pause means this page was frozen
+  let away = false; // this page is hidden (another app, the lock button): the pings say so
   let peerGoneReported = false; // the peer was reported gone (or forfeited) on this link
   let unsubscribe = null;
   const audience = createAudience(id); // who watches (spectators)
@@ -820,7 +822,8 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
     // Starts the heartbeat and leave detection once both players are in.
     startLink() {
       presence = createPresence(clock.now());
-      lastPeer = { status: CONNECTED, secondsLeft: null };
+      lastPeer = { status: CONNECTED, secondsLeft: null, away: false };
+      lastCheckAt = null;
       peerGoneReported = false;
       pingTimer = room.addTimer(clock.setInterval(ping, HEARTBEAT_INTERVAL_MS), 'interval');
       checkTimer = room.addTimer(clock.setInterval(check, PRESENCE_CHECK_INTERVAL_MS), 'interval');
@@ -858,6 +861,9 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
         // Leave match mid-game (resign): gone at once, no countdown.
         if (message.type === 'leave' && message.resign === true && room.phase === PLAYING) presence = { ...presence, goneAt: clock.now() };
         check();
+      } else if (message.type === 'ping' && message.away === true) {
+        if (presence) presence = markAway(presence, clock.now()); // still there, its page is hidden
+        check();
       } else {
         room.heard();
       }
@@ -874,6 +880,7 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
       ...(role === HOST && room.round > 0 ? { round: room.round } : {}),
       ...(room.result ? { result: room.result } : {}),
       ...(room.rematchGone ? { gone: true } : {}),
+      ...(away ? { away: true } : {}),
       ...(role === HOST && room.phase === OVER ? { rematch: room.rematchStatus() } : {}),
       ...(role === HOST && room.phase === STARTING ? { seats: room.seats } : {}),
     });
@@ -886,15 +893,21 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
   // reported once with peerGone.
   const check = () => {
     if (!presence) return;
+    // A long pause since the last check: this page was frozen (hidden, locked), so the silence of
+    // the peer is this page's own. The peer gets a new window before anything counts against it.
+    const checkedAt = clock.now();
+    if (lastCheckAt !== null && checkedAt - lastCheckAt > SUSPEND_GAP_MS) presence = resumePresence(presence, checkedAt);
+    lastCheckAt = checkedAt;
     if (room.phase !== PLAYING) {
       checkMissing();
       return;
     }
     const { presence: next, status, secondsLeft } = checkPresence(presence, clock.now());
     presence = next;
-    if (status === lastPeer.status && secondsLeft === lastPeer.secondsLeft) return;
-    lastPeer = { status, secondsLeft };
-    room.emit({ type: 'peer', status, secondsLeft });
+    const peerAway = isAway(presence);
+    if (status === lastPeer.status && secondsLeft === lastPeer.secondsLeft && peerAway === lastPeer.away) return;
+    lastPeer = { status, secondsLeft, away: peerAway };
+    room.emit({ type: 'peer', status, secondsLeft, ...(peerAway ? { away: true } : {}) });
     if (status !== GONE) return;
     peerGoneReported = true;
     clock.clearInterval(checkTimer);
@@ -932,9 +945,9 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
     if (!presence) return null;
     if (room.phase === PLAYING) {
       const { status, secondsLeft } = checkPresence(presence, clock.now());
-      return { status, secondsLeft };
+      return { status, secondsLeft, ...(isAway(presence) ? { away: true } : {}) };
     }
-    return presence.goneAt === null ? { status: CONNECTED, secondsLeft: null } : { status: GONE, secondsLeft: 0 };
+    return presence.goneAt === null ? { status: CONNECTED, secondsLeft: null, ...(isAway(presence) ? { away: true } : {}) } : { status: GONE, secondsLeft: 0 };
   };
 
   const stopTimers = () => {
@@ -1087,6 +1100,17 @@ function createRoomCore({ role, transport, code, clock, id, name = null }) {
         waiting: room.pending !== null,
         watchers: audience.list(),
       };
+    },
+
+    // This page was hidden (another app, the lock button) or is back: the opponent is told, so it waits
+    // for this player instead of counting down, and on the way back this side gives the opponent a new
+    // window too. Safe in every phase and before the opponent is seated.
+    setAway(value) {
+      const next = Boolean(value);
+      if (next === away) return;
+      away = next;
+      if (!away && presence) presence = resumePresence(presence, clock.now());
+      if (room.peerId && room.phase !== CLOSED) ping();
     },
 
     // Leaves the room: tells a seated opponent (unless they are already

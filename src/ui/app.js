@@ -886,6 +886,12 @@ export function createApp(options) {
     close() {
       closeRoom();
     },
+
+    // This page was hidden (another app, the lock button) or is back: the opponent is told (room.setAway),
+    // so it waits for this player instead of starting its leave countdown. Safe with no room.
+    setAway(value) {
+      room?.setAway?.(value);
+    },
   };
 }
 

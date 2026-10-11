@@ -144,6 +144,9 @@ export const STRINGS = Object.freeze({
   waitingCopy: 'Copy',
   waitingCopied: 'Copied',
   waitingInvite: 'Copy invite link',
+  waitingShareInvite: 'Share invite link', // on a phone: the system share sheet, one tap to a chat
+  shareTitle: 'Gomoku Tales',
+  shareText: 'Join my game of Gomoku Tales.',
   waitingLinkCopied: 'Link copied',
   waitingPressCtrlC: 'Press Ctrl+C',
   waitingLeave: 'Leave',
@@ -173,6 +176,7 @@ export const STRINGS = Object.freeze({
   skillAlreadyUsedError: SKILL_ALREADY_USED_ERROR, // the rules' refusal of a second skill, shown when a locked row is clicked
   skillUsedHint: 'Already used a skill this turn.', // the hint of every skill row after a skill
   skillUsedState: 'Next turn', // a ready skill row that cannot be used because a skill was used this turn
+  peerAway: 'Opponent is away. Waiting for them.', // the status line and the turn pill while the other player's page is hidden (another app, the lock button)
   plantToEndTurn: 'Now plant a seed to end your turn.', // the turn pill hint, status line and banner after a skill
   trapBannerTitle: 'Trap placed!', // the cast banner of the other seat and the spectators after a Tornado Zone (the character is its second line)
   trapPlaced: '{name} placed a trap!', // the notice the other seat and the spectators get when a Tornado Zone is cast: the character, never a cell

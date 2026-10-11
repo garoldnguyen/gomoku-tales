@@ -14,7 +14,7 @@ import { AVATAR_PX } from '../render3d/art-assets.js';
 import { watchCardBox } from './hud-layout.js';
 import { GAME, GAME_OVER, JOIN, LOBBY, ROOM_CLOSED_SCREEN, SELECT, SPECTATE_SCREEN, WAITING_SCREEN, WATCH } from './app.js';
 import {
-  characterStage, copyFeedbackText, portraitScale, copyRoomCode, inviteFeedbackText, inviteLink, joinViewModel, lobbyViewModel, roomClosedViewModel,
+  characterStage, copyFeedbackText, portraitScale, copyRoomCode, inviteFeedbackText, inviteLink, joinViewModel, shareInvite, lobbyViewModel, roomClosedViewModel,
   selectGlassStyle, spectateViewModel,
 } from './room-screens.js';
 import { TIP_CLOSED, selectTipReducer, selectTipViewModel, tipDelay } from './select-tooltip.js';
@@ -22,9 +22,13 @@ import { tooltipPosition } from './tooltip-position.js';
 import { createFader } from './motion.js';
 import { chooseName, loadName, randomName } from './player-names.js';
 import { STRINGS } from './strings.js';
+import { isCoarsePointer } from '../render3d/frame-governor.js';
 
+// share is the system share sheet where there is one and the device is a phone (a finger as the
+// pointer): the invite link then goes to a chat in one tap instead of through the clipboard.
 export function attachScreens(root, app, {
   clipboard = globalThis.navigator?.clipboard, location = globalThis.location, storage = null, suggestName = randomName,
+  share = isCoarsePointer(globalThis.matchMedia?.bind(globalThis)) && typeof globalThis.navigator?.share === 'function' ? (data) => globalThis.navigator.share(data) : null,
 } = {}) {
   const $ = (id) => root.querySelector(`#${id}`);
   const act = (name, ...args) => app[name]?.(...args);
@@ -198,6 +202,7 @@ export function attachScreens(root, app, {
   // refused the link itself shows, selectable, to copy by hand.
   copyInvite.addEventListener('click', async () => {
     const link = inviteLink(location.href, roomCode.textContent);
+    if (share && (await shareInvite(share, link)) !== 'failed') return; // the sheet is its own answer
     const result = await copyRoomCode(link, clipboard);
     clearTimeout(copyTimer);
     copyStatus.textContent = inviteFeedbackText(result, link);
@@ -551,7 +556,7 @@ export function attachScreens(root, app, {
       $('waiting-starting').textContent = vm.startingText ?? '';
       leave.disabled = !vm.leave.enabled;
       copyInvite.hidden = vm.invite === null;
-      if (vm.invite) copyInvite.textContent = vm.invite.label;
+      if (vm.invite) copyInvite.textContent = share ? STRINGS.waitingShareInvite : vm.invite.label;
       showSeats(waitingCards, vm.cards);
       showCharacters(waitingCharacters, vm.characters, vm.readyButton?.seat);
       showReady(waitingReady, vm.readyButton);
