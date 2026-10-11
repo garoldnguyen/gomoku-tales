@@ -147,8 +147,9 @@ test('SKILL_INFO: the numbers are the config constants and the text matches the 
   assert.equal(fact(WIND_DASH, 'Lands'), 'After their turn');
   assert.ok(SKILL_INFO[WIND_DASH].rules.includes('Cannot land on mud or poison'));
   assert.ok(SKILL_INFO[TORNADO_ZONE].rules.includes('Cut at the edge of the field'));
-  assert.ok(SKILL_INFO[TORNADO_ZONE].rules.includes('Hidden from your opponent'));
-  assert.ok(SKILL_INFO[TORNADO_ZONE].rules.includes('Armed next turn; any seed on it fires it'));
+  assert.ok(SKILL_INFO[TORNADO_ZONE].rules.includes('Hidden from your opponent, one use'));
+  assert.ok(SKILL_INFO[TORNADO_ZONE].rules.includes('Armed at once: your own seed counts'));
+  assert.ok(SKILL_INFO[TORNADO_ZONE].rules.includes('Throws the first seed to a random free plot'));
   assert.match(SKILL_INFO[MUD_TRAP].brief, /^Turn an empty plot into a mud puddle\./);
   assert.match(SKILL_INFO[PETRIFICATION].brief, /^Turn one enemy plant to stone\./);
   assert.ok(SKILL_INFO[PETRIFICATION].rules.includes('Cannot pick a seed sunk in mud'));

@@ -232,7 +232,7 @@ Build a pure function `hudViewModel(gameState, uiState, localPlayer)` that retur
 Visuals only follow logic events; they never change rules.
 
 - Wind Dash: the source bloom folds back into a seed (stages in reverse), the seed rides a short gust of petals along a curve to the target, and regrows there from Land. The target shows the red brackets before it resolves.
-- Tornado Zone (Free Action: a secret cross trap of 5 plots): the caster sees faint blue petals drifting over the cross and the other seat sees nothing; when it fires the cross is revealed as a whirlwind, the plants inside bend toward it, the seed is spun up and thrown in an arc to a free neighbour plot and lands with a soil puff, then regrows from Land.
+- Tornado Zone (Free Action: a secret cross trap of 5 plots): the caster sees faint blue petals drifting over the cross and the other seat sees nothing; when it fires the cross is revealed as a whirlwind, the plants inside bend toward it, the seed is spun up and thrown in an arc to a random free plot of the field (a longer flight and a higher arc for a farther plot) and lands with a soil puff, then regrows from Land.
 - Mud Trap: the plot sinks into a bubbling brown puddle; a seed planted in it sinks below the ground, dim, and pops up out of the dried, cracked mud when it surfaces.
 - Petrification: the plant is wrapped in earth energy from below, loses its colour, shatters and becomes a mossy rock with dust rising.
 - Venom, Hiss and Cloud: see docs/design.md section 8.1. The details of all Free Action effects are in docs/design.md sections 5 and 8.1 and docs/free-action-design.md section 8.

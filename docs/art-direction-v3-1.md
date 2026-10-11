@@ -137,7 +137,7 @@ One table `SKILL_INFO` (for example in `src/ui/skill-info.js`). The skill detail
 | skill | description | hint |
 |---|---|---|
 | Wind Dash | Pick one of your plants, then an empty target plot up to {range} plots away. The plant folds back into a seed, rides a gust of petals to the target and grows again there. | Click to select, then choose a plot |
-| Tornado Zone | Secretly pick the centre of a cross of {cross} plots. The first seed anyone plants on it fires the trap and is thrown to a free plot next to it. | Click to select, then choose the trap centre |
+| Tornado Zone | Secretly pick the centre of a cross of {cross} plots. The first seed anyone plants on it fires the trap and is thrown to a random free plot of the field. | Click to select, then choose the trap centre |
 | Mud Trap | Turns an empty plot into a mud puddle that dries after {mudTurns} turns. A seed planted in it sinks and counts for no line for {sinkTurns} turn. | Click to select, then choose a plot |
 | Petrification | Pick one of the opponent's plants. It turns to stone: a rock that stays for good. | Click to select, then choose a plant |
 

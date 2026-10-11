@@ -18,8 +18,8 @@
 // does not do: Wind Dash lands only after the opponent's next turn, only on a
 // plot that is still empty, not mud and not poisoned, and never moves a plant
 // sunk in mud; the Tornado Zone cross is cut at the edge of the field and
-// throws only the seed planted on it, and is armed only from the next turn
-// (the caster's own seed in the cast turn does not fire it); Mud Trap needs an
+// throws only the seed planted on it to a random free plot of the field, and
+// is armed at once (the caster's own seed in the cast turn fires it); Mud Trap needs an
 // empty plot that is not mud or poisoned; Petrification cannot pick a seed sunk in mud; Venom can
 // pick a plant sunk in mud, cannot pick a rock, removes nothing, and bars
 // only the Tornado throw from its plots (a Tornado Zone can still be cast
@@ -88,9 +88,9 @@ export const SKILL_INFO = Object.freeze({
     facts: [fact('Waits', turns(TORNADO_TURNS)), fact('Size', plots(4 * TORNADO_ARM + 1))],
     rules: [
       'Cut at the edge of the field',
-      'Hidden from your opponent',
-      'Armed next turn; any seed on it fires it',
-      'Throws that seed aside, then it is used up',
+      'Hidden from your opponent, one use',
+      'Armed at once: your own seed counts',
+      'Throws the first seed to a random free plot',
     ],
     hint: 'Click to select, then choose the trap centre',
   }),

@@ -140,7 +140,7 @@ test('no text names a cell, and the Tornado Zone words give the other seat nothi
 test('the words the corrected rules need are in the table', () => {
   const has = (id, rule) => assert.ok(SKILL_INFO[id].rules.includes(rule), `${id}: ${rule}`);
   has(TORNADO_ZONE, 'Cut at the edge of the field');
-  has(TORNADO_ZONE, 'Hidden from your opponent');
+  has(TORNADO_ZONE, 'Hidden from your opponent, one use');
   has(VENOM, 'Can pick a plant sunk in mud');
   has(VENOM, 'Rocks cannot be picked');
   // Only the Tornado throw is barred from poison; a Tornado Zone can be cast over it.
@@ -153,4 +153,13 @@ test('the words the corrected rules need are in the table', () => {
   assert.equal(fact(WIND_DASH, 'Lands'), 'After their turn');
   assert.equal(fact(PETRIFICATION, 'Lasts'), 'For good');
   assert.equal(fact(SKY_WATCH, 'Mode'), 'Always on');
+});
+
+test('the Tornado Zone words match the rule: armed at once, one use, a random free plot anywhere', () => {
+  const { rules } = SKILL_INFO[TORNADO_ZONE];
+  const text = rules.join(' | ');
+  assert.match(text, /at once/, 'the cast turn\'s own seed fires it');
+  assert.match(text, /random free plot/, 'the seed is thrown anywhere, not aside');
+  assert.match(text, /one use/);
+  assert.doesNotMatch(text, /next turn|aside|neighbour|next to/, 'nothing of the old rule is left');
 });

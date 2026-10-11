@@ -17,8 +17,8 @@
 //                     viewer's state; the plants inside bend towards it
 //                     (High); the other seat sees nothing on the board. When
 //                     the trap fires the cross is revealed as a whirlwind that
-//                     spins the seed up and throws it to its neighbour plot
-//                     in an arc; it lands with a small dust puff and regrows
+//                     spins the seed up and throws it to the plot it lands
+//                     on, anywhere on the field, in an arc; it lands with a small dust puff and regrows
 //                     from Land
 //   Petrification     earth energy winds round the enemy plant, its colour
 //                     drains to grey (it flickers first), it shatters and a

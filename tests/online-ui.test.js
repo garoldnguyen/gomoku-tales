@@ -323,7 +323,7 @@ test('a full game between two windows with all four skills ends on the Game over
   assert.equal(rabbit.getView().state.tornado.cells.length, 5, 'the rabbit sees its cross');
   assert.deepEqual(Object.keys(bear.getView().state.tornado).sort(), ['endsAfterTurn', 'hidden', 'player'], 'the bear never sees where');
 
-  // Turn 8: the bear plants on the cross: the trap fires and the host throws the seed to a neighbour plot.
+  // Turn 8: the bear plants on the cross: the trap fires and the host throws the seed to a random plot of the field.
   assert.equal(bear.click({ x: 5, y: 5 }), true);
   assert.equal(board()[5][5], EMPTY);
   assert.equal(rabbit.getView().state.tornado, null);
