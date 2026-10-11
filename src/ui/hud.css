@@ -313,6 +313,11 @@
 .hud .pop-fact-label { font-family: var(--label); font-size: 10px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--accent); }
 .hud .pop-fact-value { font-size: 15px; font-weight: 500; white-space: nowrap; }
 /* rules: a small gold dot each, a wrapped line hangs under its text */
+.hud .pop-turn { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-radius: 12px; background: color-mix(in srgb, var(--ready) 11%, transparent); border: 1px solid color-mix(in srgb, var(--ready) 34%, transparent); }
+.hud .pop-turn[data-turn="passive"] { background: rgba(255, 255, 255, 0.06); border-color: var(--hair); }
+.hud .pop-turn-label { font-family: var(--label); font-size: 10px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ready); }
+.hud .pop-turn[data-turn="passive"] .pop-turn-label { color: var(--ink-2); }
+.hud .pop-turn-text { font-size: 13px; line-height: 1.3; color: rgba(244, 247, 251, 0.86); }
 .hud .pop-rules { display: flex; flex-direction: column; gap: 5px; }
 .hud .pop-rule { position: relative; padding-left: 14px; font-size: 13px; line-height: 1.35; color: rgba(244, 247, 251, 0.82); }
 .hud .pop-rule::before { content: ""; position: absolute; left: 2px; top: 0.55em; width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }

@@ -143,6 +143,9 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       state: el('div', 'tip-state', head),
       brief: null,
       facts: [],
+      turn: null,
+      turnLabel: null,
+      turnText: null,
       rules: [],
       hint: null,
     };
@@ -153,6 +156,10 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       const cell = el('div', 'pop-fact', facts);
       card.facts.push({ cell, label: el('span', 'pop-fact-label', cell), value: el('span', 'pop-fact-value', cell) });
     }
+    // How the skill relates to the turn: Free action (uses no turn) or Always on.
+    card.turn = el('div', 'pop-turn', parent);
+    card.turnLabel = el('span', 'pop-turn-label', card.turn);
+    card.turnText = el('span', 'pop-turn-text', card.turn);
     if (withRules) {
       const rules = el('div', 'pop-rules', parent);
       for (let i = 0; i < RULES_MAX; i++) card.rules.push(el('div', 'pop-rule', rules));
@@ -182,6 +189,10 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
       setText(slot.label, fact?.label ?? '');
       setText(slot.value, fact?.value ?? '');
     });
+    setHidden(card.turn, !view.turn);
+    setAttr(card.turn, 'data-turn', view.turn?.kind ?? '');
+    setText(card.turnLabel, view.turn?.label ?? '');
+    setText(card.turnText, view.turn?.text ?? '');
     card.rules.forEach((line, i) => {
       setHidden(line, i >= view.rules.length);
       setText(line, view.rules[i] ?? '');

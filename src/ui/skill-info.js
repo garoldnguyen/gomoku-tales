@@ -12,6 +12,11 @@
 //   hint   how to use it.
 //   description  DERIVED from brief and rules (never typed), under
 //          DESCRIPTION_MAX characters.
+//   turn   { kind, label, text }: how the skill relates to the turn, shown in a
+//          small box of the popup and the tooltip. Every active skill is a FREE
+//          ACTION (docs/free-action-design.md: using it never ends the turn,
+//          only planting a seed does); the passive Sky Watch never uses a turn.
+//          DERIVED from isPassiveSkill, never typed per skill.
 //
 // The draft wording of the doc was checked against the rules (src/logic and
 // docs/design.md section 5) and changed where it said something the game
@@ -46,6 +51,12 @@ export const RULE_MAX = 44;
 export const RULES_MIN = 2;
 export const RULES_MAX = 4;
 export const DESCRIPTION_MAX = 220;
+export const TURN_LABEL_MAX = 14;
+export const TURN_TEXT_MAX = 48;
+
+// The two turn boxes: kind 'free' (an active skill) and 'passive' (Sky Watch).
+export const TURN_FREE = Object.freeze({ kind: 'free', label: 'Free action', text: 'Uses no turn. Plant a seed to end it' });
+export const TURN_PASSIVE = Object.freeze({ kind: 'passive', label: 'Always on', text: 'Works by itself and never uses a turn' });
 
 // The plural follows the number: 1 turn, 2 turns.
 const turns = (count) => `${count} ${count === 1 ? 'turn' : 'turns'}`;
@@ -69,6 +80,7 @@ const info = (skillId, { brief, facts, rules, hint }) => Object.freeze({
   rules: Object.freeze([...rules]),
   hint,
   description: describe(brief, rules),
+  turn: isPassiveSkill(skillId) ? TURN_PASSIVE : TURN_FREE,
 });
 
 export const SKILL_INFO = Object.freeze({

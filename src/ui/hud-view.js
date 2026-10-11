@@ -254,6 +254,7 @@ function skillView(state, player, skillId, { over, active, yours, targeting, use
     brief: info?.brief ?? '',
     facts: info?.facts ?? NO_LINES,
     rules: info?.rules ?? NO_LINES,
+    turn: info?.turn ?? null,
     hint: usedSkill && !passive ? STRINGS.skillUsedHint : info?.hint ?? '',
   };
 }
@@ -281,6 +282,7 @@ export function skillPopupViewModel(vm, player, skillId) {
     brief: row.brief,
     facts: row.facts,
     rules: row.rules,
+    turn: row.turn,
     hint: row.hint,
     description: row.description,
   };

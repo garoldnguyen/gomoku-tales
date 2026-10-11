@@ -64,6 +64,7 @@ test('the popup view model has the header, brief, facts, rules and hint of all 8
         assert.deepEqual(popup.facts, info.facts, skillId);
         assert.deepEqual(popup.rules, info.rules, skillId);
         assert.equal(popup.hint, info.hint, skillId);
+        assert.equal(popup.turn, info.turn, `${skillId} has its turn box`);
         assert.ok(['ready', 'selected', 'cooling', 'waiting'].includes(popup.state), `${skillId} state ${popup.state}`);
         assert.ok(popup.stateText.length > 0, skillId);
         seen.push(skillId);
@@ -90,6 +91,9 @@ test('the popup shows the header, the brief, the facts, the rules and the hint',
     assert.deepEqual(shownFacts(ui.popup), info.facts.map(({ label, value }) => ({ label, value })));
     assert.deepEqual(shownRules(ui.popup), info.rules);
     assert.deepEqual(textOf(ui.popup, 'pop-hint'), [info.hint]);
+    assert.deepEqual(textOf(ui.popup, 'pop-turn-label'), ['Free action'], 'a skill is a free action');
+    assert.deepEqual(textOf(ui.popup, 'pop-turn-text'), [info.turn.text]);
+    assert.equal(byClass(ui.popup, 'pop-turn')[0].getAttribute('data-turn'), 'free');
     const icon = byClass(ui.popup, 'pop-ico')[0];
     assert.equal(icon.children.length, 2, 'the icon art and its letters');
     assert.equal(ui.popup.getAttribute('aria-label'), info.title);
@@ -111,6 +115,8 @@ test('the tooltip shows only the header, the brief and the facts, never the rule
     assert.deepEqual(textOf(ui.tooltip, 'tip-state'), ['Ready']);
     assert.deepEqual(textOf(ui.tooltip, 'pop-brief'), [info.brief]);
     assert.deepEqual(shownFacts(ui.tooltip), info.facts.map(({ label, value }) => ({ label, value })));
+    assert.deepEqual(textOf(ui.tooltip, 'pop-turn-label'), ['Free action'], 'the tooltip carries the turn box too (phones only get the tooltip)');
+    assert.equal(byClass(ui.tooltip, 'pop-turn')[0].hidden, false);
     assert.equal(byClass(ui.tooltip, 'pop-rule').length, 0, 'no rules in the tooltip');
     assert.equal(byClass(ui.tooltip, 'pop-hint').length, 0, 'no hint in the tooltip');
     assert.equal(ui.popup.hidden, true, 'the tooltip is not the popup');
@@ -241,4 +247,11 @@ test('the popup and tooltip DOM uses only classes that hud.css styles', () => {
   } finally {
     ui.restore();
   }
+});
+
+test('Sky Watch is passive: its turn box says Always on, not Free action', () => {
+  const view = skillPopupViewModel(viewOf(MATCHUPS[1]), O, 'skyWatch');
+  assert.equal(view.turn.kind, 'passive');
+  assert.equal(view.turn.label, 'Always on');
+  assert.ok(!/free action/i.test(view.turn.label + view.turn.text));
 });

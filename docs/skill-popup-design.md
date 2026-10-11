@@ -45,8 +45,16 @@ Numbers are never typed in a string: they are built from the config constants.
 - Everything uses the HUD tokens already in `hud.css` (`--accent`, `--hair`, `--font`, `--display`,
   `--label`). No new hex colour outside a token block. Only opacity and transforms animate (a
   120 ms fade in, nothing under `prefers-reduced-motion`).
-- The hover and long-press tooltip shows only the header, the brief and the facts. It is for a quick
-  look; the popup has the rules.
+- The turn box (owner request, October 2026: show which skills are a free action and which cost a
+  turn): a small rounded box under the facts with a jade hairline, a spaced capital label and one
+  line. Every active skill reads FREE ACTION: "Uses no turn. Plant a seed to end it" (a skill never ends
+  the turn, only planting does, docs/free-action-design.md); the passive Sky Watch reads ALWAYS ON:
+  "Works by itself and never uses a turn" in a neutral box. The box comes from `turn` of the
+  `SKILL_INFO` entry (derived from `isPassiveSkill`, never typed per skill; limits `TURN_LABEL_MAX` 14
+  and `TURN_TEXT_MAX` 48). No skill costs a turn today: only planting a seed does.
+- The hover and long-press tooltip shows only the header, the brief, the facts and the turn box. It is
+  for a quick look (and the only thing a phone gets: the popup does not open there); the popup has
+  the rules.
 - Phones (`is-compact`): same content, width `min(280px, calc(100vw - 24px))`, 13 px rules.
 
 ## 2. The content model (SKILL_INFO)

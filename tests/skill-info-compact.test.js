@@ -13,7 +13,7 @@ import { cloudReach } from '../src/logic/cloud.js';
 import {
   CLOUD, HISS, MUD_TRAP, PETRIFICATION, SKILLS, SKY_WATCH, TORNADO_ZONE, VENOM, WIND_DASH, cooldownTurns, isPassiveSkill,
 } from '../src/logic/skills.js';
-import { SKILL_INFO, skillInfo } from '../src/ui/skill-info.js';
+import { SKILL_INFO, TURN_FREE, TURN_LABEL_MAX, TURN_PASSIVE, TURN_TEXT_MAX, skillInfo } from '../src/ui/skill-info.js';
 
 const IDS = [WIND_DASH, TORNADO_ZONE, MUD_TRAP, PETRIFICATION, HISS, VENOM, SKY_WATCH, CLOUD];
 const turnsText = (count) => `${count} ${count === 1 ? 'turn' : 'turns'}`;
@@ -30,7 +30,7 @@ test('SKILL_INFO has an entry for each of the 8 skills and nothing else', () => 
   assert.deepEqual(Object.keys(SKILL_INFO).sort(), IDS.slice().sort());
   assert.deepEqual(Object.keys(SKILL_INFO).sort(), Object.keys(SKILLS).sort());
   for (const id of IDS) {
-    assert.deepEqual(Object.keys(SKILL_INFO[id]).sort(), ['brief', 'description', 'facts', 'hint', 'rules', 'title'], id);
+    assert.deepEqual(Object.keys(SKILL_INFO[id]).sort(), ['brief', 'description', 'facts', 'hint', 'rules', 'title', 'turn'], id);
     assert.equal(skillInfo(id), SKILL_INFO[id]);
     assert.ok(Object.isFrozen(SKILL_INFO[id]) && Object.isFrozen(SKILL_INFO[id].facts) && Object.isFrozen(SKILL_INFO[id].rules), id);
   }
@@ -162,4 +162,23 @@ test('the Tornado Zone words match the rule: armed at once, one use, a random fr
   assert.match(text, /random free plot/, 'the seed is thrown anywhere, not aside');
   assert.match(text, /one use/);
   assert.doesNotMatch(text, /next turn|aside|neighbour|next to/, 'nothing of the old rule is left');
+});
+
+test('every active skill is a free action and only the passive Sky Watch is not', () => {
+  for (const id of IDS) {
+    const { turn } = SKILL_INFO[id];
+    if (isPassiveSkill(id)) {
+      assert.equal(turn, TURN_PASSIVE, id);
+      assert.equal(turn.kind, 'passive');
+    } else {
+      assert.equal(turn, TURN_FREE, id);
+      assert.equal(turn.kind, 'free');
+    }
+    assert.ok(turn.label.length > 0 && turn.label.length <= TURN_LABEL_MAX, `${id} turn label: ${turn.label}`);
+    assert.ok(turn.text.length > 0 && turn.text.length <= TURN_TEXT_MAX, `${id} turn text (${turn.text.length}): ${turn.text}`);
+    assert.ok(!/[.]$/.test(turn.text), `${id}: no full stop at the end of the turn text`);
+    assert.ok(Object.isFrozen(turn), id);
+  }
+  assert.deepEqual(IDS.filter((id) => SKILL_INFO[id].turn === TURN_PASSIVE), [SKY_WATCH]);
+  assert.match(TURN_FREE.text, /plant a seed/i, 'the box says what ends the turn');
 });
