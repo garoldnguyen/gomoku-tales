@@ -129,24 +129,29 @@ test('view model: every skill has its description and hint from SKILL_INFO', () 
 });
 
 test('SKILL_INFO: the numbers are the config constants and the text matches the rules', () => {
-  assert.ok(SKILL_INFO[TORNADO_ZONE].description.includes(`cross of ${4 * TORNADO_ARM + 1} plots`));
-  assert.ok(SKILL_INFO[TORNADO_ZONE].description.includes(`waits for ${TORNADO_TURNS} turns`));
-  assert.ok(SKILL_INFO[WIND_DASH].description.includes(`up to ${WIND_DASH_RANGE} plots away`));
-  assert.ok(SKILL_INFO[MUD_TRAP].description.includes(`stays for ${MUD_LIFETIME_TURNS} turns`));
-  assert.ok(SKILL_INFO[MUD_TRAP].description.includes(`no line for ${MUD_SINK_TURNS} turn,`), 'the sink time is the config constant, singular for 1');
+  const fact = (id, label) => SKILL_INFO[id].facts.find((f) => f.label === label)?.value;
+  const turnsText = (count) => `${count} ${count === 1 ? 'turn' : 'turns'}`;
+  assert.equal(fact(TORNADO_ZONE, 'Size'), `${4 * TORNADO_ARM + 1} plots`);
+  assert.equal(fact(TORNADO_ZONE, 'Waits'), turnsText(TORNADO_TURNS));
+  assert.equal(fact(WIND_DASH, 'Range'), `${WIND_DASH_RANGE} plots`);
+  assert.equal(fact(MUD_TRAP, 'Puddle'), turnsText(MUD_LIFETIME_TURNS));
+  assert.equal(fact(MUD_TRAP, 'Sinks'), turnsText(MUD_SINK_TURNS), 'the sink time is the config constant, singular for 1');
   // No number is typed into the strings: the only digits are the constants.
   const source = readFileSync(new URL('../src/ui/skill-info.js', import.meta.url), 'utf8');
   const strings = source.slice(source.indexOf('export const SKILL_INFO'));
   assert.doesNotMatch(strings.replace(/\$\{[^}]*\}/g, ''), /'[^'\n]*\d[^'\n]*'|`[^`\n]*\d[^`\n]*`/);
-  // Accuracy (src/logic): Wind Dash needs an empty target and lands after
-  // the opponent's turn; Tornado Zone is a secret cross trap that the first
-  // seed anyone plants on it sets off; Mud Trap needs an empty plot;
-  // Petrification takes only an opponent's plant that is not sunk in mud.
-  assert.match(SKILL_INFO[WIND_DASH].description, /empty target plot up to .* away, diagonals included\. After the opponent's next turn/);
-  assert.match(SKILL_INFO[TORNADO_ZONE].description, /Your opponent never sees it\. It is armed when this turn ends .* The first seed anyone plants on the cross, yours too, fires it: .* throws that seed to a free plot next to it/);
-  assert.match(SKILL_INFO[MUD_TRAP].description, /^Turns an empty plot into a mud puddle\./);
-  assert.match(SKILL_INFO[PETRIFICATION].description, /^Pick one of the opponent's plants\. It turns to stone: a rock that stays for good and breaks every line\./);
-  assert.ok(SKILL_INFO[PETRIFICATION].description.endsWith('A seed sunk in mud cannot be picked.'));
+  // Accuracy (src/logic): Wind Dash lands after the opponent's turn on an
+  // empty plot that is not mud; Tornado Zone is a secret cross trap, cut at
+  // the edge, that the first seed anyone plants on it sets off; Mud Trap needs
+  // an empty plot; Petrification takes only a plant that is not sunk in mud.
+  assert.equal(fact(WIND_DASH, 'Lands'), 'After their turn');
+  assert.ok(SKILL_INFO[WIND_DASH].rules.includes('Cannot land on mud or poison'));
+  assert.ok(SKILL_INFO[TORNADO_ZONE].rules.includes('Cut at the edge of the field'));
+  assert.ok(SKILL_INFO[TORNADO_ZONE].rules.includes('Hidden from your opponent'));
+  assert.ok(SKILL_INFO[TORNADO_ZONE].rules.includes('Armed next turn; any seed on it fires it'));
+  assert.match(SKILL_INFO[MUD_TRAP].brief, /^Turn an empty plot into a mud puddle\./);
+  assert.match(SKILL_INFO[PETRIFICATION].brief, /^Turn one enemy plant to stone\./);
+  assert.ok(SKILL_INFO[PETRIFICATION].rules.includes('Cannot pick a seed sunk in mud'));
 });
 
 // ---------------------------------------------------------------- tooltip

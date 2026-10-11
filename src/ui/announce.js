@@ -80,7 +80,7 @@ export function hintText(id) {
   if (id.startsWith('skill-')) {
     const info = skillInfo(id.slice('skill-'.length));
     if (!info) return null;
-    return { title: info.title, text: `${info.description} ${STRINGS.hintCancel}` };
+    return { title: info.title, text: `${info.brief} ${STRINGS.hintCancel}` };
   }
   return null;
 }

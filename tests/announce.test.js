@@ -43,7 +43,8 @@ test('the words of each hint come from strings.js and SKILL_INFO', () => {
   assert.deepEqual(hintText(HINT_WIN), { title: STRINGS.hintWinTitle, text: STRINGS.hintWinText });
   assert.deepEqual(hintText(HINT_TOUCH), { title: STRINGS.hintTouchTitle, text: STRINGS.hintTouchText });
   const info = skillInfo(TORNADO_ZONE);
-  assert.deepEqual(hintText(skillHintId(TORNADO_ZONE)), { title: info.title, text: `${info.description} ${STRINGS.hintCancel}` });
+  assert.deepEqual(hintText(skillHintId(TORNADO_ZONE)), { title: info.title, text: `${info.brief} ${STRINGS.hintCancel}` });
+  assert.notEqual(hintText(skillHintId(TORNADO_ZONE)).text, `${info.description} ${STRINGS.hintCancel}`, 'the hint shows the brief, not the description');
   assert.equal(hintText('nope'), null);
   assert.deepEqual([...parseSeen('["a","b",3]')], ['a', 'b']);
   assert.equal(parseSeen('{bad').size, 0);

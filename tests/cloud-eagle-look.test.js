@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  CLOUD_SIZE, CLOUD_TURNS, COOLDOWN_LONG, FEATHER_MAX, FEATHER_MIN, FEATHER_MS, SWIRL_MS, SWIRL_PUFF_COUNT,
+  CLOUD_SIZE, CLOUD_TURNS, COOLDOWN_LONG, FEATHER_MAX, FEATHER_MIN, FEATHER_MS, SKY_WATCH_RUN, SWIRL_MS, SWIRL_PUFF_COUNT,
 } from '../src/config.js';
 import { EMPTY, HIDDEN, O, X } from '../src/logic/board.js';
 import { CHARACTERS, CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT, assignSides } from '../src/logic/characters.js';
@@ -105,13 +105,16 @@ test('the room CSS lays the four cards in one row, and the v5 references show fo
 test('SKILL_INFO numbers of Cloud Eagle equal the config constants', () => {
   assert.equal(SKILL_INFO[SKY_WATCH].title, 'Sky Watch');
   assert.equal(SKILL_INFO[CLOUD].title, 'Cloud');
-  assert.ok(SKILL_INFO[CLOUD].description.includes(`${CLOUD_SIZE} by ${CLOUD_SIZE}`));
-  assert.ok(SKILL_INFO[CLOUD].description.includes(`next ${CLOUD_TURNS} turns`));
+  const fact = (id, label) => SKILL_INFO[id].facts.find((f) => f.label === label)?.value;
+  assert.equal(fact(CLOUD, 'Area'), `${CLOUD_SIZE} by ${CLOUD_SIZE}`);
+  assert.equal(fact(CLOUD, 'Lasts'), `${CLOUD_TURNS} ${CLOUD_TURNS === 1 ? 'turn' : 'turns'}`);
+  assert.ok(SKILL_INFO[SKY_WATCH].brief.includes(`${SKY_WATCH_RUN} in a row`));
   assert.ok(SKILL_INFO[SKY_WATCH].description.length > 0);
   // The numbers are never typed into the text.
   const source = readFileSync(new URL('../src/ui/skill-info.js', import.meta.url), 'utf8');
-  assert.ok(source.includes('${CLOUD_SIZE} by ${CLOUD_SIZE}'));
-  assert.ok(source.includes('${CLOUD_TURNS}'));
+  assert.ok(source.includes('${by(CLOUD_SIZE)}'));
+  assert.ok(source.includes('turns(CLOUD_TURNS)'));
+  assert.ok(source.includes('${SKY_WATCH_RUN}'));
 });
 
 test('the HUD card of Cloud Eagle lists Sky Watch with no timer and Cloud with its turns', () => {

@@ -1,17 +1,31 @@
-// What each skill does, in words (docs/art-direction-v3-1.md section 4.3):
-// ONE table, the single source of the skill descriptions and hints. The
-// skill detail popup, the shared tooltip and the aria-labels read it through
-// hudViewModel (hud-view.js). Numbers in the text come from the game config
-// constants, never from the strings themselves. Pure (no DOM).
+// What each skill does, in words (docs/skill-popup-design.md sections 2 and 3):
+// ONE table, the single source of the skill texts. The skill popup, the shared
+// tooltip, the aria-labels, the first-game hints and the How to Play rows read
+// it (hud-view.js, announce.js, menu.js). Numbers in the text come from the
+// game config constants, never from the strings themselves. Pure (no DOM).
+//
+// Each entry is { title, brief, facts, rules, hint, description }:
+//   brief  one sentence, at most BRIEF_MAX characters.
+//   facts  2 or 3 { label, value }: label at most FACT_LABEL_MAX, value at most
+//          FACT_VALUE_MAX characters (the label is upper-cased by CSS).
+//   rules  2 to 4 lines of at most RULE_MAX characters, no full stop at the end.
+//   hint   how to use it.
+//   description  DERIVED from brief and rules (never typed), under
+//          DESCRIPTION_MAX characters.
 //
 // The draft wording of the doc was checked against the rules (src/logic and
 // docs/design.md section 5) and changed where it said something the game
-// does not do: Wind Dash lands only after the opponent's next turn and only
-// on a plot that is still empty, Tornado Zone throws only the seed the
-// opponent plants inside it on that turn, Mud Trap needs an empty plot that
-// is not mud already, and Petrification takes only an opponent's plant that
-// is not sunk in mud. Venom poisons the square around an opponent's plant (a
-// seed sunk in mud too) and removes nothing.
+// does not do: Wind Dash lands only after the opponent's next turn, only on a
+// plot that is still empty, not mud and not poisoned, and never moves a plant
+// sunk in mud; the Tornado Zone cross is cut at the edge of the field and
+// throws only the seed planted on it, and is armed only from the next turn
+// (the caster's own seed in the cast turn does not fire it); Mud Trap needs an
+// empty plot that is not mud or poisoned; Petrification cannot pick a seed sunk in mud; Venom can
+// pick a plant sunk in mud, cannot pick a rock, removes nothing, and bars
+// only the Tornado throw from its plots (a Tornado Zone can still be cast
+// over them); Sky Watch
+// leaves out plots under the opponent's cloud; the opponent of a Cloud sees
+// the taken plots under it as puffs.
 
 import {
   CLOUD_SIZE, CLOUD_TURNS, HISS_LOCK_TURNS, MUD_LIFETIME_TURNS, MUD_SINK_TURNS, SKY_WATCH_RUN, TORNADO_ARM, TORNADO_TURNS, VENOM_TURNS,
@@ -19,55 +33,130 @@ import {
 } from '../config.js';
 import { cloudReach } from '../logic/cloud.js';
 import {
-  CLOUD, HISS, MUD_TRAP, PETRIFICATION, SKY_WATCH, TORNADO_ZONE, VENOM, WIND_DASH, getSkill,
+  CLOUD, HISS, MUD_TRAP, PETRIFICATION, SKY_WATCH, TORNADO_ZONE, VENOM, WIND_DASH, cooldownTurns, getSkill, isPassiveSkill,
 } from '../logic/skills.js';
 
+// The limits of the doc, shared by the table and its tests.
+export const BRIEF_MAX = 60;
+export const FACT_LABEL_MAX = 8;
+export const FACT_VALUE_MAX = 16;
+export const FACTS_MIN = 2;
+export const FACTS_MAX = 3;
+export const RULE_MAX = 44;
+export const RULES_MIN = 2;
+export const RULES_MAX = 4;
+export const DESCRIPTION_MAX = 220;
+
+// The plural follows the number: 1 turn, 2 turns.
 const turns = (count) => `${count} ${count === 1 ? 'turn' : 'turns'}`;
 const plots = (count) => `${count} ${count === 1 ? 'plot' : 'plots'}`;
+const by = (size) => `${size} by ${size}`;
 const CLOUD_REACH = cloudReach(CLOUD_SIZE);
-const info = (skillId, description, hint) => Object.freeze({ title: getSkill(skillId).name, description, hint });
+const NONE = 'None';
+
+const fact = (label, value) => Object.freeze({ label, value });
+// The Rest fact of every skill: its cooldown, or None for a passive skill.
+const rest = (skillId) => fact('Rest', isPassiveSkill(skillId) ? NONE : turns(cooldownTurns(skillId)));
+const sentence = (text) => (text.endsWith('.') ? text : `${text}.`);
+// The one-line form of an entry (aria-labels, hints, How to Play): the brief,
+// then every rule as a sentence.
+const describe = (brief, rules) => [brief, ...rules].map(sentence).join(' ');
+
+const info = (skillId, { brief, facts, rules, hint }) => Object.freeze({
+  title: getSkill(skillId).name,
+  brief,
+  facts: Object.freeze([rest(skillId), ...facts]),
+  rules: Object.freeze([...rules]),
+  hint,
+  description: describe(brief, rules),
+});
 
 export const SKILL_INFO = Object.freeze({
-  [WIND_DASH]: info(
-    WIND_DASH,
-    `Pick one of your plants, then an empty target plot up to ${plots(WIND_DASH_RANGE)} away, diagonals included. After the opponent's next turn, the plant folds back into a seed, rides a gust of petals to the target and grows again there, if it is still yours and the plot is still empty. It cannot land on mud.`,
-    'Click to select, then choose a plot',
-  ),
-  [TORNADO_ZONE]: info(
-    TORNADO_ZONE,
-    `Secretly pick the centre of a cross of ${plots(4 * TORNADO_ARM + 1)}: that plot and ${plots(TORNADO_ARM)} up, down, left and right of it, cut at the edge of the field. Your opponent never sees it. It is armed when this turn ends and waits for ${turns(TORNADO_TURNS)}. The first seed anyone plants on the cross, yours too, fires it: a dandelion storm throws that seed to a free plot next to it and the trap is used up.`,
-    'Click to select, then choose the trap centre',
-  ),
-  [MUD_TRAP]: info(
-    MUD_TRAP,
-    `Turns an empty plot into a mud puddle. The puddle stays for ${turns(MUD_LIFETIME_TURNS)}, then dries. A seed planted in it sinks: it counts for no line for ${turns(MUD_SINK_TURNS)}, then it surfaces and counts again.`,
-    'Click to select, then choose a plot',
-  ),
-  [PETRIFICATION]: info(
-    PETRIFICATION,
-    'Pick one of the opponent\'s plants. It turns to stone: a rock that stays for good and breaks every line. A seed sunk in mud cannot be picked.',
-    'Click to select, then choose a plant',
-  ),
-  [HISS]: info(
-    HISS,
-    `A warning hiss. For ${turns(HISS_LOCK_TURNS)} the opponent cannot use a skill, but they can still plant a seed.`,
-    'Click to select, no target needed',
-  ),
-  [VENOM]: info(
-    VENOM,
-    `Pick one of the opponent's plants, even one sunk in mud. The ${VENOM_ZONE_SIZE} by ${VENOM_ZONE_SIZE} square of plots around it is poisoned for ${turns(VENOM_TURNS)}: nobody, you included, can plant on an empty poisoned plot, and a Wind Dash, a Mud Trap or a Tornado throw cannot reach it. The plant itself stays and keeps counting for its row. Rocks cannot be picked.`,
-    'Click to select, then choose a plant',
-  ),
-  [SKY_WATCH]: info(
-    SKY_WATCH,
-    `Always on. Glowing plots with a little cloud show every empty plot where the opponent would make ${SKY_WATCH_RUN} or more in a row with one more plant, so you see a three before it becomes a four.`,
-    'Always on, nothing to click',
-  ),
-  [CLOUD]: info(
-    CLOUD,
-    `Pick any plot for a ${CLOUD_SIZE} by ${CLOUD_SIZE} cloud: it covers ${plots(CLOUD_REACH.lo)} up and left of the plot you pick, that plot, and ${plots(CLOUD_REACH.hi)} down and right of it, cut at the edge of the field. For your next ${CLOUD_TURNS} turns the opponent cannot see the plants or rocks under it; you still can. It plants no seed.`,
-    'Click to select, then choose where the cloud goes',
-  ),
+  [WIND_DASH]: info(WIND_DASH, {
+    brief: 'Send one of your plants to a nearby empty plot.',
+    facts: [fact('Range', plots(WIND_DASH_RANGE)), fact('Lands', 'After their turn')],
+    rules: [
+      'Diagonals count',
+      'Fails if the plot is taken by then',
+      'Cannot land on mud or poison',
+      'Cannot move a plant sunk in mud',
+    ],
+    hint: 'Click to select, then choose a plot',
+  }),
+  [TORNADO_ZONE]: info(TORNADO_ZONE, {
+    brief: 'Hide a cross-shaped trap on the field.',
+    facts: [fact('Waits', turns(TORNADO_TURNS)), fact('Size', plots(4 * TORNADO_ARM + 1))],
+    rules: [
+      'Cut at the edge of the field',
+      'Hidden from your opponent',
+      'Armed next turn; any seed on it fires it',
+      'Throws that seed aside, then it is used up',
+    ],
+    hint: 'Click to select, then choose the trap centre',
+  }),
+  [MUD_TRAP]: info(MUD_TRAP, {
+    brief: 'Turn an empty plot into a mud puddle.',
+    facts: [fact('Puddle', turns(MUD_LIFETIME_TURNS)), fact('Sinks', turns(MUD_SINK_TURNS))],
+    rules: [
+      'A seed planted in it sinks',
+      'A sunk seed counts for no line',
+      'Then it surfaces and counts again',
+      'Empty plots only, not mud or poison',
+    ],
+    hint: 'Click to select, then choose a plot',
+  }),
+  [PETRIFICATION]: info(PETRIFICATION, {
+    brief: 'Turn one enemy plant to stone.',
+    facts: [fact('Lasts', 'For good'), fact('Target', 'Enemy plant')],
+    rules: [
+      'The rock breaks every line',
+      'It blocks its plot for both players',
+      'Cannot pick a seed sunk in mud',
+    ],
+    hint: 'Click to select, then choose a plant',
+  }),
+  [HISS]: info(HISS, {
+    brief: 'Silence your opponent\'s skills.',
+    facts: [fact('Locks', turns(HISS_LOCK_TURNS)), fact('Target', NONE)],
+    rules: [
+      'They can still plant a seed',
+      'No target needed',
+    ],
+    hint: 'Click to select, no target needed',
+  }),
+  [VENOM]: info(VENOM, {
+    brief: `Poison a ${by(VENOM_ZONE_SIZE)} patch around an enemy plant.`,
+    facts: [fact('Lasts', turns(VENOM_TURNS)), fact('Area', by(VENOM_ZONE_SIZE))],
+    rules: [
+      'Can pick a plant sunk in mud',
+      'No seed, Dash, Mud or Tornado throw there',
+      'The plant stays and still counts',
+      'Rocks cannot be picked',
+    ],
+    hint: 'Click to select, then choose a plant',
+  }),
+  [SKY_WATCH]: info(SKY_WATCH, {
+    brief: `See where your opponent could make ${SKY_WATCH_RUN} in a row.`,
+    facts: [fact('Mode', 'Always on')],
+    rules: [
+      'Marks empty plots with a little cloud',
+      `Warns when a row of ${SKY_WATCH_RUN - 1} can become ${SKY_WATCH_RUN}`,
+      'Your opponent never sees the marks',
+      'Plots under their cloud are left out',
+    ],
+    hint: 'Always on, nothing to click',
+  }),
+  [CLOUD]: info(CLOUD, {
+    brief: `Hide a ${by(CLOUD_SIZE)} patch of the field from your opponent.`,
+    facts: [fact('Lasts', turns(CLOUD_TURNS)), fact('Area', by(CLOUD_SIZE))],
+    rules: [
+      'Your opponent sees taken plots as puffs',
+      'You still see everything under it',
+      `Covers ${plots(CLOUD_REACH.lo)} up and left, ${CLOUD_REACH.hi} down and right`,
+      'Cut at the edge of the field',
+    ],
+    hint: 'Click to select, then choose where the cloud goes',
+  }),
 });
 
 // The entry of a skill id, or null.

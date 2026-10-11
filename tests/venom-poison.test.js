@@ -377,10 +377,15 @@ test('the Hiss lock text is Locked: N turn(s) from HISS_LOCK_TURNS and Silenced 
 });
 
 test('the skill texts come from the constants', () => {
-  assert.match(SKILL_INFO[VENOM].description, new RegExp(`${VENOM_ZONE_SIZE} by ${VENOM_ZONE_SIZE} square`));
-  assert.match(SKILL_INFO[VENOM].description, new RegExp(`poisoned for ${VENOM_TURNS} turns`));
+  const fact = (id, label) => SKILL_INFO[id].facts.find((f) => f.label === label)?.value;
+  const turnsText = (count) => `${count} ${count === 1 ? 'turn' : 'turns'}`;
+  assert.match(SKILL_INFO[VENOM].brief, new RegExp(`${VENOM_ZONE_SIZE} by ${VENOM_ZONE_SIZE} patch`));
+  assert.equal(fact(VENOM, 'Area'), `${VENOM_ZONE_SIZE} by ${VENOM_ZONE_SIZE}`);
+  assert.equal(fact(VENOM, 'Lasts'), turnsText(VENOM_TURNS));
   assert.doesNotMatch(SKILL_INFO[VENOM].description, /withers|left empty/);
-  assert.match(SKILL_INFO[HISS].description, new RegExp(`For ${HISS_LOCK_TURNS} turn the opponent cannot use a skill`));
+  assert.ok(SKILL_INFO[VENOM].rules.includes('Can pick a plant sunk in mud'));
+  assert.ok(SKILL_INFO[VENOM].rules.includes('Rocks cannot be picked'));
+  assert.equal(fact(HISS, 'Locks'), turnsText(HISS_LOCK_TURNS));
   assert.match(STRINGS.venomTargetPrompt, new RegExp(`${VENOM_ZONE_SIZE} by ${VENOM_ZONE_SIZE}`));
 });
 

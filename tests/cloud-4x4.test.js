@@ -456,11 +456,12 @@ test('the Cloud preview shows the cells the cloud will cover, clipped like the s
 
 test('the texts name the size from the constants and no longer a centre cell', () => {
   const { lo, hi } = cloudReach(CLOUD_SIZE);
-  const text = SKILL_INFO[CLOUD].description;
-  assert.ok(text.includes(`${CLOUD_SIZE} by ${CLOUD_SIZE} cloud`), text);
-  assert.ok(text.includes(`${lo} plot up and left`), text);
-  assert.ok(text.includes(`${hi} plots down and right`), text);
-  assert.equal(/centre/i.test(text), false, 'a 4 by 4 cloud has no centre');
-  assert.equal(/centre/i.test(SKILL_INFO[CLOUD].hint), false);
+  const info = SKILL_INFO[CLOUD];
+  assert.ok(info.brief.includes(`${CLOUD_SIZE} by ${CLOUD_SIZE}`), info.brief);
+  assert.equal(info.facts.find((f) => f.label === 'Area').value, `${CLOUD_SIZE} by ${CLOUD_SIZE}`);
+  assert.ok(info.rules.some((rule) => rule.includes(`${lo} plot up and left`) && rule.includes(`${hi} down and right`)), info.rules.join(' / '));
+  for (const text of [info.brief, ...info.rules, info.description, info.hint]) {
+    assert.equal(/centre/i.test(text), false, `a 4 by 4 cloud has no centre: ${text}`);
+  }
   assert.equal(/centre/i.test(STRINGS.cloudTargetPrompt), false);
 });
