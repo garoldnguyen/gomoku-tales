@@ -36,6 +36,7 @@ Every screen is a DOM layer over the existing 3D world in the Ivory look (see 3.
 +--------------------------------------+
 ```
 - Background: the 3D world with the empty field (the look of shot scene empty).
+- Story (docs/skill-popup-design.md section 4): between the title and the buttons, on the menu screen only, a gold spaced-capitals kicker (STRINGS.menuStoryKicker) over a short centred line (STRINGS.menuStoryLine, at most 36em wide) in the secondary ink, data-hud-box menu-story; it fades in with the menu (opacity only) and is hidden when the window is shorter than 560 px so the buttons never move under the fold.
 - Buttons are real button elements in one column, centred horizontally, in the order above. Each is at least 44 px high and 240 px wide, with at least 12 px between buttons. The whole menu fits inside 1280 by 720 without scrolling.
 - The first button has focus when the menu appears. Tab follows the visual order. Enter and Space activate. The focus ring is 2 px, from the existing tokens.
 - Play on this computer opens the same local game screen as ?local=1, on the character select of Player 1 and Player 2 (section 3.6). No You tag.

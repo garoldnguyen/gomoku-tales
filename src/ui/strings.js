@@ -70,6 +70,9 @@ export const STRINGS = Object.freeze({
   menuHowToHint: 'Rules and skills',
   menuSettingsHint: 'Graphics quality and full screen',
   menuKeysHint: 'Up, Down to choose, Enter to select', // the hint bar
+  // The story under the title, on the first page of the menu only (docs/skill-popup-design.md section 4).
+  menuStoryKicker: 'The Festival of All Seeds',
+  menuStoryLine: 'Every spring the spirits of Flora gather on Breeze Hill to sow seeds, not to fight. Grow five in a row to win the Floral Crown.',
 
   // How to Play (section 3.2).
   howToTitle: 'How to Play',

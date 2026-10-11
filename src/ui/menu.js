@@ -28,7 +28,8 @@ export const MENU_BUTTONS = Object.freeze([
 
 // The menu card's sizes in CSS px, the same numbers src/ui/menu.css uses
 // (a test compares them). The card is one column: the head (title, then
-// the place pill), the buttons and the hint bar, `gap` apart.
+// the place pill), the story (kicker and line), the buttons and the hint
+// bar, `gap` apart.
 export const MENU_LAYOUT = Object.freeze({
   flowPadding: 16, // #flow padding around the card
   cardWidth: 520,
@@ -36,10 +37,14 @@ export const MENU_LAYOUT = Object.freeze({
   cardPadBottom: 20,
   cardPadX: 32,
   cardBorder: 1, // the card's (transparent) edge
-  gap: 40, // between the head, the choices and the hint (the short gold line sits in the first gap)
+  gap: 40, // between the head, the story, the choices and the hint (the short gold line sits in the first gap)
   titleHeight: 72, // line height of the title
   headGap: 14, // place to title
   pillHeight: 22, // the place line above the title
+  storyKickerHeight: 16, // the story's gold capitals line under the title
+  storyGap: 6, // kicker to story line
+  storyLineHeight: 20, // line height of the story line
+  storyLines: 2, // the story line wraps to two lines in the card
   buttonHeight: 52,
   buttonGap: 4,
   hintHeight: 36,
@@ -52,8 +57,9 @@ export function menuLayout(layout = MENU_LAYOUT, width = CONFIG.MENU_FIT_WIDTH, 
   const count = MENU_BUTTONS.length;
   const head = layout.titleHeight + layout.headGap + layout.pillHeight;
   const buttons = count * layout.buttonHeight + (count - 1) * layout.buttonGap;
-  const cardHeight = 2 * layout.cardBorder + layout.cardPadTop + head + layout.gap + buttons + layout.gap
-    + layout.hintHeight + layout.cardPadBottom;
+  const story = layout.storyKickerHeight + layout.storyGap + layout.storyLines * layout.storyLineHeight;
+  const cardHeight = 2 * layout.cardBorder + layout.cardPadTop + head + layout.gap + story + layout.gap + buttons
+    + layout.gap + layout.hintHeight + layout.cardPadBottom;
   const buttonWidth = layout.cardWidth - 2 * (layout.cardPadX + layout.cardBorder);
   const room = (side) => side - 2 * layout.flowPadding;
   return {
@@ -177,6 +183,9 @@ export function menuViewModel(flow, env = {}) {
     visible,
     title: STRINGS.gameTitle,
     place: STRINGS.menuPlace,
+    // The story under the title: on the menu screen only (its card is hidden
+    // while How to Play or Settings is open, and the panels have no story).
+    story: visible ? { kicker: STRINGS.menuStoryKicker, line: STRINGS.menuStoryLine } : null,
     buttons: MENU_BUTTONS,
     keysHint: STRINGS.menuKeysHint,
     overlay,

@@ -198,6 +198,34 @@
   white-space: nowrap;
 }
 
+/* The story under the title (first page of the menu only; the sizes are
+   MENU_LAYOUT of src/ui/menu.js): the kicker in spaced gold capitals, then
+   a short centred line in the secondary ink, at most 36em wide. It fades in
+   with the menu (opacity only) and is hidden on short windows below. */
+#flow .menu-story {
+  text-align: center;
+  animation: flow-fade 480ms var(--ease-out) 100ms backwards;
+}
+
+#flow .menu-story-kicker {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+#flow .menu-story-line {
+  max-width: 36em;
+  margin: 0 auto;
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
 /* Five words and air between them: no rules, no second line. */
 #flow .menu-buttons {
   display: flex;
@@ -619,6 +647,14 @@
   }
 }
 
+/* Windows under 560 px tall: no story, so the buttons never move under the
+   fold. */
+@media (max-height: 559px) {
+  #flow .menu-story {
+    display: none;
+  }
+}
+
 /* Phones and narrow windows: a smaller title and tighter spacing, so
    nothing runs past the edges (the 1280 by 720 layout of MENU_LAYOUT is
    unchanged). */
@@ -640,6 +676,14 @@
 
   #flow .menu-place {
     letter-spacing: 0.36em;
+  }
+
+  #flow .menu-story-kicker {
+    letter-spacing: 0.22em;
+  }
+
+  #flow .menu-story-line {
+    font-size: 14px;
   }
 
   #flow .menu-button {

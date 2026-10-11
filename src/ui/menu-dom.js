@@ -79,7 +79,8 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
   };
 
   // The dark scrim over the 3D scene (blurred on the frosted levels), then
-  // the menu card: title, place pill, the five buttons and the hint bar.
+  // the menu card: title, place pill, the story, the five buttons and the
+  // hint bar.
   el('div', 'scrim', root);
   const menu = el('section', 'menu-card glass', root);
   menu.dataset.hudBox = 'menu-card';
@@ -88,6 +89,13 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
   const title = el('h1', 'menu-title', head);
   title.id = 'menu-title';
   const place = el('p', 'menu-place', head);
+  // The story under the title (menuViewModel story, first page of the menu
+  // only): a gold kicker and a short line; shown once a view model has it.
+  const story = el('div', 'menu-story', menu);
+  story.dataset.hudBox = 'menu-story';
+  story.hidden = true;
+  const storyKicker = el('p', 'menu-story-kicker', story);
+  const storyLine = el('p', 'menu-story-line', story);
   const list = el('div', 'menu-buttons', menu);
   const keysHint = el('p', 'menu-keys', menu);
   const menuButtons = new Map(); // button id -> element
@@ -234,6 +242,11 @@ export function createMenu(root, { onEvent, onQuality, onFullscreen }) {
       fader.set(root, vm.visible);
       if (!vm.visible) return;
 
+      if (vm.story) {
+        storyKicker.textContent = vm.story.kicker;
+        storyLine.textContent = vm.story.line;
+        story.hidden = false;
+      }
       menu.classList.toggle('is-covered', vm.overlay !== OVERLAYS.NONE);
       menu.setAttribute('aria-hidden', String(vm.overlay !== OVERLAYS.NONE));
       fader.set(howto.node, vm.overlay === OVERLAYS.HOWTO);
