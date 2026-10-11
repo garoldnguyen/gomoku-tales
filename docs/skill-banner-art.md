@@ -1,9 +1,10 @@
-# Skill cast banners and effect art (design, art not yet supplied)
+# Skill cast banners and effect art (the banners are built; the optional effect art is not supplied)
 
 Owner request, October 2026: banner art (and optionally effect art) for the skills of the four
-characters. The owner makes the pictures with an image generator and hands the files over; the
-builder cleans them to the pixel grid (magenta to alpha, BOX downscale, quantize, plum outline) and
-integrates them in a later task. This file is the brief for both. The art is not in the repo yet.
+characters. The owner made the seven banner pictures with an image generator; the builder cleaned
+them (magenta to alpha, square art pixels, quantize) and built the banner into the glass HUD
+(section 5). The optional effect art of section 4 is still not supplied. Sections 2 and 3 keep
+the brief the owner worked from; where the delivered files differ from it, section 2 says so.
 
 ## 1. What a cast banner is
 
@@ -29,17 +30,25 @@ What is art and what is text:
 
 ## 2. File spec
 
-| File (planned) | Grid | Stored size | Notes |
-|---|---|---|---|
-| `assets/3d/v6/banner-wind-dash.png` and `banner-tornado-zone`, `banner-mud-trap`, `banner-petrification`, `banner-hiss`, `banner-venom`, `banner-cloud` | 160 x 40 art pixels | 320 x 80 (each art pixel exactly 2 x 2) | PNG, real alpha, binary alpha (0 or 255), at most 16 colours, 1 px plum `#2b1d3a` outline |
+Delivered and built: `assets/3d/v6/banner-wind-dash.png`, `banner-tornado-zone`, `banner-mud-trap`,
+`banner-petrification`, `banner-hiss`, `banner-venom`, `banner-cloud`, listed in `assets/manifest.json`
+(`use` `3d`, like the other HUD art of the glass HUD). They differ from the first brief in three ways,
+because the generator drew a longer ribbon (about 6.9 to 1) and more detail than the 160 x 40 grid
+could keep:
 
-Zones on the 160 x 40 grid (art pixels), the same in all seven so one layout fits all:
+| | brief | delivered |
+|---|---|---|
+| Grid and stored size | 160 x 40, stored 320 x 80 | 400 x 60, stored as it is (`SKILL_BANNER_PX`): one art pixel per CSS pixel, shown with `image-rendering: pixelated` |
+| Colours | at most 16 | at most 40 (24 by median cut plus 12 for the rare hues, saturation lifted a little; a test checks 40) |
+| Medallion | circle at (20, 20) | the empty disc of each file, in `SKILL_BANNER_MEDALLION` (centre x, centre y, radius); a test checks the disc is flat navy |
 
-- Medallion: a circle centred at (20, 20), outer radius 16, inner empty disc radius 12.
-- Clear text area: x 40 to 128, y 6 to 34, flat dark navy, no pattern.
-- Motif: x 128 to 156, fading into the panel.
-- Plaque: navy `#16203a`, border pale gold `#e8c77a` (1 px), a 2 px accent stripe along the bottom edge
-  in the accent colour of the character.
+Unchanged: real alpha, binary (0 or 255), no letters in the art, no magenta left. The ribbon is
+navy with a pale gold border and a 2 px accent stripe along the bottom; the picture is the plaque
+only (ribbon, medallion frame, motif at the right end). The skill icon, the skill name and the
+character name are drawn by the page. The cleaning script is not in the repo (the source pictures
+stay in `/home/pc/games/art-source-skill-banners`, outside it); what it did: key the magenta that
+touches the image border, crop to the ribbon with one square scale for the whole picture, average
+over the ribbon pixels only, quantize, keep alpha at half coverage or more.
 
 Accent colours: Wind Rabbit blue `#3b8cff`, Earth Bear ochre red `#c9703a`, Jade Serpent jade
 `#2fbf7a` (Venom deep purple `#7b3fb0`, `VENOM_FLASH_COLOUR`), Cloud Eagle pale yellow `#fff2a8`.
@@ -107,12 +116,30 @@ Same STYLE as BASE, but ask for the grid named below and a magenta background.
   radiating from the centre, about 20 pixels across, and a few small pale grey flakes, in `#5c616b`,
   `#8a8f99`, `#c4c8cf`, on magenta. No plant and no ground. It lies on top of a plant turning to stone.
 
-## 5. Integration (a later task, once the PNGs arrive)
+## 5. Integration (done)
 
-Clean with the same pipeline as the Free Action art (`clean_art.py`: key magenta, crop to the
-plaque, fit 160 x 40 with the BOX filter, quantize to at most 16 colours, binary alpha, plum
-outline, then enlarge exactly 2 x to 320 x 80). Register the files in `assets/manifest.json` (use
-`hud`), add `SKILL_BANNER_MS` and its timings to `src/config.js`, a pure `castBannerView` in
-`src/ui/cast-view.js` (key, skill id, banner art name, title, character, colour), the DOM in
-`hud.js` and `hud.css`, a shot picture, and tests (the view for the caster, the other seat and a
-spectator; Tornado Zone names no cell; a missing PNG shows the plain plaque and only warns).
+- `src/config.js`: `SKILL_BANNER_MS` 2400 (in and out included), `SKILL_BANNER_IN_MS` 520, `SKILL_BANNER_OUT_MS`
+  360, `SKILL_BANNER_SPARKS` 7, `SKILL_BANNER_PX`, `SKILL_BANNER_MEDALLION`.
+- `src/render3d/art-assets.js`: `ART.banner` by skill id and a navy placeholder per file.
+- `src/ui/cast-view.js`: pure `castBannerView(state, { local, watching, you })` returns `{ key, skill, art,
+  title, character, colour, secret, medallion }` or null (no skill, game over, Sky Watch). The key is
+  `turn:skill:banner`, so a cast plays once. Both players and spectators see the same banner. A Tornado Zone
+  is titled by its name for the caster and `STRINGS.trapBannerTitle` (`Trap placed!`, with the character as
+  the second line) for the other seat and the spectators: the words of the trap notice do not fit the
+  plaque, and the banner never reads `state.tornado`, so it carries no cell.
+- `src/ui/hud-view.js`: `banner` in the view model. `src/ui/hud.js`: the DOM (plaque, shine, two rings,
+  medallion, names, sparks) and `showBanner`, which plays a new key once, lets a running banner finish when
+  its cast leaves the view model (the turn went on), and hides it after `SKILL_BANNER_MS`. A missing PNG
+  shows the plain glass plaque (`.no-art`) with the names and only the missing file warns (the asset loader).
+- `src/ui/hud.css`: the motion, opacity and transforms only, everything sized from the banner's own width
+  (`cqw`), nothing moves under reduced motion or in shot mode. The way in, in this order: the whole plaque
+  slides and scales in with a little overshoot, the ribbon unfurls from the medallion, the medallion spins
+  and pops, a ring ripples out of it in the character's colour, a shine sweeps over the plaque, the skill
+  name and then the character name slide in, sparks burst from the motif end; at the end it slips up and
+  fades. Each skill adds its own: Wind Dash comes in as a gust from the left and spins fast, Tornado Zone
+  twirls, Mud Trap drops from above, Petrification lands and judders, Hiss slides in from the right with
+  three rings, Venom spins back with two, Cloud drifts down slowly.
+- Shots: the `hud` set takes the `freeaction` scene (a Mud Trap) at fhd and on the phone shape; the banner
+  stands finished there (`data-hud-box` `cast-banner`).
+- Tests: `tests/cast-banner.test.js` (the view for the caster, the other seat, a spectator; no cell; the
+  files, their size, palette, alpha and empty medallion; the DOM; the CSS motion rules).

@@ -143,6 +143,10 @@ def named_sets():
         # Venom on the Jade Serpent card at fhd, and the Tornado Zone on the phone shape.
         ("medium", "fhd", {"popup": "venom"}, "venomcloud"),
         ("medium", "phone", {"popup": "tornadozone"}),
+        # The cast banner (docs/skill-banner-art.md): the freeaction scene is after a Mud Trap, so the
+        # banner stands finished in shot mode, at fhd and on the phone shape.
+        ("medium", "fhd", {}, "freeaction"),
+        ("medium", "phone", {}, "freeaction"),
     ]
     full = list(levels)
     for item in shapes:

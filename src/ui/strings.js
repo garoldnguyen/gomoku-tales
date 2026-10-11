@@ -174,6 +174,7 @@ export const STRINGS = Object.freeze({
   skillUsedHint: 'Already used a skill this turn.', // the hint of every skill row after a skill
   skillUsedState: 'Next turn', // a ready skill row that cannot be used because a skill was used this turn
   plantToEndTurn: 'Now plant a seed to end your turn.', // the turn pill hint, status line and banner after a skill
+  trapBannerTitle: 'Trap placed!', // the cast banner of the other seat and the spectators after a Tornado Zone (the character is its second line)
   trapPlaced: '{name} placed a trap!', // the notice the other seat and the spectators get when a Tornado Zone is cast: the character, never a cell
   // The turn banner of a game on one screen and the first-game hints (src/ui/announce.js).
   turnBannerKicker: 'To play',

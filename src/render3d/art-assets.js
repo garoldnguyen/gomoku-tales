@@ -6,6 +6,8 @@
 // Pure: no DOM or Three.js, so it runs under node --test.
 
 import { CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT } from '../logic/characters.js';
+import { SKILL_BANNER_PX } from '../config.js';
+import { CLOUD, HISS, MUD_TRAP, PETRIFICATION, TORNADO_ZONE, VENOM, WIND_DASH } from '../logic/skills.js';
 import { CHARACTER_LOOK } from './character-look.js';
 import { CHARACTER_ANIMS } from './character-poses.js';
 import { mudTileGrid } from './mud-art.js';
@@ -57,6 +59,17 @@ export const ART = {
     hud: 'portrait-earth-bear-v5',
     mudTrapIcon: 'icon-mud-trap',
     petrificationIcon: 'icon-petrification',
+  },
+  // The cast banner plaques of assets/3d/v6 (docs/skill-banner-art.md), one per
+  // active skill id (Sky Watch is passive and is never cast). Drawn by the glass HUD.
+  banner: {
+    [WIND_DASH]: 'banner-wind-dash',
+    [TORNADO_ZONE]: 'banner-tornado-zone',
+    [MUD_TRAP]: 'banner-mud-trap',
+    [PETRIFICATION]: 'banner-petrification',
+    [HISS]: 'banner-hiss',
+    [VENOM]: 'banner-venom',
+    [CLOUD]: 'banner-cloud',
   },
   // Farmland v3 pack in assets/3d/v3/ (docs/art-direction-v3.md section 2).
   // Tuning data for these names is in assets/v3-meta.json (v3-meta.js).
@@ -287,6 +300,13 @@ export const PLACEHOLDERS_3D = {
       paint: blockSheetPainter({ width: size, height: size, frames: 1, colors: [CHARACTER_LOOK[CLOUD_EAGLE].colour] }),
     }];
   })),
+  // A banner file is SKILL_BANNER_PX, one frame; while it is missing the HUD draws a plain plaque in CSS.
+  ...Object.fromEntries(artNames(ART.banner).map((name) => [name, {
+    width: SKILL_BANNER_PX.width,
+    height: SKILL_BANNER_PX.height,
+    frames: 1,
+    paint: blockSheetPainter({ width: SKILL_BANNER_PX.width, height: SKILL_BANNER_PX.height, frames: 1, colors: ['#16203a'] }),
+  }])),
   ...Object.fromEntries(Object.entries(HUD_ART_CHARACTERS).flatMap(([group, id]) => artNames(ART[group]).map((name) => [name, {
     width: HUD_ART_PX,
     height: HUD_ART_PX,

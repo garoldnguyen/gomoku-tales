@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   BOARD_SIZE, HISS_LOCK_TURNS, HISS_WAVE_COLOUR, HISS_WAVE_MS, HUD_DUST_COUNT, HUD_DUST_MS, HUD_FEATHER_COUNT, HUD_FEATHER_MS,
-  HUD_SHAKE_LIGHT_PX, HUD_SHAKE_MS, HUD_SHAKE_PX, HUD_SHAKE_STEPS, LOCKED_ICON_OPACITY, LOCK_BLINK_MS, SKILL_FLASH_MS, VENOM_FLASH_COLOUR,
+  HUD_SHAKE_LIGHT_PX, HUD_SHAKE_MS, HUD_SHAKE_PX, HUD_SHAKE_STEPS, LOCKED_ICON_OPACITY, LOCK_BLINK_MS, SKILL_BANNER_IN_MS, SKILL_BANNER_MS, SKILL_BANNER_OUT_MS, SKILL_FLASH_MS, VENOM_FLASH_COLOUR,
 } from '../src/config.js';
 import { O, X } from '../src/logic/board.js';
 import { CHARACTERS, CLOUD_EAGLE, EARTH_BEAR, JADE_SERPENT, WIND_RABBIT, assignSides } from '../src/logic/characters.js';
@@ -84,6 +84,9 @@ test('castCssVars hands the config timings to the CSS, nothing typed twice', () 
     '--wave-colour': HISS_WAVE_COLOUR,
     '--feather-ms': `${HUD_FEATHER_MS}ms`,
     '--blink-ms': `${LOCK_BLINK_MS}ms`,
+    '--banner-in-ms': `${SKILL_BANNER_IN_MS}ms`,
+    '--banner-out-ms': `${SKILL_BANNER_OUT_MS}ms`,
+    '--banner-out-delay': `${SKILL_BANNER_MS - SKILL_BANNER_OUT_MS}ms`,
     '--locked-icon-opacity': String(LOCKED_ICON_OPACITY),
   });
 });

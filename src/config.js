@@ -568,6 +568,27 @@ export const HUD_FEATHER_COUNT = 6; // feathers on a card
 export const LOCK_BLINK_MS = 1000; // the red lock rune of a card the Hiss locks blinks once in this long
 export const LOCKED_ICON_OPACITY = 0.4; // the skill icons of a locked card (40 percent)
 export const VENOM_FLASH_COLOUR = '#7b3fb0'; // the deep purple card flash of Venom (the other skills flash their character's colour)
+// The cast banner (docs/skill-banner-art.md; src/ui/cast-view.js decides,
+// src/ui/hud.js draws, src/ui/hud.css animates opacity and transforms only,
+// and nothing moves under reduced motion): a plaque with the skill icon in its
+// medallion and the skill and character names slides in at the top centre
+// for SKILL_BANNER_MS, the same for both players and the spectators.
+export const SKILL_BANNER_MS = 2400; // the banner is up this long, in and out included
+export const SKILL_BANNER_IN_MS = 520; // the plaque unfurls and the medallion pops in this long
+export const SKILL_BANNER_OUT_MS = 360; // the plaque slips away this long at the end
+export const SKILL_BANNER_SPARKS = 7; // sparks that burst from the motif end of the plaque
+export const SKILL_BANNER_PX = Object.freeze({ width: 400, height: 60 }); // the banner PNGs (assets/3d/v6): one art pixel per CSS pixel
+// The empty medallion disc of each banner PNG in its pixels: [centre x, centre y,
+// radius]. The skill icon sits in it (hud.css sizes it from these numbers).
+export const SKILL_BANNER_MEDALLION = Object.freeze({
+  windDash: Object.freeze([44, 30, 19]),
+  tornadoZone: Object.freeze([44, 30, 18]),
+  mudTrap: Object.freeze([43, 29, 19]),
+  petrification: Object.freeze([44, 30, 18]),
+  hiss: Object.freeze([49, 31, 20]),
+  venom: Object.freeze([48, 30, 21]),
+  cloud: Object.freeze([42, 30, 19]),
+});
 export const SKY_WATCH_PULSE_LOW = 0.6; // share of SKY_WATCH_OPACITY at the faintest
 export const WIN_STAGGER_MS = 110; // the winning plants celebrate one after another this far apart
 export const WIN_RING_MS = 700;

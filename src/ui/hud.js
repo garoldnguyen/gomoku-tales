@@ -16,6 +16,9 @@
 // the border flash, the shake, the gold and green dust, the feathers and the
 // purple wave all animate opacity and transforms in hud.css and stand still
 // under reduced motion; the lock rune and the dimmed icons are plain state.
+// The cast banner (view.banner, docs/skill-banner-art.md) plays once in the
+// same way: the plaque unfurls from its medallion, the skill icon pops in, a
+// shine sweeps over it, rings ripple out and sparks burst, then it slips away.
 // Nothing here decides what to show or reads a cell.
 //
 // Design v4: a click on a skill button still runs onSkill and also opens
@@ -31,7 +34,7 @@
 import { X, O } from '../logic/board.js';
 import { characterForStone } from '../logic/characters.js';
 import { getSkill } from '../logic/skills.js';
-import { HISS_WAVE_MS, HUD_SHAKE_MS } from '../config.js';
+import { HISS_WAVE_MS, HUD_SHAKE_MS, SKILL_BANNER_MS, SKILL_BANNER_SPARKS } from '../config.js';
 import { DUST_COUNT, FEATHER_COUNT, castCssVars, castDurationMs, shakeFrames } from './cast-view.js';
 import { CARD_HEIGHT, chevronSize, hudFoldLayout, pillScale, topBarLayout } from './hud-layout.js';
 import { PORTRAIT_ART, QUALITY_CHOICES, SKILL_ICON_ART, skillPopupViewModel } from './hud-view.js';
@@ -340,6 +343,29 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
   toast.dataset.hudBox = 'toast';
   toast.hidden = true;
 
+  // The cast banner (docs/skill-banner-art.md): the plaque picture, a shine
+  // that sweeps over it, the skill icon in its medallion with rings that
+  // ripple out of it, the two names, and sparks at the motif end. Made once;
+  // hud.css plays it while the banner is .is-playing.
+  const banner = el('div', 'cast-banner', root);
+  banner.setAttribute('role', 'status');
+  banner.setAttribute('aria-live', 'polite');
+  banner.dataset.hudBox = 'cast-banner';
+  banner.hidden = true;
+  const plaque = el('div', 'cb-plaque', banner);
+  const plaqueArt = artImage(plaque, null, '');
+  const shineLane = el('div', 'cb-shine-lane', plaque);
+  el('span', 'cb-shine', shineLane);
+  for (const ring of ['is-1', 'is-2']) el('span', `cb-ring ${ring}`, banner);
+  const medal = el('span', 'cb-medal', banner);
+  const medalIcon = artImage(medal, null, '');
+  const bannerText = el('span', 'cb-text', banner);
+  const bannerTitle = el('span', 'cb-title', bannerText);
+  const bannerCharacter = el('span', 'cb-char', bannerText);
+  for (let i = 0; i < SKILL_BANNER_SPARKS; i++) el('span', 'cb-spark', banner).style.setProperty('--i', String(i));
+  let bannerKey = null;
+  let bannerTimer = null;
+
   root.addEventListener('contextmenu', (event) => {
     event.preventDefault();
     // A touch long press on a skill shows its tooltip, not a cancel.
@@ -413,6 +439,41 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
     if (locked) {
       setText(dom.runeText, card.lock.text);
       setAttr(dom.rune, 'aria-label', card.lock.text);
+    }
+  };
+
+  // The cast banner of the view model: it plays once for each new cast and
+  // is hidden when its time is up (hud.css fades it out by then). A cast
+  // that is gone from the view model (the turn went on) lets the banner
+  // finish; a new cast replaces it. In shot mode (holdCast) it stays.
+  const showBanner = (view) => {
+    const key = view?.key ?? null;
+    if (key === bannerKey) return;
+    bannerKey = key;
+    if (!view) return;
+    clearTimeout(bannerTimer);
+    plaqueArt.name = view.art;
+    medalIcon.name = SKILL_ICON_ART[view.skill];
+    medalIcon.initial.textContent = skillLetters(view.skill);
+    medalIcon.img.removeAttribute('src');
+    plaqueArt.img.removeAttribute('src');
+    showArt();
+    banner.dataset.skill = view.skill;
+    banner.style.setProperty('--cast-colour', view.colour ?? 'var(--ink)');
+    banner.style.setProperty('--med-x', String(view.medallion.x));
+    banner.style.setProperty('--med-y', String(view.medallion.y));
+    banner.style.setProperty('--med-size', String(view.medallion.size));
+    setText(bannerTitle, view.title);
+    setText(bannerCharacter, view.character);
+    banner.classList.remove('is-playing');
+    banner.hidden = false;
+    void banner.offsetWidth; // restart the animations of a new cast
+    banner.classList.add('is-playing');
+    if (!holdCast) {
+      bannerTimer = setTimeout(() => {
+        banner.classList.remove('is-playing');
+        banner.hidden = true;
+      }, SKILL_BANNER_MS + 50);
     }
   };
 
@@ -720,6 +781,8 @@ export function createHud(root, { onSkill, onQuality, onCancel, onCollapse, onFu
         fillPopup();
         placePopup();
       }
+
+      showBanner(vm.banner ?? null);
 
       const message = vm.toast ?? '';
       setText(toast, message);

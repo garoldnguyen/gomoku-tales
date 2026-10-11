@@ -3,58 +3,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { inflateSync } from 'node:zlib';
 import { CAMERA_PITCH_DEG } from '../src/config.js';
 import { HOVER_SOURCE } from '../src/render3d/character-look.js';
+import { png } from './png-read.js';
 
-const read = (path) => readFileSync(new URL(path, import.meta.url));
-const META = JSON.parse(read('../assets/v3-meta.json'));
-
-// An 8-bit RGBA PNG: { width, height, at(x, y) -> [r, g, b, a] }.
-function png(path) {
-  const data = read(path);
-  let width = 0;
-  let height = 0;
-  const idat = [];
-  for (let i = 8; i < data.length;) {
-    const length = data.readUInt32BE(i);
-    const type = data.toString('ascii', i + 4, i + 8);
-    const body = data.subarray(i + 8, i + 8 + length);
-    if (type === 'IHDR') {
-      width = body.readUInt32BE(0);
-      height = body.readUInt32BE(4);
-      assert.equal(body[8], 8, `${path}: 8 bits per channel`);
-      assert.equal(body[9], 6, `${path}: RGBA`);
-    }
-    if (type === 'IDAT') idat.push(body);
-    i += 12 + length;
-  }
-  const raw = inflateSync(Buffer.concat(idat));
-  const stride = width * 4;
-  const pixels = new Uint8Array(stride * height);
-  for (let y = 0; y < height; y++) {
-    const filter = raw[y * (stride + 1)];
-    for (let x = 0; x < stride; x++) {
-      const value = raw[y * (stride + 1) + 1 + x];
-      const a = x >= 4 ? pixels[y * stride + x - 4] : 0;
-      const b = y > 0 ? pixels[(y - 1) * stride + x] : 0;
-      const c = x >= 4 && y > 0 ? pixels[(y - 1) * stride + x - 4] : 0;
-      let predictor = 0;
-      if (filter === 1) predictor = a;
-      else if (filter === 2) predictor = b;
-      else if (filter === 3) predictor = (a + b) >> 1;
-      else if (filter === 4) {
-        const p = a + b - c;
-        const pa = Math.abs(p - a);
-        const pb = Math.abs(p - b);
-        const pc = Math.abs(p - c);
-        predictor = pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-      }
-      pixels[y * stride + x] = (value + predictor) & 0xff;
-    }
-  }
-  return { width, height, at: (x, y) => Array.from(pixels.subarray((y * width + x) * 4, (y * width + x) * 4 + 4)) };
-}
+const META = JSON.parse(readFileSync(new URL('../assets/v3-meta.json', import.meta.url)));
 
 const FRAME_W = 36;
 const FRAMES = 5;

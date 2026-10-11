@@ -83,6 +83,14 @@
     "icon-mud-trap": { "file": "3d/v5/icon-mud-trap.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
     "icon-petrification": { "file": "3d/v5/icon-petrification.png", "use": "3d", "width": 128, "height": 128, "frames": 1, "frameMs": 0 },
 
+    "banner-wind-dash": { "file": "3d/v6/banner-wind-dash.png", "use": "3d", "width": 400, "height": 60, "frames": 1, "frameMs": 0 },
+    "banner-tornado-zone": { "file": "3d/v6/banner-tornado-zone.png", "use": "3d", "width": 400, "height": 60, "frames": 1, "frameMs": 0 },
+    "banner-mud-trap": { "file": "3d/v6/banner-mud-trap.png", "use": "3d", "width": 400, "height": 60, "frames": 1, "frameMs": 0 },
+    "banner-petrification": { "file": "3d/v6/banner-petrification.png", "use": "3d", "width": 400, "height": 60, "frames": 1, "frameMs": 0 },
+    "banner-hiss": { "file": "3d/v6/banner-hiss.png", "use": "3d", "width": 400, "height": 60, "frames": 1, "frameMs": 0 },
+    "banner-venom": { "file": "3d/v6/banner-venom.png", "use": "3d", "width": 400, "height": 60, "frames": 1, "frameMs": 0 },
+    "banner-cloud": { "file": "3d/v6/banner-cloud.png", "use": "3d", "width": 400, "height": 60, "frames": 1, "frameMs": 0 },
+
     "forest-wall-pine": { "file": "3d/v3/forest-wall-pine.png", "use": "3d", "width": 192, "height": 64, "frames": 1, "frameMs": 0 },
     "forest-wall-round": { "file": "3d/v3/forest-wall-round.png", "use": "3d", "width": 192, "height": 56, "frames": 1, "frameMs": 0 },
     "tree-birch": { "file": "3d/v3/tree-birch.png", "use": "3d", "width": 30, "height": 58, "frames": 2, "frameMs": 0 },

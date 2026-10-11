@@ -14,7 +14,7 @@ Python Playwright lives outside the repo, in `~/tools/shots/venv`, with Chromium
 bash tools/shots.sh                              one picture: High at 1280x720 (the quick set)
 bash tools/shots.sh --set levels                 Low, Medium and High at 1280x720
 bash tools/shots.sh --set shapes                 Medium at wide, hd, tablet, portrait and phone
-bash tools/shots.sh --set hud                    HUD states: fhd and small expanded or collapsed, phone, and the skill popup (Venom at fhd, Tornado Zone on the phone)
+bash tools/shots.sh --set hud                    HUD states: fhd and small expanded or collapsed, phone, the skill popup (Venom at fhd, Tornado Zone on the phone) and the cast banner (the freeaction scene, a Mud Trap, at fhd and on the phone)
 bash tools/shots.sh --set full                   levels and shapes together (7 pictures)
 bash tools/shots.sh e2e                          the flow end to end check (tools/flow_e2e.py, Low at 1280x720, shots/e2e.json)
 bash tools/shots.sh flow                         short for --set flow (quick, levels, shapes, hud and full work the same way)

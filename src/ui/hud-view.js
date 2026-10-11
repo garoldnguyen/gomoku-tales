@@ -9,7 +9,7 @@ import { characterOf, isGameOver, skillCooldown } from '../logic/game.js';
 import { isSkillLocked } from '../logic/jade-serpent-skills.js';
 import { cooldownTurns, getSkill, isPassiveSkill } from '../logic/skills.js';
 import { ART } from '../render3d/art-assets.js';
-import { castNotice, castView, lockView, reactionView, trapNotice } from './cast-view.js';
+import { castBannerView, castNotice, castView, lockView, reactionView, trapNotice } from './cast-view.js';
 import { ALL_EXPANDED } from './hud-collapse.js';
 import { skillInfo } from './skill-info.js';
 import { STRINGS } from './strings.js';
@@ -102,6 +102,11 @@ export function hudViewModel(gameState, uiState = {}, localPlayer = null) {
     // for the caster, Wind Rabbit placed a trap! for the other seat and
     // the spectators after a Tornado Zone. Never a cell.
     notice: over ? null : castNotice(gameState, {
+      local: localPlayer === null, watching: localPlayer === SPECTATOR_VIEW, you: localPlayer === SPECTATOR_VIEW ? null : localPlayer,
+    }),
+    // The cast banner of a skill just used (cast-view.js castBannerView),
+    // for both players and the spectators.
+    banner: castBannerView(gameState, {
       local: localPlayer === null, watching: localPlayer === SPECTATOR_VIEW, you: localPlayer === SPECTATOR_VIEW ? null : localPlayer,
     }),
     hint,

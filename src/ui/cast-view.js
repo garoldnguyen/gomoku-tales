@@ -13,12 +13,15 @@
 
 import {
   HISS_LOCK_TURNS, HISS_WAVE_COLOUR, HISS_WAVE_MS, HUD_DUST_COUNT, HUD_DUST_MS, HUD_FEATHER_COUNT, HUD_FEATHER_MS, HUD_SHAKE_LIGHT_PX,
-  HUD_SHAKE_MS, HUD_SHAKE_PX, HUD_SHAKE_STEPS, LOCKED_ICON_OPACITY, LOCK_BLINK_MS, SKILL_FLASH_MS, VENOM_FLASH_COLOUR,
+  HUD_SHAKE_MS, HUD_SHAKE_PX, HUD_SHAKE_STEPS, LOCKED_ICON_OPACITY, LOCK_BLINK_MS, SKILL_BANNER_IN_MS, SKILL_BANNER_MEDALLION,
+  SKILL_BANNER_MS, SKILL_BANNER_OUT_MS, SKILL_BANNER_PX, SKILL_FLASH_MS, VENOM_FLASH_COLOUR,
 } from '../config.js';
 import { characterOf, isGameOver } from '../logic/game.js';
 import { isSkillLocked } from '../logic/jade-serpent-skills.js';
 import { CLOUD, HISS, MUD_TRAP, PETRIFICATION, TORNADO_ZONE, VENOM, WIND_DASH } from '../logic/skills.js';
+import { ART } from '../render3d/art-assets.js';
 import { CHARACTER_LOOK } from '../render3d/character-look.js';
+import { SKILL_INFO } from './skill-info.js';
 import { STRINGS, fillText, lockedText } from './strings.js';
 
 // The extras of each skill's card effect, besides the border flash every
@@ -103,6 +106,50 @@ export function castNotice(state, { local = false, watching = false, you = null 
   return trapNotice(state);
 }
 
+// How much of the medallion's empty disc (its diameter) the skill icon fills.
+const BANNER_ICON_SHARE = 0.88;
+
+// The cast banner (docs/skill-banner-art.md): the plaque that slides in when a
+// skill is used, { key, skill, art, title, character, colour, medallion,
+// secret } or null. Both players and the spectators see it for the same cast.
+//   art        the manifest name of the plaque picture (ART.banner)
+//   title      the skill's name; the other seat and the spectators get
+//              STRINGS.trapBannerTitle after a Tornado Zone instead (secret
+//              true), the words of the trap notice, because the banner must
+//              not name the trap
+//   character  the name of the character that cast it
+//   colour     the character's mark colour (deep purple for Venom)
+//   medallion  where the skill icon sits in the picture, as shares of its
+//              size: { x, y, size } (SKILL_BANNER_MEDALLION)
+// The banner never reads state.tornado and carries no cell. Sky Watch is
+// passive and never cast, so it has none. local, watching and you are as for
+// castNotice.
+export function castBannerView(state, { local = false, watching = false, you = null } = {}) {
+  if (isGameOver(state) || !state.skillUsed) return null;
+  const skill = state.skillUsed;
+  const art = ART.banner[skill];
+  if (!art) return null;
+  const player = state.currentPlayer;
+  const character = characterOf(state, player);
+  const caster = !watching && (local || you === player);
+  const secret = skill === TORNADO_ZONE && !caster;
+  const [cx, cy, radius] = SKILL_BANNER_MEDALLION[skill];
+  return {
+    key: `${state.turn}:${skill}:banner`,
+    skill,
+    art,
+    title: secret ? STRINGS.trapBannerTitle : SKILL_INFO[skill].title,
+    character: character.name,
+    colour: flashColour(skill, character.id),
+    secret,
+    medallion: {
+      x: cx / SKILL_BANNER_PX.width,
+      y: cy / SKILL_BANNER_PX.height,
+      size: (BANNER_ICON_SHARE * 2 * radius) / SKILL_BANNER_PX.width,
+    },
+  };
+}
+
 // The numbers hud.js hands to hud.css as custom properties on the HUD, once.
 // Keys are the property names.
 export function castCssVars() {
@@ -114,6 +161,9 @@ export function castCssVars() {
     '--wave-colour': HISS_WAVE_COLOUR,
     '--feather-ms': `${HUD_FEATHER_MS}ms`,
     '--blink-ms': `${LOCK_BLINK_MS}ms`,
+    '--banner-in-ms': `${SKILL_BANNER_IN_MS}ms`,
+    '--banner-out-ms': `${SKILL_BANNER_OUT_MS}ms`,
+    '--banner-out-delay': `${SKILL_BANNER_MS - SKILL_BANNER_OUT_MS}ms`,
     '--locked-icon-opacity': String(LOCKED_ICON_OPACITY),
   };
 }

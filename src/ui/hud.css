@@ -399,6 +399,99 @@
 .hud.is-compact .lock-rune .lock-text { display: none; }
 .hud.is-compact .lock-rune { padding: 3px 5px; }
 .hud .card.is-collapsed.is-locked .tile::after { content: ""; position: absolute; left: -3px; bottom: -3px; width: 16px; height: 16px; border-radius: 50%; background: var(--red); border: 3px solid var(--card-solid); animation: hud-blink var(--blink-ms, 1000ms) ease-in-out infinite; }
+/* The cast banner (docs/skill-banner-art.md): a plaque with the skill icon in
+   its medallion and the skill and character names, at the top centre for
+   SKILL_BANNER_MS. hud.js plays it from the view model (.is-playing) and hands
+   over --cast-colour (the character's colour, deep purple for Venom), the
+   medallion's place (--med-x, --med-y, --med-size, shares of the picture) and
+   the timings (--banner-in-ms, --banner-out-ms, --banner-out-delay) from
+   src/config.js. Everything is sized from the banner's own width (cqw), so a
+   narrow window scales the whole plaque. The resting state of every part is
+   its finished look; the animations only start from somewhere else. Only
+   opacity and transforms animate. Under reduced motion, and in shot mode
+   (data-cast-hold), nothing moves: the finished plaque simply shows. */
+.hud .cast-banner {
+  --cb-in: var(--banner-in-ms, 520ms);
+  position: absolute; left: 0; right: 0; margin-inline: auto; top: 142px; z-index: 6;
+  width: clamp(240px, calc(100% - 2 * 388px * var(--card-scale, 1) - 24px), 400px);
+  aspect-ratio: 400 / 60; container-type: inline-size; pointer-events: none;
+  filter: drop-shadow(0 8px 14px rgba(10, 20, 40, 0.4)) drop-shadow(0 0 12px color-mix(in srgb, var(--cast-colour, var(--gold)) 50%, transparent));
+}
+.hud .cast-banner[hidden] { display: none; }
+.hud .cb-plaque { position: absolute; inset: 0; transform-origin: 11% 50%; }
+.hud .cb-plaque img { display: block; width: 100%; height: 100%; image-rendering: pixelated; }
+.hud .cb-plaque .initial, .hud .cb-medal .initial { display: none; }
+/* the picture is missing: a plain glass plaque with the colour stripe */
+.hud .cb-plaque.no-art { inset: 7.5% 0; background: var(--card-solid); border: 1px solid var(--gold); border-radius: 10px; box-shadow: inset 0 -3px 0 var(--cast-colour, var(--gold)); }
+.hud .cb-plaque.no-art img { display: none; }
+.hud .cb-shine-lane { position: absolute; left: 11%; right: 6%; top: 15%; bottom: 15%; overflow: hidden; }
+.hud .cb-shine { position: absolute; top: 0; bottom: 0; left: 0; width: 16%; opacity: 0;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.6), transparent); transform: translateX(-130%) skewX(-18deg); }
+.hud .cb-medal { position: absolute; left: calc(var(--med-x, 0.11) * 100%); top: calc(var(--med-y, 0.5) * 100%);
+  width: calc(var(--med-size, 0.08) * 100cqw); aspect-ratio: 1; translate: -50% -50%;
+  display: flex; align-items: center; justify-content: center; }
+.hud .cb-medal img { width: 100%; height: 100%; image-rendering: pixelated; }
+.hud .cb-medal.no-art { border-radius: 50%; background: var(--card-solid); }
+.hud .cb-ring { position: absolute; left: calc(var(--med-x, 0.11) * 100%); top: calc(var(--med-y, 0.5) * 100%);
+  width: calc(var(--med-size, 0.08) * 100cqw * 1.7); aspect-ratio: 1; translate: -50% -50%; border-radius: 50%; opacity: 0;
+  border: 2px solid var(--cast-colour, var(--gold)); box-shadow: 0 0 10px var(--cast-colour, var(--gold)); }
+.hud .cb-text { position: absolute; left: 20.5%; width: 47%; top: 50%; translate: 0 -50%; display: flex; flex-direction: column; gap: 0.5cqw; }
+.hud .cb-title { font-size: 5.1cqw; font-weight: 500; line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  color: var(--ink); text-shadow: 0 1px 0 rgba(10, 14, 28, 0.55); }
+.hud .cb-char { font-size: 2.5cqw; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase; color: var(--gold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.hud .cb-spark { position: absolute; width: 1.3cqw; height: 1.3cqw; opacity: 0; background: var(--gold); rotate: 45deg; }
+.hud .cb-spark:nth-child(odd) { background: var(--cast-colour, var(--gold)); }
+.hud .cb-spark:nth-last-child(1) { left: 74%; top: 24%; --sx: -6px; --d: 0ms; }
+.hud .cb-spark:nth-last-child(2) { left: 80%; top: 62%; --sx: 4px; --d: 70ms; }
+.hud .cb-spark:nth-last-child(3) { left: 86%; top: 30%; --sx: 8px; --d: 130ms; }
+.hud .cb-spark:nth-last-child(4) { left: 91%; top: 58%; --sx: -3px; --d: 40ms; }
+.hud .cb-spark:nth-last-child(5) { left: 77%; top: 44%; --sx: 6px; --d: 190ms; }
+.hud .cb-spark:nth-last-child(6) { left: 94%; top: 36%; --sx: 5px; --d: 100ms; }
+.hud .cb-spark:nth-last-child(7) { left: 83%; top: 76%; --sx: -7px; --d: 160ms; }
+/* what each skill adds to the way in: where the plaque comes from (--cb-x, --cb-y),
+   how far the medallion spins (--cb-spin), how many rings ripple out, how long it takes */
+.hud .cast-banner[data-skill="windDash"] { --cb-x: -110px; --cb-y: 0px; --cb-spin: -540deg; --cb-in: 400ms; }
+.hud .cast-banner[data-skill="tornadoZone"] { --cb-spin: 900deg; --cb-rings: 2; }
+.hud .cast-banner[data-skill="mudTrap"] { --cb-y: -90px; --cb-spin: 0deg; }
+.hud .cast-banner[data-skill="petrification"] { --cb-spin: 0deg; --cb-y: -50px; }
+.hud .cast-banner[data-skill="hiss"] { --cb-x: 90px; --cb-y: 0px; --cb-spin: 200deg; --cb-rings: 3; }
+.hud .cast-banner[data-skill="venom"] { --cb-spin: -200deg; --cb-rings: 2; }
+.hud .cast-banner[data-skill="cloud"] { --cb-y: -20px; --cb-spin: 120deg; --cb-in: 760ms; }
+
+@keyframes cb-in { from { opacity: 0; transform: translate(var(--cb-x, 0px), var(--cb-y, -36px)) scale(0.86); } to { opacity: 1; transform: none; } }
+@keyframes cb-out { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-16px) scale(0.95); } }
+@keyframes cb-unfurl { 0% { opacity: 0; transform: scaleX(0.12); } 35% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+@keyframes cb-pop { 0% { opacity: 0; transform: scale(0) rotate(var(--cb-spin, -160deg)); } 55% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+@keyframes cb-ring { 0% { opacity: 0.95; transform: scale(0.5); } 100% { opacity: 0; transform: scale(2.1); } }
+@keyframes cb-shine { 0% { opacity: 0; transform: translateX(-130%) skewX(-18deg); } 15% { opacity: 1; } 100% { opacity: 0; transform: translateX(720%) skewX(-18deg); } }
+@keyframes cb-text { from { opacity: 0; transform: translateX(-18px); } to { opacity: 1; transform: none; } }
+@keyframes cb-spark { 0% { opacity: 0; transform: translate(0, 8px) scale(0.3); } 25% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--sx, 0px), -26px) scale(1.15); } }
+@keyframes cb-judder { 0%, 100% { translate: 0 0; } 20% { translate: 6px 0; } 40% { translate: -5px 0; } 60% { translate: 3px 0; } 80% { translate: -2px 0; } }
+.hud .cast-banner.is-playing {
+  animation: cb-in var(--cb-in) cubic-bezier(0.2, 1.3, 0.35, 1) both,
+    cb-out var(--banner-out-ms, 360ms) cubic-bezier(0.5, 0, 0.9, 0.4) var(--banner-out-delay, 2040ms) forwards;
+}
+.hud .cast-banner.is-playing[data-skill="petrification"] {
+  animation: cb-in var(--cb-in) cubic-bezier(0.2, 1.3, 0.35, 1) both, cb-judder 420ms linear var(--cb-in),
+    cb-out var(--banner-out-ms, 360ms) cubic-bezier(0.5, 0, 0.9, 0.4) var(--banner-out-delay, 2040ms) forwards;
+}
+.hud .cast-banner.is-playing .cb-plaque { animation: cb-unfurl calc(var(--cb-in) * 1.15) cubic-bezier(0.2, 0.9, 0.25, 1.08) both; }
+.hud .cast-banner.is-playing .cb-medal { animation: cb-pop calc(var(--cb-in) * 1.1) cubic-bezier(0.2, 1.6, 0.4, 1) calc(var(--cb-in) * 0.25) both; }
+.hud .cast-banner.is-playing .cb-ring { animation: cb-ring 720ms ease-out calc(var(--cb-in) * 0.45) var(--cb-rings, 1) both; }
+.hud .cast-banner.is-playing .cb-ring.is-2 { animation-delay: calc(var(--cb-in) * 0.45 + 200ms); }
+.hud .cast-banner.is-playing .cb-shine { animation: cb-shine 820ms ease-out calc(var(--cb-in) * 0.9) both; }
+.hud .cast-banner.is-playing .cb-title { animation: cb-text 480ms cubic-bezier(0.2, 0.9, 0.3, 1) calc(var(--cb-in) * 0.55) both; }
+.hud .cast-banner.is-playing .cb-char { animation: cb-text 480ms cubic-bezier(0.2, 0.9, 0.3, 1) calc(var(--cb-in) * 0.55 + 110ms) both; }
+.hud .cast-banner.is-playing .cb-spark { animation: cb-spark 900ms ease-out calc(var(--cb-in) * 0.7 + var(--d, 0ms)) both; }
+/* the compact layouts: the slim bars lie at the bottom, so the banner sits under the turn pill and the turn banner */
+.hud.is-compact .cast-banner { top: 178px; width: min(400px, calc(100% - 24px)); }
+.hud.is-compact.is-rail .cast-banner { top: 96px; width: min(400px, calc(100% - 2 * var(--rail-width, 124px) - 36px)); }
+/* shot mode: the finished plaque stands still */
+.hud[data-cast-hold] .cast-banner.is-playing, .hud[data-cast-hold] .cast-banner.is-playing * { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .hud .cast-banner.is-playing, .hud .cast-banner.is-playing * { animation: none !important; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hud .card.is-cast::after { animation: none; opacity: 1; }
   .hud .lock-rune, .hud .card.is-collapsed.is-locked .tile::after { animation: none; }
